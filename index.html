@@ -375,6 +375,20 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
   #top-bar{max-width:calc(58vw - 26px); gap:6px;}
 }
 
+/* practice leaderboard: top 10 best scores (one per nickname) - end of a practice game and the TOP SCORES tab */
+.lb-list{margin:6px 0 0; padding:0; list-style:none; text-align:left;}
+.lb-list li{display:flex; gap:6px; align-items:baseline; padding:2px 4px; font-size:16px; color:var(--ink-soft); line-height:1.2;}
+.lb-list li .rk{flex:none; width:22px; font-family:'Press Start 2P', monospace; font-size:8px; color:var(--accent-2);}
+.lb-list li .nm{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink);}
+.lb-list li .sc{flex:none; font-family:'Press Start 2P', monospace; font-size:8px; color:var(--ink);}
+.lb-list li .ok{flex:none; font-size:13px;}
+.lb-list li.me{background:var(--accent); }
+.lb-list li.me .rk, .lb-list li.me .nm, .lb-list li.me .sc, .lb-list li.me .ok{color:#fff;}
+.lb-note{margin-top:6px; font-size:14px; color:var(--ink-soft); text-align:center;}
+#pr-board{margin-top:8px; padding-top:6px; border-top:2px dashed var(--panel-border); max-height:190px; overflow-y:auto;}
+#pr-board.hidden{display:none;}
+#pr-board .lb-head{font-family:'Press Start 2P', monospace; font-size:8px; color:var(--accent-2);}
+
 #chat-log{
   position:absolute;
   left:16px;
@@ -831,6 +845,7 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
   <img id="pr-photo" class="hidden" alt="">
   <div id="pr-bar"><div id="pr-fill"></div></div>
   <div id="pr-msg"></div>
+  <div id="pr-board" class="hidden"></div>
   <div class="pr-btns"><button id="pr-again" class="go hidden">PLAY AGAIN</button><button id="pr-stop">STOP</button></div>
 </div>
 <div id="crosshair" class="hidden">+</div>
@@ -890,6 +905,7 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
       <button class="tab-btn hidden" id="tab-btn-admin">ADMIN</button>
       <button class="tab-btn hidden" id="tab-btn-owner">OWNER</button>
       <button class="tab-btn" id="tab-btn-help">HOW TO PLAY</button>
+      <button class="tab-btn" id="tab-btn-scores">TOP SCORES</button>
       <button class="tab-btn" id="tab-btn-log">CHANGELOG</button>
     </div>
     <div class="tab-panel" id="tab-settings">
@@ -947,6 +963,13 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
         <div class="speed-hint">The ADMIN tab is unlocked for you too.</div>
       </div>
     </div>
+    <div class="tab-panel hidden" id="tab-scores">
+      <div class="scroll-block">
+        <h3>PRACTICE - TOP 10</h3>
+        <div id="scores-board"><div class="lb-note">Loading...</div></div>
+        <div class="lb-note">Your best score for each nickname counts. Play PRACTICE to get on the board!</div>
+      </div>
+    </div>
     <div class="tab-panel hidden" id="tab-help">
       <div class="scroll-block">
         <h3>LOOK AROUND</h3>
@@ -997,6 +1020,7 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
       <div class="scroll-block">
         <h3>BETA 3 <span class="when">- Oct 8, 2026</span></h3>
         <ul>
+          <li><span class="when">Oct 8, 2026 · 12:07 PM</span><br>Practice leaderboard: the top 10 best scores, at the end of a practice game and in the new TOP SCORES tab (website version).</li>
           <li><span class="when">Oct 8, 2026 · 10:29 AM</span><br>Phone and tablet support: on-screen arrow pad, JUMP, E, R, H and CHAT buttons, drag to look around, tap to inspect.</li>
           <li><span class="when">Oct 8, 2026 · 10:29 AM</span><br>Golden ADMIN and shining diamond OWNER badges next to names - in the player list, chat and name tags.</li>
           <li><span class="when">Oct 8, 2026 · 10:29 AM</span><br>Owner menu: kick players, send announcements to everyone, and owner waves that beat everyone else's.</li>
@@ -2478,6 +2502,7 @@ function stopPractice(){
   prToggle.textContent = 'PRACTICE';
 }
 function nextPracticeRound(){
+  prBoard.classList.add('hidden');
   if(practice.round >= practice.list.length){ endPractice(); return; }
   var q = practice.q = practice.list[practice.round++];
   var photo = PART_PHOTOS[q.photo], usePhoto = !!photo && Math.random() < 0.5;
@@ -2525,6 +2550,7 @@ function endPractice(){
   prFill.style.width = '0%';
   practiceSay(newBest ? 'NEW BEST SCORE!' : 'Best score: ' + prBest, newBest ? 'good' : '');
   prAgain.classList.remove('hidden');
+  showPracticeBoard(practice.score, practice.right);
 }
 /* each frame: run the clock, and after a timeout swing the overview camera round to the right building */
 var _prTmp = new THREE.Vector3();
@@ -3077,7 +3103,8 @@ var titleTabs = [
   {btn:document.getElementById('tab-btn-perf'), panel:document.getElementById('tab-perf')},
   {btn:document.getElementById('tab-btn-help'), panel:document.getElementById('tab-help')},
   {btn:document.getElementById('tab-btn-log'), panel:document.getElementById('tab-log')},
-  {btn:document.getElementById('tab-btn-owner'), panel:document.getElementById('tab-owner')}
+  {btn:document.getElementById('tab-btn-owner'), panel:document.getElementById('tab-owner')},
+  {btn:document.getElementById('tab-btn-scores'), panel:document.getElementById('tab-scores')}
 ];
 function showTitleTab(tab){
   titleTabs.forEach(function(t){
@@ -5159,6 +5186,84 @@ function websiteJoin(){
   });
   return true;
 }
+/* ---------- Practice leaderboard (website version) ----------
+   leaderboard/<nickname> holds each nickname's best practice score: {nick, score, right, at}. The database rules
+   only let a score go UP, and cap it at the real maximum (10 rounds x 250 = 2500). Top 10 shows at the end of a
+   practice game and in the TOP SCORES tab. The claude.ai version can't reach Firebase, so it points to the website. */
+var WEBSITE_URL = 'https://danii45.github.io/cell-city/';
+var prBoard = document.getElementById('pr-board'), scoresBoard = document.getElementById('scores-board');
+function lbKey(nick){ return nick.toLowerCase().replace(/[.#$\[\]\/]/g, '_'); }
+function lbNick(){
+  var n = web.nick;
+  if(!n){ try { n = localStorage.getItem('cellcity.nick') || ''; } catch(e){} }
+  n = cleanNick(n);
+  return n.length >= 2 && !hasBadWord(n) ? n : '';
+}
+function loadLeaderboard(){
+  return startFirebase().then(function(){
+    return web.fb.ref('leaderboard').orderByChild('score').limitToLast(10).once('value');
+  }).then(function(snap){
+    var rows = [];
+    snap.forEach(function(c){
+      var v = c.val() || {};
+      if(typeof v.nick === 'string' && finite(v.score)) rows.push({nick:cleanNick(v.nick), score:v.score, right:finite(v.right) ? v.right : 0, at:finite(v.at) ? v.at : 0});
+    });
+    rows.sort(function(a, b){ return b.score - a.score || a.at - b.at; });   // ties: whoever got there first
+    return rows;
+  });
+}
+/* save a finished game: only if it beats that nickname's best (the rules would refuse a lower one anyway) */
+function submitPracticeScore(nick, score, right){
+  return startFirebase().then(function(){
+    var ref = web.fb.ref('leaderboard/' + lbKey(nick));
+    return ref.once('value').then(function(s){
+      var old = s.val();
+      if(old && finite(old.score) && old.score >= score) return false;
+      return ref.set({nick:nick, score:score, right:right, at:firebase.database.ServerValue.TIMESTAMP}).then(function(){ return true; });
+    });
+  });
+}
+function renderBoard(el, rows, me){
+  el.textContent = '';
+  if(!rows.length){ var e = document.createElement('div'); e.className = 'lb-note'; e.textContent = 'No scores yet - be the first!'; el.appendChild(e); return; }
+  var ol = document.createElement('ol'); ol.className = 'lb-list';
+  rows.forEach(function(r, i){
+    var li = document.createElement('li');
+    if(me && r.nick.toLowerCase() === me.toLowerCase()) li.className = 'me';
+    [['rk', (i+1) + '.'], ['nm', hasBadWord(r.nick) ? 'PLAYER' : r.nick], ['ok', r.right + '/10'], ['sc', String(r.score)]].forEach(function(p){
+      var sp = document.createElement('span'); sp.className = p[0]; sp.textContent = p[1]; li.appendChild(sp);
+    });
+    ol.appendChild(li);
+  });
+  el.appendChild(ol);
+}
+function boardNote(el, text){ var d = document.createElement('div'); d.className = 'lb-note'; d.textContent = text; el.appendChild(d); }
+function fillBoard(el, me, note){
+  if(!web.on){ el.textContent = ''; boardNote(el, 'The leaderboard is on the website version: ' + WEBSITE_URL); return Promise.resolve(); }
+  return loadLeaderboard().then(function(rows){
+    renderBoard(el, rows, me);
+    if(note) boardNote(el, note);
+  }).catch(function(){ el.textContent = ''; boardNote(el, 'Couldn\'t load the leaderboard right now.'); });
+}
+/* end of a practice game: save the score, then show the top 10 with you highlighted */
+function showPracticeBoard(score, right){
+  prBoard.classList.remove('hidden');
+  prBoard.textContent = '';
+  var head = document.createElement('div'); head.className = 'lb-head'; head.textContent = 'TOP 10'; prBoard.appendChild(head);
+  var list = document.createElement('div'); prBoard.appendChild(list);
+  if(!web.on){ fillBoard(list); return; }
+  var nick = lbNick();
+  if(!nick){ boardNote(list, 'Pick a nickname (MENU) to get on the leaderboard.'); fillBoard(list); return; }
+  boardNote(list, 'Saving your score...');
+  submitPracticeScore(nick, score, right).then(function(saved){
+    return fillBoard(list, nick, saved ? 'Your score is saved as ' + nick + '.' : 'Your best as ' + nick + ' is still higher - it stays on the board.');
+  }).catch(function(){ list.textContent = ''; boardNote(list, 'Couldn\'t save your score right now.'); });
+}
+document.getElementById('tab-btn-scores').addEventListener('click', function(){
+  scoresBoard.textContent = ''; boardNote(scoresBoard, 'Loading...');
+  fillBoard(scoresBoard, lbNick());
+});
+
 /* a Firebase "room" that behaves like the claude.ai one: presence(state), onPeers(cb), onConnection(cb), leave() */
 function firebaseRoom(db, code, uid){
   var base = db.ref('rooms/' + code + '/players'), me = base.child(uid), conn = db.ref('.info/connected');
