@@ -1020,6 +1020,7 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
       <div class="scroll-block">
         <h3>BETA 3 <span class="when">- Oct 8, 2026</span></h3>
         <ul>
+          <li><span class="when">Oct 8, 2026 · 1:51 PM</span><br>The bridge railings are real height now - jump over them to dive off the bridge into the lake (you'll drown!).</li>
           <li><span class="when">Oct 8, 2026 · 12:07 PM</span><br>Practice leaderboard: the top 10 best scores, at the end of a practice game and in the new TOP SCORES tab (website version).</li>
           <li><span class="when">Oct 8, 2026 · 10:29 AM</span><br>Phone and tablet support: on-screen arrow pad, JUMP, E, R, H and CHAT buttons, drag to look around, tap to inspect.</li>
           <li><span class="when">Oct 8, 2026 · 10:29 AM</span><br>Golden ADMIN and shining diamond OWNER badges next to names - in the player list, chat and name tags.</li>
@@ -3892,9 +3893,13 @@ root.add(lakePath);
     slab(a[0], a[1], b[0], b[1], B.hw*2, 0.5, 0, DECK);
     [-1, 1].forEach(function(s){ slab(a[0], a[1], b[0], b[1], 0.35, 0.8, s*(B.hw+0.17), SIDE, 0.8); });
   }
-  // railings: walls for people and cars only (the CellDoo rides underneath)
+  // railings: walls for people and cars only (the CellDoo rides underneath), in 1 m pieces that stop at the top of
+  // the rail you can see - so you can jump over it (and off the bridge into the lake)
   [-1, 1].forEach(function(s){
-    segColliders.push({ax:B.x0, az:s*(B.hw+0.17), bx:B.x3, bz:s*(B.hw+0.17), r:0.25, y0:-50, y1:50, land:true});
+    for(var x = B.x0; x < B.x3; x += 1){
+      var xb = Math.min(B.x3, x + 1), top = Math.max(bridgeAt(x, 0), bridgeAt(xb, 0)) + 0.8;
+      segColliders.push({ax:x, az:s*(B.hw+0.17), bx:xb, bz:s*(B.hw+0.17), r:0.25, y0:-50, y1:top, land:true});
+    }
   });
   // piers in the water - solid for the CellDoo, below the deck for everyone else
   [1/3, 2/3].forEach(function(k){
