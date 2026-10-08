@@ -255,6 +255,126 @@ canvas{display:block;width:100%;height:100%;touch-action:none;}
 @keyframes pr-shake{0%,100%{transform:translateX(-50%);} 25%{transform:translateX(calc(-50% - 6px));} 75%{transform:translateX(calc(-50% + 6px));}}
 #legend-toggle:disabled{opacity:0.4; cursor:not-allowed;}
 
+/* role badges: golden ADMIN, shining diamond OWNER - in the ONLINE list, chat, and the owner menu */
+.role-badge{
+  display:inline-block;
+  flex:none;
+  margin-left:5px;
+  padding:2px 4px 1px;
+  font-family:'Press Start 2P', monospace;
+  font-size:7px;
+  font-style:normal;
+  letter-spacing:0.5px;
+  vertical-align:middle;
+  border:1px solid;
+}
+.role-badge.admin{color:#ffd23f; background:#2b2104; border-color:#c99a14; text-shadow:0 0 4px rgba(255,200,40,0.8);}
+.role-badge.owner{background:#0d1a24; border-color:#9fe6ff; box-shadow:0 0 6px rgba(140,225,255,0.75);}
+.role-badge.owner i{
+  font-style:normal;
+  background:linear-gradient(110deg, #7fe3ff 0%, #ffffff 18%, #a9dcff 36%, #e4d2ff 54%, #ffffff 72%, #7fe3ff 100%);
+  background-size:250% 100%;
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+  animation:diamond-shine 2s linear infinite;
+}
+@keyframes diamond-shine{from{background-position:0% 0;} to{background-position:-250% 0;}}
+
+/* owner announcements: big banner for everyone */
+#announce{
+  position:absolute;
+  left:50%;
+  top:calc(120px + env(safe-area-inset-top,0px));
+  transform:translateX(-50%);
+  z-index:36;
+  width:min(90vw, 460px);
+  padding:12px 16px;
+  text-align:center;
+  background:#0d1a24;
+  color:#f1fbff;
+  border:3px solid #9fe6ff;
+  box-shadow:0 0 18px rgba(140,225,255,0.7), 5px 5px 0 0 #0a0f14;
+  pointer-events:none;
+}
+#announce.hidden{display:none;}
+#announce .ann-head{font-family:'Press Start 2P', monospace; font-size:9px; margin-bottom:8px;}
+#announce .ann-text{font-family:'VT323', monospace; font-size:24px; line-height:1.15; overflow-wrap:anywhere;}
+#owner-players div{display:flex; align-items:center; gap:6px; margin:4px 0; font-size:16px; color:var(--ink-soft);}
+#owner-players .grow{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+#owner-players .empty{color:var(--ink-soft); font-size:14px;}
+.menu-input{
+  width:100%;
+  font-family:'VT323', monospace;
+  font-size:18px;
+  padding:5px 8px;
+  margin-bottom:8px;
+  color:var(--ink);
+  background:var(--panel);
+  border:3px solid var(--panel-border);
+  outline:none;
+}
+
+/* on-screen controls for phones and tablets (shown only in Walk / Drive Mode on a touch screen) */
+#touch-ui{display:none;}
+body.touch-play #touch-ui{display:block;}
+#touch-pad{
+  position:absolute;
+  left:16px;
+  bottom:calc(18px + env(safe-area-inset-bottom,0px));
+  z-index:33;
+  display:grid;
+  grid-template-columns:repeat(3, 58px);
+  grid-template-rows:repeat(3, 58px);
+  gap:4px;
+}
+#touch-pad .up{grid-column:2; grid-row:1;}
+#touch-pad .left{grid-column:1; grid-row:2;}
+#touch-pad .right{grid-column:3; grid-row:2;}
+#touch-pad .down{grid-column:2; grid-row:3;}
+#touch-acts{
+  position:absolute;
+  right:16px;
+  bottom:calc(18px + env(safe-area-inset-bottom,0px));
+  z-index:33;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:10px;
+}
+#touch-acts .row{display:flex; gap:8px;}
+.tbtn{
+  width:58px; height:58px;
+  padding:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  font-family:'Press Start 2P', monospace;
+  font-size:11px;
+  color:var(--ink);
+  background:var(--panel);
+  opacity:0.88;
+  border:3px solid var(--panel-border);
+  box-shadow:3px 3px 0 0 var(--panel-border);
+  touch-action:none;
+  user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+}
+.tbtn small{font-size:6px; color:var(--ink-soft);}
+.tbtn svg{width:22px; height:22px; fill:currentColor;}
+.tbtn.held{transform:translate(2px,2px); box-shadow:1px 1px 0 0 var(--panel-border); background:var(--accent); color:#fff; opacity:1;}
+.tbtn.held small{color:#fff;}
+#tb-jump{width:86px; height:86px; border-radius:50%; font-size:11px;}
+body.touch-drive #tb-jump{display:none;}
+body.touch-play #hint{top:calc(160px + env(safe-area-inset-top,0px)); bottom:auto;}
+body.touch-play #chat-log{bottom:calc(230px + env(safe-area-inset-bottom,0px));}
+body.touch-play #chat-form{bottom:calc(190px + env(safe-area-inset-bottom,0px));}
+body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
+@media (max-width:600px){
+  /* phones: title card on the left, the buttons stack on the right - no overlap */
+  #title-card{max-width:42vw; padding:8px 9px;}
+  #title-card h1{font-size:11px;}
+  #title-card p{display:none;}
+  #top-bar{max-width:calc(58vw - 26px); gap:6px;}
+}
+
 #chat-log{
   position:absolute;
   left:16px;
@@ -715,8 +835,28 @@ canvas{display:block;width:100%;height:100%;touch-action:none;}
 </div>
 <div id="crosshair" class="hidden">+</div>
 <div id="drown-fx" class="hidden">YOU DROWNED<small>RESPAWNING ON DRY LAND...</small></div>
+<div id="touch-ui">
+  <div id="touch-pad">
+    <button class="tbtn up" data-key="KeyW" aria-label="Forward"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M5 1.5 L9 8.5 L1 8.5 Z"/></svg></button>
+    <button class="tbtn left" data-key="KeyA" aria-label="Left"><svg viewBox="0 0 10 10" aria-hidden="true"><path transform="rotate(-90 5 5)" d="M5 1.5 L9 8.5 L1 8.5 Z"/></svg></button>
+    <button class="tbtn right" data-key="KeyD" aria-label="Right"><svg viewBox="0 0 10 10" aria-hidden="true"><path transform="rotate(90 5 5)" d="M5 1.5 L9 8.5 L1 8.5 Z"/></svg></button>
+    <button class="tbtn down" data-key="KeyS" aria-label="Back"><svg viewBox="0 0 10 10" aria-hidden="true"><path transform="rotate(180 5 5)" d="M5 1.5 L9 8.5 L1 8.5 Z"/></svg></button>
+  </div>
+  <div id="touch-acts">
+    <div class="row">
+      <button class="tbtn" data-act="chat" aria-label="Chat">T<small>CHAT</small></button>
+      <button class="tbtn" data-act="h" aria-label="Hook trailer">H<small>HOOK</small></button>
+    </div>
+    <div class="row">
+      <button class="tbtn" data-act="r" aria-label="Call the CellDoo back">R<small>CALL</small></button>
+      <button class="tbtn" data-act="e" aria-label="Use">E<small>USE</small></button>
+    </div>
+    <button class="tbtn" id="tb-jump" data-act="jump" aria-label="Jump">JUMP</button>
+  </div>
+</div>
 <div id="speedo" class="hidden"><span id="speedo-num">0</span><span id="speedo-unit">KM/H</span></div>
 <div id="toast" class="hidden"></div>
+<div id="announce" class="hidden" aria-live="assertive"><div class="ann-head"></div><div class="ann-text"></div></div>
 
 <div id="hint">drag to orbit - scroll to zoom - tap a building - T to chat</div>
 
@@ -748,6 +888,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none;}
       <button class="tab-btn" id="tab-btn-perf">PERFORMANCE</button>
       <button class="tab-btn" id="tab-btn-credits">CREDITS</button>
       <button class="tab-btn hidden" id="tab-btn-admin">ADMIN</button>
+      <button class="tab-btn hidden" id="tab-btn-owner">OWNER</button>
       <button class="tab-btn" id="tab-btn-help">HOW TO PLAY</button>
       <button class="tab-btn" id="tab-btn-log">CHANGELOG</button>
     </div>
@@ -791,6 +932,21 @@ canvas{display:block;width:100%;height:100%;touch-action:none;}
         <div class="speed-hint">Cranks walk + drive speed way up. Shows on the Settings speed slider.</div>
       </div>
     </div>
+    <div class="tab-panel hidden" id="tab-owner">
+      <div class="settings-block">
+        <div class="settings-label"><span>ANNOUNCEMENT</span></div>
+        <input id="announce-input" class="menu-input" maxlength="80" placeholder="Message for everyone" autocomplete="off" spellcheck="false">
+        <button class="admin-toggle" id="announce-btn">SEND TO EVERYONE</button>
+        <div class="speed-hint">Pops up big on every player's screen.</div>
+        <div class="settings-label second"><span>PLAYERS</span></div>
+        <div id="owner-players"></div>
+        <div class="speed-hint">KICK sends a player back to the menu, and they can't rejoin for 5 minutes. Owners can't be kicked.</div>
+        <div class="settings-label second"><span>WAVES</span><span id="owner-wave-value">1 FT</span></div>
+        <input type="range" id="owner-wave-slider" min="0" max="8" step="0.5" value="1">
+        <div class="speed-hint">Your waves beat everyone's - even admins'.</div>
+        <div class="speed-hint">The ADMIN tab is unlocked for you too.</div>
+      </div>
+    </div>
     <div class="tab-panel hidden" id="tab-help">
       <div class="scroll-block">
         <h3>LOOK AROUND</h3>
@@ -826,6 +982,11 @@ canvas{display:block;width:100%;height:100%;touch-action:none;}
           <li>On the website: same <b>class code</b> = same city.</li>
           <li>Everyone gets their own car color. The wave height is shared by everyone.</li>
         </ul>
+        <h3>ON A PHONE OR TABLET</h3>
+        <ul>
+          <li>Drag with one finger to spin the city, pinch to zoom, tap a building to inspect it.</li>
+          <li>In Walk or Drive Mode: <b>drag</b> to look, the <b>arrow pad</b> to move, and the <b>JUMP</b>, <b>E</b>, <b>R</b>, <b>H</b> and <b>CHAT</b> buttons. <b>EXIT</b> is at the top.</li>
+        </ul>
         <h3>SLOW COMPUTER?</h3>
         <ul>
           <li>PERFORMANCE tab: turn on <b>Low Detail</b>, or turn the waves off.</li>
@@ -836,6 +997,9 @@ canvas{display:block;width:100%;height:100%;touch-action:none;}
       <div class="scroll-block">
         <h3>BETA 3 <span class="when">- Oct 8, 2026</span></h3>
         <ul>
+          <li><span class="when">Oct 8, 2026 · 10:29 AM</span><br>Phone and tablet support: on-screen arrow pad, JUMP, E, R, H and CHAT buttons, drag to look around, tap to inspect.</li>
+          <li><span class="when">Oct 8, 2026 · 10:29 AM</span><br>Golden ADMIN and shining diamond OWNER badges next to names - in the player list, chat and name tags.</li>
+          <li><span class="when">Oct 8, 2026 · 10:29 AM</span><br>Owner menu: kick players, send announcements to everyone, and owner waves that beat everyone else's.</li>
           <li><span class="when">Oct 8, 2026 · 9:43 AM</span><br>Fixed: clicking a building in the overview opens its info again (it only worked in Walk Mode in Chrome).</li>
           <li><span class="when">Oct 8, 2026 · 9:43 AM</span><br>Practice mode: find the right building in 15 seconds, from the organelle's name or its microscope photo.</li>
           <li><span class="when">Oct 8, 2026 · 9:43 AM</span><br>HOW TO PLAY and CHANGELOG tabs, and a BETA badge.</li>
@@ -2254,7 +2418,7 @@ function onPointerUp(e){
 renderer.domElement.addEventListener('pointerdown', onPointerDown);
 renderer.domElement.addEventListener('pointerup', onPointerUp);
 renderer.domElement.addEventListener('click', function(){
-  if(!flying) return;
+  if(!flying || touchPlay) return;
   var pid = raycastAt(0,0);
   if(pid) pickPart(pid);
 });
@@ -2296,7 +2460,7 @@ function practiceSay(text, kind){ prMsg.textContent = text; prMsg.className = ki
 function shuffle(a){ for(var i=a.length-1;i>0;i--){ var j = Math.floor(Math.random()*(i+1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
 
 function startPractice(){
-  if(flying && document.exitPointerLock && driving) document.exitPointerLock();   // clicking buildings needs the overview or Walk Mode
+  if(flying && driving) exitFirstPerson();   // clicking buildings needs the overview or Walk Mode
   infoPanel.classList.add('hidden'); clearSelection();
   legend.classList.add('hidden'); legendToggle.disabled = true;
   document.getElementById('title-screen').classList.add('hidden');
@@ -2912,7 +3076,8 @@ var titleTabs = [
   {btn:document.getElementById('tab-btn-admin'), panel:document.getElementById('tab-admin')},
   {btn:document.getElementById('tab-btn-perf'), panel:document.getElementById('tab-perf')},
   {btn:document.getElementById('tab-btn-help'), panel:document.getElementById('tab-help')},
-  {btn:document.getElementById('tab-btn-log'), panel:document.getElementById('tab-log')}
+  {btn:document.getElementById('tab-btn-log'), panel:document.getElementById('tab-log')},
+  {btn:document.getElementById('tab-btn-owner'), panel:document.getElementById('tab-owner')}
 ];
 function showTitleTab(tab){
   titleTabs.forEach(function(t){
@@ -2971,7 +3136,7 @@ document.getElementById('speed-trap').addEventListener('click', function(){
 
 /* Menu button: reopens the title screen mid-game, freeing the mouse first if locked. */
 menuBtn.addEventListener('click', function(){
-  if(document.pointerLockElement === canvasEl && document.exitPointerLock) document.exitPointerLock();
+  exitFirstPerson();
   titleScreen.classList.remove('hidden');
 });
 
@@ -2989,6 +3154,12 @@ function requestFirstPerson(mode){
     driveSpeed = 0; vertVelocity = 0; grounded = true;
     return;
   }
+  if(IS_TOUCH){   // phones and tablets: no mouse lock - the on-screen controls take over
+    touchPlay = true;
+    document.body.classList.add('touch-play');
+    enterFirstPerson();
+    return;
+  }
   if(!canvasEl.requestPointerLock){ return; }
   try{
     var p = canvasEl.requestPointerLock();
@@ -3001,16 +3172,23 @@ function lockFailed(){
   hintDismissed = true;
 }
 function applyModeUI(){
-  walkBtn.textContent = (flying && !driving) ? 'EXIT (ESC)' : 'WALK MODE';
-  driveBtn.textContent = (flying && driving) ? 'EXIT (ESC)' : 'DRIVE MODE';
+  var exit = touchPlay ? 'EXIT' : 'EXIT (ESC)';
+  walkBtn.textContent = (flying && !driving) ? exit : 'WALK MODE';
+  driveBtn.textContent = (flying && driving) ? exit : 'DRIVE MODE';
+  document.body.classList.toggle('touch-drive', touchPlay && driving);
+}
+function exitFirstPerson(){
+  if(!flying) return;
+  if(touchPlay) leaveFirstPerson();
+  else if(document.pointerLockElement === canvasEl && document.exitPointerLock) document.exitPointerLock();
 }
 
 walkBtn.addEventListener('click', function(){
-  if(flying && !driving){ if(document.exitPointerLock) document.exitPointerLock(); return; }
+  if(flying && !driving){ exitFirstPerson(); return; }
   requestFirstPerson('walk');
 });
 driveBtn.addEventListener('click', function(){
-  if(flying && driving){ if(document.exitPointerLock) document.exitPointerLock(); return; }
+  if(flying && driving){ exitFirstPerson(); return; }
   requestFirstPerson('drive');
 });
 
@@ -3051,7 +3229,12 @@ function updateDriveCamera(snap){   // snap: jump straight to the chase spot (af
 }
 
 document.addEventListener('pointerlockchange', function(){
-  if(document.pointerLockElement === canvasEl){
+  if(document.pointerLockElement === canvasEl) enterFirstPerson();
+  else if(!touchPlay) leaveFirstPerson();
+});
+/* Walk / Drive Mode on and off - with the mouse locked on a computer, or with the on-screen controls on a phone or tablet */
+function enterFirstPerson(){
+  {
     flying = true;
     freshStart = true;
     driving = (pendingMode === 'drive');
@@ -3059,10 +3242,13 @@ document.addEventListener('pointerlockchange', function(){
     crosshair.classList.remove('hidden');
     applyModeUI();
     hintDismissed = false;
-    hint.textContent = driving
+    hint.textContent = touchPlay
+      ? (driving ? 'Arrows to drive and steer - drag to look around - EXIT at the top to stop' : 'Arrows to walk - drag to look - JUMP and E buttons - tap a building to inspect - EXIT at the top to stop')
+      : driving
       ? 'W/S or up/down to drive - A/D or left/right to steer - mouse to orbit the camera - T to chat - H hooks a trailer (truck) - ESC to exit'
       : 'WASD or arrow keys to walk - mouse to look - space to jump - click to inspect - T to chat - ESC to exit';
     hint.classList.remove('hidden');
+    if(touchPlay) setTimeout(function(){ if(touchPlay) hint.classList.add('hidden'); }, 7000);   // out of the way of the controls
     camera.rotation.order = 'YXZ';
     var e = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
     yaw = e.y; pitch = e.x;
@@ -3075,10 +3261,16 @@ document.addEventListener('pointerlockchange', function(){
       camera.position.y = EYE_HEIGHT;
       camera.rotation.set(pitch, yaw, pranked ? Math.PI : 0);
     }
-  } else {
+  }
+}
+function leaveFirstPerson(){
+  {
     finishDrowning();
     if(driving) exitDriveMode();
     flying = false;
+    touchPlay = false;
+    document.body.classList.remove('touch-play');
+    for(var k in keys) keys[k] = false;   // let go of any on-screen buttons
     driving = false;
     controls.enabled = true;
     crosshair.classList.add('hidden');
@@ -3088,8 +3280,7 @@ document.addEventListener('pointerlockchange', function(){
     controls.target.copy(camera.position).add(fwd.multiplyScalar(14));
     controls.update();
   }
-});
-
+}
 document.addEventListener('mousemove', function(e){
   if(!flying) return;
   lastMouseMove = performance.now();
@@ -3104,16 +3295,67 @@ document.addEventListener('mousemove', function(e){
   if(!driving) camera.rotation.set(pitch, yaw, pranked ? Math.PI : 0);
 });
 
+/* ---------- Phones and tablets: on-screen controls instead of the keyboard and mouse ----------
+   Walk / Drive Mode can't lock the mouse on a touch screen, so there: drag anywhere to look around, the arrow
+   pad walks / drives (it presses W A S D), JUMP jumps, E rides / leaves the CellDoo, R calls it back from the
+   dock, H hooks a trailer, CHAT opens chat, and tapping a building inspects it. EXIT is in the top bar. */
+var IS_TOUCH = !!(window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches);
+var touchPlay = false;     // in Walk / Drive Mode using the on-screen controls
+function tryJump(){
+  if(flying && !driving && grounded){ vertVelocity = JUMP_SPEED * jumpMultiplier; grounded = false; }
+}
+(function(){
+  // arrow pad: hold a button = hold the key (several at once is fine - gas + steer)
+  [].forEach.call(document.querySelectorAll('#touch-ui [data-key]'), function(b){
+    var code = b.getAttribute('data-key');
+    function up(){ keys[code] = false; b.classList.remove('held'); }
+    b.addEventListener('pointerdown', function(e){ e.preventDefault(); keys[code] = true; b.classList.add('held'); try { b.setPointerCapture(e.pointerId); } catch(err){} });
+    b.addEventListener('pointerup', up);
+    b.addEventListener('pointercancel', up);
+    b.addEventListener('lostpointercapture', up);
+  });
+  var acts = {jump:tryJump, e:function(){ interact(); }, r:function(){ callCellDooBack(); }, h:function(){ toggleHook(); }, chat:function(){ openChat(''); }};
+  [].forEach.call(document.querySelectorAll('#touch-ui [data-act]'), function(b){
+    b.addEventListener('pointerdown', function(e){ e.preventDefault(); b.classList.add('held'); acts[b.getAttribute('data-act')](); });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function(t){ b.addEventListener(t, function(){ b.classList.remove('held'); }); });
+  });
+  // drag on the city to look around; a quick tap on a building inspects it (Walk Mode)
+  var look = null;
+  canvasEl.addEventListener('pointerdown', function(e){
+    if(!touchPlay || look) return;
+    look = {id:e.pointerId, x:e.clientX, y:e.clientY, sx:e.clientX, sy:e.clientY};
+  });
+  canvasEl.addEventListener('pointermove', function(e){
+    if(!look || e.pointerId !== look.id) return;
+    var dx = e.clientX - look.x, dy = e.clientY - look.y;
+    look.x = e.clientX; look.y = e.clientY;
+    lastMouseMove = performance.now();
+    var sens = 0.006, sign = pranked ? -1 : 1;
+    yaw -= sign*dx*sens; pitch -= sign*dy*sens;
+    var lim = driving ? 0.75 : (Math.PI/2 - 0.05), lo = driving ? -0.2 : -lim;
+    pitch = Math.max(lo, Math.min(lim, pitch));
+    if(!driving) camera.rotation.set(pitch, yaw, pranked ? Math.PI : 0);
+  });
+  function endLook(e){
+    if(!look || e.pointerId !== look.id) return;
+    var tap = Math.hypot(e.clientX - look.sx, e.clientY - look.sy) < 10;
+    look = null;
+    if(!tap || driving || e.type !== 'pointerup') return;
+    var r = canvasEl.getBoundingClientRect();
+    var pid = raycastAt(((e.clientX - r.left)/r.width)*2 - 1, -((e.clientY - r.top)/r.height)*2 + 1);
+    if(pid) pickPart(pid);
+  }
+  canvasEl.addEventListener('pointerup', endLook);
+  canvasEl.addEventListener('pointercancel', endLook);
+})();
+
 var ARROW_CODES = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'];
 window.addEventListener('keydown', function(e){
   if(chatOpen || e.target === chatInput) return;   // typing a chat message, not driving
-  if(e.target && e.target.classList && e.target.classList.contains('join-input')) return;   // typing a nickname or class code
+  if(e.target && e.target.classList && (e.target.classList.contains('join-input') || e.target.classList.contains('menu-input'))) return;   // typing a nickname, class code or announcement
   keys[e.code] = true;
   if(flying && (['Space','KeyW','KeyA','KeyS','KeyD'].indexOf(e.code)>=0 || ARROW_CODES.indexOf(e.code)>=0)) e.preventDefault();
-  if(flying && !driving && e.code === 'Space' && grounded){
-    vertVelocity = JUMP_SPEED * jumpMultiplier;
-    grounded = false;
-  }
+  if(e.code === 'Space') tryJump();
 });
 window.addEventListener('keyup', function(e){ keys[e.code] = false; });
 
@@ -3360,24 +3602,56 @@ var adminUnlocked = false;
 var typedBuffer = '';
 window.addEventListener('keydown', function(e){
   if(e.target === chatInput) return;   // codes typed into a chat message don't count
-  if(e.target && e.target.classList && e.target.classList.contains('join-input')) return;   // ...or into the nickname / class code boxes
+  if(e.target && e.target.classList && (e.target.classList.contains('join-input') || e.target.classList.contains('menu-input'))) return;   // ...or into the nickname / class code / announcement boxes
   if(e.key && e.key.length === 1){
     typedBuffer = (typedBuffer + e.key.toLowerCase()).slice(-20);
     if(ADMIN_CODES.some(function(code){ return typedBuffer.indexOf(code) !== -1; })){
       typedBuffer = '';
-      if(!adminUnlocked){
-        adminUnlocked = true;
-        speedSlider.max = 300;
-        document.getElementById('tab-btn-admin').classList.remove('hidden');
-        showToast('ADMIN CODE ACCEPTED - ADMIN MENU UNLOCKED');
+      if(!adminUnlocked){ unlockAdmin(); showToast('ADMIN CODE ACCEPTED - ADMIN MENU UNLOCKED'); }
+      openMenuTab(titleTabs[2]);   // pop the menu open on the admin tab (typing it again later reopens it)
+    } else if(codeHash(typedBuffer.slice(-OWNER_CODE_LEN)) === OWNER_CODE_HASH){
+      typedBuffer = '';
+      if(!ownerUnlocked){
+        ownerUnlocked = true;
+        if(!adminUnlocked) unlockAdmin();   // owners get everything admins get
+        document.getElementById('tab-btn-owner').classList.remove('hidden');
+        showToast('OWNER CODE ACCEPTED - OWNER MENU UNLOCKED');
+        sendPresence(true);
+        mp.listKey = ''; renderPlayers();
       }
-      // pop the menu open on the admin tab (typing it again later reopens it)
-      if(document.pointerLockElement === canvasEl && document.exitPointerLock) document.exitPointerLock();
-      titleScreen.classList.remove('hidden');
-      showTitleTab(titleTabs[2]);
+      openMenuTab(titleTabs[6]);
     }
   }
 });
+function unlockAdmin(){
+  adminUnlocked = true;
+  speedSlider.max = 300;
+  document.getElementById('tab-btn-admin').classList.remove('hidden');
+  sendPresence(true);
+  mp.listKey = ''; renderPlayers();   // your badge in the ONLINE list
+}
+function openMenuTab(tab){
+  exitFirstPerson();
+  titleScreen.classList.remove('hidden');
+  showTitleTab(tab);
+}
+/* OWNER: a secret code (kept as a scrambled check value, so the code itself isn't written in the page) unlocks the
+   OWNER menu - kick players, announcements, owner waves - plus everything in the ADMIN menu */
+var OWNER_CODE_HASH = 'lmrmw2', OWNER_CODE_LEN = 9;
+var ownerUnlocked = false;
+function codeHash(s){ var h = 5381; for(var i=0;i<s.length;i++) h = (Math.imul(h, 33) + s.charCodeAt(i)) >>> 0; return h.toString(36); }
+function myRole(){ return ownerUnlocked ? 'owner' : adminUnlocked ? 'admin' : ''; }
+function roleRank(role){ return role === 'owner' ? 2 : role === 'admin' ? 1 : 0; }
+/* the badge that goes next to a name: golden ADMIN, or a shining diamond OWNER */
+function roleBadge(role){
+  if(role !== 'admin' && role !== 'owner') return null;
+  var b = document.createElement('span');
+  b.className = 'role-badge ' + role;
+  if(role === 'owner'){ var i = document.createElement('i'); i.textContent = 'OWNER'; b.appendChild(i); }
+  else b.textContent = 'ADMIN';
+  return b;
+}
+function peerRole(p){ var r = p && p.presence && p.presence.role; return r === 'owner' || r === 'admin' ? r : ''; }
 
 /* ---------- Legend ---------- */
 var legendToggle = document.getElementById('legend-toggle');
@@ -3922,12 +4196,12 @@ var waveUiKey = '';
 function waveText(ft){ return ft === 0 ? 'CALM' : ft + ' FT'; }
 /* the setting in charge right now: {ft, at, adm, who} - or null if nobody has ever moved a slider (then 1 ft) */
 function roomWaveSetting(){
-  var best = myWave.at ? {ft:myWave.ft, at:myWave.at, adm:adminUnlocked, who:'YOU'} : null;
+  var best = myWave.at ? {ft:myWave.ft, at:myWave.at, rank:roleRank(myRole()), who:'YOU'} : null;
   (mp.room ? mp.others : []).forEach(function(p){
     var w = p.presence && p.presence.waves;
     if(!w || !finite(w.ft) || !finite(w.at) || w.ft < 0 || w.ft > WAVE_MAX_FT) return;
-    var c = {ft:w.ft, at:w.at, adm:!!w.adm, who:playerName(p)};
-    if(!best || (c.adm && !best.adm) || (c.adm === best.adm && c.at > best.at)) best = c;
+    var c = {ft:w.ft, at:w.at, rank:(w.own ? 2 : w.adm ? 1 : 0), who:playerName(p)};
+    if(!best || c.rank > best.rank || (c.rank === best.rank && c.at > best.at)) best = c;   // owner beats admin beats everyone; then newest wins
   });
   return best;
 }
@@ -3936,22 +4210,27 @@ function applyRoomWaves(dt){
   var set = roomWaveSetting(), ft = set ? set.ft : 1, target = ft*WAVE_FT;
   waveSize += (target - waveSize)*Math.min(1, dt*1.5);
   if(Math.abs(target - waveSize) < 0.01) waveSize = target;
-  var key = ft + '|' + (set ? set.who + '|' + set.adm : '');
+  var key = ft + '|' + (set ? set.who + '|' + set.rank : '');
   if(key === waveUiKey) return;
   waveUiKey = key;
   waveSlider.value = ft;
   waveValueEl.textContent = waveText(ft);
   waveOwnerEl.textContent = !set || !mp.room ? '' :
-    (set.who === 'YOU' ? 'Set by you' : 'Set by ' + set.who) + (set.adm ? ' (admin)' : '') + ' for everyone here.';
+    (set.who === 'YOU' ? 'Set by you' : 'Set by ' + set.who) + (set.rank === 2 ? ' (owner)' : set.rank === 1 ? ' (admin)' : '') + ' for everyone here.';
+  ownerWaveSlider.value = ft; ownerWaveValue.textContent = waveText(ft);
 }
-waveSlider.addEventListener('input', function(){
+var ownerWaveSlider = document.getElementById('owner-wave-slider');
+var ownerWaveValue = document.getElementById('owner-wave-value');
+waveSlider.addEventListener('input', function(){ setMyWaves(parseFloat(waveSlider.value), waveSlider); });
+ownerWaveSlider.addEventListener('input', function(){ setMyWaves(parseFloat(ownerWaveSlider.value), ownerWaveSlider); });
+function setMyWaves(ft, slider){
   var set = roomWaveSetting();
-  if(set && set.adm && set.who !== 'YOU' && !adminUnlocked){
-    waveSlider.value = set.ft;   // an admin is in charge of the waves
-    showToast('AN ADMIN (' + set.who + ') IS CONTROLLING THE WAVES');
+  if(set && set.who !== 'YOU' && set.rank > roleRank(myRole())){
+    slider.value = set.ft;   // someone with a higher role is in charge of the waves
+    showToast('AN ' + (set.rank === 2 ? 'OWNER' : 'ADMIN') + ' (' + set.who + ') IS CONTROLLING THE WAVES');
     return;
   }
-  myWave.ft = parseFloat(waveSlider.value);
+  myWave.ft = ft;
   myWave.at = Date.now();
   try { localStorage.setItem('cellcity.waveFt', String(myWave.ft)); localStorage.setItem('cellcity.waveFtAt', String(myWave.at)); } catch(e){}
   if(!wavesOn && myWave.ft > 0){
@@ -3962,7 +4241,7 @@ waveSlider.addEventListener('input', function(){
   waveUiKey = '';
   applyRoomWaves(0);
   sendPresence(true);
-});
+}
 
 /* ---------- Trailer: "/spawn trailer" in chat (admin only) ----------
    A flatbed car trailer that hooks onto the pickup's tow ball. Anyone in multiplayer can drive up its
@@ -4203,7 +4482,7 @@ var chatInput = document.getElementById('chat-input');
 function cleanChat(text){
   return String(text).replace(/[\u0000-\u001f\u007f-\u009f­​-‏‪-‮⁠-⁤﻿]/g, '').trim().slice(0, 120);
 }
-function addChatLine(name, text, colorId, system){
+function addChatLine(name, text, colorId, system, role){
   var row = document.createElement('div');
   row.className = 'chat-line' + (system ? ' system' : '');
   if(!system){
@@ -4212,8 +4491,10 @@ function addChatLine(name, text, colorId, system){
     var c = carColor(colorId);
     dot.style.background = c ? hexCss(c.hex) : 'transparent';
     var who = document.createElement('b');
-    who.textContent = name + ':';
+    var badge = roleBadge(role);
+    who.textContent = badge ? name : name + ':';
     row.appendChild(dot); row.appendChild(who);
+    if(badge){ badge.style.marginLeft = '0'; row.appendChild(badge); var colon = document.createElement('b'); colon.textContent = ':'; colon.style.marginLeft = '-4px'; row.appendChild(colon); }
   }
   var msg = document.createElement('span');
   msg.textContent = text;
@@ -4275,7 +4556,7 @@ function runCommand(text){
 }
 function sendChat(text){
   text = filterChat(text);
-  addChatLine('YOU', text, myColor);
+  addChatLine('YOU', text, myColor, false, myRole());
   if(!mp.room){ systemLine('Nobody else can hear you - chat works when you play online.'); return; }
   myChat = {n: Date.now(), t: text, at: Date.now()};
   sendPresence(true);
@@ -4296,6 +4577,7 @@ window.addEventListener('keydown', function(e){
     if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('enter-btn').click(); }   // Enter in the boxes = ENTER CITY
     return;
   }
+  if(e.target && e.target.classList && e.target.classList.contains('menu-input')) return;
   // match the character typed, not the key position, so it works on every keyboard layout
   var k = e.key || '';
   var slash = k === '/' || e.code === 'Slash';
@@ -4318,7 +4600,7 @@ function receiveChat(p){
   mp.chatSeen[p.peer] = c.n;
   if(firstLook && finite(c.at) && Date.now() - c.at > 120000) return;   // an old line from before you joined
   var text = cleanChat(c.t);
-  if(text) addChatLine(playerName(p), filterChat(text), p.presence.color);
+  if(text) addChatLine(playerName(p), filterChat(text), p.presence.color, false, peerRole(p));
 }
 
 /* ---------- Multiplayer: everyone with the page open shares one city ----------
@@ -4341,6 +4623,7 @@ function r2(v){ return Math.round(v*100)/100; }
 function finite(v){ return typeof v === 'number' && isFinite(v); }
 
 function presenceState(){
+  if(mp.kickedLocal) return {v:1, kicked:true, mode:'menu'};   // kicked by the owner (claude.ai version): stay out of sight
   // ver/live/seen: connection diagnostics, readable alongside the viewer's own chat with Claude
   var s = {v:1, ver:MP_BUILD, live:mp.live, seen:mp.others.length, peers:mp.peersReported, color:myColor, colorAt:myColorAt, mode:'menu', car:null, x:null, y:null, z:null, yaw:null, tilt:null, roll:null, speed:null};
   if(flying && driving){
@@ -4353,7 +4636,15 @@ function presenceState(){
   }
   s.chat = myChat;   // your newest chat line: {n, t, at}
   if(web.on) s.nick = web.nick;   // website version: your nickname (claude.ai uses your profile name)
-  s.waves = myWave.at ? {ft:myWave.ft, at:myWave.at, adm:adminUnlocked} : null;   // your latest WAVE HEIGHT move (the room shares one)
+  s.waves = myWave.at ? {ft:myWave.ft, at:myWave.at, adm:adminUnlocked, own:ownerUnlocked} : null;   // your latest WAVE HEIGHT move (the room shares one)
+  var role = myRole();
+  if(role) s.role = role;   // the ADMIN / OWNER badge next to your name
+  if(ownerUnlocked){
+    var now = Date.now();
+    ownerKicks = ownerKicks.filter(function(k){ return now - k.at < KICK_WINDOW; });
+    if(ownerKicks.length) s.kicks = ownerKicks;   // "you, leave": players you just kicked
+    if(myAnnounce) s.announce = myAnnounce;       // your newest announcement: {n, t, at}
+  }
   var tp = localTrailer && localTrailer.pose;
   s.trailer = tp ? {x:r2(tp.x), y:r2(tp.y), z:r2(tp.z), yaw:Math.round(tp.yaw*1000)/1000, hooked:towingTrailer(),
                     kind:localTrailer.kind, loaded:!!localTrailer.loaded} : null;
@@ -4446,8 +4737,8 @@ function renderSwatches(){
 function renderPlayers(){
   if(mp.status === 'none'){ playersEl.classList.add('hidden'); return; }
   var statusText = mp.status === 'solo' ? 'SOLO - NO LIVE ROOM' : mp.status === 'lost' ? 'DISCONNECTED' : mp.live ? 'LIVE' : 'CONNECTING...';
-  var rows = [{name:'YOU', color:myColor, st:statusText}];
-  mp.others.forEach(function(p){ rows.push({name:playerName(p), color:p.presence && p.presence.color}); });
+  var rows = [{name:'YOU', color:myColor, st:statusText, role:myRole()}];
+  mp.others.forEach(function(p){ rows.push({name:playerName(p), color:p.presence && p.presence.color, role:peerRole(p), peer:p.peer}); });
   var key = JSON.stringify(rows);
   if(key === mp.listKey) return;
   mp.listKey = key;
@@ -4464,8 +4755,11 @@ function renderPlayers(){
     var name = document.createElement('span');
     name.textContent = r.name;
     row.appendChild(dot); row.appendChild(name);
+    var badge = roleBadge(r.role);
+    if(badge) row.appendChild(badge);
     playersListEl.appendChild(row);
   });
+  renderOwnerPlayers(rows);
 }
 
 function disposeObject(o){
@@ -4495,8 +4789,12 @@ function onRoomPeers(change){
   change.peers.forEach(function(p){
     if(p.sameTab){ mp.myPeer = p.peer; return; }
     if(p.kind !== 'viewer') return;
+    if(p.presence && p.presence.kicked) return;   // kicked by the owner: out of sight
     others.push(p);
   });
+  if(mp.kickedLocal) others = [];
+  others.forEach(function(p){ checkKicked(p); receiveAnnounce(p); });
+  if(mp.kickedLocal || !mp.room) others = [];   // just got kicked
   mp.others = others;
   var live = {};
   others.forEach(function(p){ live[p.peer] = true; });
@@ -4506,6 +4804,156 @@ function onRoomPeers(change){
   resolveNames();
   renderPlayers();
   renderSwatches();
+}
+
+/* ---------- OWNER powers: announcements and kicks ride in the owner's presence ----------
+   Only accepted from a player whose presence says they're the owner, and owners can't be kicked. Each page
+   checks for itself, so this is a friendly school-game lock rather than real security. */
+var KICK_WINDOW = 30000, KICK_BAN_MS = 5*60*1000;
+var ownerKicks = [];       // [{p: peer id, at}] - recent kicks, sent in presence for 30 s
+var myAnnounce = null;     // {n, t, at}
+var annSeen = {};
+var annEl = document.getElementById('announce'), annTimer = null;
+function showAnnouncement(text, from){
+  annEl.querySelector('.ann-head').textContent = 'ANNOUNCEMENT FROM ' + from.toUpperCase();
+  annEl.querySelector('.ann-text').textContent = text;
+  annEl.classList.remove('hidden');
+  clearTimeout(annTimer);
+  annTimer = setTimeout(function(){ annEl.classList.add('hidden'); }, 8000);
+  systemLine('ANNOUNCEMENT (' + from + '): ' + text);
+}
+function receiveAnnounce(p){
+  var a = p.presence && p.presence.announce;
+  if(peerRole(p) !== 'owner' || !a || typeof a.t !== 'string' || !finite(a.n)) return;
+  if(annSeen[p.peer] === a.n) return;
+  var firstLook = !(p.peer in annSeen);
+  annSeen[p.peer] = a.n;
+  if(firstLook && finite(a.at) && Date.now() - a.at > 60000) return;   // an old one from before you joined
+  var text = filterChat(cleanChat(a.t));
+  if(text) showAnnouncement(text, playerName(p));
+}
+function checkKicked(p){
+  if(mp.kickedLocal || ownerUnlocked || peerRole(p) !== 'owner' || !Array.isArray(p.presence.kicks)) return;
+  var now = Date.now();
+  var mine = p.presence.kicks.some(function(k){ return k && k.p === mp.myPeer && finite(k.at) && now - k.at < KICK_WINDOW; });
+  if(mine) getKicked(playerName(p));
+}
+function getKicked(by){
+  try { localStorage.setItem('cellcity.kickedUntil', String(Date.now() + KICK_BAN_MS)); } catch(e){}
+  exitFirstPerson();
+  if(web.on){
+    if(mp.room && mp.room.leave) mp.room.leave();
+    mp.room = null; web.joined = false;
+    clearRemotes();
+    mp.status = 'solo'; mp.listKey = ''; renderPlayers();
+    joinMsg.textContent = 'You were kicked by ' + by + '. You can rejoin in 5 minutes.'; joinMsg.classList.add('bad');
+  } else {
+    mp.kickedLocal = true;   // claude.ai: the room can't be left, so hide from everyone instead
+    clearRemotes(); sendPresence(true);
+  }
+  showAnnouncement('You were kicked from the city by the owner. You can still play solo.', by);
+}
+/* kicked on this device recently? (the website version checks before joining) */
+function kickedFor(){ var until = 0; try { until = parseFloat(localStorage.getItem('cellcity.kickedUntil')) || 0; } catch(e){} return Math.max(0, until - Date.now()); }
+
+/* the OWNER tab: announcement box, the player list with KICK buttons, and the owner wave slider */
+var announceInput = document.getElementById('announce-input'), ownerPlayersEl = document.getElementById('owner-players');
+function sendAnnouncement(){
+  var text = filterChat(cleanChat(announceInput.value));
+  if(!ownerUnlocked || !text) return;
+  myAnnounce = {n:Date.now(), t:text, at:Date.now()};
+  announceInput.value = '';
+  sendPresence(true);
+  showAnnouncement(text, 'YOU');
+  if(!mp.room) systemLine('Nobody else is here to see it - announcements reach everyone when you play online.');
+}
+document.getElementById('announce-btn').addEventListener('click', sendAnnouncement);
+announceInput.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); sendAnnouncement(); } });
+var ownerListKey = '';
+function renderOwnerPlayers(rows){
+  var others = rows.filter(function(r){ return r.peer; });
+  var key = JSON.stringify(others);
+  if(key === ownerListKey) return;
+  ownerListKey = key;
+  ownerPlayersEl.textContent = '';
+  if(!others.length){ var e = document.createElement('div'); e.className = 'empty'; e.textContent = 'Nobody else is online right now.'; ownerPlayersEl.appendChild(e); return; }
+  others.forEach(function(r){
+    var row = document.createElement('div');
+    var name = document.createElement('span'); name.className = 'grow'; name.textContent = r.name;
+    row.appendChild(name);
+    var badge = roleBadge(r.role); if(badge) row.appendChild(badge);
+    if(r.role !== 'owner'){
+      var kick = document.createElement('button');
+      kick.className = 'admin-toggle'; kick.textContent = 'KICK';
+      kick.addEventListener('click', function(){
+        ownerKicks.push({p:r.peer, at:Date.now()});
+        sendPresence(true);
+        showToast('KICKED ' + r.name.toUpperCase());
+        systemLine(r.name + ' was kicked.');
+      });
+      row.appendChild(kick);
+    }
+    ownerPlayersEl.appendChild(row);
+  });
+}
+
+/* a player's floating name tag, with a golden ADMIN or a shining diamond OWNER badge after the name */
+function nameTag(text, role){
+  var badge = role === 'owner' ? 'OWNER' : role === 'admin' ? 'ADMIN' : '';
+  var c = document.createElement('canvas'), ctx = c.getContext('2d');
+  ctx.font = '20px monospace';
+  var nw = ctx.measureText(text).width;
+  ctx.font = 'bold 18px monospace';
+  var bw = badge ? ctx.measureText(badge).width + 16 : 0;
+  var w = Math.max(256, Math.ceil((nw + (badge ? bw + 10 : 0) + 36)/32)*32);
+  c.width = w; c.height = 64;
+  var tex = new THREE.CanvasTexture(c);
+  tex.magFilter = THREE.NearestFilter;
+  var sprite = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, depthTest:false}));
+  sprite.scale.set(5*w/256, 1.28, 1);
+  sprite.userData.tag = {ctx:ctx, tex:tex, w:w, text:text, nw:nw, badge:badge, bw:bw, role:role, lastShine:0};
+  drawNameTag(sprite.userData.tag, 0);
+  root.add(sprite);
+  return sprite;
+}
+function drawNameTag(t, time){
+  var ctx = t.ctx, w = t.w;
+  ctx.clearRect(0, 0, w, 64);
+  ctx.fillStyle = 'rgba(35,28,24,0.85)';
+  ctx.fillRect(0, 0, w, 64);
+  ctx.strokeStyle = t.role === 'owner' ? '#9fe6ff' : t.role === 'admin' ? '#e0b021' : '#f0ead9';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(2, 2, w-4, 60);
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  var x0 = (w - (t.nw + (t.badge ? t.bw + 10 : 0)))/2;
+  ctx.font = '20px monospace'; ctx.fillStyle = '#f7f2e6';
+  ctx.fillText(t.text, x0, 34);
+  if(t.badge){
+    var bx = x0 + t.nw + 10;
+    ctx.fillStyle = t.role === 'owner' ? '#0d1a24' : '#2b2104';
+    ctx.fillRect(bx, 16, t.bw, 34);
+    ctx.font = 'bold 18px monospace';
+    if(t.role === 'admin'){
+      ctx.fillStyle = '#ffd23f';
+    } else {
+      // diamond: icy blue, white and lilac, with a bright band sweeping across
+      var s = (time*0.7) % 1, g = ctx.createLinearGradient(bx, 0, bx + t.bw, 0);
+      g.addColorStop(0, '#7fe3ff');
+      g.addColorStop(Math.max(0, s - 0.18), '#a9dcff');
+      g.addColorStop(s, '#ffffff');
+      g.addColorStop(Math.min(1, s + 0.18), '#e4d2ff');
+      g.addColorStop(1, '#7fe3ff');
+      ctx.fillStyle = g;
+    }
+    ctx.fillText(t.badge, bx + 8, 34);
+  }
+  t.tex.needsUpdate = true;
+}
+function shineNameTag(sprite){
+  var t = sprite.userData.tag, now = performance.now()/1000;
+  if(!t || now - t.lastShine < 0.08) return;   // ~12 redraws a second is plenty for the shimmer
+  t.lastShine = now;
+  drawNameTag(t, now);
 }
 
 /* draw everyone else: smooth toward their latest position, nudged ahead by their speed */
@@ -4576,13 +5024,13 @@ function updateRemotes(dt){
     g.rotation.set(finite(s.tilt) ? s.tilt : 0, a.yaw, finite(s.roll) ? s.roll : 0, 'YXZ');
     a.model.wheels.forEach(function(w){ w.rotation.x += speed*dt/a.model.wheelR; });
 
-    var text = playerName(p);
-    if(a.tagText !== text){
+    var text = playerName(p), role = peerRole(p), tagKey = text + '|' + role;
+    if(a.tagText !== tagKey){
       if(a.tag){ root.remove(a.tag); disposeObject(a.tag); }
-      a.tag = label(text, 0, 0, 0, root);
-      a.tag.scale.set(5, 1.28, 1);
-      a.tagText = text;
+      a.tag = nameTag(text, role);
+      a.tagText = tagKey;
     }
+    if(role === 'owner') shineNameTag(a.tag);
     a.tag.visible = true;
     a.tag.position.set(a.pos.x, a.pos.y + (want === 'walker' ? 2.6 : want === 'truck' ? 4.0 : want === 'celldoo' ? 2.4 : 3.0), a.pos.z);
 
@@ -4686,6 +5134,12 @@ function websiteJoin(){
   nickInput.value = nick;
   if(nick.length < 2){ joinMsg.textContent = 'Type a nickname (2 to 16 letters or numbers).'; joinMsg.classList.add('bad'); nickInput.focus(); return false; }
   if(hasBadWord(nick)){ joinMsg.textContent = 'Please pick a different nickname.'; joinMsg.classList.add('bad'); nickInput.focus(); return false; }
+  var banned = kickedFor();
+  if(banned){   // kicked a few minutes ago: in you go, but solo
+    joinMsg.textContent = 'You were kicked - multiplayer comes back in ' + Math.ceil(banned/60000) + ' min.'; joinMsg.classList.add('bad');
+    systemLine('You were kicked by the owner - playing solo. Multiplayer comes back in ' + Math.ceil(banned/60000) + ' min.');
+    return true;
+  }
   joinMsg.textContent = 'Same code = same city. Share yours only with your class.'; joinMsg.classList.remove('bad');
   try { localStorage.setItem('cellcity.nick', nick); localStorage.setItem('cellcity.room', roomInput.value.trim()); } catch(e){}
   web.nick = nick;
@@ -4764,6 +5218,7 @@ function firebaseRoom(db, code, uid){
 (function initMultiplayer(){
   var cl = window.claude;
   if(!cl || typeof cl.use !== 'function'){ initWebsite(); return; }   // opened outside claude.ai: the website version
+  if(kickedFor()) mp.kickedLocal = true;   // kicked by the owner a few minutes ago
   renderPlayers();
   cl.use('user').then(function(u){ if(u){ mp.user = u; resolveNames(); } }).catch(function(){});
   cl.use('room').then(function(room){
