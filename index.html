@@ -91,7 +91,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none;}
   justify-content:flex-end;
   max-width:calc(100vw - 32px);
 }
-#legend-toggle, #walk-toggle, #drive-toggle, #menu-toggle{
+#legend-toggle, #walk-toggle, #drive-toggle, #menu-toggle, #practice-toggle{
   background:var(--panel);
   border:3px solid var(--panel-border);
   box-shadow: 3px 3px 0 0 var(--panel-border);
@@ -102,7 +102,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none;}
   cursor:pointer;
   white-space:nowrap;
 }
-#legend-toggle:active, #walk-toggle:active, #drive-toggle:active, #menu-toggle:active{transform:translate(2px,2px);box-shadow:1px 1px 0 0 var(--panel-border);}
+#legend-toggle:active, #walk-toggle:active, #drive-toggle:active, #menu-toggle:active, #practice-toggle:active{transform:translate(2px,2px);box-shadow:1px 1px 0 0 var(--panel-border);}
 
 #toast{
   position:absolute;
@@ -174,6 +174,87 @@ canvas{display:block;width:100%;height:100%;touch-action:none;}
 #hint.hidden{opacity:0;}
 
 /* chat: recent lines bottom-left (fade after a while), input box while typing */
+/* BETA badge: next to the title in the corner while you play, and on the menu */
+.beta-pill{
+  display:inline-block;
+  margin-left:6px;
+  padding:2px 5px 1px;
+  font-family:'Press Start 2P', monospace;
+  font-size:8px;
+  letter-spacing:0.5px;
+  vertical-align:middle;
+  color:#fff;
+  background:var(--accent);
+  border:2px solid var(--panel-border);
+}
+#title-screen h1 .beta-pill{font-size:9px; position:relative; top:-3px;}
+
+/* HOW TO PLAY / CHANGELOG tabs: long text scrolls inside the tab */
+#title-screen .scroll-block{
+  max-height:min(42vh, 300px);
+  overflow-y:auto;
+  padding:12px 14px;
+  border:2px solid var(--panel-border);
+  text-align:left;
+}
+#title-screen .scroll-block h3{
+  margin:12px 0 4px;
+  font-family:'Press Start 2P', monospace;
+  font-size:9px;
+  color:var(--accent-2);
+  letter-spacing:0.5px;
+}
+#title-screen .scroll-block h3:first-child{margin-top:0;}
+#title-screen .scroll-block ul{margin:0; padding-left:18px;}
+#title-screen .scroll-block li{font-size:16px; color:var(--ink-soft); line-height:1.25; margin:2px 0;}
+#title-screen .scroll-block b{color:var(--ink); font-weight:normal;}
+#title-screen .scroll-block .when{font-family:'VT323', monospace; font-size:14px; color:var(--ink-soft); letter-spacing:0;}
+#title-screen .scroll-block li .when{font-size:13px; color:var(--accent);}
+
+/* PRACTICE: find the building in 15 seconds */
+#practice{
+  position:absolute;
+  left:50%;
+  top:calc(64px + env(safe-area-inset-top,0px));
+  transform:translateX(-50%);
+  z-index:34;
+  width:min(92vw, 340px);
+  padding:12px 14px;
+  background:var(--panel);
+  border:3px solid var(--panel-border);
+  box-shadow:5px 5px 0 0 var(--panel-border);
+  font-family:'VT323', monospace;
+  text-align:center;
+}
+#practice.hidden{display:none;}
+#practice .pr-top{display:flex; justify-content:space-between; font-family:'Press Start 2P', monospace; font-size:8px; color:var(--accent-2); margin-bottom:8px;}
+#pr-ask{font-size:16px; color:var(--ink-soft);}
+#pr-name{margin:4px 0 6px; font-family:'Press Start 2P', monospace; font-size:14px; line-height:1.4; color:var(--ink);}
+#pr-name.hidden, #pr-photo.hidden{display:none;}
+#pr-photo{display:block; width:100%; height:120px; object-fit:cover; margin:6px 0; border:2px solid var(--panel-border); background:#000;}
+#pr-bar{height:10px; border:2px solid var(--panel-border); background:var(--bg); margin:6px 0;}
+#pr-fill{height:100%; width:100%; background:var(--accent-2);}
+#pr-fill.low{background:var(--accent);}
+#pr-msg{min-height:20px; font-size:17px; color:var(--ink);}
+#pr-msg.good{color:var(--accent-2);}
+#pr-msg.bad{color:var(--accent);}
+#practice .pr-btns{display:flex; gap:8px; justify-content:center; margin-top:8px;}
+#practice .pr-btns button{
+  font-family:'Press Start 2P', monospace;
+  font-size:9px;
+  padding:7px 10px;
+  color:var(--ink);
+  background:var(--panel);
+  border:2px solid var(--panel-border);
+  box-shadow:2px 2px 0 0 var(--panel-border);
+  cursor:pointer;
+}
+#practice .pr-btns button.go{background:var(--accent); color:#fff;}
+#practice .pr-btns button.hidden{display:none;}
+#practice.shake{animation:pr-shake 0.3s;}
+@keyframes pr-shake{0%,100%{transform:translateX(-50%);} 25%{transform:translateX(calc(-50% - 6px));} 75%{transform:translateX(calc(-50% + 6px));}}
+#legend-toggle:disabled{opacity:0.4; cursor:not-allowed;}
+
 #chat-log{
   position:absolute;
   left:16px;
@@ -598,7 +679,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none;}
   #title-card{max-width:66vw;}
   #title-card p{font-size:13px;}
   #legend{font-size:13px;}
-  #legend-toggle, #walk-toggle, #drive-toggle, #menu-toggle{font-size:9px; padding:8px 9px;}
+  #legend-toggle, #walk-toggle, #drive-toggle, #menu-toggle, #practice-toggle{font-size:9px; padding:8px 9px;}
 }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -607,7 +688,7 @@ canvas{display:block;width:100%;height:100%;touch-action:none;}
 <div id="canvas-wrap"></div>
 
 <div id="title-card">
-  <h1>CELL CITY</h1>
+  <h1>CELL CITY<span class="beta-pill">BETA</span></h1>
   <p>An animal cell, built as a town. Click any building.</p>
   <div id="players" class="hidden">
     <div class="players-head">ONLINE <span id="players-count">1</span> <span id="players-status"></span></div>
@@ -617,11 +698,21 @@ canvas{display:block;width:100%;height:100%;touch-action:none;}
 
 <div id="top-bar">
   <button id="menu-toggle">MENU</button>
+  <button id="practice-toggle">PRACTICE</button>
   <button id="drive-toggle">DRIVE MODE</button>
   <button id="walk-toggle">WALK MODE</button>
   <button id="legend-toggle">KEY</button>
 </div>
 <div id="legend" class="hidden"></div>
+<div id="practice" class="hidden" aria-live="polite">
+  <div class="pr-top"><span id="pr-round">ROUND 1/10</span><span id="pr-score">SCORE 0</span></div>
+  <div id="pr-ask">Find the building for:</div>
+  <div id="pr-name">-</div>
+  <img id="pr-photo" class="hidden" alt="">
+  <div id="pr-bar"><div id="pr-fill"></div></div>
+  <div id="pr-msg"></div>
+  <div class="pr-btns"><button id="pr-again" class="go hidden">PLAY AGAIN</button><button id="pr-stop">STOP</button></div>
+</div>
 <div id="crosshair" class="hidden">+</div>
 <div id="drown-fx" class="hidden">YOU DROWNED<small>RESPAWNING ON DRY LAND...</small></div>
 <div id="speedo" class="hidden"><span id="speedo-num">0</span><span id="speedo-unit">KM/H</span></div>
@@ -650,13 +741,15 @@ canvas{display:block;width:100%;height:100%;touch-action:none;}
 
 <div id="title-screen">
   <div class="panel">
-    <h1>CELL CITY</h1>
+    <h1>CELL CITY<span class="beta-pill">BETA</span></h1>
     <p class="subtitle">An animal cell, built as a town.</p>
     <div class="tab-row">
       <button class="tab-btn active" id="tab-btn-settings">SETTINGS</button>
       <button class="tab-btn" id="tab-btn-perf">PERFORMANCE</button>
       <button class="tab-btn" id="tab-btn-credits">CREDITS</button>
       <button class="tab-btn hidden" id="tab-btn-admin">ADMIN</button>
+      <button class="tab-btn" id="tab-btn-help">HOW TO PLAY</button>
+      <button class="tab-btn" id="tab-btn-log">CHANGELOG</button>
     </div>
     <div class="tab-panel" id="tab-settings">
       <div class="settings-block">
@@ -696,6 +789,77 @@ canvas{display:block;width:100%;height:100%;touch-action:none;}
         <div class="speed-hint">F1: MOTOCELL racer, more grip and speed. Truck: lifted pickup, with engine sounds.</div>
         <div class="settings-label second"><span>EXTRA SPEED</span><button class="admin-toggle" id="boost-toggle">OFF</button></div>
         <div class="speed-hint">Cranks walk + drive speed way up. Shows on the Settings speed slider.</div>
+      </div>
+    </div>
+    <div class="tab-panel hidden" id="tab-help">
+      <div class="scroll-block">
+        <h3>LOOK AROUND</h3>
+        <ul>
+          <li><b>Drag</b> to spin the camera, <b>scroll</b> to zoom.</li>
+          <li><b>Click any building</b> to learn which organelle it is, with a real microscope photo.</li>
+          <li><b>KEY</b> lists every organelle and its building.</li>
+        </ul>
+        <h3>WALK MODE</h3>
+        <ul>
+          <li><b>WASD</b> or arrow keys to walk, <b>mouse</b> to look, <b>Space</b> to jump.</li>
+          <li><b>Click</b> a building (aim with the +) to inspect it. <b>Esc</b> to stop.</li>
+        </ul>
+        <h3>DRIVE MODE</h3>
+        <ul>
+          <li><b>W / S</b> to go and brake, <b>A / D</b> to steer, <b>mouse</b> to look around.</li>
+          <li>The race track is east, over the bridge. Type <b>/speed miles</b> in chat for MPH.</li>
+        </ul>
+        <h3>THE LAKE &amp; THE CELLDOO</h3>
+        <ul>
+          <li>Don't walk or drive into the water - you'll drown and respawn on land.</li>
+          <li>Walk to the dock (south gate) and press <b>E</b> to ride the CellDoo jet ski. <b>E</b> at the dock or ramp to get off.</li>
+          <li>Big waves let you jump - land badly or turn too sharp and you might wipe out!</li>
+          <li>Left it out on the lake? Stand on the dock and press <b>R</b> to call it back.</li>
+        </ul>
+        <h3>PRACTICE</h3>
+        <ul>
+          <li>Press <b>PRACTICE</b> (top right). You get 15 seconds to click the building for the organelle it shows - by name or by microscope photo. 10 rounds; faster = more points.</li>
+        </ul>
+        <h3>PLAYING TOGETHER</h3>
+        <ul>
+          <li><b>T</b> or <b>Enter</b> to chat. <b>/help</b> lists the chat commands.</li>
+          <li>On the website: same <b>class code</b> = same city.</li>
+          <li>Everyone gets their own car color. The wave height is shared by everyone.</li>
+        </ul>
+        <h3>SLOW COMPUTER?</h3>
+        <ul>
+          <li>PERFORMANCE tab: turn on <b>Low Detail</b>, or turn the waves off.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="tab-panel hidden" id="tab-log">
+      <div class="scroll-block">
+        <h3>BETA 3 <span class="when">- Oct 8, 2026</span></h3>
+        <ul>
+          <li><span class="when">Oct 8, 2026 · 9:43 AM</span><br>Fixed: clicking a building in the overview opens its info again (it only worked in Walk Mode in Chrome).</li>
+          <li><span class="when">Oct 8, 2026 · 9:43 AM</span><br>Practice mode: find the right building in 15 seconds, from the organelle's name or its microscope photo.</li>
+          <li><span class="when">Oct 8, 2026 · 9:43 AM</span><br>HOW TO PLAY and CHANGELOG tabs, and a BETA badge.</li>
+          <li><span class="when">Oct 7, 2026 · 8:04 PM</span><br>Cell City is a real website: pick a nickname and play together - no account needed.</li>
+          <li><span class="when">Oct 7, 2026 · 7:48 PM</span><br>Nickname screen, class codes for private cities, and a chat filter.</li>
+        </ul>
+        <h3>BETA 2 <span class="when">- Oct 7, 2026</span></h3>
+        <ul>
+          <li><span class="when">Oct 7, 2026 · 7:05 PM</span><br>Sharp-turn wipeouts on the CellDoo set to about 1 in 5.</li>
+          <li><span class="when">Oct 7, 2026 · 6:57 PM</span><br>R on the dock calls the CellDoo back.</li>
+          <li><span class="when">Oct 7, 2026 · 6:49 PM</span><br>Deeper lake bed - only waves, no blue plate.</li>
+          <li><span class="when">Oct 7, 2026 · 5:52 PM</span><br>Much better CellDoo steering at high speed.</li>
+          <li><span class="when">Oct 7, 2026 · 2:43 PM</span><br>New CellDoo model, and wipeouts from turning too sharp.</li>
+          <li><span class="when">Oct 7, 2026 · 1:31 PM</span><br>Wave height in feet, up to 8 ft. Calm harbor by the dock, taller bridge.</li>
+          <li><span class="when">Oct 7, 2026 · 1:25 PM</span><br>Waves are shared by everyone (admins have priority). The CellDoo jumps big waves - land badly and you might wipe out.</li>
+          <li><span class="when">Oct 7, 2026 · 12:31 PM</span><br>Wave size slider.</li>
+          <li><span class="when">Oct 7, 2026 · 12:25 PM</span><br>The lake goes all the way round the city, with a bridge to the race track. Fall in and you drown, then respawn on land. Speedometer (/speed miles for MPH).</li>
+        </ul>
+        <h3>BETA 1 <span class="when">- before Oct 7, 2026, 12:00 PM</span></h3>
+        <ul>
+          <li>The animal cell built as a city - every organelle is a building, with real microscope photos.</li>
+          <li>Walk Mode and Drive Mode, a figure-8 race track, and admin vehicles (MOTOCELL F1, pickup truck).</li>
+          <li>Multiplayer with chat, car colors, trailers, the CellDoo jet ski, a boat ramp and a dock.</li>
+        </ul>
       </div>
     </div>
     <div class="tab-panel hidden" id="tab-credits">
@@ -2084,17 +2248,149 @@ function onPointerUp(e){
   var ndcX = ((p.clientX-rect.left)/rect.width)*2-1;
   var ndcY = -((p.clientY-rect.top)/rect.height)*2+1;
   var pid = raycastAt(ndcX, ndcY);
-  if(pid) selectPart(pid);
+  if(pid) pickPart(pid);
 }
-renderer.domElement.addEventListener('mousedown', onPointerDown);
-renderer.domElement.addEventListener('mouseup', onPointerUp);
-renderer.domElement.addEventListener('touchstart', onPointerDown, {passive:true});
-renderer.domElement.addEventListener('touchend', onPointerUp, {passive:true});
+// pointer events (mouse, touch and pen): the camera controls cancel the old mousedown/mouseup events in Chrome
+renderer.domElement.addEventListener('pointerdown', onPointerDown);
+renderer.domElement.addEventListener('pointerup', onPointerUp);
 renderer.domElement.addEventListener('click', function(){
   if(!flying) return;
   var pid = raycastAt(0,0);
-  if(pid) selectPart(pid);
+  if(pid) pickPart(pid);
 });
+
+/* ---------- Practice: 10 rounds of "find the building for this organelle" in 15 seconds ----------
+   Each round shows either the organelle's name or its microscope photo; click (or, in Walk Mode, aim and click)
+   the matching building. Faster answers score more; a wrong click costs 2 seconds; when time runs out the right
+   building lights up and the camera swings round to it. The KEY is off while you practise - no peeking! */
+var PRACTICE_TIME = 15, PRACTICE_ROUNDS = 10, PRACTICE_WRONG_COST = 2;
+var PRACTICE_QS = [
+  {name:'CELL MEMBRANE', parts:['membrane'], photo:'membrane'},
+  {name:'CELL WALL', parts:['wall'], photo:'wall'},
+  {name:'NUCLEUS', parts:['cityhall'], photo:'nucleus'},
+  {name:'CHROMOSOMES', parts:['chromosomes'], photo:'chromosomes'},
+  {name:'MITOCHONDRIA', parts:['powerplant'], photo:'mitochondria'},
+  {name:'CHLOROPLAST', parts:['farms'], photo:'chloroplast'},
+  {name:'VACUOLE', parts:['watertower', 'foodstore', 'wastesite'], photo:'vacuole'},
+  {name:'ENDOPLASMIC RETICULUM', parts:['highway'], photo:'er'},
+  {name:'RIBOSOME', parts:['ribosome'], photo:'ribosome'},
+  {name:'GOLGI APPARATUS', parts:['golgi'], photo:'golgi'}
+];
+var practice = {on:false, phase:'off', round:0, score:0, right:0, q:null, left:0, wait:0, list:[], lit:[], camGoal:null};
+var prEl = document.getElementById('practice'), prRound = document.getElementById('pr-round'), prScore = document.getElementById('pr-score');
+var prAsk = document.getElementById('pr-ask'), prName = document.getElementById('pr-name'), prPhoto = document.getElementById('pr-photo');
+var prFill = document.getElementById('pr-fill'), prMsg = document.getElementById('pr-msg');
+var prAgain = document.getElementById('pr-again'), prStop = document.getElementById('pr-stop'), prToggle = document.getElementById('practice-toggle');
+var prBest = 0;
+try { prBest = parseInt(localStorage.getItem('cellcity.practiceBest'), 10) || 0; } catch(e){}
+
+/* clicks on buildings go here: an answer while practising, otherwise the info panel */
+function pickPart(pid){ if(practice.on) practiceGuess(pid); else selectPart(pid); }
+
+function practiceLight(parts){
+  practice.lit.forEach(function(pid){ (outlineGroups[pid] || []).forEach(function(o){ o.visible = false; }); });
+  practice.lit = parts || [];
+  practice.lit.forEach(function(pid){ (outlineGroups[pid] || []).forEach(function(o){ o.visible = true; }); });
+}
+function practiceSay(text, kind){ prMsg.textContent = text; prMsg.className = kind || ''; }
+function shuffle(a){ for(var i=a.length-1;i>0;i--){ var j = Math.floor(Math.random()*(i+1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+
+function startPractice(){
+  if(flying && document.exitPointerLock && driving) document.exitPointerLock();   // clicking buildings needs the overview or Walk Mode
+  infoPanel.classList.add('hidden'); clearSelection();
+  legend.classList.add('hidden'); legendToggle.disabled = true;
+  document.getElementById('title-screen').classList.add('hidden');
+  practice.on = true; practice.round = 0; practice.score = 0; practice.right = 0;
+  practice.list = shuffle(PRACTICE_QS.slice()).slice(0, PRACTICE_ROUNDS);
+  prEl.classList.remove('hidden'); prAgain.classList.add('hidden');
+  prToggle.textContent = 'STOP PRACTICE';
+  nextPracticeRound();
+}
+function stopPractice(){
+  practice.on = false; practice.phase = 'off'; practice.camGoal = null;
+  practiceLight([]);
+  prEl.classList.add('hidden');
+  legendToggle.disabled = false;
+  prToggle.textContent = 'PRACTICE';
+}
+function nextPracticeRound(){
+  if(practice.round >= practice.list.length){ endPractice(); return; }
+  var q = practice.q = practice.list[practice.round++];
+  var photo = PART_PHOTOS[q.photo], usePhoto = !!photo && Math.random() < 0.5;
+  practice.phase = 'ask'; practice.left = PRACTICE_TIME; practice.camGoal = null;
+  practiceLight([]);
+  prRound.textContent = 'ROUND ' + practice.round + '/' + practice.list.length;
+  prScore.textContent = 'SCORE ' + practice.score;
+  if(usePhoto){
+    prAsk.textContent = 'Which building is this organelle?';
+    prName.classList.add('hidden');
+    prPhoto.src = photo; prPhoto.alt = 'A mystery organelle under a microscope'; prPhoto.classList.remove('hidden');
+  } else {
+    prAsk.textContent = 'Find the building for:';
+    prName.textContent = q.name; prName.classList.remove('hidden');
+    prPhoto.classList.add('hidden'); prPhoto.removeAttribute('src');
+  }
+  practiceSay(flying ? 'Aim with the + and click it.' : 'Click it in the city - drag to look around.');
+}
+function practiceGuess(pid){
+  if(practice.phase !== 'ask') return;
+  var q = practice.q;
+  if(q.parts.indexOf(pid) >= 0){
+    var pts = 100 + Math.round(practice.left*10);
+    practice.score += pts; practice.right++;
+    prScore.textContent = 'SCORE ' + practice.score;
+    practiceSay('CORRECT! ' + PARTS[pid].title.toUpperCase() + ' = ' + q.name + '  +' + pts, 'good');
+    practiceLight(q.parts);
+    practice.phase = 'reveal'; practice.wait = 1.6;
+  } else {
+    practice.left = Math.max(0, practice.left - PRACTICE_WRONG_COST);
+    var d = PARTS[pid];
+    practiceSay('NOPE - that\'s the ' + d.title + ' (' + d.tag.toLowerCase() + '). -' + PRACTICE_WRONG_COST + 's', 'bad');
+    prEl.classList.remove('shake'); void prEl.offsetWidth; prEl.classList.add('shake');
+  }
+}
+function endPractice(){
+  practice.phase = 'done'; practiceLight([]); practice.camGoal = null;
+  var newBest = practice.score > prBest;
+  if(newBest){ prBest = practice.score; try { localStorage.setItem('cellcity.practiceBest', String(prBest)); } catch(e){} }
+  prRound.textContent = 'DONE!';
+  prScore.textContent = 'SCORE ' + practice.score;
+  prAsk.textContent = 'You found ' + practice.right + ' of ' + practice.list.length + '.';
+  prName.textContent = practice.right === practice.list.length ? 'PERFECT!' : practice.right >= 7 ? 'GREAT JOB!' : practice.right >= 4 ? 'NICE TRY!' : 'KEEP PRACTISING!';
+  prName.classList.remove('hidden'); prPhoto.classList.add('hidden');
+  prFill.style.width = '0%';
+  practiceSay(newBest ? 'NEW BEST SCORE!' : 'Best score: ' + prBest, newBest ? 'good' : '');
+  prAgain.classList.remove('hidden');
+}
+/* each frame: run the clock, and after a timeout swing the overview camera round to the right building */
+var _prTmp = new THREE.Vector3();
+function updatePractice(dt){
+  if(!practice.on) return;
+  if(practice.phase === 'ask'){
+    practice.left -= dt;
+    if(practice.left <= 0){
+      practice.left = 0;
+      var q = practice.q, names = q.parts.map(function(p){ return PARTS[p].title; });
+      practiceSay('TIME\'S UP! It was the ' + (names.length > 1 ? names.slice(0, -1).join(', ') + ' or ' + names[names.length-1] : names[0]) + '.', 'bad');
+      practiceLight(q.parts);
+      var m = (partGroups[q.parts[0]] || [])[0];
+      if(m){ m.getWorldPosition(_prTmp); practice.camGoal = _prTmp.clone(); }
+      practice.phase = 'reveal'; practice.wait = 3;
+    }
+    prFill.style.width = (100*practice.left/PRACTICE_TIME) + '%';
+    prFill.classList.toggle('low', practice.left < 5);
+  } else if(practice.phase === 'reveal'){
+    practice.wait -= dt;
+    if(practice.camGoal && !flying){
+      controls.target.lerp(practice.camGoal, 1 - Math.exp(-3*dt));
+      camera.position.lerp(_prTmp.set(practice.camGoal.x + 30, practice.camGoal.y + 34, practice.camGoal.z + 38), 1 - Math.exp(-2*dt));
+    }
+    if(practice.wait <= 0) nextPracticeRound();
+  }
+}
+prToggle.addEventListener('click', function(){ if(practice.on) stopPractice(); else startPractice(); });
+prStop.addEventListener('click', stopPractice);
+prAgain.addEventListener('click', startPractice);
 
 /* ---------- The car model: built once, hidden until Drive Mode is entered ---------- */
 function buildCarModel(){
@@ -2614,7 +2910,9 @@ var titleTabs = [
   {btn:document.getElementById('tab-btn-settings'), panel:document.getElementById('tab-settings')},
   {btn:document.getElementById('tab-btn-credits'), panel:document.getElementById('tab-credits')},
   {btn:document.getElementById('tab-btn-admin'), panel:document.getElementById('tab-admin')},
-  {btn:document.getElementById('tab-btn-perf'), panel:document.getElementById('tab-perf')}
+  {btn:document.getElementById('tab-btn-perf'), panel:document.getElementById('tab-perf')},
+  {btn:document.getElementById('tab-btn-help'), panel:document.getElementById('tab-help')},
+  {btn:document.getElementById('tab-btn-log'), panel:document.getElementById('tab-log')}
 ];
 function showTitleTab(tab){
   titleTabs.forEach(function(t){
@@ -4506,6 +4804,7 @@ function animate(){
   addTrailerColliders();
   updateLake(dt);
   updateSpeedo();
+  updatePractice(dt);
   sendPresence(false);
   followSky();
   renderer.render(scene, camera);
