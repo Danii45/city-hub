@@ -1030,6 +1030,7 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
       <div class="scroll-block">
         <h3>VERSION 1.1 <span class="when">- Oct 9, 2026</span></h3>
         <ul>
+          <li><span class="when">Oct 9, 2026 · 9:52 AM</span><br>AURORA paint for owners: the northern lights roll over your car in waves of blue, violet, pink and mint.</li>
           <li><span class="when">Oct 9, 2026 · 9:40 AM</span><br>Special paints: shiny GOLD for admins, and a shining DIAMOND for owners (owners can pick either).</li>
           <li><span class="when">Oct 9, 2026 · 9:35 AM</span><br>Fixed: switching between Walk and Drive on a bridge keeps you on it - it used to drop you underneath (on the race track's crossover, onto the road below).</li>
           <li><span class="when">Oct 9, 2026 · 9:35 AM</span><br>Fixed: the CellDoo's hitbox matches its shape - it pulls up right alongside the dock, and its nose doesn't poke into it.</li>
@@ -2762,7 +2763,8 @@ var CAR_COLORS = [
   {id:'maroon', name:'MAROON', hex:0x6e2026},
   // special shiny paints: GOLD for admins (and owners), DIAMOND for owners only. Anyone allowed can use them at once
   {id:'gold',    name:'GOLD',    hex:0xb8860b, shine:'gold',    role:'admin'},
-  {id:'diamond', name:'DIAMOND', hex:0x6fd4ff, shine:'diamond', role:'owner'}
+  {id:'diamond', name:'DIAMOND', hex:0x6fd4ff, shine:'diamond', role:'owner'},
+  {id:'aurora',  name:'AURORA',  hex:0x7355ff, shine:'aurora',  role:'owner'}   // owners only: the northern lights (Daniel's palette)
 ];
 function carColor(id){
   for(var i=0;i<CAR_COLORS.length;i++) if(CAR_COLORS[i].id === id) return CAR_COLORS[i];
@@ -2774,6 +2776,7 @@ function colorAllowed(c, role){ return !!c && (!c.shine || roleRank(role) >= rol
 function colorCss(c){
   if(c.shine === 'gold') return 'linear-gradient(120deg, #8a5a00, #d9a520 25%, #fff4c2 45%, #d9a520 60%, #8a5a00 80%, #ffe27a)';
   if(c.shine === 'diamond') return 'linear-gradient(120deg, #7fe3ff, #ffffff 20%, #a9dcff 40%, #e4d2ff 60%, #ffffff 80%, #7fe3ff)';
+  if(c.shine === 'aurora') return 'linear-gradient(120deg, #1212c2, #3900e6, #7355ff, #ab7dff, #f494ff, #fbd7ff, #c4fff1, #6affde, #01e6ce, #00a6ce, #0165a2, #023782, #1212c2)';
   return hexCss(c.hex);
 }
 function paintModel(model, colorId){
@@ -2793,6 +2796,8 @@ function paintModel(model, colorId){
 var shinyPaints = [];   // {mat, kind, phase}
 function unshine(mat){ for(var i=shinyPaints.length-1;i>=0;i--) if(shinyPaints[i].mat === mat) shinyPaints.splice(i, 1); }
 function setShinyPaint(model, kind){
+  // an AURORA body is colored corner by corner (see paintAurora): switch that off first
+  if(model.aurora){ model.paint.vertexColors = false; model.paint.needsUpdate = true; model.aurora = null; }
   var old = model.paint;
   if(!!kind !== !!old.isMeshPhongMaterial){
     var m = kind ? new THREE.MeshPhongMaterial({color:old.color.getHex(), flatShading:true}) : solidMat(old.color.getHex());
@@ -2802,11 +2807,34 @@ function setShinyPaint(model, kind){
   }
   unshine(model.paint);
   if(!kind) return;
-  model.paint.specular.setHex(kind === 'diamond' ? 0xffffff : 0xfff0b0);
-  model.paint.shininess = kind === 'diamond' ? 140 : 60;
+  model.paint.specular.setHex(kind === 'gold' ? 0xfff0b0 : 0xffffff);
+  model.paint.shininess = kind === 'gold' ? 60 : kind === 'aurora' ? 100 : 140;
+  if(kind === 'aurora'){ paintAurora(model); return; }
   shinyPaints.push({mat:model.paint, kind:kind, phase:Math.random()*6});
 }
+/* AURORA: every corner of the painted body gets its own place in the palette - further along the further back (and
+   lower) it sits on the vehicle - so bands of color roll along the body like the northern lights. Each frame
+   updateShinyPaints() moves them on and writes the colors into the corners (vertex colors) */
+function paintAurora(model){
+  var g = model.group, v = new THREE.Vector3(), m = new THREE.Matrix4(), inv = new THREE.Matrix4(), parts = [];
+  g.updateMatrixWorld(true);
+  inv.copy(g.matrixWorld).invert();
+  g.traverse(function(o){
+    if(o.material !== model.paint || !o.geometry) return;
+    var pos = o.geometry.attributes.position, phases = new Float32Array(pos.count);
+    m.multiplyMatrices(inv, o.matrixWorld);   // this part's own space -> the vehicle's
+    for(var i=0;i<pos.count;i++){ v.fromBufferAttribute(pos, i).applyMatrix4(m); phases[i] = v.z*1.1 - v.y*0.9 + v.x*0.25; }
+    if(!o.geometry.attributes.color) o.geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(pos.count*3), 3));
+    parts.push({col:o.geometry.attributes.color, phases:phases});
+  });
+  model.paint.vertexColors = true;
+  model.paint.needsUpdate = true;
+  model.aurora = parts;
+  shinyPaints.push({mat:model.paint, kind:'aurora', phase:0, parts:parts});
+}
 var DIAMOND_SHADES = [0x4fc8ff, 0xc6f2ff, 0x7fb8ff, 0xcfc4ff].map(function(h){ return new THREE.Color(h); });
+var AURORA_SHADES = [0x1212c2, 0x3900e6, 0x7355ff, 0xab7dff, 0xf494ff, 0xfbd7ff, 0xc4fff1, 0x6affde, 0x01e6ce, 0x00a6ce, 0x0165a2, 0x023782]
+  .map(function(h){ return new THREE.Color(h); });
 function updateShinyPaints(t){
   shinyPaints.forEach(function(p){
     var s = 0.5 + 0.5*Math.sin(t*2.6 + p.phase);
@@ -2814,6 +2842,19 @@ function updateShinyPaints(t){
       var g = Math.pow(0.5 + 0.5*Math.sin(t*4.1 + p.phase*1.7), 6);   // a quick bright glint now and then
       p.mat.color.setRGB(0.55 + 0.23*s, 0.34 + 0.18*s, 0.03 + 0.07*s);   // deep, metallic gold (darker than the YELLOW paint)
       p.mat.emissive.setRGB(0.1*s + 0.45*g, 0.06*s + 0.33*g, 0.08*g);   // ...that flashes bright
+    } else if(p.kind === 'aurora'){
+      var n = AURORA_SHADES.length;
+      p.mat.color.setRGB(1, 1, 1);   // the corners carry the color
+      p.parts.forEach(function(part){
+        var arr = part.col.array;
+        for(var i=0;i<part.phases.length;i++){
+          var a = ((t*0.45 + part.phases[i]) % n + n) % n, k = Math.floor(a), f = a - k;
+          var c0 = AURORA_SHADES[k], c1 = AURORA_SHADES[(k+1) % n];
+          arr[i*3] = c0.r + (c1.r - c0.r)*f; arr[i*3+1] = c0.g + (c1.g - c0.g)*f; arr[i*3+2] = c0.b + (c1.b - c0.b)*f;
+        }
+        part.col.needsUpdate = true;
+      });
+      p.mat.emissive.setRGB(0.03 + 0.03*s, 0.02 + 0.02*s, 0.08 + 0.05*s);   // a soft violet glow
     } else {
       var u = (t*0.5 + p.phase) % DIAMOND_SHADES.length, i = Math.floor(u);
       p.mat.color.copy(DIAMOND_SHADES[i]).lerp(DIAMOND_SHADES[(i+1) % DIAMOND_SHADES.length], u - i);
@@ -5116,7 +5157,7 @@ function renderSwatches(){
     swatchesEl.appendChild(b);
   });
   colorNameEl.textContent = carColor(myColor).name;
-  specialHint.textContent = myRole() === 'owner' ? 'Owner paints: shiny GOLD and shining DIAMOND.' : myRole() === 'admin' ? 'Admin paint: shiny GOLD.' : '';
+  specialHint.textContent = myRole() === 'owner' ? 'Owner paints: shiny GOLD, shining DIAMOND and AURORA (the northern lights).' : myRole() === 'admin' ? 'Admin paint: shiny GOLD.' : '';
 }
 
 function renderPlayers(){
