@@ -826,7 +826,7 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
 <div id="canvas-wrap"></div>
 
 <div id="title-card">
-  <h1>CELL CITY<span class="version-pill">1.0</span></h1>
+  <h1>CELL CITY<span class="version-pill">1.1</span></h1>
   <p>An animal cell, built as a town. Click any building.</p>
   <div id="players" class="hidden">
     <div class="players-head">ONLINE <span id="players-count">1</span> <span id="players-status"></span></div>
@@ -900,7 +900,7 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
 
 <div id="title-screen">
   <div class="panel">
-    <h1>CELL CITY<span class="version-pill">1.0</span></h1>
+    <h1>CELL CITY<span class="version-pill">1.1</span></h1>
     <p class="subtitle">An animal cell, built as a town.</p>
     <div class="tab-row">
       <button class="tab-btn active" id="tab-btn-settings">SETTINGS</button>
@@ -995,9 +995,10 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
         <h3>THE LAKE &amp; THE CELLDOO</h3>
         <ul>
           <li>Don't walk or drive into the water - you'll drown and respawn on land.</li>
-          <li>Walk to the dock (south gate) and press <b>E</b> to ride the CellDoo jet ski. <b>E</b> at the dock or ramp to get off.</li>
+          <li>Walk to the dock (south gate) and press <b>E</b> to ride the CellDoo jet ski. <b>E</b> at the dock or the ramp to get off - or run it up onto the beach and hop off there.</li>
           <li>Big waves let you jump - land badly or turn too sharp and you might wipe out!</li>
           <li>Left it out on the lake? Stand on the dock and press <b>R</b> to call it back.</li>
+          <li>Other players can see your CellDoo wherever you leave it.</li>
         </ul>
         <h3>PRACTICE</h3>
         <ul>
@@ -1022,6 +1023,13 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
     </div>
     <div class="tab-panel hidden" id="tab-log">
       <div class="scroll-block">
+        <h3>VERSION 1.1 <span class="when">- Oct 9, 2026</span></h3>
+        <ul>
+          <li><span class="when">Oct 9, 2026 · 9:08 AM</span><br>Engine sounds for the car, the MOTOCELL F1 and the CellDoo - the cars shift through their gears, and the CellDoo hisses spray on the water.</li>
+          <li><span class="when">Oct 9, 2026 · 9:08 AM</span><br>No more invisible walls on the lake: drive the CellDoo up onto the beach or the boat ramp, and press E to hop off right there.</li>
+          <li><span class="when">Oct 9, 2026 · 9:08 AM</span><br>Trailers bump into walls and buildings now, instead of going through them.</li>
+          <li><span class="when">Oct 9, 2026 · 9:08 AM</span><br>Everyone can see your CellDoo when you leave it out on the lake or the beach, or call it back to the dock.</li>
+        </ul>
         <h3>VERSION 1.0 <span class="when">- Oct 8, 2026</span></h3>
         <ul>
           <li><span class="when">Oct 8, 2026 · 2:34 PM</span><br>City Hub: the website now opens on a hub where you pick a city. Cell City is the first - more are coming soon. BACK TO CITY HUB is under ENTER CITY.</li>
@@ -2937,14 +2945,15 @@ function setCarModel(name){
   car.group.visible = shown;
   car.group.position.copy(carPos);
   car.group.rotation.y = carYaw;
-  // engine sound belongs to the truck only: switch it on/off if you swap vehicles mid-drive
-  if(driving && name === 'truck') startEngineSound(); else stopEngineSound();
+  // every vehicle has its own engine sound (the truck's is a recording): swap it if you change vehicles mid-drive
+  stopEngineSound();
+  if(driving) startEngineSound();
 }
 
-/* ---------- Truck sounds (Web Audio): engine loop while driving the truck, a loud crash hit ----------
+/* ---------- Vehicle sounds (Web Audio): the truck's recorded engine loop and loud crash hit, and made-on-the-fly engines for the rest ----------
    The clips are Daniel's recordings, embedded above the game script as TRUCK_SOUNDS. Browsers only let
    sound start after a click or key press, so the audio context is woken up on the first one. */
-var sfx = {ctx:null, buffers:{}, decoding:null, engine:null, engineGain:null, crashBus:null, lastCrash:0};
+var sfx = {ctx:null, buffers:{}, decoding:null, engine:null, engineGain:null, crashBus:null, lastCrash:0, synth:null};
 function unlockAudio(){
   var AC = window.AudioContext || window.webkitAudioContext;
   if(!AC || !window.TRUCK_SOUNDS) return;
@@ -2970,6 +2979,7 @@ function audioReady(){
   return sfx.decoding;
 }
 function startEngineSound(){
+  if(carName !== 'truck'){ startSynthEngine(carName); return; }   // the sedan, F1 and CellDoo: made on the fly (below)
   audioReady().then(function(){
     var buf = sfx.buffers.engine;
     if(!buf || sfx.engine || !driving || carName !== 'truck') return;
@@ -2987,6 +2997,7 @@ function startEngineSound(){
   });
 }
 function stopEngineSound(){
+  stopSynthEngine();
   if(!sfx.engine) return;
   var t = sfx.ctx.currentTime, g = sfx.engineGain;
   g.gain.cancelScheduledValues(t);
@@ -2995,11 +3006,87 @@ function stopEngineSound(){
   sfx.engine.stop(t + 0.09);
   sfx.engine = null; sfx.engineGain = null;
 }
-function updateEngineSound(speedFrac){
+function updateEngineSound(speedFrac, throttle){
+  updateSynthEngine(speedFrac, throttle);
   if(!sfx.engine) return;
   var t = sfx.ctx.currentTime;
   sfx.engine.playbackRate.setTargetAtTime(0.9 + 0.3*speedFrac, t, 0.12);   // revs up a little with speed
   sfx.engineGain.gain.setTargetAtTime(0.45 + 0.35*speedFrac, t, 0.12);
+}
+
+/* Engine sounds for everything but the truck, made on the fly (no recordings): two detuned oscillators through a
+   low-pass filter, plus a low "sub" note. The sedan and the F1 run up through their gears (the pitch climbs, then
+   drops on each shift); the CellDoo has no gears, just a buzzy whine and a hiss of spray while it's in the water.
+     idle/top: pitch (Hz) at idle and at the redline - cut0/cut1: the filter, dull at idle, brighter at full revs
+     level: volume - chug: how much each engine "firing" pulses the sound (0 = smooth) */
+var SYNTH_ENGINES = {
+  sedan:   {gears:4, idle:34, top:96,  cut0:300, cut1:1100, level:0.20, wave2:'square',   chug:0.35},
+  f1:      {gears:6, idle:70, top:300, cut0:900, cut1:3600, level:0.12, wave2:'sawtooth', chug:0},
+  celldoo: {gears:1, idle:52, top:150, cut0:450, cut1:1500, level:0.15, wave2:'square',   chug:0.25, spray:true}
+};
+function startSynthEngine(name){
+  var spec = SYNTH_ENGINES[name];
+  unlockAudio();
+  if(!spec || !sfx.ctx || sfx.synth) return;
+  var ctx = sfx.ctx, t = ctx.currentTime, n = {spec:spec};
+  n.out = ctx.createGain(); n.out.gain.setValueAtTime(0, t); n.out.gain.linearRampToValueAtTime(spec.level*0.6, t + 0.2);
+  n.out.connect(ctx.destination);
+  n.filter = ctx.createBiquadFilter(); n.filter.type = 'lowpass'; n.filter.Q.value = 1.5; n.filter.frequency.value = spec.cut0;
+  n.pulse = ctx.createGain(); n.pulse.gain.value = 1;   // the "chug": its volume is wobbled by the firing pulses below
+  n.filter.connect(n.pulse); n.pulse.connect(n.out);
+  n.o1 = ctx.createOscillator(); n.o1.type = 'sawtooth';
+  n.o2 = ctx.createOscillator(); n.o2.type = spec.wave2;
+  n.sub = ctx.createOscillator(); n.sub.type = 'sine';
+  var subGain = ctx.createGain(); subGain.gain.value = 0.6;
+  n.o1.connect(n.filter); n.o2.connect(n.filter); n.sub.connect(subGain); subGain.connect(n.pulse);
+  n.lfo = ctx.createOscillator(); n.lfo.type = 'square';
+  n.lfoDepth = ctx.createGain(); n.lfoDepth.gain.value = spec.chug*0.5;
+  n.lfo.connect(n.lfoDepth); n.lfoDepth.connect(n.pulse.gain);
+  n.oscs = [n.o1, n.o2, n.sub, n.lfo];
+  if(spec.spray){
+    // white noise, band-passed into a hiss: the spray off the hull
+    var len = ctx.sampleRate*2, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+    for(var i=0;i<len;i++) d[i] = Math.random()*2 - 1;
+    n.noise = ctx.createBufferSource(); n.noise.buffer = buf; n.noise.loop = true;
+    var band = ctx.createBiquadFilter(); band.type = 'bandpass'; band.frequency.value = 1400; band.Q.value = 0.7;
+    n.spray = ctx.createGain(); n.spray.gain.value = 0;
+    n.noise.connect(band); band.connect(n.spray); n.spray.connect(n.out);
+    n.oscs.push(n.noise);
+  }
+  n.oscs.forEach(function(o){ o.start(t); });
+  sfx.synth = n;
+  updateSynthEngine(0, 0);
+}
+function stopSynthEngine(){
+  var n = sfx.synth;
+  if(!n) return;
+  var t = sfx.ctx.currentTime;
+  n.out.gain.cancelScheduledValues(t);
+  n.out.gain.setValueAtTime(n.out.gain.value, t);
+  n.out.gain.linearRampToValueAtTime(0, t + 0.1);
+  n.oscs.forEach(function(o){ o.stop(t + 0.12); });
+  setTimeout(function(){ n.out.disconnect(); }, 300);
+  sfx.synth = null;
+}
+/* revs (0..1) for a speed: through the gears for the cars, straight up for the CellDoo */
+function engineRevs(spec, speedFrac){
+  if(spec.gears <= 1) return speedFrac;
+  var g = Math.min(0.9999, speedFrac)*spec.gears, gear = Math.floor(g), inGear = g - gear;
+  return gear === 0 ? inGear : 0.45 + 0.55*inGear;   // after each shift the revs drop back to about half
+}
+function updateSynthEngine(speedFrac, throttle){
+  var n = sfx.synth;
+  if(!n) return;
+  var spec = n.spec, t = sfx.ctx.currentTime, on = throttle ? 1 : 0;
+  var revs = Math.min(1, engineRevs(spec, speedFrac) + 0.08*on);   // the throttle lifts the revs a touch
+  var f = spec.idle + (spec.top - spec.idle)*revs;
+  n.o1.frequency.setTargetAtTime(f, t, 0.06);
+  n.o2.frequency.setTargetAtTime(spec.wave2 === 'sawtooth' ? f*2.01 : f*1.006, t, 0.06);   // F1: an octave up for the scream
+  n.sub.frequency.setTargetAtTime(f/2, t, 0.06);
+  n.lfo.frequency.setTargetAtTime(f/2, t, 0.06);
+  n.filter.frequency.setTargetAtTime(spec.cut0 + (spec.cut1 - spec.cut0)*revs + 300*on, t, 0.08);
+  n.out.gain.setTargetAtTime(spec.level*(0.55 + 0.3*speedFrac + 0.25*on), t, 0.1);
+  if(n.spray) n.spray.gain.setTargetAtTime(spec.spray && !boatBeached ? 0.9*speedFrac : 0, t, 0.15);
 }
 function playCrashSound(){
   var now = performance.now();
@@ -3301,7 +3388,7 @@ function enterDriveMode(){
   car.group.position.copy(carPos);
   car.group.rotation.y = carYaw;
   updateDriveCamera();
-  if(carName === 'truck') startEngineSound();
+  startEngineSound();
 }
 function exitDriveMode(){
   stopEngineSound();
@@ -3523,6 +3610,7 @@ function updateDriveMovement(dt){
   else if(updateDrowning(dt)) return;                        // sinking after driving into the lake (or a CellDoo wipeout)
   // parked on someone's trailer while they tow it? it carries you (and turns you) with it
   rideTrailers(carPos, carPos.y, function(dyaw){ carYaw += dyaw; if(spin) spin.travelYaw += dyaw; });
+  var startYaw = carYaw;   // where this frame started, in case your trailer hits something and stops you
   var throttle = 0;
   if(keys['KeyW']||keys['ArrowUp']) throttle = 1;
   else if(keys['KeyS']||keys['ArrowDown']) throttle = -1;
@@ -3532,13 +3620,17 @@ function updateDriveMovement(dt){
   if(pranked){ throttle *= -1; steerInput *= -1; }
 
   var topSpeed = Math.max(walkSpeed*carSpec.topMul, 10);
+  // the CellDoo out of the water: the throttle only gets it crawling, and if it ran aground fast it slides to a stop
+  var beached = carName === 'celldoo' && boatBeached;
+  var fwdMax = beached ? BEACH_CRAWL : topSpeed, backMax = beached ? BEACH_CRAWL : topSpeed*0.5;
   if(spin){ driveSpeed *= Math.exp(-1.8*dt); }   // sliding sideways scrubs speed off; no throttle or brakes mid-spin
-  else if(throttle>0){ driveSpeed = Math.min(topSpeed, driveSpeed + carSpec.accel*dt); }
-  else if(throttle<0){ driveSpeed = Math.max(-topSpeed*0.5, driveSpeed - carSpec.accel*dt); }
+  else if(throttle>0){ if(driveSpeed < fwdMax) driveSpeed = Math.min(fwdMax, driveSpeed + carSpec.accel*dt); }
+  else if(throttle<0){ if(driveSpeed > -backMax) driveSpeed = Math.max(-backMax, driveSpeed - carSpec.accel*dt); }
   else {
     if(driveSpeed>0) driveSpeed = Math.max(0, driveSpeed - carSpec.accel*0.6*dt);
     else if(driveSpeed<0) driveSpeed = Math.min(0, driveSpeed + carSpec.accel*0.6*dt);
   }
+  if(beached && Math.abs(driveSpeed) > BEACH_CRAWL) driveSpeed *= Math.exp(-3.5*dt);   // grinding up the sand
 
   // The wheel turns in gradually (not snapping to full lock) and self-centers when released.
   // Steering feels the same at every speed: once you're past a crawl, full lock turns the car at
@@ -3635,9 +3727,27 @@ function updateDriveMovement(dt){
   var headX = -Math.sin(carYaw), headZ = -Math.cos(carYaw);   // where the nose points (for ramp tilt)
   var roll = Math.max(-0.07, Math.min(0.07, -carYawRate*driveSpeed*0.005));  // lean out of the turn
   var tilt;
-  if(movingBoat){
+  var bs = movingBoat ? boatSurface(carPos.x, carPos.z, carPos.y) : null;
+  if(movingBoat && !bs.water){
+    // out of the water (beach, boat ramp, road, bridge): rest on the ground and tilt with it - or, if you flew off a
+    // wave onto the beach, drop onto it
+    boatBeached = true;
+    if(boatAir || carPos.y > bs.y + 0.5){
+      boatAir = true;
+      boatVy += BOAT_GRAVITY*dt;
+      carPos.y += boatVy*dt;
+      if(carPos.y <= bs.y){ carPos.y = bs.y; boatAir = false; boatVy = 0; driveSpeed *= 0.7; }
+    } else {
+      carPos.y += (bs.y - carPos.y)*Math.min(1, dt*18);
+      boatVy = 0;
+    }
+    var gF = boatSurface(carPos.x+headX*1.4, carPos.z+headZ*1.4, carPos.y).y, gB = boatSurface(carPos.x-headX*1.4, carPos.z-headZ*1.4, carPos.y).y;
+    tilt = boatAir ? boatAirTilt : Math.atan2(gF-gB, 2.8);
+  } else if(movingBoat){
+    boatBeached = false;
     // ride the waves: bob with the water and pitch/roll with its slope; lean harder into turns
     var water = waterHeightAt(carPos.x, carPos.z);
+    if(!boatAir && carPos.y > water + 0.6){ boatAir = true; boatVy = Math.min(boatVy, 0); boatAirTilt = 0; }   // dropped into the water from up high
     var wF = waterHeightAt(carPos.x+headX*1.2, carPos.z+headZ*1.2), wB = waterHeightAt(carPos.x-headX*1.2, carPos.z-headZ*1.2);
     var wL = waterHeightAt(carPos.x+headZ*0.6, carPos.z-headX*0.6), wR = waterHeightAt(carPos.x-headZ*0.6, carPos.z+headX*0.6);
     var waterTilt = Math.atan2(wF-wB, 2.4) + Math.min(0.12, Math.abs(driveSpeed)*0.004);   // nose lifts a little at speed
@@ -3682,8 +3792,15 @@ function updateDriveMovement(dt){
   car.group.position.copy(carPos);
   car.group.rotation.set(tilt, carYaw, roll, 'YXZ');
   car.wheels.forEach(function(w){ w.rotation.x += driveSpeed*dt/car.wheelR; });
-  updateLocalTrailer(dt);
-  updateEngineSound(Math.min(1, Math.abs(driveSpeed)/topSpeed));
+  if(!updateLocalTrailer(dt)){
+    // the trailer would run into a wall or a building: it stops the truck dead (back up or steer the other way)
+    if(Math.abs(driveSpeed) > 5 && !trailerStuck){ showToast('YOUR TRAILER HIT SOMETHING!'); playCrashSound(); }
+    trailerStuck = true;
+    carPos.x = x0; carPos.z = z0; carYaw = startYaw; carYawRate = 0; driveSpeed = 0;
+    car.group.position.copy(carPos);
+    car.group.rotation.set(tilt, carYaw, roll, 'YXZ');
+  } else trailerStuck = false;
+  updateEngineSound(Math.min(1, Math.abs(driveSpeed)/topSpeed), throttle);
 
   // chase cam drifts back behind the car unless you've just used the mouse to look around
   if(performance.now() - lastMouseMove > 1200 && Math.abs(driveSpeed) > 1){
@@ -3786,7 +3903,7 @@ if(window.matchMedia){
    Low-poly water with waves (switchable in PERFORMANCE), sandy beaches on both shores, a boat ramp you can back a
    trailer down, a wooden dock, the CellDoo jet ski, and a bridge carrying the race-track road over the water.
    No invisible walls for people or cars: walk or drive into the water and you drown, then respawn on dry land.
-   Only the CellDoo is kept in the water (it can't climb out onto the shore). Shape and size: LAKE_P / LAKE_IN /
+   The CellDoo can run up onto the beach or the ramp too (then it only crawls). Shape and size: LAKE_P / LAKE_IN /
    LAKE_OUT up in Scene setup. */
 var WATER_Y = 0.1, LAKE_BOTTOM = -1.6;
 var RAMP = {x0:9, x1:17, zTop:124, zShore:133, zEnd:144, depth:-1.4};   // flat on land, then slopes into the water
@@ -3816,6 +3933,7 @@ lakeTime = waveClock();
 /* CellDoo jumps: off a crest at speed it leaves the water, flies, and lands - badly, once in a while */
 var BOAT_GRAVITY = -18;
 var boatAir = false, boatVy = 0, boatAirTilt = 0;
+var boatBeached = false;   // the CellDoo is out of the water (beach, boat ramp, road, bridge)
 
 /* "distance" from the city centre along the lake's rounded-square shape (a superellipse): the shores are LAKE_IN and LAKE_OUT */
 function lakeR(x, z){ var ax = Math.abs(x)/100, az = Math.abs(z)/100; return 100*Math.pow(Math.pow(ax, LAKE_P) + Math.pow(az, LAKE_P), 1/LAKE_P); }
@@ -3963,12 +4081,14 @@ root.add(lakePath);
     slab(a[0], a[1], b[0], b[1], B.hw*2, 0.5, 0, DECK);
     [-1, 1].forEach(function(s){ slab(a[0], a[1], b[0], b[1], 0.35, 0.8, s*(B.hw+0.17), SIDE, 0.8); });
   }
-  // railings: walls for people and cars only (the CellDoo rides underneath), in 1 m pieces that stop at the top of
-  // the rail you can see - so you can jump over it (and off the bridge into the lake)
+  // railings, in 1 m pieces that stop at the top of the rail you can see - so you can jump over it (and off the bridge
+  // into the lake). Over the water they start at the deck, so the CellDoo rides underneath; over land they go all the
+  // way down, so nothing climbs onto the ramps from the side
   [-1, 1].forEach(function(s){
     for(var x = B.x0; x < B.x3; x += 1){
-      var xb = Math.min(B.x3, x + 1), top = Math.max(bridgeAt(x, 0), bridgeAt(xb, 0)) + 0.8;
-      segColliders.push({ax:x, az:s*(B.hw+0.17), bx:xb, bz:s*(B.hw+0.17), r:0.25, y0:-50, y1:top, land:true});
+      var xb = Math.min(B.x3, x + 1), deck = Math.min(bridgeAt(x, 0), bridgeAt(xb, 0)), top = Math.max(bridgeAt(x, 0), bridgeAt(xb, 0)) + 0.8;
+      var overWater = inLake((x + xb)/2, s*(B.hw+0.17));
+      pushSegCollider(x, s*(B.hw+0.17), xb, s*(B.hw+0.17), 0.25, overWater ? deck - 0.3 : -50, top);
     }
   });
   // piers in the water - solid for the CellDoo, below the deck for everyone else
@@ -4000,20 +4120,28 @@ root.add(lakePath);
   });
 })();
 
-// walls for the CellDoo only: both shorelines, the ramp mouth and the dock. People and cars can walk/drive straight in.
+// no invisible walls round the lake: the CellDoo can run up onto the beach or the boat ramp (and crawl about on land).
+// What's left is stuff you can see: the ramp's curbs, and the dock's edges (the CellDoo can't drive up onto the dock).
 (function(){
-  var N = 320, Y0 = -50, Y1 = 50;
-  [LAKE_IN, LAKE_OUT].forEach(function(r){
-    for(var i=0;i<N;i++){
-      var a = lakeDir(i/N*Math.PI*2), b = lakeDir((i+1)/N*Math.PI*2);
-      segColliders.push({ax:a.x*r, az:a.z*r, bx:b.x*r, bz:b.z*r, r:0.3, y0:Y0, y1:Y1, boat:true});
-    }
-  });
+  var Y0 = -50, Y1 = 50;
   [RAMP.x0, RAMP.x1].forEach(function(x){ pushSegCollider(x, RAMP.zTop, x, RAMP.zEnd, 0.3, Y0, Y1); });   // the curbs you can see
-  segColliders.push({ax:RAMP.x0, az:RAMP.zShore+0.4, bx:RAMP.x1, bz:RAMP.zShore+0.4, r:0.3, y0:Y0, y1:Y1, boat:true});   // the CellDoo can't drive up it
-  [DOCK.x0, DOCK.x1].forEach(function(x){ segColliders.push({ax:x, az:DOCK.z0 - 2, bx:x, bz:DOCK.z1, r:0.3, y0:Y0, y1:Y1, boat:true}); });
+  [DOCK.x0, DOCK.x1].forEach(function(x){ segColliders.push({ax:x, az:DOCK.z0, bx:x, bz:DOCK.z1, r:0.3, y0:Y0, y1:Y1, boat:true}); });
   segColliders.push({ax:DOCK.x0, az:DOCK.z1, bx:DOCK.x1, bz:DOCK.z1, r:0.3, y0:Y0, y1:Y1, boat:true});
 })();
+/* where the CellDoo sits at (x,z), given its height y: {y, water}. On the water it floats; on the beach, the boat
+   ramp's shallow end, a road or the bridge it rests on the ground (BOAT_LAND_LIFT keeps the hull's V out of it) */
+var BOAT_LAND_LIFT = 0.2, BEACH_CRAWL = 3;   // on land the CellDoo slides to a stop, then can only crawl (m/s)
+function boatSurface(x, z, y){
+  var b = bridgeAt(x, z);
+  if(b !== null && y > b - 1) return {y:b + BOAT_LAND_LIFT, water:false};   // up on the bridge (not underneath it)
+  if(inLake(x, z) && !onDock(x, z)){
+    var w = waterHeightAt(x, z);
+    if(!onRamp(x, z)) return {y:w, water:true};
+    var g = groundAt(x, z, y);
+    return g > w - 0.3 ? {y:g + BOAT_LAND_LIFT, water:false} : {y:w, water:true};   // the ramp's shallow end is dry
+  }
+  return {y:groundAt(x, z, y) + BOAT_LAND_LIFT, water:false};
+}
 
 /* Drowning: walk or drive into deep water (anywhere but the dock, the boat ramp or the bridge) and you sink -
    YOU DROWNED - then you respawn on the last dry ground you were on, a few steps back from the shore. */
@@ -4152,7 +4280,7 @@ celldoo.model.group.visible = true;
 paintModel(celldoo.model, myColor);
 function setCellDooState(state, pose){
   celldoo.state = state;
-  if(pose){ celldoo.pose.x = pose.x; celldoo.pose.z = pose.z; celldoo.pose.yaw = pose.yaw; }
+  if(pose){ celldoo.pose.x = pose.x; celldoo.pose.z = pose.z; celldoo.pose.yaw = pose.yaw; celldoo.pose.y = finite(pose.y) ? pose.y : 0; }
   celldoo.model.group.visible = (state === 'docked' || state === 'returning');
   if(state !== 'returning') celldoo.recall = null;
 }
@@ -4165,17 +4293,32 @@ function nearestLanding(x, z){
   LANDINGS.forEach(function(s){ var d = Math.hypot(s.x - x, s.z - z); if(d < bd){ bd = d; best = s; } });
   return {spot:best, dist:bd};
 }
+/* a dry spot to step off a beached CellDoo: to its right, its left, or behind it - not in the water, not inside anything */
+function landingBeside(x, z, yawNow){
+  var rx = Math.cos(yawNow), rz = -Math.sin(yawNow), bx = Math.sin(yawNow), bz = Math.cos(yawNow);
+  var tries = [[2.2*rx, 2.2*rz], [-2.2*rx, -2.2*rz], [3.2*bx, 3.2*bz]];
+  for(var i=0;i<tries.length;i++){
+    var px = x + tries[i][0], pz = z + tries[i][1];
+    if(inOpenWater(px, pz)) continue;
+    var py = groundAt(px, pz, carPos.y);
+    if(Math.abs(py - (carPos.y - BOAT_LAND_LIFT)) > 1) continue;   // not off the edge of the bridge
+    if(hitSolid(px, pz, 0.6, py + 0.3, py + EYE_HEIGHT)) continue;
+    return {x:px, z:pz, y:py, ashore:true};
+  }
+  return null;
+}
 function boardCellDoo(){
   celldoo.prevCar = carName;
   setCarModel('celldoo');
   if(!driving) requestFirstPerson('drive');
-  carPos.set(celldoo.pose.x, WATER_Y, celldoo.pose.z);
+  var rest = boatSurface(celldoo.pose.x, celldoo.pose.z, celldoo.pose.y || 0);
+  carPos.set(celldoo.pose.x, rest.y, celldoo.pose.z);
   carYaw = celldoo.pose.yaw; boatTravelYaw = carYaw; yaw = carYaw;
-  boatAir = false; boatVy = 0;
+  boatAir = false; boatVy = 0; boatBeached = !rest.water;
   driveSpeed = 0; carYawRate = 0; steerAngle = 0;
   setCellDooState('riding');
   car.group.visible = true;
-  showToast('CELLDOO! RIDE BACK TO THE DOCK OR BOAT RAMP AND PRESS E TO HOP OFF');
+  showToast('CELLDOO! PRESS E AT THE DOCK OR THE BOAT RAMP - OR UP ON THE BEACH - TO HOP OFF');
 }
 /* E: get on/off the CellDoo, or ride it onto your jet ski trailer to load it */
 function interact(){
@@ -4196,9 +4339,10 @@ function interact(){
       }
     }
     var n = nearestLanding(carPos.x, carPos.z);
-    if(n.dist > 14){ showToast('RIDE TO THE DOCK OR THE BOAT RAMP TO GET OFF'); return; }
-    setCellDooState('docked', {x:carPos.x, z:carPos.z, yaw:carYaw});
-    celldoo.landing = n.spot;
+    var ashore = boatBeached && !boatAir ? landingBeside(carPos.x, carPos.z, carYaw) : null;   // run aground: hop off right here
+    if(!ashore && n.dist > 14){ showToast('RIDE TO THE DOCK OR THE BOAT RAMP - OR RUN IT UP ONTO THE BEACH - TO GET OFF'); return; }
+    setCellDooState('docked', {x:carPos.x, z:carPos.z, yaw:carYaw, y:carPos.y});
+    celldoo.landing = ashore || n.spot;
     requestFirstPerson('walk');
     return;
   }
@@ -4217,7 +4361,10 @@ function callCellDooBack(){
   if(celldoo.state !== 'docked') return;
   var p = celldoo.pose;
   if(Math.hypot(p.x - DOCK_SPOT.x, p.z - DOCK_SPOT.z) < 1){ showToast('THE CELLDOO IS ALREADY AT THE DOCK'); return; }
+  // it can slide itself back off a beach, but not drive home from a road, the bridge or the race track
+  if(!nearWater(p.x, p.z, 15) || (p.y || 0) > 1){ showToast('THE CELLDOO IS TOO FAR FROM THE WATER - GO AND GET IT'); return; }
   setCellDooState('returning');
+  p.y = 0;
   celldoo.recall = {a:Math.atan2(p.z, p.x), r:lakeR(p.x, p.z), yaw:p.yaw};
   showToast('CELLDOO ON ITS WAY BACK TO THE DOCK');
 }
@@ -4253,21 +4400,25 @@ function leaveCellDoo(){
   var spot = celldoo.landing || nearestLanding(carPos.x, carPos.z).spot;
   celldoo.landing = null;
   camera.position.set(spot.x, spot.y + EYE_HEIGHT, spot.z);
-  lastSafe.x = MAIN_X; lastSafe.z = RAMP.zTop - 9; lastSafe.y = 0;   // fall in off the dock: respawn on the path by the ramp
+  if(spot.ashore){ lastSafe.x = spot.x; lastSafe.z = spot.z; lastSafe.y = spot.y; lastSafe.yaw = carYaw; }   // stepped off on the beach
+  else { lastSafe.x = MAIN_X; lastSafe.z = RAMP.zTop - 9; lastSafe.y = 0; }   // fall in off the dock: respawn on the path by the ramp
   driving = false;   // so switching back to your car doesn't start its engine sound
   setCarModel(celldoo.prevCar || 'sedan');
+}
+/* a CellDoo nobody's riding (yours, or someone else's): bobbing on the water, or sitting on the beach, ramp or road
+   where it was left */
+function placeParkedCellDoo(g, p){
+  var s = boatSurface(p.x, p.z, p.y || 0), fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw);
+  var hF = boatSurface(p.x+fx, p.z+fz, s.y).y, hB = boatSurface(p.x-fx, p.z-fz, s.y).y;
+  g.position.set(p.x, s.y, p.z);
+  g.rotation.set(Math.atan2(hF - hB, 2), p.yaw, 0, 'YXZ');
 }
 function updateLake(dt){
   lakeTime = waveClock();
   applyRoomWaves(dt);
   updateWater();
   if(celldoo.state === 'returning') updateRecall(dt);
-  if(celldoo.state === 'docked' || celldoo.state === 'returning'){
-    var p = celldoo.pose, g = celldoo.model.group;
-    g.position.set(p.x, waterHeightAt(p.x, p.z), p.z);
-    var fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw);
-    g.rotation.set(Math.atan2(waterHeightAt(p.x+fx, p.z+fz) - waterHeightAt(p.x-fx, p.z-fz), 2), p.yaw, 0, 'YXZ');
-  }
+  if(celldoo.state === 'docked' || celldoo.state === 'returning') placeParkedCellDoo(celldoo.model.group, celldoo.pose);
   if(celldoo.state === 'docked' && flying && !driving){
     var p2 = celldoo.pose, d = Math.hypot(camera.position.x - p2.x, camera.position.z - p2.z);
     if(d < 5 && !celldoo.prompted){ showToast('PRESS E TO RIDE THE CELLDOO'); celldoo.prompted = true; }
@@ -4485,19 +4636,39 @@ function toggleHook(){
   if(Math.hypot(coupler.x - h.x, coupler.z - h.z) < 3.5){ localTrailer.hooked = true; showToast('TRAILER HOOKED'); }
   else showToast('BACK THE TRUCK UP TO THE TRAILER TO HOOK IT');
 }
-/* the trailer trails the tow ball: its nose points at the ball and its axle stays one tongue-length behind */
+/* the trailer's body as a few circles along its length (trailer-local z, nose at -z): keeps it out of walls and buildings */
+var TRAILER_BODY = {
+  car:    [{z:-3.3, r:1.4}, {z:-1.0, r:1.45}, {z:1.3, r:1.45}, {z:3.6, r:1.2}],
+  jetski: [{z:-2.6, r:0.9}, {z:-0.8, r:0.9}, {z:1.0, r:0.9}]
+};
+var trailerStuck = false;
+/* how far the trailer at this pose digs into a wall, a building, a barrier or the map edge (0 = clear). Other players
+   don't count - including anyone parked on it */
+function trailerHitDepth(kind, pose){
+  var saved = remoteColliders, worst = 0;
+  remoteColliders = [];
+  TRAILER_BODY[kind].forEach(function(c){
+    var w = trailerWorld(pose, 0, c.z), hit = solidContact(w.x, w.z, c.r, pose.y + 0.3, pose.y + 1.5);
+    if(hit && hit.depth > worst) worst = hit.depth;
+  });
+  remoteColliders = saved;
+  return worst;
+}
+/* the trailer trails the tow ball: its nose points at the ball and its axle stays one tongue-length behind.
+   Returns false (and doesn't move it) if that would push it into something - then the truck has to stop */
 function updateLocalTrailer(dt){
-  if(!towingTrailer()) return;
+  if(!towingTrailer()) return true;
   var p = localTrailer.pose, h = hitchPoint(), tongue = tongueOf(localTrailer);
   var tyaw = Math.atan2(-(h.x - p.x), -(h.z - p.z));
   var rel = Math.atan2(Math.sin(tyaw - carYaw), Math.cos(tyaw - carYaw));
   if(driveSpeed < -0.1) rel *= Math.max(0, 1 - 1.5*dt);   // reversing assist: the trailer straightens out behind you
   if(Math.abs(rel) > 1.3) rel = rel > 0 ? 1.3 : -1.3;     // no jackknifing past ~75 degrees
   tyaw = carYaw + rel;
-  p.yaw = tyaw;
-  p.x = h.x + Math.sin(tyaw)*tongue;
-  p.z = h.z + Math.cos(tyaw)*tongue;
-  p.y = groundAt(p.x, p.z, carPos.y);
+  var np = {x: h.x + Math.sin(tyaw)*tongue, z: h.z + Math.cos(tyaw)*tongue, yaw: tyaw};
+  np.y = groundAt(np.x, np.z, carPos.y);
+  var dig = trailerHitDepth(localTrailer.kind, np);
+  if(dig > 0.02 && dig > trailerHitDepth(localTrailer.kind, p)) return false;   // only moves that don't dig in any deeper
+  p.yaw = np.yaw; p.x = np.x; p.z = np.z; p.y = np.y;
   placeTrailerModel(localTrailer.model, p, driveSpeed, dt);
   // backed far enough down the boat ramp? the CellDoo floats off the trailer
   // (only while reversing, and only once the trailer has been out of the water since it was loaded)
@@ -4510,6 +4681,7 @@ function updateLocalTrailer(dt){
     showToast('CELLDOO LAUNCHED - GET OUT AND PRESS E TO RIDE IT');
     sendPresence(true);
   }
+  return true;
 }
 /* every car trailer you could drive onto: your own parked one, and everyone else's */
 function trailersAround(){
@@ -4750,6 +4922,11 @@ function presenceState(){
   var tp = localTrailer && localTrailer.pose;
   s.trailer = tp ? {x:r2(tp.x), y:r2(tp.y), z:r2(tp.z), yaw:Math.round(tp.yaw*1000)/1000, hooked:towingTrailer(),
                     kind:localTrailer.kind, loaded:!!localTrailer.loaded} : null;
+  // your CellDoo while it's left somewhere away from the dock (or driving itself home), so everyone else sees it too.
+  // (Tied up at the dock it isn't sent: everyone has their own CellDoo there.)
+  var cp = celldoo.pose, awayFromDock = Math.hypot(cp.x - DOCK_SPOT.x, cp.z - DOCK_SPOT.z) > 1;
+  s.ski = celldoo.state === 'returning' || (celldoo.state === 'docked' && awayFromDock) ?
+          {x:r2(cp.x), y:r2(cp.y || 0), z:r2(cp.z), yaw:r2(cp.yaw)} : null;
   return s;
 }
 function sendPresence(force){
@@ -4876,6 +5053,7 @@ function removeAvatar(peer){
   if(a.model){ root.remove(a.model.group); disposeObject(a.model.group); }
   if(a.tag){ root.remove(a.tag); disposeObject(a.tag); }
   if(a.trailer){ root.remove(a.trailer.model.group); disposeObject(a.trailer.model.group); }
+  if(a.ski){ root.remove(a.ski.model.group); disposeObject(a.ski.model.group); }
   delete mp.avatars[peer];
 }
 function clearRemotes(){
@@ -5098,6 +5276,27 @@ function updateRemotes(dt){
       placeTrailerModel(T.model, tp, tr.hooked && finite(s.speed) ? s.speed : 0, dt);
     } else if(a.trailer){
       root.remove(a.trailer.model.group); disposeObject(a.trailer.model.group); a.trailer = null;
+    }
+
+    // their CellDoo, left out on the lake or the beach (or driving itself home) - in their color, and solid
+    var sk = s.ski;
+    if(sk && finite(sk.x) && finite(sk.z) && finite(sk.yaw)){
+      var skY = finite(sk.y) ? sk.y : 0;
+      if(!a.ski){ a.ski = {model:buildCellDooModel(), color:null, pose:{x:sk.x, y:skY, z:sk.z, yaw:sk.yaw}}; a.ski.model.group.visible = true; }
+      var parkedColor = carColor(s.color) ? s.color : 'red';
+      if(a.ski.color !== parkedColor){ paintModel(a.ski.model, parkedColor); a.ski.color = parkedColor; }
+      var sp = a.ski.pose;
+      if((sp.x-sk.x)*(sp.x-sk.x) + (sp.z-sk.z)*(sp.z-sk.z) > 40*40){ sp.x = sk.x; sp.z = sk.z; sp.yaw = sk.yaw; }
+      else {
+        sp.x += (sk.x-sp.x)*k; sp.z += (sk.z-sp.z)*k;
+        sp.yaw += Math.atan2(Math.sin(sk.yaw-sp.yaw), Math.cos(sk.yaw-sp.yaw))*k;
+      }
+      sp.y = skY;
+      placeParkedCellDoo(a.ski.model.group, sp);
+      var skG = a.ski.model.group.position;
+      remoteColliders.push({x:skG.x, z:skG.z, r:1.2, y0:skG.y - 0.3, y1:skG.y + 1.0});
+    } else if(a.ski){
+      root.remove(a.ski.model.group); disposeObject(a.ski.model.group); a.ski = null;
     }
 
     if(a.kind !== want){
