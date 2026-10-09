@@ -188,7 +188,6 @@ canvas{display:block;width:100%;height:100%;touch-action:none;}
   border:2px solid var(--panel-border);
 }
 #title-screen h1 .version-pill{font-size:9px; position:relative; top:-3px;}
-#confetti{position:fixed; inset:0; width:100%; height:100%; z-index:45; pointer-events:none;}
 
 /* HOW TO PLAY / CHANGELOG tabs: long text scrolls inside the tab */
 #title-screen .scroll-block{
@@ -319,20 +318,34 @@ canvas{display:block;width:100%;height:100%;touch-action:none;}
 /* on-screen controls for phones and tablets (shown only in Walk / Drive Mode on a touch screen) */
 #touch-ui{display:none;}
 body.touch-play #touch-ui{display:block;}
-#touch-pad{
+/* joystick (bottom left): a big touch area so it's easy to grab; the knob follows your thumb */
+#touch-stick{
   position:absolute;
-  left:16px;
-  bottom:calc(18px + env(safe-area-inset-bottom,0px));
+  left:4px;
+  bottom:calc(6px + env(safe-area-inset-bottom,0px));
   z-index:33;
-  display:grid;
-  grid-template-columns:repeat(3, 58px);
-  grid-template-rows:repeat(3, 58px);
-  gap:4px;
+  width:190px; height:190px;
+  touch-action:none;
+  user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
 }
-#touch-pad .up{grid-column:2; grid-row:1;}
-#touch-pad .left{grid-column:1; grid-row:2;}
-#touch-pad .right{grid-column:3; grid-row:2;}
-#touch-pad .down{grid-column:2; grid-row:3;}
+#touch-stick .base{
+  position:absolute; left:25px; top:25px; width:140px; height:140px;
+  border-radius:50%;
+  background:rgba(251,247,236,0.22);
+  border:3px solid var(--panel-border);
+  box-shadow:3px 3px 0 0 var(--panel-border);
+  pointer-events:none;
+}
+#touch-stick .knob{
+  position:absolute; left:63px; top:63px; width:64px; height:64px;
+  border-radius:50%;
+  background:var(--panel);
+  opacity:0.92;
+  border:3px solid var(--panel-border);
+  box-shadow:2px 2px 0 0 var(--panel-border);
+  pointer-events:none;
+}
+#touch-stick.held .knob{background:var(--accent); opacity:1;}
 #touch-acts{
   position:absolute;
   right:16px;
@@ -830,7 +843,7 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
 <div id="canvas-wrap"></div>
 
 <div id="title-card">
-  <h1>CELL CITY<span class="version-pill">1.1</span></h1>
+  <h1>CELL CITY<span class="version-pill">1.2</span></h1>
   <p>An animal cell, built as a town. Click any building.</p>
   <div id="players" class="hidden">
     <div class="players-head">ONLINE <span id="players-count">1</span> <span id="players-status"></span></div>
@@ -859,12 +872,7 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
 <div id="crosshair" class="hidden">+</div>
 <div id="drown-fx" class="hidden">YOU DROWNED<small>RESPAWNING ON DRY LAND...</small></div>
 <div id="touch-ui">
-  <div id="touch-pad">
-    <button class="tbtn up" data-key="KeyW" aria-label="Forward"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="M5 1.5 L9 8.5 L1 8.5 Z"/></svg></button>
-    <button class="tbtn left" data-key="KeyA" aria-label="Left"><svg viewBox="0 0 10 10" aria-hidden="true"><path transform="rotate(-90 5 5)" d="M5 1.5 L9 8.5 L1 8.5 Z"/></svg></button>
-    <button class="tbtn right" data-key="KeyD" aria-label="Right"><svg viewBox="0 0 10 10" aria-hidden="true"><path transform="rotate(90 5 5)" d="M5 1.5 L9 8.5 L1 8.5 Z"/></svg></button>
-    <button class="tbtn down" data-key="KeyS" aria-label="Back"><svg viewBox="0 0 10 10" aria-hidden="true"><path transform="rotate(180 5 5)" d="M5 1.5 L9 8.5 L1 8.5 Z"/></svg></button>
-  </div>
+  <div id="touch-stick" role="application" aria-label="Joystick: push it the way you want to go"><div class="base"></div><div class="knob"></div></div>
   <div id="touch-acts">
     <div class="row">
       <button class="tbtn" data-act="chat" aria-label="Chat">T<small>CHAT</small></button>
@@ -904,7 +912,7 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
 
 <div id="title-screen">
   <div class="panel">
-    <h1>CELL CITY<span class="version-pill">1.1</span></h1>
+    <h1>CELL CITY<span class="version-pill">1.2</span></h1>
     <p class="subtitle">An animal cell, built as a town.</p>
     <div class="tab-row">
       <button class="tab-btn active" id="tab-btn-settings">SETTINGS</button>
@@ -1018,7 +1026,7 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
         <h3>ON A PHONE OR TABLET</h3>
         <ul>
           <li>Drag with one finger to spin the city, pinch to zoom, tap a building to inspect it.</li>
-          <li>In Walk or Drive Mode: <b>drag</b> to look, the <b>arrow pad</b> to move, and the <b>JUMP</b>, <b>E</b>, <b>R</b>, <b>H</b> and <b>CHAT</b> buttons. <b>EXIT</b> is at the top.</li>
+          <li>In Walk or Drive Mode: <b>drag</b> to look, and push the <b>joystick</b> (bottom left) the way you want to go - on foot you walk that way, in a vehicle you steer that way and go (pull it back to reverse). Then the <b>JUMP</b>, <b>E</b>, <b>R</b>, <b>H</b> and <b>CHAT</b> buttons. <b>EXIT</b> is at the top.</li>
         </ul>
         <h3>SLOW COMPUTER?</h3>
         <ul>
@@ -1028,6 +1036,15 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
     </div>
     <div class="tab-panel hidden" id="tab-log">
       <div class="scroll-block">
+        <h3>VERSION 1.2 <span class="when">- Oct 9, 2026</span></h3>
+        <ul>
+          <li><span class="when">Oct 9, 2026 · 10:55 AM</span><br>A better-looking city: dark asphalt roads with yellow center lines and zebra crosswalks, sidewalks that stop at the crossings, and streetlights on the corners.</li>
+          <li><span class="when">Oct 9, 2026 · 10:55 AM</span><br>The city is filled in: rows of houses, corner shops with awnings, apartment blocks and glass office towers, with trees along the streets. Everyone now gets the same city.</li>
+          <li><span class="when">Oct 9, 2026 · 10:55 AM</span><br>Roads and highways sit flat on the ground - cars don't sink into the highway any more.</li>
+          <li><span class="when">Oct 9, 2026 · 10:55 AM</span><br>Fixed hitboxes: the power plant matches its buildings (no more invisible wall sticking out into the streets), City Hall and the water tower are round, and buildings no longer have an invisible margin around them.</li>
+          <li><span class="when">Oct 9, 2026 · 10:55 AM</span><br>Phones and tablets: a joystick instead of the arrow pad. Push it the way you want to go - on foot you walk that way, in a vehicle it steers that way and gives it gas. Pull it back to reverse.</li>
+          <li><span class="when">Oct 9, 2026 · 10:55 AM</span><br>No more confetti when you join.</li>
+        </ul>
         <h3>VERSION 1.1 <span class="when">- Oct 9, 2026</span></h3>
         <ul>
           <li><span class="when">Oct 9, 2026 · 9:52 AM</span><br>AURORA paint for owners: the northern lights roll over your car in waves of blue, violet, pink and mint.</li>
@@ -1239,10 +1256,10 @@ var PARTS = {
 /* ---------- Solid color palette (no textures) ---------- */
 var GRASS_BLADE_COLOR = 0x2e5136; /* alpine green - ground and grass blocks share this exact color */
 var GROUND_COLOR = GRASS_BLADE_COLOR;
-var LOCAL_ROAD_COLOR = 0x47443e;
-var HIGHWAY_COLOR = 0x716b5c;
-var SIDEWALK_COLOR = 0xc9c2b0;
-var CURB_COLOR = 0xdcd6c6;
+var LOCAL_ROAD_COLOR = 0x3d3f45;   /* clean dark asphalt */
+var HIGHWAY_COLOR = 0x4f5259;
+var SIDEWALK_COLOR = 0xc3bfb6;
+var CURB_COLOR = 0xe8e6e0;
 var WALL_COLOR = 0x8a7a63;
 var FIELD_COLOR = 0x7a5536;
 var CROP_COLOR = 0x5a9a48;
@@ -1405,6 +1422,8 @@ function pushBlocker(cx,cz,xExtent,zExtent,pad){
   blockers.push({x0:cx-xExtent/2-pad, x1:cx+xExtent/2+pad, z0:cz-zExtent/2-pad, z1:cz+zExtent/2+pad});
 }
 var solidObstacles = [];
+/* curved colliders: barrier segments (capsules) and pillars, each with a height range so the bridge and the road under it don't block each other */
+var segColliders = [];
 function pushSolid(cx,cz,xExtent,zExtent,pad){
   pushBlocker(cx,cz,xExtent,zExtent,pad);
   var p = pad===undefined?0.4:pad;
@@ -1534,7 +1553,7 @@ function simpleBuilding(opts){
 
   group.position.set(opts.x, 0, opts.z);
   root.add(group);
-  pushSolid(opts.x, opts.z, opts.w+1, opts.d+1, 0.6);
+  pushSolid(opts.x, opts.z, opts.w, opts.d, 0.2);   // hitbox = the walls
   return group;
 }
 
@@ -1562,39 +1581,86 @@ function label(text, x, y, z, parentGroup){
   return sprite;
 }
 
-/* ---------- Roads, sidewalks, curbs (unique Y per piece kills z-fighting) ---------- */
-function flatStrip(isVertical, fixed, from, to, width, mat, blockPad){
+/* ---------- Roads, sidewalks, curbs and road paint ----------
+   Everything flat sits just above the ground in a few fixed layers - field, road, highway, sidewalk, curb, paint -
+   each a hair higher than the one below AND drawn on top of it (polygon offset), so nothing flickers and nothing
+   floats (pieces used to stack 1 cm per piece, up to 60 cm: cars sank into the highway). Roads stay one mesh per
+   strip, because they're clickable (the ER); sidewalks, curbs and all the paint are batched into one mesh each. */
+var FLAT = {field:0, road:1, highway:2, sidewalk:3, curb:4, paint:5, hwpaint:6};
+function flatY(layer){ return 0.02 + 0.006*layer; }
+function onLayer(mat, layer){
+  mat.polygonOffset = true;
+  mat.polygonOffsetFactor = -(layer + 1);
+  mat.polygonOffsetUnits = -4*(layer + 1);
+  return mat;
+}
+function flatStrip(isVertical, fixed, from, to, width, mat, blockPad, layer){
   var length = to-from, mid=(from+to)/2;
   var w = isVertical? width : length;
   var d = isVertical? length : width;
-  var m = new THREE.Mesh(new THREE.PlaneGeometry(w,d), mat);
+  var m = new THREE.Mesh(new THREE.PlaneGeometry(w,d), onLayer(mat, layer || 0));
   m.rotation.x = -Math.PI/2;
   var cx = isVertical? fixed : mid;
   var cz = isVertical? mid : fixed;
-  m.position.set(cx, nextFlatY(), cz);
+  m.position.set(cx, flatY(layer || 0), cz);
   root.add(m);
   pushBlocker(cx, cz, w, d, blockPad===undefined?0.15:blockPad);
   return m;
 }
 function roadStrip(isVertical, fixed, from, to, width, highway){
-  var m = flatStrip(isVertical, fixed, from, to, width, solidMat(highway?HIGHWAY_COLOR:LOCAL_ROAD_COLOR), 0.15);
-  registerClickable(m, 'highway', highway?HIGHWAY_COLOR:LOCAL_ROAD_COLOR);
+  var hex = highway ? HIGHWAY_COLOR : LOCAL_ROAD_COLOR;
+  var m = flatStrip(isVertical, fixed, from, to, width, solidMat(hex), 0.15, highway ? FLAT.highway : FLAT.road);
+  registerClickable(m, 'highway', hex);
 }
-function sidewalkWithCurb(isVertical, fixed, from, to){
-  flatStrip(isVertical, fixed, from, to, SIDEWALK_W, solidMat(SIDEWALK_COLOR), 0.1);
-  var curbFixed = fixed + (fixed<0?SIDEWALK_W*-0.42:SIDEWALK_W*0.42);
-  flatStrip(isVertical, isVertical?curbFixed:curbFixed, from, to, 0.35, solidMat(CURB_COLOR), 0.05);
-}
+/* lots of flat axis-aligned rectangles on one layer, as ONE mesh (vertex colors) - cheap to draw however many */
+function FlatBatch(layer){ this.layer = layer; this.pos = []; this.col = []; }
+FlatBatch.prototype.rect = function(cx, cz, w, d, hex){
+  var y = flatY(this.layer), c = new THREE.Color(hex), x0 = cx-w/2, x1 = cx+w/2, z0 = cz-d/2, z1 = cz+d/2, self = this;
+  [[x0,z1],[x1,z1],[x1,z0],[x0,z1],[x1,z0],[x0,z0]].forEach(function(p){ self.pos.push(p[0], y, p[1]); self.col.push(c.r, c.g, c.b); });
+};
+/* a rectangle running along a street: 'along' is the street's own direction */
+FlatBatch.prototype.stripRect = function(isVertical, fixed, alongMid, alongLen, across, acrossW, hex){
+  if(isVertical) this.rect(fixed + across, alongMid, acrossW, alongLen, hex);
+  else this.rect(alongMid, fixed + across, alongLen, acrossW, hex);
+};
+FlatBatch.prototype.build = function(){
+  var g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
+  g.computeVertexNormals();
+  var m = new THREE.Mesh(g, onLayer(new THREE.MeshLambertMaterial({vertexColors:true}), this.layer));
+  root.add(m);
+  return m;
+};
 
+/* the grid streets. Each street is cut into pieces between the cross streets (and the ring highway at each end):
+   sidewalks and curbs stop at the crossings (they used to run straight across the other road), and every piece
+   gets a dashed yellow center line and a zebra crosswalk at both ends */
+var STREET_PIECES = [[-58,-42],[-36,-16],[-10,10],[16,36],[42,58]];
+var LANE_YELLOW = 0xe9c46a, ZEBRA_WHITE = 0xf1efe8;
+var sidewalkBatch = new FlatBatch(FLAT.sidewalk), curbBatch = new FlatBatch(FLAT.curb), paintBatch = new FlatBatch(FLAT.paint);
 GRID.forEach(function(g){
   roadStrip(true, g, -RING_HALF, RING_HALF, ROAD_W, false);
-  sidewalkWithCurb(true, g-SIDEWALK_OFF, -RING_HALF, RING_HALF);
-  sidewalkWithCurb(true, g+SIDEWALK_OFF, -RING_HALF, RING_HALF);
-
   roadStrip(false, g, -RING_HALF, RING_HALF, ROAD_W, false);
-  sidewalkWithCurb(false, g-SIDEWALK_OFF, -RING_HALF, RING_HALF);
-  sidewalkWithCurb(false, g+SIDEWALK_OFF, -RING_HALF, RING_HALF);
 });
+GRID.forEach(function(g){
+  [true, false].forEach(function(isVertical){
+    STREET_PIECES.forEach(function(sp){
+      var a = sp[0], b = sp[1], mid = (a+b)/2, len = b-a;
+      [-1, 1].forEach(function(s){
+        sidewalkBatch.stripRect(isVertical, g, mid, len, s*SIDEWALK_OFF, SIDEWALK_W, SIDEWALK_COLOR);
+        curbBatch.stripRect(isVertical, g, mid, len, s*(ROAD_W/2 + 0.17), 0.34, CURB_COLOR);   // on the road side
+        if(isVertical) pushBlocker(g + s*SIDEWALK_OFF, mid, SIDEWALK_W, len, 0.1);
+        else pushBlocker(mid, g + s*SIDEWALK_OFF, len, SIDEWALK_W, 0.1);
+      });
+      for(var p = a + 3.4; p + 1.6 <= b - 3.4; p += 3) paintBatch.stripRect(isVertical, g, p + 0.8, 1.6, 0, 0.16, LANE_YELLOW);
+      [a + 1.5, b - 1.5].forEach(function(at){
+        [-2.4, -1.2, 0, 1.2, 2.4].forEach(function(off){ paintBatch.stripRect(isVertical, g, at, 2.2, off, 0.6, ZEBRA_WHITE); });
+      });
+    });
+  });
+});
+sidewalkBatch.build(); curbBatch.build(); paintBatch.build();
 
 /* the highway: square loop just inside the wall, plus the south approach + the west spur to the farms */
 roadStrip(false, -RING_HALF, -RING_HALF-6, RING_HALF+6, HWY_W, true);
@@ -1604,32 +1670,13 @@ roadStrip(true,   RING_HALF, -RING_HALF-6, RING_HALF+6, HWY_W, true);
 roadStrip(true, MAIN_X, RING_HALF, GROUND_HALF-8, HWY_W, true);
 roadStrip(false, 0, -74, -RING_HALF, HWY_W, true);
 
-/* highway detail: a raised median + dashed lane markers, so it reads as a real divided
-   expressway (like a small 407) instead of just a wide plain road */
+/* highway detail: a median + dashed lane markers, so it reads as a real divided expressway instead of just a wide
+   plain road (all in one batched mesh) */
+var hwPaint = new FlatBatch(FLAT.hwpaint);
 function highwayDetail(isVertical, fixed, from, to){
-  var medianY = nextFlatY();
-  var medLen = to-from;
-  var medW = isVertical ? 1.0 : medLen;
-  var medD = isVertical ? medLen : 1.0;
-  var median = new THREE.Mesh(new THREE.PlaneGeometry(medW,medD), solidMat(0xdcd6c6));
-  median.rotation.x = -Math.PI/2;
-  median.position.set(isVertical?fixed:(from+to)/2, medianY, isVertical?(from+to)/2:fixed);
-  root.add(median);
-
-  var dashY = nextFlatY();
-  var dashMat = solidMat(0xf3efe2);
+  hwPaint.stripRect(isVertical, fixed, (from+to)/2, to-from, 0, 1.0, 0xdcd6c6);
   [-2.4, 2.4].forEach(function(off){
-    for(var p=from+2; p<to-2; p+=4){
-      var dashLen = 1.6;
-      var cx = isVertical ? fixed+off : p+dashLen/2;
-      var cz = isVertical ? p+dashLen/2 : fixed+off;
-      var w = isVertical ? 0.22 : dashLen;
-      var d = isVertical ? dashLen : 0.22;
-      var dash = new THREE.Mesh(new THREE.PlaneGeometry(w,d), dashMat);
-      dash.rotation.x = -Math.PI/2;
-      dash.position.set(cx, dashY, cz);
-      root.add(dash);
-    }
+    for(var p=from+2; p<to-2; p+=4) hwPaint.stripRect(isVertical, fixed, p + 0.8, 1.6, off, 0.22, 0xf3efe2);
   });
 }
 highwayDetail(false, -RING_HALF, -RING_HALF-6, RING_HALF+6);
@@ -1638,6 +1685,7 @@ highwayDetail(true,  -RING_HALF, -RING_HALF-6, RING_HALF+6);
 highwayDetail(true,   RING_HALF, -RING_HALF-6, RING_HALF+6);
 highwayDetail(true, MAIN_X, RING_HALF, GROUND_HALF-8);
 highwayDetail(false, 0, -74, -RING_HALF);
+hwPaint.build();
 
 /* overhead sign gantry on the south approach, like a highway gantry sign */
 var gantryZ = RING_HALF + 16;
@@ -1657,16 +1705,26 @@ root.add(gBeam);
   root.add(gSign);
 });
 
-/* streetlights at every grid intersection */
-function streetlight(x,z){
-  var pole = box(0.35,3.6,0.35, solidMat(0x6b6558));
-  pole.position.set(x,1.8,z);
+/* streetlights on two corners of every grid crossing - on the sidewalk, not in the middle of the road - with an arm
+   reaching out over the street. Solid poles. */
+var lampPoleMat = solidMat(0x5b5f66), lampGlowMat = new THREE.MeshBasicMaterial({color:0xffe9a0});
+function streetlight(x, z, armX, armZ){
+  var pole = box(0.25, 4.4, 0.25, lampPoleMat);
+  pole.position.set(x, 2.2, z);
   root.add(pole);
-  var lamp = new THREE.Mesh(new THREE.BoxGeometry(0.7,0.5,0.7), new THREE.MeshBasicMaterial({color:0xffe9a0}));
-  lamp.position.set(x,3.7,z);
+  var arm = box(Math.abs(armX) + 0.2, 0.16, Math.abs(armZ) + 0.2, lampPoleMat);
+  arm.position.set(x + armX/2, 4.35, z + armZ/2);
+  root.add(arm);
+  var lamp = box(0.7, 0.22, 0.45, lampGlowMat);
+  lamp.position.set(x + armX, 4.18, z + armZ);
   root.add(lamp);
+  pushSegCollider(x, z, x, z, 0.2, -50, 4.5);
 }
-GRID.forEach(function(gx){ GRID.forEach(function(gz){ streetlight(gx+1.6, gz+1.6); }); });
+GRID.forEach(function(gx){ GRID.forEach(function(gz){
+  var c = ROAD_W/2 + 0.7;   // just behind the curb, on the corner
+  streetlight(gx + c, gz + c, -1.6, 0);
+  streetlight(gx - c, gz - c, 1.6, 0);
+}); });
 
 /* ---------- Trees (decorative) ---------- */
 function tree(x,z,scale){
@@ -1680,6 +1738,16 @@ function tree(x,z,scale){
 }
 
 /* ---------- Block grid: landmarks spread out, ribosome workshops, townhouses ---------- */
+/* the city's own random numbers (mulberry32): the same every time and for every player, so everyone gets the same
+   streets of houses - and bumps into the same walls. (Math.random() made each player's city different.) */
+var citySeed = 1009;
+function cityRand(){
+  citySeed = (citySeed + 0x6D2B79F5) | 0;
+  var t = Math.imul(citySeed ^ (citySeed >>> 15), 1 | citySeed);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+function cityPick(list){ return list[Math.floor(cityRand()*list.length)]; }
 var USED = {};
 function mark(col,row){ USED[col+','+row] = true; }
 function cellXZ(col,row){ return {x:col*BLOCK, z:row*BLOCK}; }
@@ -1701,7 +1769,8 @@ chDoor.position.set(0,1.2,7.3);
 cityHall.add(chDoor);
 root.add(cityHall);
 label('CITY HALL', 0, 15.5, 0, cityHall);
-pushSolid(0,0,16,16,0.4);
+pushBlocker(0,0,16,16,0.4);                    // keeps grass off the plaza
+pushSegCollider(0, 0, 0, 0, 7.6, -50, 13);     // City Hall is round: so is its hitbox (it was a square, with invisible corners)
 
 /* Chromosomes: documents prop right beside City Hall, same block */
 var docGroup = new THREE.Group();
@@ -1756,7 +1825,8 @@ function clarifierTank(cx,cz,r){
   var hub = new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,0.6,8), solidMat(0x6a6a5a));
   hub.position.set(cx,0.8,cz);
   root.add(hub);
-  pushSolid(cx,cz,r*2+1,r*2+1,0.3);
+  pushBlocker(cx,cz,r*2+1,r*2+1,0.3);
+  pushSegCollider(cx, cz, cx, cz, r + 0.3, -50, 1);   // round tank, round hitbox
 }
 clarifierTank(wastePos.x-2.6, wastePos.z-2.0, 2.0);
 clarifierTank(wastePos.x+2.6, wastePos.z-2.0, 1.7);
@@ -1832,13 +1902,18 @@ var wireMat = new THREE.LineBasicMaterial({color:0x2a2a2a});
 pp.position.set(ppPos.x, 0, ppPos.z);
 root.add(pp);
 label('POWER PLANT', ppPos.x+3, 20, ppPos.z, root);
-pushSolid(ppPos.x, ppPos.z, 22, 9, 0.6);
+// hitboxes that match what you see (it used to be one big box that stuck out into both streets and cut into the
+// tower): the turbine hall, the round cooling tower, and the pylon. The yard is still kept clear of grass and trees.
+pushBlocker(ppPos.x, ppPos.z, 22, 10, 0.4);
+solidObstacles.push({x0:ppPos.x-5.6, x1:ppPos.x+1.6, z0:ppPos.z-2.6, z1:ppPos.z+2.6});   // turbine hall (and the stack on it)
+pushSegCollider(ppPos.x+3, ppPos.z, ppPos.x+3, ppPos.z, 4.9, -50, 12.2);                  // cooling tower: round, 5 m at the base
+pushSegCollider(ppPos.x+9, ppPos.z+2.5, ppPos.x+9, ppPos.z+2.5, 0.35, -50, 9);             // pylon
 
 /* Park: civic green between City Hall and the Vacuole district */
 mark(0,1);
 var parkPos = cellXZ(0,1);
 [[-5,-5],[5,-4],[-4,4],[4,5],[0,0],[-6,1],[6,-1],[1,-6],[-1,6],[3,3]].forEach(function(o){
-  tree(parkPos.x+o[0], parkPos.z+o[1], 0.9+Math.random()*0.5);
+  tree(parkPos.x+o[0], parkPos.z+o[1], 0.9+cityRand()*0.5);
 });
 
 /* Vacuole A: Water Tower + Food Store, south of the park */
@@ -1891,7 +1966,8 @@ wtGroup.add(wtBand);
 wtGroup.position.set(vacPos.x-4, 0, vacPos.z-3);
 root.add(wtGroup);
 label('WATER TOWER', vacPos.x-4, 14.5, vacPos.z-3, root);
-pushSolid(vacPos.x-4, vacPos.z-3, 7.4, 7.4, 0.4);
+pushBlocker(vacPos.x-4, vacPos.z-3, 7.4, 7.4, 0.4);
+pushSegCollider(vacPos.x-4, vacPos.z-3, vacPos.x-4, vacPos.z-3, 3.4, -50, 14);   // round, like the tower's legs
 
 simpleBuilding({x:vacPos.x+4,z:vacPos.z+3,w:4.6,h:3.8,d:4.4,wallHex:0xdba24a,roofHex:0x8f5a34,partId:'foodstore',roofH:1.9});
 label('FOOD STORE', vacPos.x+4, 7.4, vacPos.z+3, root);
@@ -1905,96 +1981,239 @@ ribosomeCells.forEach(function(rc, idx){
   if(idx===0) label('WORKSHOP', p.x, 5, p.z, root);
 });
 
-/* Townhouses: fill every remaining block, generic residential, not clickable, real shape variety */
+/* ---------- Filling the city: houses, shops, apartments and office towers on every free block ----------
+   Every ordinary building in the city goes into ONE mesh (MeshBatch), so the city can be full of them and still
+   cost almost nothing to draw. They face the streets, and their hitboxes are exactly their walls. The layout comes
+   from cityRand(), so it's the same city every time, for everyone. */
 var HOUSE_PALETTES = [
   {wall:0xdba24a, roof:0x8f5a34},
   {wall:0xc9a06a, roof:0x6b4a38},
   {wall:0xb5c98a, roof:0x5a6b3a},
   {wall:0x9ab8c9, roof:0x3f5a6b},
   {wall:0xd98a8a, roof:0x6b3a3a},
-  {wall:0xe0c97a, roof:0x5f4f36}
+  {wall:0xe0c97a, roof:0x5f4f36},
+  {wall:0xece4d4, roof:0x4a5560},
+  {wall:0xa7b7a0, roof:0x7a4a3a}
 ];
-function townhouse(cx,cz){
-  var pal = HOUSE_PALETTES[Math.floor(Math.random()*HOUSE_PALETTES.length)];
-  var w = 2.4 + Math.random()*1.6;
-  var d = 2.4 + Math.random()*1.6;
-  var h = 2.0 + Math.random()*1.6;
-  var roofH = 0.7 + Math.random()*1.1;
-  simpleBuilding({x:cx,z:cz,w:w,h:h,d:d,wallHex:pal.wall,roofHex:pal.roof,partId:null,roofH:roofH});
-  if(Math.random() < 0.3){
-    var pal2 = HOUSE_PALETTES[Math.floor(Math.random()*HOUSE_PALETTES.length)];
-    var w2=w*0.55, d2=d*0.55, h2=h*0.72;
-    simpleBuilding({x:cx+w/2+w2/2-0.2, z:cz+d/2-d2/2, w:w2,h:h2,d:d2, wallHex:pal2.wall, roofHex:pal2.roof, partId:null, roofH:roofH*0.8});
-  }
-}
-/* Apartment buildings: taller multi-floor blocks mixed into some leftover lots */
 var APT_PALETTES = [
   {wall:0xb0a8a0, roof:0x6b6560},
   {wall:0x9fb0ab, roof:0x5a6b66},
   {wall:0xc9c2b0, roof:0x7a7366},
-  {wall:0xa8a4b0, roof:0x5f5a6b}
+  {wall:0xa8a4b0, roof:0x5f5a6b},
+  {wall:0xc58f6e, roof:0x6b4a3a}
 ];
-function apartmentBuilding(cx,cz){
-  var pal = APT_PALETTES[Math.floor(Math.random()*APT_PALETTES.length)];
-  var w = 5.5 + Math.random()*1.6;
-  var d = 4.6 + Math.random()*1.2;
-  var floors = 3 + Math.floor(Math.random()*3);
-  var floorH = 1.9;
-  var h = floors*floorH;
-  var group = new THREE.Group();
-  var body = box(w,h,d, solidMat(pal.wall));
-  body.position.y = h/2;
-  group.add(body);
-  registerClickable(body, null, pal.wall);
+var SHOP_PALETTES = [
+  {wall:0xe8dcc0, awning:0xc0453c, sign:0x2b2320},
+  {wall:0xc96a4a, awning:0x2f7d46, sign:0xf1ece0},
+  {wall:0x6a8fb0, awning:0xe3b52c, sign:0x2b2320},
+  {wall:0xe0b86a, awning:0x2f6fd6, sign:0xf1ece0},
+  {wall:0xb7c4b0, awning:0xe0783c, sign:0x2b2320}
+];
+var OFFICE_PALETTES = [
+  {wall:0xd8d4cc, glass:0x6fa4c4},
+  {wall:0xb8b4ac, glass:0x4f86a8},
+  {wall:0x8f969e, glass:0x9fd0e6},
+  {wall:0xc9bfae, glass:0x5f8fa0}
+];
+var GLASS = 0xbfdcea, STRIPE_WHITE = 0xf1ece0;
 
-  var roofCap = box(w+0.2,0.3,d+0.2, solidMat(pal.roof));
-  roofCap.position.y = h+0.15;
-  group.add(roofCap);
-  var util = box(1.2,0.8,1.2, solidMat(shadeHex(pal.roof,0.8)));
-  util.position.set(w*0.22,h+0.7,0);
-  group.add(util);
+function MeshBatch(){ this.pos = []; this.nor = []; this.col = []; }
+MeshBatch.prototype.add = function(geo, matrix, hex){
+  var g = geo.index ? geo.toNonIndexed() : geo;
+  g.applyMatrix4(matrix);
+  g.computeVertexNormals();   // separate corners per face: crisp, flat-shaded low-poly faces
+  var p = g.attributes.position.array, n = g.attributes.normal.array, c = new THREE.Color(hex);
+  for(var i=0;i<p.length;i++){ this.pos.push(p[i]); this.nor.push(n[i]); }
+  for(var j=0;j<p.length/3;j++) this.col.push(c.r, c.g, c.b);
+  if(g !== geo) g.dispose();
+  geo.dispose();
+};
+MeshBatch.prototype.build = function(){
+  var g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nor, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
+  var m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({vertexColors:true}));
+  root.add(m);
+  this.pos = this.nor = this.col = null;
+  return m;
+};
+var cityBatch = new MeshBatch();
 
-  var winCols = Math.max(2, Math.floor(w/1.3));
+/* one building's frame: its middle at (x, z) on the ground, its front facing 'rot' (0 = south/+z, PI = north,
+   PI/2 = east, -PI/2 = west). Parts are placed in its own space, front = +z. */
+function Lot(x, z, rot){ this.x = x; this.z = z; this.rot = rot; this.m = new THREE.Matrix4().makeRotationY(rot).setPosition(x, 0, z); }
+Lot.prototype.part = function(geo, px, py, pz, hex, rx, ry){
+  var L = new THREE.Matrix4().makeTranslation(px, py, pz);
+  if(ry) L.multiply(new THREE.Matrix4().makeRotationY(ry));
+  if(rx) L.multiply(new THREE.Matrix4().makeRotationX(rx));
+  cityBatch.add(geo, new THREE.Matrix4().multiplyMatrices(this.m, L), hex);
+};
+Lot.prototype.box = function(w, h, d, px, py, pz, hex, rx){ this.part(new THREE.BoxGeometry(w, h, d), px, py, pz, hex, rx); };
+/* the walls are solid: a hitbox exactly the building's footprint (turned with it) */
+Lot.prototype.solid = function(w, d){
+  var side = Math.abs(Math.sin(this.rot)) > 0.5, W = side ? d : w, D = side ? w : d;
+  pushSolid(this.x, this.z, W, D, 0.12);
+};
+function gableGeo(w, h, d){   // a triangular roof running front to back
+  var s = new THREE.Shape();
+  s.moveTo(-w/2, 0); s.lineTo(w/2, 0); s.lineTo(0, h); s.lineTo(-w/2, 0);
+  var g = new THREE.ExtrudeGeometry(s, {depth:d, bevelEnabled:false});
+  g.translate(0, 0, -d/2);
+  return g;
+}
+
+function cityHouse(x, z, rot, maxW, maxD){
+  var pal = cityPick(HOUSE_PALETTES), L = new Lot(x, z, rot);
+  var w = Math.min(maxW, 3.2 + cityRand()*1.2), d = Math.min(maxD, 3.4 + cityRand()*1.0), h = 2.6 + cityRand()*1.2;
+  var roofH = 1.1 + cityRand()*0.7, trim = shadeHex(pal.wall, 0.7), dark = shadeHex(pal.wall, 0.42);
+  L.box(w, h, d, 0, h/2, 0, pal.wall);
+  L.box(w + 0.2, 0.22, d + 0.2, 0, h - 0.11, 0, trim);                                // eaves trim
+  if(cityRand() < 0.55) L.part(gableGeo(w + 0.5, roofH, d + 0.5), 0, h, 0, pal.roof);  // gable roof...
+  else L.part(new THREE.ConeGeometry(Math.max(w, d)*0.78, roofH, 4), 0, h + roofH/2, 0, pal.roof, 0, Math.PI/4);   // ...or a hip roof
+  L.box(0.45, roofH + 0.5, 0.45, w*0.26, h + roofH*0.45, -d*0.18, shadeHex(pal.roof, 0.75));   // chimney
+  var doorX = cityRand() < 0.5 ? -w*0.22 : w*0.22;
+  L.box(0.8, 1.5, 0.08, doorX, 0.75, d/2 + 0.04, dark);                                // door
+  L.box(1.3, 0.14, 0.7, doorX, 0.07, d/2 + 0.35, 0xa9a39a);                           // front step
+  L.box(0.8, 0.65, 0.06, -doorX, h*0.5, d/2 + 0.03, GLASS);                            // front window
+  [-1, 1].forEach(function(s){ L.box(0.06, 0.6, 0.8, s*(w/2 + 0.03), h*0.5, 0, GLASS); });   // side windows
+  L.solid(w, d);
+  return d;
+}
+function cityShop(x, z, rot, maxW){
+  var pal = cityPick(SHOP_PALETTES), L = new Lot(x, z, rot);
+  var w = Math.min(maxW, 5 + cityRand()*1.6), d = 4.2, h = 3.2 + cityRand()*0.6;
+  L.box(w, h, d, 0, h/2, 0, pal.wall);
+  L.box(w + 0.16, 0.4, d + 0.16, 0, h + 0.2, 0, shadeHex(pal.wall, 0.75));            // flat roof parapet
+  L.box(w*0.62, 1.4, 0.06, w*0.12, 1.25, d/2 + 0.03, GLASS);                           // shop window
+  L.box(0.9, 1.9, 0.07, -w*0.36, 0.95, d/2 + 0.04, shadeHex(pal.wall, 0.4));          // door
+  L.box(w*0.94, 0.1, 1.2, 0, 2.3, d/2 + 0.55, pal.awning, 0.28);                       // awning...
+  for(var i=0;i<3;i++) L.box(w*0.94/7, 0.03, 1.22, -w*0.94/2 + w*0.94/7*(2*i + 1.5), 2.36, d/2 + 0.55, STRIPE_WHITE, 0.28);   // ...with stripes
+  L.box(w*0.6, 0.55, 0.1, 0, h - 0.5, d/2 + 0.06, pal.sign);                           // sign board
+  L.solid(w, d);
+  return d;
+}
+function cityApartment(x, z, rot, maxW){
+  var pal = cityPick(APT_PALETTES), L = new Lot(x, z, rot);
+  var w = Math.min(maxW, 7 + cityRand()*3), d = 5, floors = 3 + Math.floor(cityRand()*3), floorH = 1.9, h = floors*floorH;
+  L.box(w, h, d, 0, h/2, 0, pal.wall);
+  L.box(w + 0.2, 0.3, d + 0.2, 0, h + 0.15, 0, pal.roof);                              // roof cap
+  L.box(1.2, 0.8, 1.2, w*0.25, h + 0.7, -d*0.1, shadeHex(pal.roof, 0.8));             // rooftop machinery
+  var cols = Math.max(2, Math.floor(w/1.5));
   for(var f=0; f<floors; f++){
     var wy = f*floorH + floorH*0.55;
-    for(var c=0; c<winCols; c++){
-      var wx = -w/2 + (c+0.5)*(w/winCols);
-      var win1 = box(0.55,0.65,0.08, solidMat(0xcfe8f0));
-      win1.position.set(wx, wy, d/2+0.05);
-      group.add(win1);
-      var win2 = box(0.55,0.65,0.08, solidMat(0xcfe8f0));
-      win2.position.set(wx, wy, -d/2-0.05);
-      group.add(win2);
+    for(var c=0; c<cols; c++){
+      var wx = -w/2 + (c + 0.5)*(w/cols);
+      if(f === 0 && Math.abs(wx) < 0.9) continue;   // the entrance
+      L.box(0.6, 0.7, 0.06, wx, wy, d/2 + 0.03, GLASS);
+      L.box(0.6, 0.7, 0.06, wx, wy, -d/2 - 0.03, GLASS);
     }
+    if(f > 0) L.box(w + 0.06, 0.1, d + 0.06, 0, f*floorH, 0, shadeHex(pal.wall, 0.85));   // floor lines
   }
-  var aptDoor = box(1.1,1.7,0.1, solidMat(shadeHex(pal.wall,0.5)));
-  aptDoor.position.set(0, 0.85, d/2+0.05);
-  group.add(aptDoor);
-
-  group.position.set(cx,0,cz);
-  root.add(group);
-  pushSolid(cx,cz,w+1,d+1,0.6);
+  L.box(1.2, 1.8, 0.08, 0, 0.9, d/2 + 0.04, shadeHex(pal.wall, 0.45));                // entrance
+  L.box(2.0, 0.12, 1.0, 0, 2.05, d/2 + 0.5, pal.roof);                                // entrance canopy
+  L.solid(w, d);
+  return d;
+}
+function cityOffice(x, z, size){
+  var pal = cityPick(OFFICE_PALETTES), L = new Lot(x, z, 0);
+  var w = size, d = size, floors = 5 + Math.floor(cityRand()*4), floorH = 2.2, h = floors*floorH;
+  L.box(w, h, d, 0, h/2, 0, pal.wall);
+  for(var f=0; f<floors; f++) L.box(w + 0.08, floorH*0.55, d + 0.08, 0, f*floorH + floorH*0.55, 0, pal.glass);   // glass bands all round
+  L.box(w*0.55, 1.4, d*0.55, 0, h + 0.7, 0, shadeHex(pal.wall, 0.8));                 // rooftop
+  L.box(0.18, 3.2, 0.18, w*0.15, h + 3.0, 0, 0x8a8a90);                                // antenna
+  L.box(2.4, 2.0, 0.1, 0, 1.0, d/2 + 0.06, 0x3a3f46);                                  // lobby doors
+  L.solid(w, d);
+}
+/* a small tree in the batch (trunk + leafy ball), solid trunk */
+var LEAF_GREENS = [0x4f9a43, 0x5aa64a, 0x468a3c, 0x62a84e];
+function cityTree(x, z, s){
+  var L = new Lot(x, z, 0);
+  L.box(0.4*s, 2.0*s, 0.4*s, 0, 1.0*s, 0, 0x8a5a3a);
+  L.part(new THREE.IcosahedronGeometry(1.3*s, 0), 0, 2.7*s, 0, cityPick(LEAF_GREENS), 0, cityRand()*6);
+  pushSegCollider(x, z, x, z, 0.25*s, -50, 2.2*s);
+  pushBlocker(x, z, 0.6, 0.6, 0.1);
+}
+/* is there room for a tree here (nothing solid within r)? */
+function roomFor(x, z, r){
+  for(var i=0;i<solidObstacles.length;i++){
+    var b = solidObstacles[i];
+    if(x > b.x0 - r && x < b.x1 + r && z > b.z0 - r && z < b.z1 + r) return false;
+  }
+  return true;
 }
 
-var HOUSE_OFFSETS = [[-6,-5],[6,5]];
+/* the free space inside a block: from the sidewalks to the sidewalks (or to the ring highway, on the outside) */
+function blockArea(col, row){
+  var c = cellXZ(col, row), edge = RING_HALF - HWY_W/2 - 0.5;
+  return {x0:Math.max(c.x - 8, -edge), x1:Math.min(c.x + 8, edge), z0:Math.max(c.z - 8, -edge), z1:Math.min(c.z + 8, edge)};
+}
+/* a row of buildings along one side of a block, fronts facing that side's street. side: -1 = north, +1 = south */
+function streetRow(a, side, kind){
+  var W = a.x1 - a.x0, n = kind === 'house' ? (W > 15 ? 3 : 2) : kind === 'shop' ? 2 : (cityRand() < 0.5 ? 1 : 2);
+  var slot = W/n, rot = side < 0 ? Math.PI : 0, setback = 1.3, depth = 0;
+  for(var i=0;i<n;i++){
+    var x = a.x0 + slot*(i + 0.5), maxW = slot - 1.2;
+    var d = kind === 'house' ? Math.min(4.4, 3.4 + cityRand()*1.0) : kind === 'shop' ? 4.2 : 5;
+    var z = side < 0 ? a.z0 + setback + d/2 : a.z1 - setback - d/2;
+    if(kind === 'house') cityHouse(x, z, rot, maxW, d);
+    else if(kind === 'shop') cityShop(x, z, rot, maxW);
+    else cityApartment(x, z, rot, maxW);
+    depth = Math.max(depth, d);
+  }
+  return depth;
+}
+function fillBlock(col, row){
+  var a = blockArea(col, row), cx = (a.x0 + a.x1)/2, cz = (a.z0 + a.z1)/2;
+  var downtown = Math.abs(col) <= 1 && Math.abs(row) <= 1, r = cityRand(), kind;
+  if(downtown) kind = r < 0.35 ? 'tower' : r < 0.7 ? 'apartments' : 'shops';
+  else kind = r < 0.5 ? 'houses' : r < 0.75 ? 'shops' : 'apartments';
+  if(kind === 'tower'){
+    var size = Math.min(a.x1 - a.x0, a.z1 - a.z0) - 7;
+    var plaza = new FlatBatch(FLAT.sidewalk);
+    plaza.rect(cx, cz, size + 4, size + 4, 0xb3aea4);
+    plaza.build();
+    pushBlocker(cx, cz, size + 4, size + 4, 0.1);
+    cityOffice(cx, cz, size);
+    [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(function(o){ cityTree(cx + o[0]*(size/2 + 3.2), cz + o[1]*(size/2 + 3.2), 0.8); });
+    return;
+  }
+  if(kind === 'houses'){ streetRow(a, -1, 'house'); streetRow(a, 1, 'house'); }
+  else if(kind === 'shops'){ var shopSide = cityRand() < 0.5 ? -1 : 1; streetRow(a, shopSide, 'shop'); streetRow(a, -shopSide, 'house'); }
+  else { streetRow(a, -1, 'apartment'); streetRow(a, 1, cityRand() < 0.5 ? 'apartment' : 'house'); }
+  // a couple of trees in the back yards between the two rows
+  for(var t=0;t<3;t++){
+    var tx = a.x0 + 2 + cityRand()*(a.x1 - a.x0 - 4), tz = cz + (cityRand() - 0.5)*2;
+    if(roomFor(tx, tz, 1.4)) cityTree(tx, tz, 0.75 + cityRand()*0.3);
+  }
+}
 for(var col=-2; col<=2; col++){
   for(var row=-2; row<=2; row++){
-    if(USED[col+','+row]) continue;
-    var cxz = cellXZ(col,row);
-    if(Math.random() < 0.3){
-      apartmentBuilding(cxz.x, cxz.z);
-    } else {
-      HOUSE_OFFSETS.forEach(function(o){ townhouse(cxz.x+o[0], cxz.z+o[1]); });
-    }
+    if(!USED[col+','+row]) fillBlock(col, row);
   }
 }
+/* street trees along the edges of every block (where there's room - not in front of a door or a landmark) */
+for(var col2=-2; col2<=2; col2++){
+  for(var row2=-2; row2<=2; row2++){
+    var ba = blockArea(col2, row2);
+    [[ba.x0 + 0.9, null], [ba.x1 - 0.9, null], [null, ba.z0 + 0.9], [null, ba.z1 - 0.9]].forEach(function(e){
+      for(var k=-1; k<=1; k++){
+        var tx = e[0] !== null ? e[0] : (ba.x0 + ba.x1)/2 + k*5.2;
+        var tz = e[1] !== null ? e[1] : (ba.z0 + ba.z1)/2 + k*5.2;
+        if(roomFor(tx, tz, 1.5) && !isBlocked(tx, tz)) cityTree(tx, tz, 0.7);
+      }
+    });
+  }
+}
+cityBatch.build();
 
 /* ---------- Rural area: Farms = Chloroplast, relocated outside downtown, tucked against the west wall ---------- */
 var FARM_X = -72, FARM_Z = 0;
 pushBlocker(FARM_X, FARM_Z, 20, 54, 0.4);
 var field = new THREE.Mesh(new THREE.PlaneGeometry(16,50), solidMat(FIELD_COLOR));
 field.rotation.x=-Math.PI/2;
-field.position.set(FARM_X, nextFlatY(), FARM_Z);
+onLayer(field.material, FLAT.field);
+field.position.set(FARM_X, flatY(FLAT.field), FARM_Z);
 registerClickable(field,'farms',FIELD_COLOR);
 root.add(field);
 simpleBuilding({x:FARM_X+5,z:FARM_Z-19,w:3.8,h:3.2,d:3.4,wallHex:0xcf5a4a,roofHex:0x5a4530,partId:'farms',roofH:1.7});
@@ -2093,15 +2312,15 @@ label('BORDER CHECK', MAIN_X, 12.5, gateZ, root);
 
 /* ---------- Trees scattered in the green buffer between the ring road and the wall ---------- */
 for(var t=0;t<22;t++){
-  var side = Math.floor(Math.random()*4);
-  var along = (Math.random()*2-1)*(WALL_HALF-4);
-  var across = RING_HALF + 4 + Math.random()*(WALL_HALF-RING_HALF-8);
+  var side = Math.floor(cityRand()*4);
+  var along = (cityRand()*2-1)*(WALL_HALF-4);
+  var across = RING_HALF + 4 + cityRand()*(WALL_HALF-RING_HALF-8);
   var tx2, tz2;
   if(side===0){ tx2=along; tz2=-across; }
   else if(side===1){ tx2=along; tz2=across; }
   else if(side===2){ tx2=-across; tz2=along; }
   else { tx2=across; tz2=along; }
-  if(!isBlocked(tx2,tz2)) tree(tx2, tz2, 0.8+Math.random()*0.6);
+  if(!isBlocked(tx2,tz2)) tree(tx2, tz2, 0.8+cityRand()*0.6);
 }
 
 /* ---------- 3D grass: small blocks sticking out of the ground, on YOUR height-map grid ----------
@@ -2291,8 +2510,6 @@ function deckBottom(p){ return p.e < 3 ? -0.02 : TRACK_Y + p.e - DECK_THICK; }
   qm.build();
 })();
 
-/* curved colliders: barrier segments (capsules) and pillars, each with a height range so the bridge and the road under it don't block each other */
-var segColliders = [];
 var remoteColliders = [];   // other players, rebuilt every frame
 function pushSegCollider(ax,az,bx,bz,r,y0,y1){ segColliders.push({ax:ax,az:az,bx:bx,bz:bz,r:r,y0:y0,y1:y1}); }
 
@@ -3257,61 +3474,6 @@ function showToast(msg){
   toastTimer = setTimeout(function(){ toastEl.classList.add('hidden'); }, 2600);
 }
 
-/* ---------- Confetti: a burst from both bottom corners the first time you enter the city ---------- */
-var CONFETTI_COLORS = ['#e0783c', '#4f8f5b', '#ffd23f', '#2f86c9', '#e85d9a', '#9fe6ff', '#ffffff'];
-function launchConfetti(){
-  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  var cv = document.createElement('canvas');
-  cv.id = 'confetti';
-  document.body.appendChild(cv);
-  var ctx = cv.getContext('2d'), dpr = Math.min(2, window.devicePixelRatio || 1);
-  var W = window.innerWidth, H = window.innerHeight;
-  cv.width = W*dpr; cv.height = H*dpr;
-  ctx.scale(dpr, dpr);
-  // drag (K) slows the pieces right down after the launch, so they flutter down instead of dropping like stones
-  var G = 1000, K = 5, LIFE = 4.5, unit = Math.max(8, Math.min(W, H)/55), bits = [];
-  for(var i=0;i<180;i++){
-    var dir = i % 2 ? -1 : 1, rise = H*(0.45 + 0.45*Math.random());
-    bits.push({
-      x: dir > 0 ? -10 : W + 10, y: H + 10,
-      vx: dir*K*W*(0.12 + 0.4*Math.random()), vy: -K*(rise + 120),
-      delay: Math.random()*0.35,
-      w: unit*(0.7 + 0.6*Math.random()), h: unit*(0.35 + 0.3*Math.random()),
-      rot: Math.random()*Math.PI*2, spin: (Math.random() - 0.5)*12,
-      flip: Math.random()*Math.PI*2, flipSpeed: 6 + Math.random()*8,
-      sway: Math.random()*Math.PI*2,
-      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length]
-    });
-  }
-  var t = 0, last = performance.now();
-  function frame(now){
-    var dt = Math.min(0.05, (now - last)/1000); last = now; t += dt;
-    ctx.clearRect(0, 0, W, H);
-    ctx.globalAlpha = Math.max(0, Math.min(1, LIFE - t));   // fades out over the last second
-    var alive = 0;
-    bits.forEach(function(b){
-      if(t < b.delay) { alive++; return; }
-      b.vy += (G - K*b.vy)*dt;
-      b.vx -= K*b.vx*dt;
-      b.x += (b.vx + (b.vy > 0 ? 40*Math.sin(t*3 + b.sway) : 0))*dt;   // a little side-to-side on the way down
-      b.y += b.vy*dt;
-      b.rot += b.spin*dt; b.flip += b.flipSpeed*dt;
-      if(b.y > H + 20 && b.vy > 0) return;
-      alive++;
-      ctx.save();
-      ctx.translate(b.x, b.y);
-      ctx.rotate(b.rot);
-      ctx.fillStyle = b.color;
-      var fh = b.h*Math.abs(Math.cos(b.flip));   // tumbling: the piece looks thinner as it turns edge-on
-      ctx.fillRect(-b.w/2, -fh/2, b.w, Math.max(1, fh));
-      ctx.restore();
-    });
-    if(t < LIFE && alive) requestAnimationFrame(frame);
-    else cv.remove();
-  }
-  requestAnimationFrame(frame);
-}
-
 /* ---------- Title screen: tabs (walk-speed setting / credits) ---------- */
 var titleScreen = document.getElementById('title-screen');
 var speedSlider = document.getElementById('speed-slider');
@@ -3348,11 +3510,9 @@ lowDetailToggle.addEventListener('click', function(){
 });
 applyDetail();
 
-var joinedOnce = false;
 document.getElementById('enter-btn').addEventListener('click', function(){
   if(web.on && !websiteJoin()) return;   // website: needs a nickname first
   titleScreen.classList.add('hidden');
-  if(!joinedOnce){ joinedOnce = true; launchConfetti(); }   // first time in: confetti!
 });
 
 var titleTabs = [
@@ -3532,7 +3692,7 @@ function enterFirstPerson(){
     applyModeUI();
     hintDismissed = false;
     hint.textContent = touchPlay
-      ? (driving ? 'Arrows to drive and steer - drag to look around - EXIT at the top to stop' : 'Arrows to walk - drag to look - JUMP and E buttons - tap a building to inspect - EXIT at the top to stop')
+      ? (driving ? 'Push the joystick the way you want to go - pull it back to reverse - drag to look around - EXIT at the top to stop' : 'Joystick to walk - drag to look - JUMP and E buttons - tap a building to inspect - EXIT at the top to stop')
       : driving
       ? 'W/S or up/down to drive - A/D or left/right to steer - mouse to orbit the camera - T to chat - H hooks a trailer (truck) - ESC to exit'
       : 'WASD or arrow keys to walk - mouse to look - space to jump - click to inspect - T to chat - ESC to exit';
@@ -3558,6 +3718,7 @@ function leaveFirstPerson(){
     if(driving) exitDriveMode();
     flying = false;
     touchPlay = false;
+    releaseStick();
     document.body.classList.remove('touch-play');
     for(var k in keys) keys[k] = false;   // let go of any on-screen buttons
     driving = false;
@@ -3585,24 +3746,49 @@ document.addEventListener('mousemove', function(e){
 });
 
 /* ---------- Phones and tablets: on-screen controls instead of the keyboard and mouse ----------
-   Walk / Drive Mode can't lock the mouse on a touch screen, so there: drag anywhere to look around, the arrow
-   pad walks / drives (it presses W A S D), JUMP jumps, E rides / leaves the CellDoo, R calls it back from the
+   Walk / Drive Mode can't lock the mouse on a touch screen, so there: drag anywhere to look around, the joystick
+   (bottom left) walks that way / steers that way and drives (pull it back to reverse), JUMP jumps, E rides / leaves the CellDoo, R calls it back from the
    dock, H hooks a trailer, CHAT opens chat, and tapping a building inspects it. EXIT is in the top bar. */
 var IS_TOUCH = !!(window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches);
 var touchPlay = false;     // in Walk / Drive Mode using the on-screen controls
 function tryJump(){
   if(flying && !driving && grounded){ vertVelocity = JUMP_SPEED * jumpMultiplier; grounded = false; }
 }
+/* the joystick: push it the way you want to go, as far as you like (a little = slow, all the way = full speed).
+   On foot you walk that way. In a vehicle it steers toward that way and gives it gas - push it up to go straight,
+   off to a side to turn that way, pull it right back to reverse. "That way" is from where the camera looks. */
+var stick = {x:0, y:0, on:false};   // x: right, y: forward, each -1..1
+var STICK_DEAD = 0.15;              // a tiny nudge does nothing
+function stickAmount(){ return stick.on ? Math.min(1, Math.hypot(stick.x, stick.y)) : 0; }
+function releaseStick(){
+  stick.x = 0; stick.y = 0; stick.on = false;
+  var el = document.getElementById('touch-stick');
+  el.classList.remove('held');
+  el.querySelector('.knob').style.transform = '';
+}
 (function(){
-  // arrow pad: hold a button = hold the key (several at once is fine - gas + steer)
-  [].forEach.call(document.querySelectorAll('#touch-ui [data-key]'), function(b){
-    var code = b.getAttribute('data-key');
-    function up(){ keys[code] = false; b.classList.remove('held'); }
-    b.addEventListener('pointerdown', function(e){ e.preventDefault(); keys[code] = true; b.classList.add('held'); try { b.setPointerCapture(e.pointerId); } catch(err){} });
-    b.addEventListener('pointerup', up);
-    b.addEventListener('pointercancel', up);
-    b.addEventListener('lostpointercapture', up);
+  var el = document.getElementById('touch-stick'), base = el.querySelector('.base'), knob = el.querySelector('.knob');
+  var id = null, REACH = 52;   // how far (px) the knob can move from the middle
+  function follow(e){
+    var r = base.getBoundingClientRect(), dx = e.clientX - (r.left + r.width/2), dy = e.clientY - (r.top + r.height/2);
+    var d = Math.hypot(dx, dy);
+    if(d > REACH){ dx *= REACH/d; dy *= REACH/d; }
+    knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+    stick.x = dx/REACH; stick.y = -dy/REACH; stick.on = true;
+  }
+  el.addEventListener('pointerdown', function(e){
+    e.preventDefault();
+    id = e.pointerId;
+    try { el.setPointerCapture(id); } catch(err){}
+    el.classList.add('held');
+    follow(e);
   });
+  el.addEventListener('pointermove', function(e){ if(e.pointerId === id) follow(e); });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function(t){
+    el.addEventListener(t, function(e){ if(e.pointerId === id){ id = null; releaseStick(); } });
+  });
+})();
+(function(){
   var acts = {jump:tryJump, e:function(){ interact(); }, r:function(){ callCellDooBack(); }, h:function(){ toggleHook(); }, chat:function(){ openChat(''); }};
   [].forEach.call(document.querySelectorAll('#touch-ui [data-act]'), function(b){
     b.addEventListener('pointerdown', function(e){ e.preventDefault(); b.classList.add('held'); acts[b.getAttribute('data-act')](); });
@@ -3666,8 +3852,13 @@ function updateFlyMovement(dt){
   if(keys['KeyS']||keys['ArrowDown']) move.sub(forward);
   if(keys['KeyD']||keys['ArrowRight']) move.add(right);
   if(keys['KeyA']||keys['ArrowLeft']) move.sub(right);
+  var pace = 1;
+  if(move.lengthSq() === 0 && stickAmount() > STICK_DEAD){   // phones: the joystick, as fast as you push it
+    move.addScaledVector(forward, stick.y).addScaledVector(right, stick.x);
+    pace = stickAmount();
+  }
   if(pranked) move.multiplyScalar(-1);
-  if(move.lengthSq()>0) move.normalize().multiplyScalar(walkSpeed*dt);
+  if(move.lengthSq()>0) move.normalize().multiplyScalar(walkSpeed*dt*pace);
   var tryX = camera.position.x + move.x, tryZ = camera.position.z + move.z;
   var feet = camera.position.y - EYE_HEIGHT;
   if(!hitSolid(tryX, camera.position.z, 0.6, feet+0.3, feet+EYE_HEIGHT)) camera.position.x = tryX;
@@ -3734,6 +3925,18 @@ function updateDriveMovement(dt){
   var steerInput = 0;
   if(keys['KeyA']||keys['ArrowLeft']) steerInput += 1;
   if(keys['KeyD']||keys['ArrowRight']) steerInput -= 1;
+  var gas = 1;   // how hard you're pushing (the joystick can be part-way)
+  if(throttle === 0 && steerInput === 0 && stickAmount() > STICK_DEAD){
+    // phones: push the joystick the way you want to go. Up = straight ahead, off to a side = turn that way (still going),
+    // and the further to the side, the more it eases off the gas for the turn (so it doesn't spin out). Pulled
+    // straight back = reverse.
+    var ang = Math.atan2(stick.x, stick.y);   // 0 = up, +PI/2 = right
+    if(Math.abs(ang) < 2.4){
+      throttle = 1;
+      steerInput = -Math.max(-1, Math.min(1, ang/1.2));
+      gas = stickAmount()*(1 - 0.45*Math.min(1, Math.abs(ang)/1.57));
+    } else { throttle = -1; gas = stickAmount(); }
+  }
   if(pranked){ throttle *= -1; steerInput *= -1; }
 
   var topSpeed = Math.max(walkSpeed*carSpec.topMul, 10);
@@ -3741,8 +3944,16 @@ function updateDriveMovement(dt){
   var beached = carName === 'celldoo' && boatBeached;
   var fwdMax = beached ? BEACH_CRAWL : topSpeed, backMax = beached ? BEACH_CRAWL : topSpeed*0.5;
   if(spin){ driveSpeed *= Math.exp(-1.8*dt); }   // sliding sideways scrubs speed off; no throttle or brakes mid-spin
-  else if(throttle>0){ if(driveSpeed < fwdMax) driveSpeed = Math.min(fwdMax, driveSpeed + carSpec.accel*dt); }
-  else if(throttle<0){ if(driveSpeed > -backMax) driveSpeed = Math.max(-backMax, driveSpeed - carSpec.accel*dt); }
+  else if(throttle>0){
+    var fwdCap = fwdMax*gas;
+    if(driveSpeed < fwdCap) driveSpeed = Math.min(fwdCap, driveSpeed + carSpec.accel*dt);
+    else if(gas < 1) driveSpeed = Math.max(fwdCap, driveSpeed - carSpec.accel*0.6*dt);   // eased off the joystick: slow to that speed
+  }
+  else if(throttle<0){
+    var backCap = backMax*gas;
+    if(driveSpeed > -backCap) driveSpeed = Math.max(-backCap, driveSpeed - carSpec.accel*dt);
+    else if(gas < 1) driveSpeed = Math.min(-backCap, driveSpeed + carSpec.accel*0.6*dt);
+  }
   else {
     if(driveSpeed>0) driveSpeed = Math.max(0, driveSpeed - carSpec.accel*0.6*dt);
     else if(driveSpeed<0) driveSpeed = Math.min(0, driveSpeed + carSpec.accel*0.6*dt);
