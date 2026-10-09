@@ -1025,6 +1025,10 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
       <div class="scroll-block">
         <h3>VERSION 1.1 <span class="when">- Oct 9, 2026</span></h3>
         <ul>
+          <li><span class="when">Oct 9, 2026 · 9:35 AM</span><br>Fixed: switching between Walk and Drive on a bridge keeps you on it - it used to drop you underneath (on the race track's crossover, onto the road below).</li>
+          <li><span class="when">Oct 9, 2026 · 9:35 AM</span><br>Fixed: the CellDoo's hitbox matches its shape - it pulls up right alongside the dock, and its nose doesn't poke into it.</li>
+          <li><span class="when">Oct 9, 2026 · 9:35 AM</span><br>Fixed: the boat ramp's curbs are only as tall as they look - step, drive or ride right over them.</li>
+          <li><span class="when">Oct 9, 2026 · 9:35 AM</span><br>Fixed: a CellDoo under the bridge doesn't pop up onto the bridge ramp any more.</li>
           <li><span class="when">Oct 9, 2026 · 9:08 AM</span><br>Engine sounds for the car, the MOTOCELL F1 and the CellDoo - the cars shift through their gears, and the CellDoo hisses spray on the water.</li>
           <li><span class="when">Oct 9, 2026 · 9:08 AM</span><br>No more invisible walls on the lake: drive the CellDoo up onto the beach or the boat ramp, and press E to hop off right there.</li>
           <li><span class="when">Oct 9, 2026 · 9:08 AM</span><br>Trailers bump into walls and buildings now, instead of going through them.</li>
@@ -3332,9 +3336,11 @@ function requestFirstPerson(mode){
     var wasDriving = driving;
     driving = (mode === 'drive');
     applyModeUI();
-    if(driving && !wasDriving) enterDriveMode();
+    // switching between walking and driving keeps you at the height you're at: on a bridge deck you stay on the deck
+    // (it used to drop you to the ground - and on the race track's crossover, onto the road underneath)
+    if(driving && !wasDriving) enterDriveMode(camera.position.y - EYE_HEIGHT);
     if(!driving && wasDriving) exitDriveMode();
-    if(!driving){ camera.position.y = EYE_HEIGHT; }
+    if(!driving){ camera.position.y = surfaceAt(camera.position.x, camera.position.z, camera.position.y - EYE_HEIGHT) + EYE_HEIGHT; }
     driveSpeed = 0; vertVelocity = 0; grounded = true;
     return;
   }
@@ -3376,8 +3382,9 @@ driveBtn.addEventListener('click', function(){
   requestFirstPerson('drive');
 });
 
-function enterDriveMode(){
+function enterDriveMode(feetY){   // feetY: the height you were standing at (leave out from the overview: the ground)
   carPos.set(camera.position.x, 0, camera.position.z);
+  carPos.y = surfaceAt(carPos.x, carPos.z, feetY || 0);   // start on what you were standing on, not under it
   carYaw = yaw;
   steerAngle = 0;
   carYawRate = 0;
@@ -3442,7 +3449,7 @@ function enterFirstPerson(){
       pitch = 0.18;
       enterDriveMode();
     } else {
-      camera.position.y = EYE_HEIGHT;
+      camera.position.y = surfaceAt(camera.position.x, camera.position.z, 0) + EYE_HEIGHT;   // on the ground (or a bridge) right away
       camera.rotation.set(pitch, yaw, pranked ? Math.PI : 0);
     }
   }
@@ -3605,6 +3612,18 @@ function endSpin(){
   steerAngle = 0;
 }
 
+/* what your vehicle bumps into at (px,pz). Cars are one circle; the CellDoo is long and narrow, so it's three circles
+   along its hull (bow, middle, stern) - it can pull right up alongside the dock, and its nose doesn't poke into things */
+var CELLDOO_HULL = [{ahead:1.2, r:0.7}, {ahead:0, r:0.7}, {ahead:-1.15, r:0.7}];
+function vehicleContact(px, pz, R, yLo, yHi, shrink){
+  if(carName !== 'celldoo') return solidContact(px, pz, R, yLo, yHi);
+  var fx = -Math.sin(carYaw), fz = -Math.cos(carYaw), best = null;
+  CELLDOO_HULL.forEach(function(c){
+    var h = solidContact(px + fx*c.ahead, pz + fz*c.ahead, c.r*(shrink || 1), yLo, yHi);
+    if(h && (!best || h.depth > best.depth)) best = h;
+  });
+  return best;
+}
 function updateDriveMovement(dt){
   if(carName === 'celldoo' && !drown) freshStart = false;   // the CellDoo floats
   else if(updateDrowning(dt)) return;                        // sinking after driving into the lake (or a CellDoo wipeout)
@@ -3685,7 +3704,7 @@ function updateDriveMovement(dt){
   var moveYaw = spin ? spin.travelYaw : movingBoat ? boatTravelYaw : carYaw;
   var carForward = new THREE.Vector3(0,0,-1).applyQuaternion(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0), moveYaw));
   var stepX = carForward.x*driveSpeed*sdt, stepZ = carForward.z*driveSpeed*sdt;
-  var hit = solidContact(carPos.x+stepX, carPos.z+stepZ, R, yLo, yHi);
+  var hit = vehicleContact(carPos.x+stepX, carPos.z+stepZ, R, yLo, yHi);
   if(!hit){
     carPos.x += stepX; carPos.z += stepZ;
     wasColliding = false;
@@ -3706,10 +3725,10 @@ function updateDriveMovement(dt){
     // still nudges into it, and rejecting the slide outright would pin the car in place
     var sx0 = carPos.x, sz0 = carPos.z;
     carPos.x += slideX; carPos.z += slideZ;
-    var dig = solidContact(carPos.x, carPos.z, R, yLo, yHi);
+    var dig = vehicleContact(carPos.x, carPos.z, R, yLo, yHi);
     if(dig){
       carPos.x += dig.nx*dig.depth; carPos.z += dig.nz*dig.depth;
-      if(hitSolid(carPos.x, carPos.z, R*0.98, yLo, yHi)){ carPos.x = sx0; carPos.z = sz0; }  // wedged in a corner: stay put
+      if(vehicleContact(carPos.x, carPos.z, R*0.98, yLo, yHi, 0.98)){ carPos.x = sx0; carPos.z = sz0; }  // wedged in a corner: stay put
     }
     // mid spin-out, the slide carries on along the wall
     if(spin && (slideX || slideZ) && driveSpeed > 0) spin.travelYaw = Math.atan2(-slideX, -slideZ);
@@ -3721,7 +3740,7 @@ function updateDriveMovement(dt){
     wasColliding = true;
   }
   // never stay overlapping a wall
-  var stuck = solidContact(carPos.x, carPos.z, R, yLo, yHi);
+  var stuck = vehicleContact(carPos.x, carPos.z, R, yLo, yHi);
   if(stuck){ carPos.x += stuck.nx*stuck.depth; carPos.z += stuck.nz*stuck.depth; }
   }
   var headX = -Math.sin(carYaw), headZ = -Math.cos(carYaw);   // where the nose points (for ramp tilt)
@@ -4087,8 +4106,13 @@ root.add(lakePath);
   [-1, 1].forEach(function(s){
     for(var x = B.x0; x < B.x3; x += 1){
       var xb = Math.min(B.x3, x + 1), deck = Math.min(bridgeAt(x, 0), bridgeAt(xb, 0)), top = Math.max(bridgeAt(x, 0), bridgeAt(xb, 0)) + 0.8;
-      var overWater = inLake((x + xb)/2, s*(B.hw+0.17));
-      pushSegCollider(x, s*(B.hw+0.17), xb, s*(B.hw+0.17), 0.25, overWater ? deck - 0.3 : -50, top);
+      var overWater = inLake((x + xb)/2, s*(B.hw+0.17)), rz = s*(B.hw+0.17);
+      if(overWater) pushSegCollider(x, rz, xb, rz, 0.25, deck - 0.3, top);
+      else {
+        // over land: solid to the ground for people and cars; for the CellDoo only where the ramp is too low to fit under
+        segColliders.push({ax:x, az:rz, bx:xb, bz:rz, r:0.25, y0:-50, y1:top, land:true});
+        segColliders.push({ax:x, az:rz, bx:xb, bz:rz, r:0.25, y0:deck < 1.5 ? -50 : deck - 0.3, y1:top, boat:true});
+      }
     }
   });
   // piers in the water - solid for the CellDoo, below the deck for everyone else
@@ -4121,12 +4145,18 @@ root.add(lakePath);
 })();
 
 // no invisible walls round the lake: the CellDoo can run up onto the beach or the boat ramp (and crawl about on land).
-// What's left is stuff you can see: the ramp's curbs, and the dock's edges (the CellDoo can't drive up onto the dock).
+// What's left is stuff you can see: the ramp's curbs (only as tall as they look, so you step or drive over them),
+// the dock's edges (the CellDoo can't drive up onto the dock), and the underside of the bridge ramps.
 (function(){
   var Y0 = -50, Y1 = 50;
-  [RAMP.x0, RAMP.x1].forEach(function(x){ pushSegCollider(x, RAMP.zTop, x, RAMP.zEnd, 0.3, Y0, Y1); });   // the curbs you can see
+  [RAMP.x0, RAMP.x1].forEach(function(x){ pushSegCollider(x, RAMP.zTop, x, RAMP.zEnd, 0.15, Y0, 0.225); });   // the curbs you can see: 22 cm tall
+  // under the bridge, the ramps come down to meet the ground: the CellDoo can nose in until the deck is too low to fit under
+  [BRIDGE.x0 + (BRIDGE.x1 - BRIDGE.x0)*1.5/BRIDGE.h, BRIDGE.x3 - (BRIDGE.x3 - BRIDGE.x2)*1.5/BRIDGE.h].forEach(function(x){
+    segColliders.push({ax:x, az:-BRIDGE.hw, bx:x, bz:BRIDGE.hw, r:0.3, y0:Y0, y1:1.2, boat:true});
+  });
   [DOCK.x0, DOCK.x1].forEach(function(x){ segColliders.push({ax:x, az:DOCK.z0, bx:x, bz:DOCK.z1, r:0.3, y0:Y0, y1:Y1, boat:true}); });
   segColliders.push({ax:DOCK.x0, az:DOCK.z1, bx:DOCK.x1, bz:DOCK.z1, r:0.3, y0:Y0, y1:Y1, boat:true});
+  segColliders.push({ax:DOCK.x0, az:DOCK.z0, bx:DOCK.x1, bz:DOCK.z0, r:0.3, y0:Y0, y1:Y1, boat:true});   // the shore end, too
 })();
 /* where the CellDoo sits at (x,z), given its height y: {y, water}. On the water it floats; on the beach, the boat
    ramp's shallow end, a road or the bridge it rests on the ground (BOAT_LAND_LIFT keeps the hull's V out of it) */
@@ -4134,6 +4164,7 @@ var BOAT_LAND_LIFT = 0.2, BEACH_CRAWL = 3;   // on land the CellDoo slides to a 
 function boatSurface(x, z, y){
   var b = bridgeAt(x, z);
   if(b !== null && y > b - 1) return {y:b + BOAT_LAND_LIFT, water:false};   // up on the bridge (not underneath it)
+  if(b !== null && !inLake(x, z)) return {y:trackSurfaceAt(x, z, y) + BOAT_LAND_LIFT, water:false};   // on the sand UNDER a bridge ramp: stay under it
   if(inLake(x, z) && !onDock(x, z)){
     var w = waterHeightAt(x, z);
     if(!onRamp(x, z)) return {y:w, water:true};
