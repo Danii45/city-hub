@@ -922,7 +922,7 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
       <button class="tab-btn" id="tab-btn-credits">CREDITS</button>
       <button class="tab-btn hidden" id="tab-btn-admin">ADMIN</button>
       <button class="tab-btn hidden" id="tab-btn-owner">OWNER</button>
-      <button class="tab-btn hidden" id="tab-btn-pencil">PENCIL</button>
+      <button class="tab-btn hidden" id="tab-btn-pencil">hussvalley0487</button>
       <button class="tab-btn" id="tab-btn-help">HOW TO PLAY</button>
       <button class="tab-btn" id="tab-btn-scores">TOP SCORES</button>
       <button class="tab-btn" id="tab-btn-log">CHANGELOG</button>
@@ -1054,7 +1054,7 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
       <div class="scroll-block">
         <h3>VERSION 1.2 <span class="when">- Oct 9, 2026</span></h3>
         <ul>
-          <li><span class="when">Oct 13, 2026 · 11:39 AM</span><br>Secret PENCIL LOVER 420 mode: a pink-and-brown flashing badge, FAST COLORS (your ride flashes pink and poo brown) and FAST CELLDOO (fast anywhere, even on land). Owners get the options too.</li>
+          <li><span class="when">Oct 13, 2026 · 11:39 AM</span><br>Secret hussvalley0487 mode: a pink-and-brown flashing badge, FAST COLORS (your ride flashes pink and poo brown) and FAST CELLDOO (fast anywhere, even on land). Owners get the options too.</li>
           <li><span class="when">Oct 13, 2026 · 11:01 AM</span><br>Cars jump! Drive off a ramp (or a crest) fast and you fly, then land. And a JUMP RAMP outside the north-west corner of the city wall launches you right over the lake - go full speed, or you'll land in the water.</li>
           <li><span class="when">Oct 13, 2026 · 9:47 AM</span><br>MONSTER WAVES: the WAVE HEIGHT slider goes up to 70 FT now. Above 8 FT a giant swell rolls in on top - the harbor and the bridge stay sheltered, and the lake is much deeper.</li>
           <li><span class="when">Oct 9, 2026 · 11:33 AM</span><br>Real-size waves: at 8 FT the big rolling swells really are 8 feet from the bottom to the top (they used to only reach that now and then), with deep blue troughs and white caps on the crests. Bigger jumps on the CellDoo!</li>
@@ -4243,10 +4243,11 @@ window.addEventListener('keydown', function(e){
     }
   }
 });
-/* PENCIL LOVER 420: type andy123 anywhere. A flashing pink-and-brown PENCIL LOVER 420 badge next to your name, and the
-   PENCIL tab: FAST COLORS (your vehicles flash pink and poo brown, really fast - everyone sees it) and FAST CELLDOO
+/* the hussvalley0487 mode (called "pencil" in the code): type andy123 anywhere. A flashing pink-and-brown hussvalley0487
+   badge next to your name, and its own tab: FAST COLORS (your vehicles flash pink and poo brown, really fast - everyone sees it) and FAST CELLDOO
    (the CellDoo goes fast anywhere, even on land). Owners get the two options too, in the OWNER tab. */
 var PENCIL_CODE = 'andy123';
+var PENCIL_NAME = 'hussvalley0487';   // the mode's name: on its badge, its tab and its message
 var pencilUnlocked = false, fastColors = false, fastSki = false;
 function canPencil(){ return pencilUnlocked || ownerUnlocked; }
 window.addEventListener('keydown', function(e){
@@ -4257,7 +4258,7 @@ window.addEventListener('keydown', function(e){
   if(!pencilUnlocked){
     pencilUnlocked = true;
     document.getElementById('tab-btn-pencil').classList.remove('hidden');
-    showToast('PENCIL LOVER 420 MODE UNLOCKED');
+    showToast(PENCIL_NAME + ' MODE UNLOCKED');
     sendPresence(true);
     mp.listKey = ''; renderPlayers();
   }
@@ -4283,8 +4284,8 @@ function setFastSki(on){
 }
 fastColorBtns.forEach(function(b){ b.addEventListener('click', function(){ setFastColors(!fastColors); }); });
 fastSkiBtns.forEach(function(b){ b.addEventListener('click', function(){ setFastSki(!fastSki); }); });
-/* the PENCIL LOVER 420 badge (flashes pink and poo brown - see .role-badge.pencil) */
-function pencilBadge(){ var b = document.createElement('span'); b.className = 'role-badge pencil'; b.textContent = 'PENCIL LOVER 420'; return b; }
+/* the hussvalley0487 badge (flashes pink and poo brown - see .role-badge.pencil) */
+function pencilBadge(){ var b = document.createElement('span'); b.className = 'role-badge pencil'; b.textContent = PENCIL_NAME; return b; }
 function peerPencil(p){ return !!(p && p.presence && p.presence.pencil === true); }
 /* someone else's flashing colors show only if they really have the mode (or are an owner) */
 function peerStrobe(p){ return !!(p && p.presence && p.presence.strobe === true && (peerPencil(p) || peerRole(p) === 'owner')); }
@@ -5484,7 +5485,7 @@ function presenceState(){
   s.waves = myWave.at ? {ft:myWave.ft, at:myWave.at, adm:adminUnlocked, own:ownerUnlocked} : null;   // your latest WAVE HEIGHT move (the room shares one)
   var role = myRole();
   if(role) s.role = role;   // the ADMIN / OWNER badge next to your name
-  if(pencilUnlocked) s.pencil = true;              // the PENCIL LOVER 420 badge
+  if(pencilUnlocked) s.pencil = true;              // the hussvalley0487 badge
   if(fastColors && canPencil()) s.strobe = true;   // your flashing colors
   if(ownerUnlocked){
     var now = Date.now();
@@ -5768,7 +5769,7 @@ function nameTag(text, role, pencil){
   var nw = ctx.measureText(text).width;
   ctx.font = 'bold 18px monospace';
   var bw = badge ? ctx.measureText(badge).width + 16 : 0;
-  var pw = pencil ? ctx.measureText('PENCIL LOVER 420').width + 16 : 0;
+  var pw = pencil ? ctx.measureText(PENCIL_NAME).width + 16 : 0;
   var w = Math.max(256, Math.ceil((nw + (badge ? bw + 10 : 0) + (pencil ? pw + 10 : 0) + 36)/32)*32);
   c.width = w; c.height = 64;
   var tex = new THREE.CanvasTexture(c);
@@ -5812,13 +5813,13 @@ function drawNameTag(t, time){
     ctx.fillText(t.badge, bx + 8, 34);
   }
   if(t.pencil){
-    // PENCIL LOVER 420: flashes pink and poo brown
+    // the hussvalley0487 badge: flashes pink and poo brown
     var px = x0 + t.nw + 10 + (t.badge ? t.bw + 10 : 0), pink = Math.floor(time*4) % 2 === 0;
     ctx.fillStyle = pink ? '#ff4fb8' : '#6b4423';
     ctx.fillRect(px, 16, t.pw, 34);
     ctx.font = 'bold 18px monospace';
     ctx.fillStyle = pink ? '#ffffff' : '#ffd1ec';
-    ctx.fillText('PENCIL LOVER 420', px + 8, 34);
+    ctx.fillText(PENCIL_NAME, px + 8, 34);
   }
   t.tex.needsUpdate = true;
 }
