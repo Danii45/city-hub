@@ -270,6 +270,8 @@ canvas{display:block;width:100%;height:100%;touch-action:none;}
 }
 .role-badge.admin{color:#ffd23f; background:#2b2104; border-color:#c99a14; text-shadow:0 0 4px rgba(255,200,40,0.8);}
 .role-badge.owner{background:#0d1a24; border-color:#9fe6ff; box-shadow:0 0 6px rgba(140,225,255,0.75);}
+.role-badge.pencil{color:#fff; background:#ff4fb8; border-color:#ffd1ec; animation:pencil-flash 0.5s steps(1) infinite;}
+@keyframes pencil-flash{0%{color:#fff; background:#ff4fb8; border-color:#ffd1ec;} 50%{color:#ffd1ec; background:#6b4423; border-color:#3b2412;}}
 .role-badge.owner i{
   font-style:normal;
   background:linear-gradient(110deg, #7fe3ff 0%, #ffffff 18%, #a9dcff 36%, #e4d2ff 54%, #ffffff 72%, #7fe3ff 100%);
@@ -920,6 +922,7 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
       <button class="tab-btn" id="tab-btn-credits">CREDITS</button>
       <button class="tab-btn hidden" id="tab-btn-admin">ADMIN</button>
       <button class="tab-btn hidden" id="tab-btn-owner">OWNER</button>
+      <button class="tab-btn hidden" id="tab-btn-pencil">PENCIL</button>
       <button class="tab-btn" id="tab-btn-help">HOW TO PLAY</button>
       <button class="tab-btn" id="tab-btn-scores">TOP SCORES</button>
       <button class="tab-btn" id="tab-btn-log">CHANGELOG</button>
@@ -977,7 +980,19 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
         <div class="settings-label second"><span>WAVES</span><span id="owner-wave-value">1 FT</span></div>
         <input type="range" id="owner-wave-slider" min="0" max="70" step="1" value="1">
         <div class="speed-hint">Your waves beat everyone's - even admins'.</div>
+        <div class="settings-label second"><span>FAST COLORS</span><button class="admin-toggle" id="owner-fastcolors-toggle">OFF</button></div>
+        <div class="speed-hint">Your car, truck and CellDoo flash pink and poo brown, really really fast. Everyone sees it.</div>
+        <div class="settings-label second"><span>FAST CELLDOO</span><button class="admin-toggle" id="owner-fastski-toggle">OFF</button></div>
+        <div class="speed-hint">The CellDoo goes fast anywhere - even on land.</div>
         <div class="speed-hint">The ADMIN tab is unlocked for you too.</div>
+      </div>
+    </div>
+    <div class="tab-panel hidden" id="tab-pencil">
+      <div class="settings-block">
+        <div class="settings-label"><span>FAST COLORS</span><button class="admin-toggle" id="fastcolors-toggle">OFF</button></div>
+        <div class="speed-hint">Your car, truck and CellDoo flash pink and poo brown, really really fast. Everyone sees it.</div>
+        <div class="settings-label second"><span>FAST CELLDOO</span><button class="admin-toggle" id="fastski-toggle">OFF</button></div>
+        <div class="speed-hint">The CellDoo goes fast anywhere - even on land.</div>
       </div>
     </div>
     <div class="tab-panel hidden" id="tab-scores">
@@ -1039,6 +1054,7 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
       <div class="scroll-block">
         <h3>VERSION 1.2 <span class="when">- Oct 9, 2026</span></h3>
         <ul>
+          <li><span class="when">Oct 13, 2026 · 11:39 AM</span><br>Secret PENCIL LOVER 420 mode: a pink-and-brown flashing badge, FAST COLORS (your ride flashes pink and poo brown) and FAST CELLDOO (fast anywhere, even on land). Owners get the options too.</li>
           <li><span class="when">Oct 13, 2026 · 11:01 AM</span><br>Cars jump! Drive off a ramp (or a crest) fast and you fly, then land. And a JUMP RAMP outside the north-west corner of the city wall launches you right over the lake - go full speed, or you'll land in the water.</li>
           <li><span class="when">Oct 13, 2026 · 9:47 AM</span><br>MONSTER WAVES: the WAVE HEIGHT slider goes up to 70 FT now. Above 8 FT a giant swell rolls in on top - the harbor and the bridge stay sheltered, and the lake is much deeper.</li>
           <li><span class="when">Oct 9, 2026 · 11:33 AM</span><br>Real-size waves: at 8 FT the big rolling swells really are 8 feet from the bottom to the top (they used to only reach that now and then), with deep blue troughs and white caps on the crests. Bigger jumps on the CellDoo!</li>
@@ -2992,7 +3008,8 @@ var CAR_COLORS = [
   // special shiny paints: GOLD for admins (and owners), DIAMOND for owners only. Anyone allowed can use them at once
   {id:'gold',    name:'GOLD',    hex:0xb8860b, shine:'gold',    role:'admin'},
   {id:'diamond', name:'DIAMOND', hex:0x6fd4ff, shine:'diamond', role:'owner'},
-  {id:'aurora',  name:'AURORA',  hex:0x7355ff, shine:'aurora',  role:'owner'}   // owners only: the northern lights (Daniel's palette)
+  {id:'aurora',  name:'AURORA',  hex:0x7355ff, shine:'aurora',  role:'owner'},  // owners only: the northern lights (Daniel's palette)
+  {id:'strobe',  name:'FAST COLORS', hex:0xff4fb8, shine:'strobe', role:'pencil', hidden:true}   // the PENCIL mode's flashing colors (a toggle, not a swatch)
 ];
 function carColor(id){
   for(var i=0;i<CAR_COLORS.length;i++) if(CAR_COLORS[i].id === id) return CAR_COLORS[i];
@@ -3004,6 +3021,7 @@ function colorAllowed(c, role){ return !!c && (!c.shine || roleRank(role) >= rol
 function colorCss(c){
   if(c.shine === 'gold') return 'linear-gradient(120deg, #8a5a00, #d9a520 25%, #fff4c2 45%, #d9a520 60%, #8a5a00 80%, #ffe27a)';
   if(c.shine === 'diamond') return 'linear-gradient(120deg, #7fe3ff, #ffffff 20%, #a9dcff 40%, #e4d2ff 60%, #ffffff 80%, #7fe3ff)';
+  if(c.shine === 'strobe') return 'linear-gradient(90deg, #ff4fb8, #6b4423, #ff4fb8, #6b4423, #ff4fb8)';
   if(c.shine === 'aurora') return 'linear-gradient(120deg, #1212c2, #3900e6, #7355ff, #ab7dff, #f494ff, #fbd7ff, #c4fff1, #6affde, #01e6ce, #00a6ce, #0165a2, #023782, #1212c2)';
   return hexCss(c.hex);
 }
@@ -3060,6 +3078,7 @@ function paintAurora(model){
   model.aurora = parts;
   shinyPaints.push({mat:model.paint, kind:'aurora', phase:0, parts:parts});
 }
+var STROBE_PINK = new THREE.Color(0xff4fb8), STROBE_BROWN = new THREE.Color(0x6b4423);   // FAST COLORS: only these two
 var DIAMOND_SHADES = [0x4fc8ff, 0xc6f2ff, 0x7fb8ff, 0xcfc4ff].map(function(h){ return new THREE.Color(h); });
 var AURORA_SHADES = [0x1212c2, 0x3900e6, 0x7355ff, 0xab7dff, 0xf494ff, 0xfbd7ff, 0xc4fff1, 0x6affde, 0x01e6ce, 0x00a6ce, 0x0165a2, 0x023782]
   .map(function(h){ return new THREE.Color(h); });
@@ -3070,6 +3089,10 @@ function updateShinyPaints(t){
       var g = Math.pow(0.5 + 0.5*Math.sin(t*4.1 + p.phase*1.7), 6);   // a quick bright glint now and then
       p.mat.color.setRGB(0.55 + 0.23*s, 0.34 + 0.18*s, 0.03 + 0.07*s);   // deep, metallic gold (darker than the YELLOW paint)
       p.mat.emissive.setRGB(0.1*s + 0.45*g, 0.06*s + 0.33*g, 0.08*g);   // ...that flashes bright
+    } else if(p.kind === 'strobe'){
+      var pb = 0.5 + 0.5*Math.sin((t*3 + p.phase)*Math.PI*2);   // pink <-> poo brown and back, three times a second
+      p.mat.color.copy(STROBE_PINK).lerp(STROBE_BROWN, pb);
+      p.mat.emissive.copy(p.mat.color).multiplyScalar(0.3);
     } else if(p.kind === 'aurora'){
       var n = AURORA_SHADES.length;
       p.mat.color.setRGB(1, 1, 1);   // the corners carry the color
@@ -3268,6 +3291,8 @@ try {
 } catch(e){}
 var myColorAt = Date.now();   // when you took it - whoever took a color first keeps it
 Object.keys(cars).forEach(function(k){ paintModel(cars[k], myColor); });
+/* the paint on your own vehicles: your color - or, in PENCIL mode with FAST COLORS on, the flashing rainbow */
+function myPaint(){ return fastColors && canPencil() ? 'strobe' : myColor; }
 function setCarModel(name){
   var shown = car.group.visible;
   car.group.visible = false;
@@ -3535,7 +3560,8 @@ var titleTabs = [
   {btn:document.getElementById('tab-btn-help'), panel:document.getElementById('tab-help')},
   {btn:document.getElementById('tab-btn-log'), panel:document.getElementById('tab-log')},
   {btn:document.getElementById('tab-btn-owner'), panel:document.getElementById('tab-owner')},
-  {btn:document.getElementById('tab-btn-scores'), panel:document.getElementById('tab-scores')}
+  {btn:document.getElementById('tab-btn-scores'), panel:document.getElementById('tab-scores')},
+  {btn:document.getElementById('tab-btn-pencil'), panel:document.getElementById('tab-pencil')}
 ];
 function showTitleTab(tab){
   titleTabs.forEach(function(t){
@@ -3960,7 +3986,9 @@ function updateDriveMovement(dt){
 
   var topSpeed = Math.max(walkSpeed*carSpec.topMul, 10);
   // the CellDoo out of the water: the throttle only gets it crawling, and if it ran aground fast it slides to a stop
-  var beached = carName === 'celldoo' && boatBeached;
+  var turboSki = carName === 'celldoo' && fastSki && canPencil();   // PENCIL mode: fast anywhere
+  if(turboSki) topSpeed *= 1.5;
+  var beached = carName === 'celldoo' && boatBeached && !turboSki;
   var fwdMax = beached ? BEACH_CRAWL : topSpeed, backMax = beached ? BEACH_CRAWL : topSpeed*0.5;
   if(spin){ driveSpeed *= Math.exp(-1.8*dt); }   // sliding sideways scrubs speed off; no throttle or brakes mid-spin
   else if(flyingCar){ }   // in the air you keep your speed
@@ -4215,6 +4243,51 @@ window.addEventListener('keydown', function(e){
     }
   }
 });
+/* PENCIL LOVER 420: type andy123 anywhere. A flashing pink-and-brown PENCIL LOVER 420 badge next to your name, and the
+   PENCIL tab: FAST COLORS (your vehicles flash pink and poo brown, really fast - everyone sees it) and FAST CELLDOO
+   (the CellDoo goes fast anywhere, even on land). Owners get the two options too, in the OWNER tab. */
+var PENCIL_CODE = 'andy123';
+var pencilUnlocked = false, fastColors = false, fastSki = false;
+function canPencil(){ return pencilUnlocked || ownerUnlocked; }
+window.addEventListener('keydown', function(e){
+  if(e.target === chatInput) return;
+  if(e.target && e.target.classList && (e.target.classList.contains('join-input') || e.target.classList.contains('menu-input'))) return;
+  if(!e.key || e.key.length !== 1 || typedBuffer.slice(-PENCIL_CODE.length) !== PENCIL_CODE) return;
+  typedBuffer = '';
+  if(!pencilUnlocked){
+    pencilUnlocked = true;
+    document.getElementById('tab-btn-pencil').classList.remove('hidden');
+    showToast('PENCIL LOVER 420 MODE UNLOCKED');
+    sendPresence(true);
+    mp.listKey = ''; renderPlayers();
+  }
+  openMenuTab(titleTabs[8]);
+});
+var fastColorBtns = [document.getElementById('fastcolors-toggle'), document.getElementById('owner-fastcolors-toggle')];
+var fastSkiBtns = [document.getElementById('fastski-toggle'), document.getElementById('owner-fastski-toggle')];
+function setFastColors(on){
+  if(!canPencil()) return;
+  fastColors = on;
+  fastColorBtns.forEach(function(b){ setToggle(b, on); });
+  Object.keys(cars).forEach(function(k){ paintModel(cars[k], myPaint()); });
+  repaintCellDoos();
+  mp.listKey = ''; renderPlayers();
+  sendPresence(true);
+  showToast(on ? 'FAST COLORS ON' : 'FAST COLORS OFF');
+}
+function setFastSki(on){
+  if(!canPencil()) return;
+  fastSki = on;
+  fastSkiBtns.forEach(function(b){ setToggle(b, on); });
+  showToast(on ? 'FAST CELLDOO ON - IT GOES FAST ANYWHERE' : 'FAST CELLDOO OFF');
+}
+fastColorBtns.forEach(function(b){ b.addEventListener('click', function(){ setFastColors(!fastColors); }); });
+fastSkiBtns.forEach(function(b){ b.addEventListener('click', function(){ setFastSki(!fastSki); }); });
+/* the PENCIL LOVER 420 badge (flashes pink and poo brown - see .role-badge.pencil) */
+function pencilBadge(){ var b = document.createElement('span'); b.className = 'role-badge pencil'; b.textContent = 'PENCIL LOVER 420'; return b; }
+function peerPencil(p){ return !!(p && p.presence && p.presence.pencil === true); }
+/* someone else's flashing colors show only if they really have the mode (or are an owner) */
+function peerStrobe(p){ return !!(p && p.presence && p.presence.strobe === true && (peerPencil(p) || peerRole(p) === 'owner')); }
 function unlockAdmin(){
   adminUnlocked = true;
   speedSlider.max = 300;
@@ -4780,8 +4853,8 @@ function setCellDooState(state, pose){
   if(state !== 'returning') celldoo.recall = null;
 }
 function repaintCellDoos(){
-  paintModel(celldoo.model, myColor);
-  if(localTrailer && localTrailer.kind === 'jetski') paintModel(localTrailer.model.ski, myColor);
+  paintModel(celldoo.model, myPaint());
+  if(localTrailer && localTrailer.kind === 'jetski') paintModel(localTrailer.model.ski, myPaint());
 }
 function nearestLanding(x, z){
   var best = LANDINGS[0], bd = Infinity;
@@ -5112,7 +5185,7 @@ function spawnTrailer(kind){
   }
   var model = kind === 'jetski' ? buildJetskiTrailerModel() : buildTrailerModel();
   localTrailer = {kind: kind, model: model, pose: pose, prev: copyPose(pose), hooked: hooked, loaded: kind === 'jetski', dry: pose.y >= WATER_Y - 0.2};
-  if(kind === 'jetski'){ paintModel(model.ski, myColor); setCellDooState('trailer'); }   // the CellDoo leaves the dock for the trailer
+  if(kind === 'jetski'){ paintModel(model.ski, myPaint()); setCellDooState('trailer'); }   // the CellDoo leaves the dock for the trailer
   placeTrailerModel(localTrailer.model, pose);
   sendPresence(true);
 }
@@ -5251,7 +5324,7 @@ var chatInput = document.getElementById('chat-input');
 function cleanChat(text){
   return String(text).replace(/[\u0000-\u001f\u007f-\u009f­​-‏‪-‮⁠-⁤﻿]/g, '').trim().slice(0, 120);
 }
-function addChatLine(name, text, colorId, system, role){
+function addChatLine(name, text, colorId, system, role, pencil){
   var row = document.createElement('div');
   row.className = 'chat-line' + (system ? ' system' : '');
   if(!system){
@@ -5261,9 +5334,10 @@ function addChatLine(name, text, colorId, system, role){
     dot.style.background = c ? colorCss(c) : 'transparent';
     if(c && c.shine) dot.classList.add('shiny');
     var who = document.createElement('b');
-    var badge = roleBadge(role);
+    var badge = roleBadge(role) || (pencil ? pencilBadge() : null);
     who.textContent = badge ? name : name + ':';
     row.appendChild(dot); row.appendChild(who);
+    if(badge && pencil && badge.className.indexOf('pencil') < 0){ badge.style.marginLeft = '0'; row.appendChild(badge); badge = pencilBadge(); }
     if(badge){ badge.style.marginLeft = '0'; row.appendChild(badge); var colon = document.createElement('b'); colon.textContent = ':'; colon.style.marginLeft = '-4px'; row.appendChild(colon); }
   }
   var msg = document.createElement('span');
@@ -5326,7 +5400,7 @@ function runCommand(text){
 }
 function sendChat(text){
   text = filterChat(text);
-  addChatLine('YOU', text, myColor, false, myRole());
+  addChatLine('YOU', text, myPaint(), false, myRole(), pencilUnlocked);
   if(!mp.room){ systemLine('Nobody else can hear you - chat works when you play online.'); return; }
   myChat = {n: Date.now(), t: text, at: Date.now()};
   sendPresence(true);
@@ -5370,7 +5444,7 @@ function receiveChat(p){
   mp.chatSeen[p.peer] = c.n;
   if(firstLook && finite(c.at) && Date.now() - c.at > 120000) return;   // an old line from before you joined
   var text = cleanChat(c.t);
-  if(text) addChatLine(playerName(p), filterChat(text), p.presence.color, false, peerRole(p));
+  if(text) addChatLine(playerName(p), filterChat(text), peerStrobe(p) ? 'strobe' : p.presence.color, false, peerRole(p), peerPencil(p));
 }
 
 /* ---------- Multiplayer: everyone with the page open shares one city ----------
@@ -5410,6 +5484,8 @@ function presenceState(){
   s.waves = myWave.at ? {ft:myWave.ft, at:myWave.at, adm:adminUnlocked, own:ownerUnlocked} : null;   // your latest WAVE HEIGHT move (the room shares one)
   var role = myRole();
   if(role) s.role = role;   // the ADMIN / OWNER badge next to your name
+  if(pencilUnlocked) s.pencil = true;              // the PENCIL LOVER 420 badge
+  if(fastColors && canPencil()) s.strobe = true;   // your flashing colors
   if(ownerUnlocked){
     var now = Date.now();
     ownerKicks = ownerKicks.filter(function(k){ return now - k.at < KICK_WINDOW; });
@@ -5472,7 +5548,7 @@ function setMyColor(id){
     if(c.shine) localStorage.setItem('cellcity.special', id);
     else { localStorage.setItem('cellcity.color', id); localStorage.removeItem('cellcity.special'); }
   } catch(e){}
-  Object.keys(cars).forEach(function(k){ paintModel(cars[k], id); });
+  Object.keys(cars).forEach(function(k){ paintModel(cars[k], myPaint()); });
   repaintCellDoos();
   renderSwatches();
   mp.listKey = ''; renderPlayers();
@@ -5502,7 +5578,7 @@ function renderSwatches(){
   if(key === swatchKey) return;
   swatchKey = key;
   swatchesEl.textContent = '';
-  CAR_COLORS.filter(function(c){ return colorAllowed(c, myRole()); }).forEach(function(c){
+  CAR_COLORS.filter(function(c){ return !c.hidden && colorAllowed(c, myRole()); }).forEach(function(c){
     var b = document.createElement('button');
     var takenBy = taken[c.id];
     b.className = 'swatch' + (c.shine ? ' shiny ' + c.shine : '') + (c.id === myColor ? ' picked' : '') + (takenBy ? ' taken' : '');
@@ -5520,8 +5596,8 @@ function renderSwatches(){
 function renderPlayers(){
   if(mp.status === 'none'){ playersEl.classList.add('hidden'); return; }
   var statusText = mp.status === 'solo' ? 'SOLO - NO LIVE ROOM' : mp.status === 'lost' ? 'DISCONNECTED' : mp.live ? 'LIVE' : 'CONNECTING...';
-  var rows = [{name:'YOU', color:myColor, st:statusText, role:myRole()}];
-  mp.others.forEach(function(p){ rows.push({name:playerName(p), color:peerColor(p), role:peerRole(p), peer:p.peer}); });
+  var rows = [{name:'YOU', color:myPaint(), st:statusText, role:myRole(), pencil:pencilUnlocked}];
+  mp.others.forEach(function(p){ rows.push({name:playerName(p), color:peerStrobe(p) ? 'strobe' : peerColor(p), role:peerRole(p), pencil:peerPencil(p), peer:p.peer}); });
   var key = JSON.stringify(rows);
   if(key === mp.listKey) return;
   mp.listKey = key;
@@ -5541,6 +5617,7 @@ function renderPlayers(){
     row.appendChild(dot); row.appendChild(name);
     var badge = roleBadge(r.role);
     if(badge) row.appendChild(badge);
+    if(r.pencil) row.appendChild(pencilBadge());
     playersListEl.appendChild(row);
   });
   renderOwnerPlayers(rows);
@@ -5667,6 +5744,7 @@ function renderOwnerPlayers(rows){
     var name = document.createElement('span'); name.className = 'grow'; name.textContent = r.name;
     row.appendChild(name);
     var badge = roleBadge(r.role); if(badge) row.appendChild(badge);
+    if(r.pencil) row.appendChild(pencilBadge());
     if(r.role !== 'owner'){
       var kick = document.createElement('button');
       kick.className = 'admin-toggle'; kick.textContent = 'KICK';
@@ -5683,20 +5761,21 @@ function renderOwnerPlayers(rows){
 }
 
 /* a player's floating name tag, with a golden ADMIN or a shining diamond OWNER badge after the name */
-function nameTag(text, role){
+function nameTag(text, role, pencil){
   var badge = role === 'owner' ? 'OWNER' : role === 'admin' ? 'ADMIN' : '';
   var c = document.createElement('canvas'), ctx = c.getContext('2d');
   ctx.font = '20px monospace';
   var nw = ctx.measureText(text).width;
   ctx.font = 'bold 18px monospace';
   var bw = badge ? ctx.measureText(badge).width + 16 : 0;
-  var w = Math.max(256, Math.ceil((nw + (badge ? bw + 10 : 0) + 36)/32)*32);
+  var pw = pencil ? ctx.measureText('PENCIL LOVER 420').width + 16 : 0;
+  var w = Math.max(256, Math.ceil((nw + (badge ? bw + 10 : 0) + (pencil ? pw + 10 : 0) + 36)/32)*32);
   c.width = w; c.height = 64;
   var tex = new THREE.CanvasTexture(c);
   tex.magFilter = THREE.NearestFilter;
   var sprite = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, depthTest:false}));
   sprite.scale.set(5*w/256, 1.28, 1);
-  sprite.userData.tag = {ctx:ctx, tex:tex, w:w, text:text, nw:nw, badge:badge, bw:bw, role:role, lastShine:0};
+  sprite.userData.tag = {ctx:ctx, tex:tex, w:w, text:text, nw:nw, badge:badge, bw:bw, role:role, pencil:!!pencil, pw:pw, lastShine:0};
   drawNameTag(sprite.userData.tag, 0);
   root.add(sprite);
   return sprite;
@@ -5710,7 +5789,7 @@ function drawNameTag(t, time){
   ctx.lineWidth = 4;
   ctx.strokeRect(2, 2, w-4, 60);
   ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-  var x0 = (w - (t.nw + (t.badge ? t.bw + 10 : 0)))/2;
+  var x0 = (w - (t.nw + (t.badge ? t.bw + 10 : 0) + (t.pencil ? t.pw + 10 : 0)))/2;
   ctx.font = '20px monospace'; ctx.fillStyle = '#f7f2e6';
   ctx.fillText(t.text, x0, 34);
   if(t.badge){
@@ -5731,6 +5810,15 @@ function drawNameTag(t, time){
       ctx.fillStyle = g;
     }
     ctx.fillText(t.badge, bx + 8, 34);
+  }
+  if(t.pencil){
+    // PENCIL LOVER 420: flashes pink and poo brown
+    var px = x0 + t.nw + 10 + (t.badge ? t.bw + 10 : 0), pink = Math.floor(time*4) % 2 === 0;
+    ctx.fillStyle = pink ? '#ff4fb8' : '#6b4423';
+    ctx.fillRect(px, 16, t.pw, 34);
+    ctx.font = 'bold 18px monospace';
+    ctx.fillStyle = pink ? '#ffffff' : '#ffd1ec';
+    ctx.fillText('PENCIL LOVER 420', px + 8, 34);
   }
   t.tex.needsUpdate = true;
 }
@@ -5767,7 +5855,7 @@ function updateRemotes(dt){
       var T = a.trailer, tp = T.pose;
       if(T.kind === 'jetski'){
         T.model.ski.group.visible = !!tr.loaded;   // their CellDoo, in their color, while it's strapped on
-        var skiColor = peerColor(p);
+        var skiColor = peerStrobe(p) ? 'strobe' : peerColor(p);
         if(T.skiColor !== skiColor){ paintModel(T.model.ski, skiColor); T.skiColor = skiColor; }
       }
       T.prev = copyPose(tp);   // riders get carried by exactly this frame's movement
@@ -5788,7 +5876,7 @@ function updateRemotes(dt){
     if(sk && finite(sk.x) && finite(sk.z) && finite(sk.yaw)){
       var skY = finite(sk.y) ? sk.y : 0;
       if(!a.ski){ a.ski = {model:buildCellDooModel(), color:null, pose:{x:sk.x, y:skY, z:sk.z, yaw:sk.yaw}}; a.ski.model.group.visible = true; }
-      var parkedColor = peerColor(p);
+      var parkedColor = peerStrobe(p) ? 'strobe' : peerColor(p);
       if(a.ski.color !== parkedColor){ paintModel(a.ski.model, parkedColor); a.ski.color = parkedColor; }
       var sp = a.ski.pose;
       if((sp.x-sk.x)*(sp.x-sk.x) + (sp.z-sk.z)*(sp.z-sk.z) > 40*40){ sp.x = sk.x; sp.z = sk.z; sp.yaw = sk.yaw; }
@@ -5811,7 +5899,7 @@ function updateRemotes(dt){
       a.kind = want; a.color = null; a.fresh = true;
     }
     if(!a.model){ if(a.tag) a.tag.visible = false; return; }
-    var colorId = peerColor(p);
+    var colorId = peerStrobe(p) ? 'strobe' : peerColor(p);
     if(a.color !== colorId){ paintModel(a.model, colorId); a.color = colorId; }
 
     var ahead = Math.min(0.15, Math.max(0, (Date.now() - p.updatedAt)/1000));
@@ -5830,13 +5918,13 @@ function updateRemotes(dt){
     g.rotation.set(finite(s.tilt) ? s.tilt : 0, a.yaw, finite(s.roll) ? s.roll : 0, 'YXZ');
     a.model.wheels.forEach(function(w){ w.rotation.x += speed*dt/a.model.wheelR; });
 
-    var text = playerName(p), role = peerRole(p), tagKey = text + '|' + role;
+    var text = playerName(p), role = peerRole(p), pencil = peerPencil(p), tagKey = text + '|' + role + '|' + pencil;
     if(a.tagText !== tagKey){
       if(a.tag){ root.remove(a.tag); disposeObject(a.tag); }
-      a.tag = nameTag(text, role);
+      a.tag = nameTag(text, role, pencil);
       a.tagText = tagKey;
     }
-    if(role === 'owner') shineNameTag(a.tag);
+    if(role === 'owner' || pencil) shineNameTag(a.tag);   // the diamond shimmer / the pink-brown flashing
     a.tag.visible = true;
     a.tag.position.set(a.pos.x, a.pos.y + (want === 'walker' ? 2.6 : want === 'truck' ? 4.0 : want === 'celldoo' ? 2.4 : 3.0), a.pos.z);
 
