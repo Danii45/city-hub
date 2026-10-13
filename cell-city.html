@@ -1004,6 +1004,7 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
         <ul>
           <li><b>W / S</b> to go and brake, <b>A / D</b> to steer, <b>mouse</b> to look around.</li>
           <li>The race track is east, over the bridge. Type <b>/speed miles</b> in chat for MPH.</li>
+          <li>Cars can <b>jump</b>: hit a ramp fast and you fly (no steering in the air). The <b>JUMP RAMP</b> is outside the north-west corner of the city wall - go full speed to fly over the lake!</li>
         </ul>
         <h3>THE LAKE &amp; THE CELLDOO</h3>
         <ul>
@@ -1038,6 +1039,7 @@ body.touch-play #speedo{bottom:calc(250px + env(safe-area-inset-bottom,0px));}
       <div class="scroll-block">
         <h3>VERSION 1.2 <span class="when">- Oct 9, 2026</span></h3>
         <ul>
+          <li><span class="when">Oct 13, 2026 · 11:01 AM</span><br>Cars jump! Drive off a ramp (or a crest) fast and you fly, then land. And a JUMP RAMP outside the north-west corner of the city wall launches you right over the lake - go full speed, or you'll land in the water.</li>
           <li><span class="when">Oct 13, 2026 · 9:47 AM</span><br>MONSTER WAVES: the WAVE HEIGHT slider goes up to 70 FT now. Above 8 FT a giant swell rolls in on top - the harbor and the bridge stay sheltered, and the lake is much deeper.</li>
           <li><span class="when">Oct 9, 2026 · 11:33 AM</span><br>Real-size waves: at 8 FT the big rolling swells really are 8 feet from the bottom to the top (they used to only reach that now and then), with deep blue troughs and white caps on the crests. Bigger jumps on the CellDoo!</li>
           <li><span class="when">Oct 9, 2026 · 10:55 AM</span><br>A better-looking city: dark asphalt roads with yellow center lines and zebra crosswalks, sidewalks that stop at the crossings, and streetlights on the corners.</li>
@@ -1285,6 +1287,10 @@ var RING_HALF = 62;               // the highway loop, just inside the wall
 var WALL_HALF = 82;
 var GROUND_HALF = 108;
 var LAKE_P = 6, LAKE_IN = 133, LAKE_OUT = 172;   // the lake: a rounded-square ring round the city (see the Lake section)
+/* the JUMP RAMP (built in the Lake section): on the grass outside the north-west corner of the city wall, pointing
+   diagonally out over the lake. lip = the top edge you fly off; dir = the way you fly; len and h = how long and tall the
+   ramp is (25 degrees); hw = half its width; run = the run-up strip behind it, from the corner of the wall */
+var JUMP = {lipX:-114.3, lipZ:-114.3, dirX:-Math.SQRT1_2, dirZ:-Math.SQRT1_2, len:8.6, h:4, hw:4, run:32};
 var MAP_HALF = LAKE_OUT + 18;                     // dry land past the outer shore, then the map edge
 var MAIN_X = 13;                  // street that runs through the south gate
 var ROAD_W = 6, HWY_W = 8, SIDEWALK_W = 2, SIDEWALK_OFF = ROAD_W/2 + SIDEWALK_W/2;
@@ -2325,6 +2331,9 @@ for(var t=0;t<22;t++){
   if(!isBlocked(tx2,tz2)) tree(tx2, tz2, 0.8+cityRand()*0.6);
 }
 
+/* no grass poking through the jump ramp or its run-up (outside the north-west corner of the wall) */
+for(var jr = 0; jr <= JUMP.len + JUMP.run; jr += 2.5) pushBlocker(JUMP.lipX - JUMP.dirX*jr, JUMP.lipZ - JUMP.dirZ*jr, JUMP.hw*2 + 2, JUMP.hw*2 + 2, 0);
+
 /* ---------- 3D grass: small blocks sticking out of the ground, on YOUR height-map grid ----------
    This is the exact 8x8 pixel grid from your uploaded heightmap (orange=0 blocks,
    red=1 block, dark blue=2 blocks tall), read pixel-by-pixel from the file. That
@@ -3263,6 +3272,7 @@ function setCarModel(name){
   var shown = car.group.visible;
   car.group.visible = false;
   car = cars[name]; carSpec = CAR_SPECS[name]; carName = name;
+  carAir = false; carVy = 0;
   car.group.visible = shown;
   car.group.position.copy(carPos);
   car.group.rotation.y = carYaw;
@@ -3643,6 +3653,7 @@ driveBtn.addEventListener('click', function(){
 });
 
 function enterDriveMode(feetY){   // feetY: the height you were standing at (leave out from the overview: the ground)
+  carAir = false; carVy = 0;
   carPos.set(camera.position.x, 0, camera.position.z);
   carPos.y = surfaceAt(carPos.x, carPos.z, feetY || 0);   // start on what you were standing on, not under it
   carYaw = yaw;
@@ -3885,6 +3896,10 @@ function updateFlyMovement(dt){
    vehicle's grip) for a split second and the back end lets go. The car whirls round while still
    sliding the way it was going, scrubs off speed, and you get control back once it settles. */
 var spin = null;        // {t, dur, dir, rate0, travelYaw} while spinning
+/* car jumps: off the top of a ramp at speed (or off an edge) a car, the F1 or the truck flies - gravity pulls it down,
+   no steering or brakes in the air - and lands where it lands (see the end of updateDriveMovement) */
+var CAR_GRAVITY = -14;
+var carAir = false, carVy = 0, carAirTilt = 0;
 var overGrip = 0;       // how long you've been past the grip limit
 var SPIN_TIME = 1.3;
 var SPIN_AFTER = 0.25;   // how long you can be past the grip limit before the back end lets go
@@ -3940,12 +3955,15 @@ function updateDriveMovement(dt){
     } else { throttle = -1; gas = stickAmount(); }
   }
   if(pranked){ throttle *= -1; steerInput *= -1; }
+  var flyingCar = carAir && carName !== 'celldoo';
+  if(flyingCar){ throttle = 0; steerInput = 0; }   // wheels off the ground: nothing to steer or brake with
 
   var topSpeed = Math.max(walkSpeed*carSpec.topMul, 10);
   // the CellDoo out of the water: the throttle only gets it crawling, and if it ran aground fast it slides to a stop
   var beached = carName === 'celldoo' && boatBeached;
   var fwdMax = beached ? BEACH_CRAWL : topSpeed, backMax = beached ? BEACH_CRAWL : topSpeed*0.5;
   if(spin){ driveSpeed *= Math.exp(-1.8*dt); }   // sliding sideways scrubs speed off; no throttle or brakes mid-spin
+  else if(flyingCar){ }   // in the air you keep your speed
   else if(throttle>0){
     var fwdCap = fwdMax*gas;
     if(driveSpeed < fwdCap) driveSpeed = Math.min(fwdCap, driveSpeed + carSpec.accel*dt);
@@ -4112,11 +4130,39 @@ function updateDriveMovement(dt){
       }
     }
   } else {
+    // on the ground the car follows it - until the ground drops away faster than gravity can pull the car down (off
+    // the top of a ramp at speed, or off an edge): then it flies, nose following the arc, and lands where it lands
     var surf = surfaceAt(carPos.x, carPos.z, carPos.y);
-    carPos.y += (surf - carPos.y) * Math.min(1, dt*18);
-    var hF = surfaceAt(carPos.x+headX*1.4, carPos.z+headZ*1.4, carPos.y);
-    var hB = surfaceAt(carPos.x-headX*1.4, carPos.z-headZ*1.4, carPos.y);
-    tilt = Math.atan2(hF-hB, 2.8);
+    if(carAir){
+      carVy += CAR_GRAVITY*dt;
+      carPos.y += carVy*dt;
+      carAirTilt += (Math.atan2(carVy, Math.max(Math.abs(driveSpeed), 6)) - carAirTilt)*Math.min(1, 2.5*dt);
+      tilt = carAirTilt;
+      if(carPos.y <= surf){
+        var impact = -carVy;
+        carPos.y = surf; carAir = false; carVy = 0;
+        if(impact > 10){
+          driveSpeed *= 0.85;   // a big landing knocks some speed off
+          showToast(impact > 16 ? 'HUGE LANDING!' : 'NICE JUMP!');
+          if(carName === 'truck') playCrashSound();
+        }
+      }
+    } else {
+      var prevY = carPos.y, fly = carPos.y + carVy*dt + 0.5*CAR_GRAVITY*dt*dt;   // where gravity alone would take it
+      if(fly > surf + 0.12 && Math.abs(driveSpeed) > 4){
+        carAir = true;
+        carVy += CAR_GRAVITY*dt;
+        carPos.y = fly;
+        carAirTilt = Math.atan2(carVy, Math.max(Math.abs(driveSpeed), 6));
+        tilt = carAirTilt;
+      } else {
+        carPos.y += (surf - carPos.y) * Math.min(1, dt*18);
+        carVy = (carPos.y - prevY)/dt;   // how fast the ground is carrying it up (or down)
+        var hF = surfaceAt(carPos.x+headX*1.4, carPos.z+headZ*1.4, carPos.y);
+        var hB = surfaceAt(carPos.x-headX*1.4, carPos.z-headZ*1.4, carPos.y);
+        tilt = Math.atan2(hF-hB, 2.8);
+      }
+    }
     checkDrowning(carPos.x, carPos.z, carPos.y, carYaw, dt);
   }
   car.group.position.copy(carPos);
@@ -4324,11 +4370,20 @@ function shoreFade(x, z){
 function waterHeightAtT(x, z, t){ return WATER_Y + (wavesOn ? waveH(x, z, t)*shoreFade(x, z) : 0); }
 function waterHeightAt(x, z){ return waterHeightAtT(x, z, lakeTime); }
 /* what you stand or drive on: the dock, the boat ramp, the bridge, the lake bed, or the normal ground/track */
+/* the jump ramp's surface at (x, z), or null if you're not on it */
+function jumpRampAt(x, z){
+  var dx = x - JUMP.lipX, dz = z - JUMP.lipZ;
+  var u = dx*JUMP.dirX + dz*JUMP.dirZ, v = -dx*JUMP.dirZ + dz*JUMP.dirX;   // along (0 = the lip, -len = the bottom) and across
+  if(u > 0 || u < -JUMP.len || Math.abs(v) > JUMP.hw) return null;
+  return JUMP.h*(1 + u/JUMP.len);
+}
 function groundAt(x, z, curY){
   if(onDock(x, z)) return DOCK.h;
   if(onRamp(x, z)) return z <= RAMP.zShore ? 0 : Math.max(RAMP.depth, RAMP.depth*(z - RAMP.zShore)/(RAMP.zEnd - RAMP.zShore));
   var b = bridgeAt(x, z);
   if(b !== null) return b;
+  var jr = jumpRampAt(x, z);
+  if(jr !== null) return jr;
   if(inLake(x, z)) return LAKE_BOTTOM;
   return trackSurfaceAt(x, z, curY);
 }
@@ -4483,11 +4538,65 @@ root.add(lakePath);
   });
 })();
 
+// the JUMP RAMP: a stunt kicker on the grass outside the city's north-west corner, pointing out across the lake (see
+// JUMP up in Scene setup). Its deck has red and white chevrons, side rails and flags; there's a run-up from the corner
+// of the wall and a landing zone on the far shore. The sides and the front are solid (you can't drive up the side or
+// the 4 m front face); off the top of the lip you fly.
+(function(){
+  var J = JUMP, ax = -J.dirZ, az = J.dirX;   // 'across' the ramp
+  function at(u, v){ return {x: J.lipX + J.dirX*u + ax*v, z: J.lipZ + J.dirZ*u + az*v}; }   // u: along (0 = lip, -len = base)
+  var g = new THREE.Group();
+  g.position.set(J.lipX, 0, J.lipZ);
+  g.rotation.y = Math.atan2(-J.dirX, -J.dirZ);   // the group's -z points the way you jump; the base is at +z = len
+  root.add(g);
+  var WOOD = solidMat(0x8a6a45), POST = solidMat(0x5e4630), RAIL = solidMat(0xd8d4cc), RED = solidMat(0xc0453c), WHITE = solidMat(0xf1ece0);
+  var ang = Math.atan2(J.h, J.len), slope = Math.hypot(J.h, J.len);
+  var deck = new THREE.Group();
+  deck.position.set(0, J.h/2, J.len/2);
+  deck.rotation.x = ang;   // rises toward the lip
+  g.add(deck);
+  function add(parent, w, h, d, mat, x, y, z){ var m = box(w, h, d, mat); m.position.set(x, y, z); parent.add(m); return m; }
+  add(deck, J.hw*2, 0.3, slope, WOOD, 0, -0.15, 0);
+  for(var i=0;i<6;i++) add(deck, J.hw*2 - 0.5, 0.04, 0.7, i % 2 ? WHITE : RED, 0, 0.02, -slope/2 + 0.6 + i*1.45);   // chevrons
+  [-1, 1].forEach(function(s){ add(deck, 0.25, 0.7, slope, RAIL, s*(J.hw + 0.12), 0.35, 0); });                 // side rails
+  [0.35, J.len*0.5, J.len*0.85].forEach(function(zl){                                                          // posts underneath
+    var ph = J.h*(1 - zl/J.len);
+    [-1, 1].forEach(function(s){ add(g, 0.35, ph, 0.35, POST, s*(J.hw - 0.4), ph/2, zl); });
+  });
+  add(g, J.hw*2 - 0.4, 0.3, 0.3, POST, 0, J.h*0.5, 0.35);                                                    // cross brace
+  [-1, 1].forEach(function(s){                                                                                // flags at the lip
+    add(g, 0.12, J.h + 3, 0.12, POST, s*(J.hw + 0.9), (J.h + 3)/2, 0.2);
+    add(g, 1.3, 0.75, 0.05, solidMat(0xe0783c), s*(J.hw + 0.9) + s*0.65, J.h + 2.6, 0.2);
+  });
+  // the run-up from the corner of the wall, and the landing zone across the lake
+  var dirt = onLayer(solidMat(0x9b7b55), FLAT.road), pad = onLayer(solidMat(0xa58a62), FLAT.road);
+  var run = new THREE.Mesh(new THREE.PlaneGeometry(J.hw*2, J.run), dirt);
+  run.rotation.x = -Math.PI/2; run.position.set(0, flatY(FLAT.road), J.len + J.run/2);
+  g.add(run);
+  var land = new THREE.Mesh(new THREE.PlaneGeometry(14, 36), pad);
+  land.rotation.x = -Math.PI/2; land.position.set(0, flatY(FLAT.road), -78);
+  g.add(land);
+  var lipTop = at(0, 0), landMid = at(78, 0);
+  label('JUMP RAMP', lipTop.x, J.h + 6, lipTop.z, root);
+  label('LANDING ZONE', landMid.x, 5, landMid.z, root);
+  // solid sides (1 m pieces as tall as the rail at that spot) and a solid front face below the lip
+  for(var u = -J.len; u < 0; u += 1){
+    var u2 = Math.min(0, u + 1), top = J.h*(1 + u2/J.len) + 0.8;
+    [-1, 1].forEach(function(s){
+      var p = at(u, s*(J.hw + 0.12)), q = at(u2, s*(J.hw + 0.12));
+      pushSegCollider(p.x, p.z, q.x, q.z, 0.2, -50, top);
+    });
+  }
+  var f0 = at(0.3, -J.hw), f1 = at(0.3, J.hw);
+  pushSegCollider(f0.x, f0.z, f1.x, f1.z, 0.25, -50, J.h*0.55);   // low enough that a car going off the top clears it
+})();
+
 // trees along both shores (kept clear of the path, ramp and dock, and of the bridge road)
 (function(){
   function clear(x, z){
     if(z > 90 && x > -4 && x < 45) return false;          // path, ramp, dock
     if(x > 90 && Math.abs(z) < 11) return false;           // bridge road
+    if(x < -70 && z < -70 && Math.abs(x - z) < 18) return false;   // the jump ramp's run-up and landing zone
     return true;
   }
   [[LAKE_IN - 10, 34], [LAKE_OUT + 10, 46], [LAKE_OUT + 15.5, 46]].forEach(function(ring, ri){
@@ -4560,7 +4669,7 @@ function placeAtSafeSpot(){
   if(driving){
     carPos.set(s.x, y, s.z);
     carYaw = faceYaw; yaw = faceYaw; pitch = 0.18;
-    driveSpeed = 0; carYawRate = 0; steerAngle = 0; spin = null; overGrip = 0;
+    driveSpeed = 0; carYawRate = 0; steerAngle = 0; spin = null; overGrip = 0; carAir = false; carVy = 0;
     if(localTrailer) localTrailer.hooked = false;
     car.group.position.copy(carPos);
     car.group.rotation.set(0, carYaw, 0, 'YXZ');
