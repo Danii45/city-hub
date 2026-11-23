@@ -2898,7 +2898,7 @@ function carEnv(){
 }
 function buildCoupeModel(){
   var g = new THREE.Group(), env = carEnv();
-  function phys(o){ var m = new THREE.MeshPhysicalMaterial(o); m.envMap = env; m.envMapIntensity = o.envI || 1; return m; }
+  function phys(o){ var ei = o.envI || 1; delete o.envI; var m = new THREE.MeshPhysicalMaterial(o); m.envMap = env; m.envMapIntensity = ei; return m; }
   var paint = phys({color:0xc9cac6, roughness:0.32, metalness:0, clearcoat:1, clearcoatRoughness:0.03, envI:0.55});
   var glass = phys({color:0x0d1219, roughness:0.05, metalness:0.2, clearcoat:1, clearcoatRoughness:0.02, envI:1.4});
   var carbon = phys({color:0x18191c, roughness:0.45, metalness:0.2, clearcoat:0.8, clearcoatRoughness:0.08, envI:0.5});
@@ -3010,7 +3010,87 @@ function buildCoupeModel(){
   });
   g.traverse(function(o){ if(o.isMesh) o.castShadow = false; });
   g.visible = false; root.add(g);
-  return {group:g, wheels:wheels, wheelR:WR, paint:paint, fixedPaint:true};
+  var model = {group:g, wheels:wheels, wheelR:WR, paint:paint, fixedPaint:true};
+  coupeGLB.models.push(model);
+  if(coupeGLB.state === 'ready') setTimeout(function(){ useCoupeGLB(model); }, 0);
+  return model;
+}
+/* ---------- The TRACK COUPE's real 3D model ----------
+   The drawn coupe above is a stand-in: the first time someone needs the coupe (you pick it, or another player drives
+   one past you), the real model (models/coupe.glb, squeezed down from 47 MB to about 4 MB) loads in the background
+   and takes its place. Its wheels are found by where they sit, so they roll and the front ones steer; the brakes stay
+   put. If it can't load, the drawn one just stays. */
+var COUPE_GLB_URL = 'models/coupe.glb';
+var COUPE_LIBS = ['https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js', 'https://cdn.jsdelivr.net/npm/meshoptimizer@0.18.1/meshopt_decoder.js'];
+var COUPE_WHEELS = [[0.82, -1.205], [-0.82, -1.205], [0.78, 1.245], [-0.78, 1.245]];   // where its wheels are (x, z), after turning it round
+var coupeGLB = {state:'idle', template:null, models:[]};
+function requestCoupeGLB(){
+  if(coupeGLB.state !== 'idle') return;
+  coupeGLB.state = 'loading';
+  loadScript(COUPE_LIBS[0]).then(function(){ return window.MeshoptDecoder ? null : loadScript(COUPE_LIBS[1]); }).then(function(){
+    return MeshoptDecoder.ready;
+  }).then(function(){
+    return new Promise(function(resolve, reject){
+      var loader = new THREE.GLTFLoader();
+      loader.setMeshoptDecoder(MeshoptDecoder);
+      loader.load(COUPE_GLB_URL, function(gltf){ resolve(gltf.scene); }, null, reject);
+    });
+  }).then(function(scene){
+    coupeGLB.template = prepareCoupeTemplate(scene);
+    coupeGLB.state = 'ready';
+    coupeGLB.models.forEach(function(m){ if(m.group.parent) useCoupeGLB(m); });
+  }).catch(function(){ coupeGLB.state = 'failed'; });
+}
+function prepareCoupeTemplate(scene){
+  var holder = new THREE.Group(), env = carEnv();
+  scene.rotation.y = Math.PI;   // the model faces +z; our cars face -z
+  holder.add(scene);
+  var pivots = COUPE_WHEELS.map(function(w){
+    var p = new THREE.Group(); p.name = 'glbWheel'; p.position.set(w[0], 0.38, w[1]);
+    var s = new THREE.Group(); s.name = 'glbSpin'; p.add(s); holder.add(p); return p;
+  });
+  holder.updateMatrixWorld(true);
+  var meshes = [];
+  scene.traverse(function(o){ if(o.isMesh) meshes.push(o); });
+  var bx = new THREE.Box3(), c = new THREE.Vector3();
+  meshes.forEach(function(o){
+    [].concat(o.material).forEach(function(mt){ if(mt && 'envMap' in mt){ mt.envMap = env; mt.envMapIntensity = 0.9; mt.needsUpdate = true; } });
+    var names = o.name, up = o.parent;
+    for(var i=0;i<3 && up;i++, up = up.parent) names += ' ' + up.name;
+    [].concat(o.material).forEach(function(mt){ if(mt) names += ' ' + mt.name; });
+    names = names.toLowerCase();
+    if(/brake|caliper/.test(names) || !/wheel|disc|tire|tyre|rim/.test(names)) return;
+    bx.setFromObject(o).getCenter(c);
+    for(var k=0;k<pivots.length;k++){
+      var p = pivots[k];
+      if(Math.abs(c.x - p.position.x) < 0.4 && Math.abs(c.z - p.position.z) < 0.45 && Math.abs(c.y - 0.38) < 0.35){ p.children[0].attach(o); break; }
+    }
+  });
+  return holder;
+}
+function useCoupeGLB(model){
+  if(model.glb || !coupeGLB.template) return;
+  var inst = coupeGLB.template.clone(true), keep = model.cockpit ? model.cockpit.group : null;
+  model.group.children.slice().forEach(function(ch){ if(ch !== keep){ model.group.remove(ch); disposeObject(ch); } });
+  model.group.add(inst);
+  model.wheels.length = 0;
+  inst.children.forEach(function(ch){ if(ch.name === 'glbWheel'){ ch.rotation.order = 'YXZ'; ch.spin = ch.children[0]; model.wheels.push(ch); } });
+  model.wheelR = 0.38; model.glb = true;
+  if(model.cockpit){   // the real model has its own inside: keep just the seat position
+    var ck = model.cockpit;
+    while(ck.group.children.length) disposeObject(ck.group.children[0]), ck.group.remove(ck.group.children[0]);
+    ck.wheel = new THREE.Group(); ck.group.add(ck.wheel);
+    ck.front = model.wheels.filter(function(w){ return w.position.z < 0; });
+    ck.eye.set(-0.37, 1.08, 0.12);
+    // from the driver's seat, the tinted glass would make everything dark: it's hidden while you're inside
+    ck.hide = [];
+    inst.traverse(function(o){
+      if(!o.isMesh) return;
+      var nm = (o.name + ' ' + (o.parent ? o.parent.name : '') + ' ' + [].concat(o.material).map(function(m){ return m ? m.name : ''; }).join(' ')).toLowerCase();
+      if((/glass|window|windscreen|windshield/.test(nm) && !/int_glass/.test(nm)) || [].concat(o.material).some(function(m){ return m && m.transparent && m.opacity < 0.9; })) ck.hide.push(o);
+    });
+    applyCarView();
+  }
 }
 function buildWalker(){
   var g = new THREE.Group(), paint = solidMat(0xc8382f), dark = solidMat(0x2b2a2e);
@@ -3132,6 +3212,7 @@ function setCarModel(name){
   car.group.visible = false;
   car = cars[name]; carSpec = CAR_SPECS[name]; carName = name;
   manual.gear = 1; manual.revs = null; speedoText = '';
+  if(name === 'coupe') requestCoupeGLB();
   if(carSpec.manual && !IS_TOUCH) showToast(t('manualHint'));
   applyCarView();
   car.group.visible = shown;
@@ -3971,6 +4052,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 23, 2026 · 11:30 AM</span><br>The TRACK COUPE now uses a real 3D model (it loads the first time you pick it).</li>' +
   '<li><span class="when">Nov 23, 2026 · 11:15 AM</span><br>Owner: the TRACK COUPE - a glossy white sports car (clear-coat paint that reflects the sky) with a big wing and a 6-speed manual. SHIFT + 1-6 changes gear, W gas, S brake and reverse.</li>' +
   '<li><span class="when">Nov 23, 2026 · 9:10 AM</span><br>Owner: ADD MANY AT ONCE in the PLAYERS tab - paste names and passwords from a sheet.</li>' +
   '<li><span class="when">Nov 23, 2026 · 8:55 AM</span><br>Change your password: MENU, PLAY tab, CHANGE PASSWORD (website version).</li>' +
@@ -5568,7 +5650,7 @@ function updateRemotes(dt){
     if(!a) a = mp.avatars[p.peer] = {model:null, kind:null, color:null, tag:null, tagText:null, pos:new THREE.Vector3(), yaw:0, fresh:true};
     if(a.kind !== want){
       if(a.model){ root.remove(a.model.group); disposeObject(a.model.group); }
-      a.model = want === 'sedan' ? buildCarModel() : want === 'f1' ? buildF1Model() : want === 'coupe' ? buildCoupeModel() : want === 'walker' ? buildWalker() : null;
+      a.model = want === 'sedan' ? buildCarModel() : want === 'f1' ? buildF1Model() : want === 'coupe' ? (requestCoupeGLB(), buildCoupeModel()) : want === 'walker' ? buildWalker() : null;
       a.kind = want; a.color = null; a.fresh = true;
     }
     if(!a.model){ if(a.tag) a.tag.visible = false; return; }
