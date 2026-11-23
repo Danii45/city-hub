@@ -431,6 +431,16 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
           <div class="msg" id="login-msg" data-t="loginNote">Don't have a password? Ask Daniel.</div>
         </div>
         <div id="login-in" class="hidden"><span id="login-who">-</span><button class="btn" id="signout-btn" data-t="signOut">SIGN OUT</button></div>
+        <div id="pw-change" class="hidden">
+          <div class="btn-row" style="margin-top:8px"><button class="btn" id="pw-open" data-t="pwChange">CHANGE PASSWORD</button></div>
+          <div id="pw-form" class="hidden">
+            <input id="pw-old" class="text-input menu-input" type="password" maxlength="40" data-tp="pwOldPh" placeholder="Your password now" autocomplete="current-password" style="margin-top:8px">
+            <input id="pw-new" class="text-input menu-input" type="password" maxlength="40" data-tp="pwNewPh" placeholder="New password (6+)" autocomplete="new-password" style="margin-top:6px">
+            <input id="pw-new2" class="text-input menu-input" type="password" maxlength="40" data-tp="pwNew2Ph" placeholder="New password again" autocomplete="new-password" style="margin-top:6px">
+            <div class="btn-row" style="margin-top:8px"><button class="btn go" id="pw-save" data-t="save">SAVE</button><button class="btn" id="pw-cancel" data-t="cancel">CANCEL</button></div>
+            <div class="msg" id="pw-msg"></div>
+          </div>
+        </div>
         <div class="settings-label second"><span data-t="language">LANGUAGE</span></div>
         <div class="chips"><button class="chip" id="lang-en">ENGLISH</button><button class="chip" id="lang-fr">FRANÇAIS</button></div>
       </div>
@@ -3727,6 +3737,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 23, 2026 · 8:55 AM</span><br>Change your password: MENU, PLAY tab, CHANGE PASSWORD (website version).</li>' +
   '<li><span class="when">Nov 23, 2026 · 8:45 AM</span><br>Building passcode: on claude.ai, type the passcode on a plot\'s card to unlock building. Daniel sets it in the PLAYERS tab.</li>' +
   '<li><span class="when">Nov 18, 2026 · 11:21 AM</span><br>Build with blocks! Houses can now be built block by block instead of ready-made: cubes, half blocks, ramps, stairs, posts, windows, glass, lights and plants in 18 colors, up to 14 blocks high. You can climb on what you build and walk up the ramps and stairs.</li>' +
   '<li><span class="when">Nov 18, 2026 · 11:21 AM</span><br>Block houses have a room inside: GO INSIDE to walk in, and BUILD INSIDE to put up walls with blocks, add furniture and pick the floor and wallpaper.</li>' +
@@ -4865,6 +4876,7 @@ function afterSignIn(user, typedName){
     net.ready = true; net.canBuild = true;
     loginOut.classList.add('hidden'); loginIn.classList.remove('hidden');
     loginWho.textContent = t('signedInAs', {name:net.name});
+    document.getElementById('pw-change').classList.remove('hidden');
     document.getElementById('tab-btn-players').classList.toggle('hidden', !net.isOwner);
     document.getElementById('vehicle-block').classList.toggle('hidden', !net.isOwner);
     if(net.isOwner && wantedSpecial) setMyColor(wantedSpecial);
@@ -4876,6 +4888,49 @@ document.getElementById('signout-btn').addEventListener('click', function(){
   if(mp.room && mp.room.leave) mp.room.leave();
   (window.firebase && firebase.auth ? firebase.auth().signOut() : Promise.resolve()).then(function(){ location.reload(); });
 });
+
+/* ---------- Change your own password (website): type the one you have now, then the new one twice ---------- */
+STR.en.pwChange = 'CHANGE PASSWORD'; STR.fr.pwChange = 'CHANGER LE MOT DE PASSE';
+STR.en.pwOldPh = 'Your password now'; STR.fr.pwOldPh = 'Ton mot de passe actuel';
+STR.en.pwNewPh = 'New password (6+)'; STR.fr.pwNewPh = 'Nouveau mot de passe (6+)';
+STR.en.pwNew2Ph = 'New password again'; STR.fr.pwNew2Ph = 'Encore le nouveau mot de passe';
+STR.en.pwShort = 'The new password needs 6 or more characters.'; STR.fr.pwShort = 'Le nouveau mot de passe doit avoir 6 caractères ou plus.';
+STR.en.pwMismatch = 'The two new passwords are different.'; STR.fr.pwMismatch = 'Les deux nouveaux mots de passe sont différents.';
+STR.en.pwOldWrong = 'Your password now is wrong.'; STR.fr.pwOldWrong = 'Ton mot de passe actuel est faux.';
+STR.en.pwSaving = 'Changing...'; STR.fr.pwSaving = 'Changement...';
+STR.en.pwDone = 'Password changed! Use the new one next time.'; STR.fr.pwDone = 'Mot de passe changé ! Utilise le nouveau la prochaine fois.';
+STR.en.pwFail = 'Couldn\'t change it ({why}).'; STR.fr.pwFail = 'Impossible de le changer ({why}).';
+(function(){
+  var form = document.getElementById('pw-form'), openBtn = document.getElementById('pw-open'), msgEl = document.getElementById('pw-msg');
+  var oldEl = document.getElementById('pw-old'), newEl = document.getElementById('pw-new'), new2El = document.getElementById('pw-new2'), saveBtn = document.getElementById('pw-save');
+  function msg(key, cls, vars){ msgEl.textContent = key ? t(key, vars) : ''; msgEl.className = 'msg' + (cls ? ' ' + cls : ''); }
+  function clear(){ oldEl.value = newEl.value = new2El.value = ''; }
+  openBtn.addEventListener('click', function(){ form.classList.remove('hidden'); openBtn.parentNode.classList.add('hidden'); msg(''); oldEl.focus(); });
+  document.getElementById('pw-cancel').addEventListener('click', function(){ clear(); msg(''); form.classList.add('hidden'); openBtn.parentNode.classList.remove('hidden'); });
+  saveBtn.addEventListener('click', function(){
+    var user = window.firebase && firebase.auth && firebase.auth().currentUser;
+    if(!user) return;
+    if(!oldEl.value){ oldEl.focus(); return; }
+    if(newEl.value.length < 6){ msg('pwShort', 'bad'); newEl.focus(); return; }
+    if(newEl.value !== new2El.value){ msg('pwMismatch', 'bad'); new2El.focus(); return; }
+    msg('pwSaving'); saveBtn.disabled = true;
+    var cred = firebase.auth.EmailAuthProvider.credential(user.email, oldEl.value);
+    user.reauthenticateWithCredential(cred).then(function(){
+      return user.updatePassword(newEl.value);
+    }).then(function(){
+      saveBtn.disabled = false; clear(); msg('pwDone', 'good');
+      form.classList.add('hidden'); openBtn.parentNode.classList.remove('hidden');
+      showToast(t('pwDone'));
+    }).catch(function(err){
+      saveBtn.disabled = false;
+      var c = (err && err.code) || '';
+      if(/wrong-password|invalid-credential|invalid-login/.test(c)){ msg('pwOldWrong', 'bad'); oldEl.value = ''; oldEl.focus(); }
+      else if(/too-many-requests/.test(c)) msg('loginTooMany', 'bad');
+      else if(/weak-password/.test(c)) msg('pwShort', 'bad');
+      else msg('pwFail', 'bad', {why:c || (err && err.message) || '?'});
+    });
+  });
+})();
 
 /* everyone's plots and the list of players, live */
 function startListening(){
