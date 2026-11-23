@@ -2034,6 +2034,7 @@ function petMika(){
     hearts.push({s:sp, t:-i*0.09, vy:0.9 + Math.random()*0.7, sway:Math.random()*6});
   }
   arfSound();
+  addChatLine('Mika', pet.sleeping ? '*sleepy ruff*' : 'ruff!', 'orange', false, null);
 }
 function updateHearts(dt){
   for(var i=hearts.length-1;i>=0;i--){
@@ -2190,9 +2191,19 @@ function updatePet(dt){
     pet.ds = Math.abs(gap) <= step || Math.abs(gap) > 12 ? goal : (pet.ds + Math.sign(gap)*step + L) % L;
   }
   pet.s = pet.ds;
-  var at = petAt(pet.s); pet.x = at[0]; pet.z = at[1];
-  pet.sprite.position.set(pet.x, surfaceAt(pet.x, pet.z, 0) + Math.abs(Math.sin(moveTime*(happy ? 13 : 7)))*(happy ? 0.45 : 0.25), pet.z);
-  pet.sprite.material.rotation = Math.sin(moveTime*(happy ? 17 : 7))*(happy ? 0.16 : 0.06);
+  var at = mikaSpot(petAt(pet.s)), ph = mikaPhase(); pet.x = at[0]; pet.z = at[1];
+  setMikaSleeping(ph.mode === 'sleep');
+  if(ph.mode === 'sleep'){
+    var br = 1 + Math.sin(moveTime*1.8)*0.025;   // breathing
+    pet.sprite.scale.set(pet.sleepW*br, pet.sleepH*br, 1);
+    pet.sprite.position.set(pet.x, MIKA_BED.y, pet.z);
+    pet.sprite.material.rotation = happy ? Math.sin(moveTime*17)*0.08 : 0;
+  } else {
+    pet.sprite.position.set(pet.x, surfaceAt(pet.x, pet.z, 0) + Math.abs(Math.sin(moveTime*(happy ? 13 : 7)))*(happy ? 0.45 : 0.25), pet.z);
+    pet.sprite.material.rotation = Math.sin(moveTime*(happy ? 17 : 7))*(happy ? 0.16 : 0.06);
+  }
+  updateZzz(ph.mode === 'sleep');
+  mikaChat(ph.mode === 'sleep');
   if(flying && driving && Math.abs(driveSpeed) > 2.5 && carPos.y < 3){
     var hx = pet.x - carPos.x, hz = pet.z - carPos.z, r = carSpec.radius + 0.6;
     if(hx*hx + hz*hz < r*r){
@@ -2207,6 +2218,98 @@ function updatePet(dt){
   }
   if(!driving) remoteColliders.push({x:pet.x, z:pet.z, r:0.5, y0:0, y1:2.6});
 }
+/* ---------- Mika's bed, her naps, and what she says in the chat ----------
+   A round dog bed by the fountain next to the Eiffel Tower. Every 5 minutes (the same for everyone, by the clock) she
+   trots over, curls up and naps for 50 seconds (her sleeping photo, Z z z floating up, *snore* in the chat), then
+   trots back to her walk. While she's awake she says "bark" or "ruff" in the chat now and then. */
+var MIKA_BED = {x:-8.6, z:47, y:0.32}, MIKA_VIA = [-10.5, 31];   // beside the fountain (west side); she goes round the carousel
+var MIKA_CYCLE = 300, MIKA_GO = 225, MIKA_SLEEP = 240, MIKA_WAKE = 290;
+(function buildMikaBed(){
+  var g = new THREE.Group(); g.position.set(MIKA_BED.x, 0, MIKA_BED.z);
+  var rim = new THREE.Mesh(new THREE.TorusGeometry(1.25, 0.32, 10, 28), solidMat(0x7a2a3a)); rim.rotation.x = Math.PI/2; rim.scale.set(1, 0.78, 1); rim.position.y = 0.3; g.add(rim);
+  var base = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.4, 0.22, 28), solidMat(0x5e1f2c)); base.scale.set(1, 1, 0.78); base.position.y = 0.11; g.add(base);
+  var cushion = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.16, 28), solidMat(0xe8d6b8)); cushion.scale.set(1, 1, 0.78); cushion.position.y = 0.26; g.add(cushion);
+  var bone = new THREE.Group(); bone.position.set(-0.6, 0.08, 1.55); bone.rotation.y = 0.6;
+  bone.add(box(0.5, 0.1, 0.1, solidMat(0xf4efe4)));
+  [-1, 1].forEach(function(sd){ [-1, 1].forEach(function(e){ var k = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), solidMat(0xf4efe4)); k.position.set(sd*0.26, 0, e*0.06); bone.add(k); }); });
+  g.add(bone);
+  // a little sign: MIKA
+  var c = document.createElement('canvas'); c.width = 256; c.height = 96;
+  var x = c.getContext('2d'); x.fillStyle = '#f6f1e4'; x.fillRect(0, 0, 256, 96); x.strokeStyle = '#7a2a3a'; x.lineWidth = 8; x.strokeRect(4, 4, 248, 88);
+  x.fillStyle = '#7a2a3a'; x.font = 'bold 54px Georgia, serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('MIKA', 128, 52);
+  var sign = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.38), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c)}));
+  sign.position.set(-1.25, 0.75, 0); sign.rotation.y = -Math.PI/2; g.add(sign);
+  var post = box(0.06, 0.6, 0.06, solidMat(0x6b4a32)); post.position.set(-1.27, 0.3, 0); g.add(post);
+  root.add(g);
+})();
+/* where she is in her 5 minutes: walking, going to bed, asleep, or heading back */
+function mikaPhase(){
+  var T = (((Date.now() + (net.timeOffset || 0))/1000) % MIKA_CYCLE + MIKA_CYCLE) % MIKA_CYCLE;
+  if(T < MIKA_GO) return {mode:'walk', f:0};
+  if(T < MIKA_SLEEP) return {mode:'toBed', f:(T - MIKA_GO)/(MIKA_SLEEP - MIKA_GO)};
+  if(T < MIKA_WAKE) return {mode:'sleep', f:(T - MIKA_SLEEP)/(MIKA_WAKE - MIKA_SLEEP)};
+  return {mode:'back', f:(T - MIKA_WAKE)/(MIKA_CYCLE - MIKA_WAKE)};
+}
+function mikaSpot(loop){
+  var ph = mikaPhase(), e = function(u){ return u*u*(3 - 2*u); };
+  function lerp(a, b, u){ return [a[0] + (b[0] - a[0])*u, a[1] + (b[1] - a[1])*u]; }
+  var bed = [MIKA_BED.x, MIKA_BED.z];
+  if(ph.mode === 'toBed') return ph.f < 0.5 ? lerp(loop, MIKA_VIA, e(ph.f*2)) : lerp(MIKA_VIA, bed, e(ph.f*2 - 1));
+  if(ph.mode === 'sleep') return bed;
+  if(ph.mode === 'back') return ph.f < 0.5 ? lerp(bed, MIKA_VIA, e(ph.f*2)) : lerp(MIKA_VIA, loop, e(ph.f*2 - 1));
+  return loop;
+}
+var SLEEP_TEX = new THREE.TextureLoader().load('pets/pet-sleep.jpg');
+function setMikaSleeping(on){
+  if(!!pet.sleeping === on) return;
+  var mat = pet.sprite.material;
+  if(on){
+    var img = SLEEP_TEX.image; if(!img || !img.width) return;
+    pet.awakeTex = mat.map; pet.awakeScale = pet.sprite.scale.clone();
+    pet.sleepH = 1.5; pet.sleepW = 1.5*img.width/img.height;
+    mat.map = SLEEP_TEX; pet.sprite.center.set(0.5, 0);
+  } else if(pet.awakeTex){
+    mat.map = pet.awakeTex; pet.sprite.scale.copy(pet.awakeScale);
+  }
+  mat.needsUpdate = true;
+  pet.sleeping = on;
+}
+var zzz = (function(){
+  var list = [];
+  for(var i=0;i<3;i++){
+    var c = document.createElement('canvas'); c.width = c.height = 64;
+    var x = c.getContext('2d'); x.font = 'bold 52px Georgia, serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.lineWidth = 6; x.strokeStyle = '#1f2233'; x.strokeText('Z', 32, 34); x.fillStyle = '#ffffff'; x.fillText('Z', 32, 34);
+    var sp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c), transparent:true, depthWrite:false}));
+    sp.visible = false; root.add(sp); list.push(sp);
+  }
+  return list;
+})();
+function updateZzz(on){
+  zzz.forEach(function(sp, i){
+    sp.visible = on && pet.state === 'walk';
+    if(!sp.visible) return;
+    var u = ((moveTime*0.45 + i/3) % 1);
+    sp.position.set(MIKA_BED.x + 0.5 + u*0.9 + Math.sin(u*6 + i)*0.15, MIKA_BED.y + 1.4 + u*1.8, MIKA_BED.z);
+    sp.scale.setScalar(0.3 + u*0.45);
+    sp.material.opacity = u < 0.15 ? u/0.15 : 1 - (u - 0.15)/0.85;
+  });
+}
+/* she talks in the chat: everyone sees the same line at the same moment (it's worked out from the clock) */
+var MIKA_SAYS = ['bark', 'ruff', 'bark bark!', 'ruff ruff!', 'arf!', 'BARK', '*wags tail*'];
+var mikaChatSlot = -1;
+function mikaChat(asleep){
+  if(!signedIn() || pet.state !== 'walk') return;
+  var now = (Date.now() + (net.timeOffset || 0))/1000, len = asleep ? 9 : 35, slot = Math.floor(now/len)*(asleep ? 1 : 7);
+  if(slot === mikaChatSlot) return;
+  var first = mikaChatSlot === -1;
+  mikaChatSlot = slot;
+  if(first) return;   // not the moment you arrive
+  var h = Math.abs(Math.sin(slot*12.9898)*43758.5453) % 1;
+  if(asleep) addChatLine('Mika', '*snore*', 'orange', false, null);
+  else if(h < 0.6) addChatLine('Mika', MIKA_SAYS[Math.floor(h/0.6*MIKA_SAYS.length)], 'orange', false, null);
+}
+
 /* ---------- Mika comes back from heaven ----------
    Two seconds after you hit her: a beam of golden light shines down where she was walking, she rises up out of the
    ground with a halo over her head and a heavenly choir singing AAAAAHHHH, floats, drifts back down - and walks on
@@ -2239,7 +2342,8 @@ function startHeaven(){
 }
 function updateHeaven(dt){
   pet.s = sharedPetS();
-  var T = heaven.t += dt, at = petAt(pet.s), ground = surfaceAt(at[0], at[1], 0);
+  setMikaSleeping(false);
+  var T = heaven.t += dt, at = mikaSpot(petAt(pet.s)), ground = surfaceAt(at[0], at[1], 0);
   pet.x = at[0]; pet.z = at[1];
   var ease = function(u){ u = Math.max(0, Math.min(1, u)); return u*u*(3 - 2*u); };
   var lift = 3.2*ease(T/2.2) - 3.2*ease((T - 4.0)/1.8);           // rises, floats, comes back down
@@ -4493,6 +4597,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 23, 2026 · 2:05 PM</span><br>Mika has a bed by the fountain next to the Eiffel Tower and naps in it every 5 minutes (Z z z). She also barks and snores in the chat.</li>' +
   '<li><span class="when">Nov 23, 2026 · 1:55 PM</span><br>Mika now has a name tag showing her BEST FRIEND - whoever has petted her the most.</li>' +
   '<li><span class="when">Nov 23, 2026 · 1:50 PM</span><br>When anyone pets Mika she freezes for everyone, then walks on. The MIKA PET LEADERBOARD pops up on the right each time you pet her.</li>' +
   '<li><span class="when">Nov 23, 2026 · 1:45 PM</span><br>Mika is now in the same spot for everyone. Every pet counts worldwide - and your first pet unlocks the MIKA PET LEADERBOARD (MENU > MIKA).</li>' +
