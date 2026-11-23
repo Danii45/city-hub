@@ -1891,17 +1891,17 @@ function updatePeople(dt){
 }
 var peopleFrame = 0;
 /* ---------- The dog: a photo on a stick ----------
-   One flat photo of Daniel's dog (a random one of the two, pets/pet-1.jpg or pet-2.jpg) walks round the park by the
-   Eiffel Tower, bobbing like a cardboard cutout. Hit it with a car and it spins off into the sky, and a black box says
+   One flat photo of Daniel's dog (a random one of the two, pets/pet-1.jpg or pet-2.jpg) walks a small square right under
+   the Eiffel Tower, bobbing like a cardboard cutout. Hit it with a car and it spins off into the sky, and a black box says
    HOW DARE YOU? / SENTENCE: EXECUTION. Twenty seconds later a new one (random photo again) shows up somewhere else. */
 STR.en.howDare = 'HOW DARE YOU?'; STR.fr.howDare = 'COMMENT OSES-TU ?';
 STR.en.sentence = 'SENTENCE: EXECUTION'; STR.fr.sentence = 'SENTENCE : EXÉCUTION';
-var PET_PHOTOS = ['pets/pet-1.jpg', 'pets/pet-2.jpg'], PET_LOOP = [[-25, 25], [25, 25], [25, -25], [-25, -25]], PET_SIDE = 50;
+var PET_PHOTOS = ['pets/pet-1.jpg', 'pets/pet-2.jpg'], PET_LOOP = [[-10, 10], [10, 10], [10, -10], [-10, -10]], PET_SIDE = 20;   // a small square right under the Eiffel Tower, between its legs
 var pet = (function(){
   var loader = new THREE.TextureLoader(), texs = PET_PHOTOS.map(function(u){ return loader.load(u); });
   var sp = new THREE.Sprite(new THREE.SpriteMaterial({map:texs[0]}));
   sp.center.set(0.5, 0); sp.visible = false; root.add(sp);
-  return {sprite:sp, texs:texs, state:'gone', t:3, s:0, dir:1, speed:2.2, x:0, z:0, vel:new THREE.Vector3()};
+  return {sprite:sp, texs:texs, state:'gone', t:3, s:0, dir:1, speed:1.6, x:0, z:0, vel:new THREE.Vector3()};
 })();
 function petAt(s){
   var k = Math.floor(s/PET_SIDE) % 4, f = (s % PET_SIDE)/PET_SIDE, a = PET_LOOP[k], b = PET_LOOP[(k + 1) % 4];
@@ -4145,7 +4145,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
-  '<li><span class="when">Nov 23, 2026 · 11:50 AM</span><br>Daniel\'s dog now walks around the park by the Eiffel Tower. Don\'t you dare hit it.</li>' +
+  '<li><span class="when">Nov 23, 2026 · 11:50 AM</span><br>Daniel\'s dog now walks around right under the Eiffel Tower. Don\'t you dare hit it.</li>' +
   '<li><span class="when">Nov 23, 2026 · 11:45 AM</span><br>TRACK COUPE: shift down into too low a gear for your speed and the engine might BLOW UP. Wait for the revs to drop before you shift down!</li>' +
   '<li><span class="when">Nov 23, 2026 · 11:30 AM</span><br>The TRACK COUPE now uses a real 3D model (it loads the first time you pick it).</li>' +
   '<li><span class="when">Nov 23, 2026 · 11:15 AM</span><br>Owner: the TRACK COUPE - a glossy white sports car (clear-coat paint that reflects the sky) with a big wing and a 6-speed manual. SHIFT + 1-6 changes gear, W gas, S brake and reverse.</li>' +
