@@ -3737,6 +3737,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 23, 2026 · 9:10 AM</span><br>Owner: ADD MANY AT ONCE in the PLAYERS tab - paste names and passwords from a sheet.</li>' +
   '<li><span class="when">Nov 23, 2026 · 8:55 AM</span><br>Change your password: MENU, PLAY tab, CHANGE PASSWORD (website version).</li>' +
   '<li><span class="when">Nov 23, 2026 · 8:45 AM</span><br>Building passcode: on claude.ai, type the passcode on a plot\'s card to unlock building. Daniel sets it in the PLAYERS tab.</li>' +
   '<li><span class="when">Nov 18, 2026 · 11:21 AM</span><br>Build with blocks! Houses can now be built block by block instead of ready-made: cubes, half blocks, ramps, stairs, posts, windows, glass, lights and plants in 18 colors, up to 14 blocks high. You can climb on what you build and walk up the ramps and stairs.</li>' +
@@ -4990,10 +4991,19 @@ document.getElementById('add-btn').addEventListener('click', function(){
   var clash = Object.keys(net.members).some(function(u){ return net.members[u] && net.members[u].key === key; });
   if(clash){ addMsg(t('addNameTaken'), 'bad'); return; }
   addMsg(t('adding'));
+  makeAccount(name, key, pw).then(function(){
+    addMsg(t('added', {name:name}), 'good');
+    addNameEl.value = ''; addPwEl.value = '';
+  }).catch(function(err){
+    addMsg(err && err.code === 'exists' ? t('addExists') : t('addFailed', {why:(err && (err.code || err.message)) || '?'}), 'bad');
+  });
+});
+/* makes one player's account and puts them on the list */
+function makeAccount(name, key, pw){
   // a second, separate Firebase connection makes the account, so the owner stays signed in as themselves
   var app2 = firebase.apps.filter(function(a){ return a.name === 'adder'; })[0] || firebase.initializeApp(FIREBASE_CONFIG, 'adder');
   var auth2 = app2.auth(), email = key + EMAIL_DOMAIN;
-  auth2.setPersistence(firebase.auth.Auth.Persistence.NONE).then(function(){
+  return auth2.setPersistence(firebase.auth.Auth.Persistence.NONE).then(function(){
     return auth2.createUserWithEmailAndPassword(email, pw).catch(function(err){
       if(err && err.code === 'auth/email-already-in-use') return auth2.signInWithEmailAndPassword(email, pw).catch(function(){ throw {code:'exists'}; });
       throw err;
@@ -5003,13 +5013,82 @@ document.getElementById('add-btn').addEventListener('click', function(){
     return auth2.signOut().then(function(){
       return net.db.ref('paris/members/' + uid).set({name:name, key:key, at:firebase.database.ServerValue.TIMESTAMP});
     });
-  }).then(function(){
-    addMsg(t('added', {name:name}), 'good');
-    addNameEl.value = ''; addPwEl.value = '';
-  }).catch(function(err){
-    addMsg(err && err.code === 'exists' ? t('addExists') : t('addFailed', {why:(err && (err.code || err.message)) || '?'}), 'bad');
   });
-});
+}
+
+/* ADD MANY: paste the name and password columns from a spreadsheet (one player a line) and add them all */
+STR.en.addMany = 'ADD MANY AT ONCE'; STR.fr.addMany = 'EN AJOUTER PLUSIEURS';
+STR.en.addManyPh = 'Paste from your sheet: name, then password, one player a line'; STR.fr.addManyPh = 'Colle depuis ta feuille : nom, puis mot de passe, un joueur par ligne';
+STR.en.addManyBtn = 'ADD ALL'; STR.fr.addManyBtn = 'TOUT AJOUTER';
+STR.en.addManyNote = 'In your sheet, select the name and password columns (just the answers, not the titles), copy, and paste here.';
+STR.fr.addManyNote = 'Dans ta feuille, sélectionne les colonnes nom et mot de passe (juste les réponses, pas les titres), copie et colle ici.';
+STR.en.addManyEmpty = 'Paste some players first.'; STR.fr.addManyEmpty = 'Colle d\'abord des joueurs.';
+STR.en.addManyWorking = 'Adding {n} of {total}...'; STR.fr.addManyWorking = 'Ajout {n} sur {total}...';
+STR.en.addManyDone = 'Done: {ok} added.'; STR.fr.addManyDone = 'Fini : {ok} ajouté(s).';
+STR.en.addManyProblems = 'Not added (left in the box - fix them and press ADD ALL again):'; STR.fr.addManyProblems = 'Pas ajoutés (laissés dans la boîte - corrige-les et appuie encore sur TOUT AJOUTER) :';
+STR.en.whyName = 'name too short'; STR.fr.whyName = 'nom trop court';
+STR.en.whyPw = 'password under 6'; STR.fr.whyPw = 'mot de passe de moins de 6';
+STR.en.whyTaken = 'name already on the list'; STR.fr.whyTaken = 'nom déjà sur la liste';
+STR.en.whyTwice = 'same name twice'; STR.fr.whyTwice = 'même nom deux fois';
+STR.en.whyExists = 'has an account already'; STR.fr.whyExists = 'a déjà un compte';
+(function(){
+  var addBlock = document.getElementById('add-msg');
+  var box = document.createElement('div'); box.id = 'many-block';
+  box.innerHTML = '<div class="settings-label second"><span data-t="addMany"></span></div>' +
+    '<textarea id="many-in" class="text-input menu-input" rows="6" spellcheck="false" style="resize:vertical;font-size:16px;line-height:1.3"></textarea>' +
+    '<div class="btn-row" style="margin-top:8px"><button class="btn go" id="many-btn" data-t="addManyBtn"></button></div>' +
+    '<div class="msg" id="many-msg" data-t="addManyNote"></div>';
+  addBlock.parentNode.insertBefore(box, addBlock.nextSibling);
+  var inp = box.querySelector('#many-in'), btn = box.querySelector('#many-btn'), msgEl = box.querySelector('#many-msg');
+  inp.setAttribute('data-tp', 'addManyPh');
+  inp.addEventListener('keydown', function(e){ e.stopPropagation(); });
+  inp.addEventListener('keyup', function(e){ e.stopPropagation(); });
+  function show(text, cls){ msgEl.removeAttribute('data-t'); msgEl.textContent = text; msgEl.className = 'msg' + (cls ? ' ' + cls : ''); }
+  function lines(){
+    return inp.value.split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean).map(function(l){
+      var parts = l.indexOf('\t') >= 0 ? l.split('\t') : l.split(',');
+      var pw = parts.length > 1 ? parts[parts.length - 1].trim() : '';
+      var nm = parts.length > 1 ? parts.slice(0, -1).join(' ').trim() : parts[0].trim();
+      // a pasted Google Forms sheet may have the timestamp first: then use the last two columns
+      if(l.indexOf('\t') >= 0 && parts.length > 2) nm = parts[parts.length - 2].trim();
+      return {line:l, name:cleanNick(nm), pw:pw};
+    });
+  }
+  btn.addEventListener('click', function(){
+    if(!net.isOwner) return;
+    var list = lines();
+    if(!list.length){ show(t('addManyEmpty'), 'bad'); return; }
+    var taken = {}, seen = {}, bad = [], todo = [];
+    Object.keys(net.members).forEach(function(u){ if(net.members[u] && net.members[u].key) taken[net.members[u].key] = true; });
+    list.forEach(function(r){
+      r.key = nameKey(r.name);
+      if(r.key.length < 2) r.why = 'whyName';
+      else if(r.pw.length < 6) r.why = 'whyPw';
+      else if(taken[r.key]) r.why = 'whyTaken';
+      else if(seen[r.key]) r.why = 'whyTwice';
+      seen[r.key] = true;
+      (r.why ? bad : todo).push(r);
+    });
+    btn.disabled = true; inp.disabled = true;
+    var ok = 0, i = 0;
+    function next(){
+      if(i >= todo.length) return Promise.resolve();
+      var r = todo[i++];
+      show(t('addManyWorking', {n:i, total:todo.length}));
+      return makeAccount(r.name, r.key, r.pw).then(function(){ ok++; }, function(err){
+        r.why = err && err.code === 'exists' ? 'whyExists' : ((err && (err.code || err.message)) || '?');
+        bad.push(r);
+      }).then(function(){ return new Promise(function(res){ setTimeout(res, 400); }); }).then(next);
+    }
+    next().then(function(){
+      btn.disabled = false; inp.disabled = false;
+      inp.value = bad.map(function(r){ return r.line; }).join('\n');
+      var text = t('addManyDone', {ok:ok});
+      if(bad.length) text += ' ' + t('addManyProblems') + ' ' + bad.map(function(r){ return (r.name || r.line) + ' (' + (STR[LANG][r.why] ? t(r.why) : r.why) + ')'; }).join(', ');
+      show(text, bad.length ? 'bad' : 'good');
+    });
+  });
+})();
 var memberConfirm = null;
 function renderMembers(){
   if(CLAUDE_MODE){ renderMembersClaude(); return; }
@@ -5356,7 +5435,7 @@ function initClaude(){
   loginMsg('claudeNote');
   document.getElementById('login-block').appendChild(loginMsgEl);
   // the PLAYERS tab: no passwords here, just a note, the builders, and announcements
-  var addBits = [document.getElementById('add-name'), document.getElementById('add-pw'), document.getElementById('add-btn').parentNode];
+  var addBits = [document.getElementById('add-name'), document.getElementById('add-pw'), document.getElementById('add-btn').parentNode, document.getElementById('many-block')];
   addBits.forEach(function(el){ el.classList.add('hidden'); });
   var addLabel = document.querySelector('#tab-players [data-t="addPlayer"]');
   if(addLabel) addLabel.setAttribute('data-t', 'tabPlayers');
