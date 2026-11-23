@@ -3212,7 +3212,7 @@ function setCarModel(name){
   var shown = car.group.visible;
   car.group.visible = false;
   car = cars[name]; carSpec = CAR_SPECS[name]; carName = name;
-  manual.gear = 1; manual.revs = null; speedoText = '';
+  manual.gear = 1; manual.lastGear = 1; manual.revs = null; manual.blown = 0; speedoText = '';
   if(name === 'coupe') requestCoupeGLB();
   if(carSpec.manual && !IS_TOUCH) showToast(t('manualHint'));
   applyCarView();
@@ -3644,16 +3644,41 @@ function updateDriveMovement(dt){
    limiter). On a phone (no keyboard) it shifts by itself. */
 var GEAR_TOP = [0, 0.24, 0.40, 0.56, 0.72, 0.87, 1.0];      // top speed in each gear, as a share of the car's top speed
 var GEAR_PULL = [0, 1.35, 1.15, 0.98, 0.84, 0.72, 0.6];     // how hard each gear pulls
-var manual = {gear:1, revs:null, limiter:0};
+var manual = {gear:1, lastGear:1, revs:null, limiter:0, blown:0, smokeT:0};
 STR.en.gearN = 'GEAR {n}'; STR.fr.gearN = 'VITESSE {n}';
 STR.en.manualHint = 'MANUAL: SHIFT + 1-6 to change gear - W gas - S brake (hold when stopped to reverse)';
 STR.fr.manualHint = 'MANUELLE : MAJ + 1-6 pour changer de vitesse - W gaz - S frein (reste appuyé à l\'arrêt pour reculer)';
 STR.en.vCoupe = 'TRACK COUPE'; STR.fr.vCoupe = 'COUPÉ PISTE';
 function setGear(n){
-  if(!carSpec.manual || n === manual.gear) return;
+  if(!carSpec.manual || n === manual.gear || manual.blown > 0) return;
+  // shifting DOWN into a gear that can't go this fast over-revs the engine: the faster you're going for that gear,
+  // the bigger the chance it blows up
+  var topSpeed = Math.max(walkSpeed*carSpec.topMul, 10), newCap = topSpeed*GEAR_TOP[n], over = driveSpeed/Math.max(1, newCap);
   manual.gear = n;
-  showToast(t('gearN', {n:n}));
   speedoText = '';
+  if(n < manual.lastGear && over > 1.12){
+    var chance = Math.min(0.85, 0.1 + (over - 1.12)*1.2);
+    manual.lastGear = n;
+    if(Math.random() < chance){ blowEngine(); return; }
+    showToast(t('closeCall'));
+    return;
+  }
+  manual.lastGear = n;
+  showToast(t('gearN', {n:n}));
+}
+STR.en.closeCall = 'CLOSE ONE! The engine almost blew - wrong gear!'; STR.fr.closeCall = 'OUF ! Le moteur a failli exploser - mauvaise vitesse !';
+STR.en.engineBlown = 'ENGINE BLOWN!'; STR.fr.engineBlown = 'MOTEUR EXPLOSÉ !';
+STR.en.wrongGear = 'wrong gear!'; STR.fr.wrongGear = 'mauvaise vitesse !';
+STR.en.engineFixed = 'Engine fixed - back in 1st. Shift carefully!'; STR.fr.engineFixed = 'Moteur réparé - retour en 1re. Change de vitesse prudemment !';
+function blowEngine(){
+  manual.blown = 5;
+  stopEngineSound();
+  var back = 1.7;   // the engine is in the back
+  var x = carPos.x + Math.sin(carYaw)*back, z = carPos.z + Math.cos(carYaw)*back;
+  explode(x, carPos.y + 0.9, z);
+  showChauffard(t('engineBlown'), t('wrongGear'));
+  screenShake = SHAKE_TIME*2.2;
+  driveSpeed *= 0.6;
 }
 window.addEventListener('keydown', function(e){
   if(chatOpen || typingInBox(e) || !e.shiftKey) return;
@@ -3664,6 +3689,16 @@ window.addEventListener('keydown', function(e){
 });
 function manualDrive(dt, throttle, gas, topSpeed){
   var v = driveSpeed, accel = carSpec.accel;
+  if(manual.blown > 0){
+    manual.blown -= dt;
+    manual.revs = null;
+    var drag = accel*(throttle < 0 ? 2.1 : 0.5);   // no engine: you just roll (the brakes still work)
+    if(v > 0) driveSpeed = Math.max(0, v - drag*dt); else if(v < 0) driveSpeed = Math.min(0, v + drag*dt);
+    manual.smokeT -= dt;
+    if(manual.smokeT <= 0){ manual.smokeT = 0.08; smokePuff(carPos.x + Math.sin(carYaw)*1.7, carPos.y + 1.0, carPos.z + Math.cos(carYaw)*1.7, manual.blown/5); }
+    if(manual.blown <= 0){ manual.blown = 0; manual.gear = 1; manual.lastGear = 1; speedoText = ''; showToast(t('engineFixed')); if(driving) startEngineSound(); }
+    return;
+  }
   if(touchPlay && throttle >= 0){   // no keyboard: pick the gear for the speed
     var want = 1; while(want < 6 && v > topSpeed*GEAR_TOP[want]*0.92) want++;
     manual.gear = want;
@@ -4053,6 +4088,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 23, 2026 · 11:45 AM</span><br>TRACK COUPE: shift down into too low a gear for your speed and the engine might BLOW UP. Wait for the revs to drop before you shift down!</li>' +
   '<li><span class="when">Nov 23, 2026 · 11:30 AM</span><br>The TRACK COUPE now uses a real 3D model (it loads the first time you pick it).</li>' +
   '<li><span class="when">Nov 23, 2026 · 11:15 AM</span><br>Owner: the TRACK COUPE - a glossy white sports car (clear-coat paint that reflects the sky) with a big wing and a 6-speed manual. SHIFT + 1-6 changes gear, W gas, S brake and reverse.</li>' +
   '<li><span class="when">Nov 23, 2026 · 9:10 AM</span><br>Owner: ADD MANY AT ONCE in the PLAYERS tab - paste names and passwords from a sheet.</li>' +
@@ -6046,7 +6082,100 @@ function renderMembersClaude(){
 
 /* ---------- Little things that move: the toy boats, the windmill, the tourist boat, the fountains ---------- */
 var moveTime = 0;
+/* ---------- Explosions (a blown engine) ----------
+   A white flash, an orange fireball that swells and fades, a ring of dust racing along the ground, bits of the car
+   flying out and bouncing, black smoke rolling up - and a deep BOOM. Everything here cleans itself up. */
+var blasts = [];
+var BLAST_GEO = {ball:new THREE.IcosahedronGeometry(1, 2), bit:new THREE.BoxGeometry(0.22, 0.1, 0.3), ring:new THREE.RingGeometry(0.8, 1, 40)};
+BLAST_GEO.ring.rotateX(-Math.PI/2);
+function blastMat(hex, add){ return new THREE.MeshBasicMaterial({color:hex, transparent:true, depthWrite:false, blending:add ? THREE.AdditiveBlending : THREE.NormalBlending}); }
+function explode(x, y, z){
+  var g = new THREE.Group(); g.position.set(x, y, z); root.add(g);
+  var b = {g:g, t:0, parts:[], bits:[], dead:5};
+  var light = new THREE.PointLight(0xffb060, 6, 40); light.position.y = 1; g.add(light); b.light = light;
+  [[0xffffff, 1, 0.12, 2.2, true], [0xfff1a0, 1, 0.35, 3.6, true], [0xff8a1c, 1, 0.75, 4.6, true], [0xd8401a, 0.9, 1.1, 5.2, false]].forEach(function(f, i){
+    var m = new THREE.Mesh(BLAST_GEO.ball, blastMat(f[0], f[4])); m.scale.setScalar(0.3); g.add(m);
+    b.parts.push({m:m, life:f[2], size:f[3], op:f[1], delay:i*0.03});
+  });
+  for(var k=0;k<7;k++){   // a few extra fire puffs, off-center
+    var pm = new THREE.Mesh(BLAST_GEO.ball, blastMat(k % 2 ? 0xff9a2a : 0xffc04a, true));
+    pm.position.set((Math.random() - 0.5)*2.5, Math.random()*1.5, (Math.random() - 0.5)*2.5); pm.scale.setScalar(0.2); g.add(pm);
+    b.parts.push({m:pm, life:0.6 + Math.random()*0.4, size:1.6 + Math.random()*1.4, op:0.9, delay:0.05 + Math.random()*0.15});
+  }
+  var ring = new THREE.Mesh(BLAST_GEO.ring, blastMat(0xd9cdb0, false)); ring.position.y = -y + 0.08 + carPos.y; g.add(ring); b.ring = ring;
+  var bitMat = new THREE.MeshLambertMaterial({color:0x2a2a2c});
+  for(var j=0;j<28;j++){
+    var bm = new THREE.Mesh(BLAST_GEO.bit, j % 4 ? bitMat : new THREE.MeshLambertMaterial({color:0xe8e6e0}));
+    var a = Math.random()*Math.PI*2, sp = 5 + Math.random()*9;
+    b.bits.push({m:bm, v:new THREE.Vector3(Math.cos(a)*sp, 6 + Math.random()*10, Math.sin(a)*sp), w:new THREE.Vector3(Math.random()*14, Math.random()*14, Math.random()*14)});
+    g.add(bm);
+  }
+  for(var s2=0;s2<14;s2++) smokePuff(x + (Math.random() - 0.5)*2, y + Math.random(), z + (Math.random() - 0.5)*2, 1.4);
+  blasts.push(b);
+  boomSound();
+}
+var smokes = [], SMOKE_MATS = [0x1c1c1e, 0x2e2e30, 0x45454a].map(function(h){ return blastMat(h, false); });
+function smokePuff(x, y, z, strength){
+  if(smokes.length > 120) return;
+  var m = new THREE.Mesh(BLAST_GEO.ball, SMOKE_MATS[Math.floor(Math.random()*3)].clone());
+  m.position.set(x + (Math.random() - 0.5)*0.6, y, z + (Math.random() - 0.5)*0.6);
+  m.scale.setScalar(0.35 + 0.3*strength);
+  root.add(m);
+  smokes.push({m:m, t:0, life:2.5 + Math.random()*1.5, rise:1.6 + Math.random()*1.5, grow:0.9 + 0.6*strength, drift:new THREE.Vector3((Math.random() - 0.5)*0.8, 0, (Math.random() - 0.5)*0.8)});
+}
+function updateBlasts(dt){
+  for(var i=blasts.length-1;i>=0;i--){
+    var b = blasts[i];
+    b.t += dt;
+    b.parts.forEach(function(p){
+      var u = Math.max(0, (b.t - p.delay)/p.life);
+      p.m.visible = b.t >= p.delay && u < 1;
+      if(!p.m.visible) return;
+      p.m.scale.setScalar(0.3 + p.size*(1 - Math.pow(1 - u, 3)));
+      p.m.material.opacity = p.op*(1 - u*u);
+    });
+    b.light.intensity = Math.max(0, 6*(1 - b.t/0.7));
+    var ru = Math.min(1, b.t/0.9); b.ring.scale.setScalar(1 + ru*14); b.ring.material.opacity = 0.7*(1 - ru); b.ring.visible = ru < 1;
+    b.bits.forEach(function(bt){
+      bt.v.y -= 22*dt;
+      bt.m.position.addScaledVector(bt.v, dt);
+      var floor = -b.g.position.y + carPos.y + 0.05;
+      if(bt.m.position.y < floor){ bt.m.position.y = floor; bt.v.y *= -0.35; bt.v.x *= 0.6; bt.v.z *= 0.6; bt.w.multiplyScalar(0.6); }
+      bt.m.rotation.x += bt.w.x*dt; bt.m.rotation.y += bt.w.y*dt; bt.m.rotation.z += bt.w.z*dt;
+    });
+    if(b.t > b.dead){
+      root.remove(b.g);
+      b.g.traverse(function(o){ if(o.material && o.material !== b.bits[1].m.material) o.material.dispose(); });
+      blasts.splice(i, 1);
+    }
+  }
+  for(var j=smokes.length-1;j>=0;j--){
+    var s3 = smokes[j];
+    s3.t += dt;
+    var u = s3.t/s3.life;
+    s3.m.position.y += s3.rise*dt; s3.m.position.addScaledVector(s3.drift, dt);
+    s3.m.scale.multiplyScalar(1 + s3.grow*dt);
+    s3.m.material.opacity = 0.85*(1 - u);
+    if(u >= 1){ root.remove(s3.m); s3.m.material.dispose(); smokes.splice(j, 1); }
+  }
+}
+function boomSound(){
+  var ctx = sfx.ctx;
+  if(!ctx || ctx.state !== 'running') return;
+  var now = ctx.currentTime;
+  var o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = 'sine'; o.frequency.setValueAtTime(110, now); o.frequency.exponentialRampToValueAtTime(28, now + 1.2);
+  g.gain.setValueAtTime(1, now); g.gain.exponentialRampToValueAtTime(0.01, now + 1.4);
+  o.connect(g); g.connect(ctx.destination); o.start(now); o.stop(now + 1.5);
+  var len = Math.floor(ctx.sampleRate*1.8), buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+  for(var i=0;i<len;i++) d[i] = (Math.random()*2 - 1)*Math.pow(1 - i/len, 2.5);
+  var n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), ng = ctx.createGain();
+  n.buffer = buf; f.type = 'lowpass'; f.frequency.setValueAtTime(2400, now); f.frequency.exponentialRampToValueAtTime(200, now + 1.5);
+  ng.gain.value = 0.9;
+  n.connect(f); f.connect(ng); ng.connect(ctx.destination); n.start(now);
+}
 function updateMovers(dt){
+  updateBlasts(dt);
   moveTime += dt;
   movers.forEach(function(m){
     if(m.kind === 'boat'){
