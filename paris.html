@@ -1916,7 +1916,38 @@ function spawnPet(){
   pet.s = Math.random()*PET_SIDE*4; pet.dir = Math.random() < 0.5 ? 1 : -1;
   pet.state = 'walk'; pet.sprite.visible = true;
 }
+/* ---------- The sentence: your car is executed ----------
+   Two seconds after HOW DARE YOU?, whatever car you're driving blows up - a much bigger blast than a blown engine -
+   and is thrown into the air, flipping, then crashes down wrecked and smoking. Five seconds later it works again. */
+STR.en.executed = 'SENTENCE CARRIED OUT'; STR.fr.executed = 'SENTENCE EXÉCUTÉE';
+var doom = {t:0}, wreck = {on:false, t:0, y:0, vy:0, flip:0, flipV:0, roll:0};
+function updateDoom(dt){
+  if(doom.t > 0){
+    doom.t -= dt;
+    if(doom.t <= 0 && flying && driving) executeCar();
+  }
+  if(!wreck.on) return;
+  wreck.t += dt;
+  if(wreck.y > 0 || wreck.vy > 0){
+    wreck.vy -= 24*dt; wreck.y += wreck.vy*dt; wreck.flip += wreck.flipV*dt;
+    if(wreck.y <= 0){ wreck.y = 0; if(wreck.vy < -6){ wreck.vy *= -0.3; wreck.flipV *= 0.4; screenShake = SHAKE_TIME; thudSound(12); } else { wreck.vy = 0; wreck.flipV = 0; } }
+  } else {
+    wreck.flip += (Math.round(wreck.flip/(Math.PI*2))*Math.PI*2 - wreck.flip)*Math.min(1, dt*3);   // settles back on its wheels
+  }
+  if(Math.random() < dt*14) smokePuff(carPos.x, carPos.y + wreck.y + 1, carPos.z, 1.2);
+  if(wreck.t > 5.5){ wreck.on = false; wreck.y = 0; wreck.flip = 0; if(flying && driving) startEngineSound(); }
+}
+function executeCar(){
+  explode(carPos.x, carPos.y + 1, carPos.z, 2.8);
+  showChauffard(t('executed'), '', true);
+  screenShake = SHAKE_TIME*4;
+  wreck.on = true; wreck.t = 0; wreck.y = 0; wreck.vy = 15; wreck.flip = 0; wreck.flipV = (Math.random() < 0.5 ? -1 : 1)*(9 + Math.random()*4);
+  driveSpeed *= 0.25;
+  stopEngineSound();
+  if(carSpec.manual){ manual.blown = 0; manual.revs = null; }
+}
 function updatePet(dt){
+  updateDoom(dt);
   if(pet.state === 'gone'){ pet.t -= dt; if(pet.t <= 0) spawnPet(); return; }
   if(pet.state === 'fly'){
     pet.vel.y -= 9*dt;
@@ -1938,6 +1969,7 @@ function updatePet(dt){
       pet.state = 'fly'; pet.t = 2;
       pet.vel.set(fx*sp*0.6, 10 + sp*0.4, fz*sp*0.6);
       showChauffard(t('howDare'), t('sentence'), true);
+      doom.t = 2;   // the sentence is carried out in 2 seconds
       thudSound(sp); screenShake = SHAKE_TIME; driveSpeed *= 0.9;
       return;
     }
@@ -3695,6 +3727,7 @@ function updateDriveMovement(dt){
     else { throttle = -1; gas = stickAmount(); }
   }
   var topSpeed = Math.max(walkSpeed*carSpec.topMul, 10);
+  if(wreck.on){ throttle = 0; steerInput = 0; }
   if(carSpec.manual){ manualDrive(dt, throttle, gas, topSpeed); }
   else if(spin) driveSpeed *= Math.exp(-1.8*dt);
   else if(throttle > 0){
@@ -3763,6 +3796,7 @@ function updateDriveMovement(dt){
   var roll = Math.max(-0.07, Math.min(0.07, -carYawRate*driveSpeed*0.005));
   car.group.position.copy(carPos);
   car.group.rotation.set(0, carYaw, roll, 'YXZ');
+  if(wreck.on){ car.group.position.y += wreck.y; car.group.rotateX(wreck.flip); }
   car.wheels.forEach(function(w){ (w.spin || w).rotation.x += driveSpeed*dt/car.wheelR; });
   updateEngineSound(Math.min(1, Math.abs(driveSpeed)/topSpeed), throttle);
   // the camera turns with the car as you steer (it used to wait a second, then catch up slowly). Mid spin-out it keeps
@@ -4227,6 +4261,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 23, 2026 · 12:10 PM</span><br>Hit Mika and the sentence is carried out: 2 seconds later your car blows up - HUGE - and flips through the air.</li>' +
   '<li><span class="when">Nov 23, 2026 · 12:00 PM</span><br>Hit Mika and, two seconds later, she rises again (as the other photo) with a halo and a heavenly choir - then walks on like nothing happened.</li>' +
   '<li><span class="when">Nov 23, 2026 · 11:50 AM</span><br>Daniel\'s dog now walks around right under the Eiffel Tower. Don\'t you dare hit it.</li>' +
   '<li><span class="when">Nov 23, 2026 · 11:45 AM</span><br>TRACK COUPE: shift down into too low a gear for your speed and the engine might BLOW UP. Wait for the revs to drop before you shift down!</li>' +
@@ -6230,39 +6265,42 @@ var blasts = [];
 var BLAST_GEO = {ball:new THREE.IcosahedronGeometry(1, 2), bit:new THREE.BoxGeometry(0.22, 0.1, 0.3), ring:new THREE.RingGeometry(0.8, 1, 40)};
 BLAST_GEO.ring.rotateX(-Math.PI/2);
 function blastMat(hex, add){ return new THREE.MeshBasicMaterial({color:hex, transparent:true, depthWrite:false, blending:add ? THREE.AdditiveBlending : THREE.NormalBlending}); }
-function explode(x, y, z){
+function explode(x, y, z, k){
+  k = k || 1;
   var g = new THREE.Group(); g.position.set(x, y, z); root.add(g);
-  var b = {g:g, t:0, parts:[], bits:[], dead:5};
-  var light = new THREE.PointLight(0xffb060, 6, 40); light.position.y = 1; g.add(light); b.light = light;
+  var b = {g:g, t:0, parts:[], bits:[], dead:5 + k, k:k};
+  var light = new THREE.PointLight(0xffb060, 6*k, 40*k); light.position.y = 1; g.add(light); b.light = light;
   [[0xffffff, 1, 0.12, 2.2, true], [0xfff1a0, 1, 0.35, 3.6, true], [0xff8a1c, 1, 0.75, 4.6, true], [0xd8401a, 0.9, 1.1, 5.2, false]].forEach(function(f, i){
     var m = new THREE.Mesh(BLAST_GEO.ball, blastMat(f[0], f[4])); m.scale.setScalar(0.3); g.add(m);
-    b.parts.push({m:m, life:f[2], size:f[3], op:f[1], delay:i*0.03});
+    b.parts.push({m:m, life:f[2]*(0.6 + 0.4*k), size:f[3]*k, op:f[1], delay:i*0.03});
   });
-  for(var k=0;k<7;k++){   // a few extra fire puffs, off-center
-    var pm = new THREE.Mesh(BLAST_GEO.ball, blastMat(k % 2 ? 0xff9a2a : 0xffc04a, true));
-    pm.position.set((Math.random() - 0.5)*2.5, Math.random()*1.5, (Math.random() - 0.5)*2.5); pm.scale.setScalar(0.2); g.add(pm);
-    b.parts.push({m:pm, life:0.6 + Math.random()*0.4, size:1.6 + Math.random()*1.4, op:0.9, delay:0.05 + Math.random()*0.15});
+  for(var kk=0;kk<7*k;kk++){   // extra fire puffs, off-center
+    var pm = new THREE.Mesh(BLAST_GEO.ball, blastMat(kk % 2 ? 0xff9a2a : 0xffc04a, true));
+    pm.position.set((Math.random() - 0.5)*2.5*k, Math.random()*1.5*k, (Math.random() - 0.5)*2.5*k); pm.scale.setScalar(0.2); g.add(pm);
+    b.parts.push({m:pm, life:(0.6 + Math.random()*0.4)*(0.6 + 0.4*k), size:(1.6 + Math.random()*1.4)*k, op:0.9, delay:0.05 + Math.random()*0.15*k});
   }
   var ring = new THREE.Mesh(BLAST_GEO.ring, blastMat(0xd9cdb0, false)); ring.position.y = -y + 0.08 + carPos.y; g.add(ring); b.ring = ring;
   var bitMat = new THREE.MeshLambertMaterial({color:0x2a2a2c});
-  for(var j=0;j<28;j++){
+  for(var j=0;j<28*k;j++){
     var bm = new THREE.Mesh(BLAST_GEO.bit, j % 4 ? bitMat : new THREE.MeshLambertMaterial({color:0xe8e6e0}));
-    var a = Math.random()*Math.PI*2, sp = 5 + Math.random()*9;
-    b.bits.push({m:bm, v:new THREE.Vector3(Math.cos(a)*sp, 6 + Math.random()*10, Math.sin(a)*sp), w:new THREE.Vector3(Math.random()*14, Math.random()*14, Math.random()*14)});
+    var a = Math.random()*Math.PI*2, sp = (5 + Math.random()*9)*Math.sqrt(k);
+    if(k > 1) bm.scale.setScalar(1 + Math.random()*k);
+    b.bits.push({m:bm, v:new THREE.Vector3(Math.cos(a)*sp, (6 + Math.random()*10)*Math.sqrt(k), Math.sin(a)*sp), w:new THREE.Vector3(Math.random()*14, Math.random()*14, Math.random()*14)});
     g.add(bm);
   }
-  for(var s2=0;s2<14;s2++) smokePuff(x + (Math.random() - 0.5)*2, y + Math.random(), z + (Math.random() - 0.5)*2, 1.4);
+  for(var s2=0;s2<14*k;s2++) smokePuff(x + (Math.random() - 0.5)*2*k, y + Math.random()*k, z + (Math.random() - 0.5)*2*k, 1.4*k, 0.35*k + Math.random()*0.4);   // smoke after the fire
   blasts.push(b);
-  boomSound();
+  boomSound(k);
 }
 var smokes = [], SMOKE_MATS = [0x1c1c1e, 0x2e2e30, 0x45454a].map(function(h){ return blastMat(h, false); });
-function smokePuff(x, y, z, strength){
-  if(smokes.length > 120) return;
+function smokePuff(x, y, z, strength, delay){
+  if(smokes.length > 260) return;
   var m = new THREE.Mesh(BLAST_GEO.ball, SMOKE_MATS[Math.floor(Math.random()*3)].clone());
   m.position.set(x + (Math.random() - 0.5)*0.6, y, z + (Math.random() - 0.5)*0.6);
-  m.scale.setScalar(0.35 + 0.3*strength);
+  m.scale.setScalar(0.35 + 0.3*Math.min(strength, 2));
   root.add(m);
-  smokes.push({m:m, t:0, life:2.5 + Math.random()*1.5, rise:1.6 + Math.random()*1.5, grow:0.9 + 0.6*strength, drift:new THREE.Vector3((Math.random() - 0.5)*0.8, 0, (Math.random() - 0.5)*0.8)});
+  m.visible = !delay;
+  smokes.push({m:m, t:-(delay || 0), life:2.5 + Math.random()*1.5 + Math.min(2, strength*0.5), rise:1.6 + Math.random()*1.5 + strength*0.4, grow:0.6 + 0.25*Math.min(strength, 4), drift:new THREE.Vector3((Math.random() - 0.5)*0.8, 0, (Math.random() - 0.5)*0.8)});
 }
 function updateBlasts(dt){
   for(var i=blasts.length-1;i>=0;i--){
@@ -6275,8 +6313,8 @@ function updateBlasts(dt){
       p.m.scale.setScalar(0.3 + p.size*(1 - Math.pow(1 - u, 3)));
       p.m.material.opacity = p.op*(1 - u*u);
     });
-    b.light.intensity = Math.max(0, 6*(1 - b.t/0.7));
-    var ru = Math.min(1, b.t/0.9); b.ring.scale.setScalar(1 + ru*14); b.ring.material.opacity = 0.7*(1 - ru); b.ring.visible = ru < 1;
+    b.light.intensity = Math.max(0, 6*b.k*(1 - b.t/(0.7*b.k)));
+    var ru = Math.min(1, b.t/(0.9*Math.sqrt(b.k))); b.ring.scale.setScalar(1 + ru*14*b.k); b.ring.material.opacity = 0.7*(1 - ru); b.ring.visible = ru < 1;
     b.bits.forEach(function(bt){
       bt.v.y -= 22*dt;
       bt.m.position.addScaledVector(bt.v, dt);
@@ -6293,6 +6331,8 @@ function updateBlasts(dt){
   for(var j=smokes.length-1;j>=0;j--){
     var s3 = smokes[j];
     s3.t += dt;
+    if(s3.t < 0) continue;
+    s3.m.visible = true;
     var u = s3.t/s3.life;
     s3.m.position.y += s3.rise*dt; s3.m.position.addScaledVector(s3.drift, dt);
     s3.m.scale.multiplyScalar(1 + s3.grow*dt);
@@ -6300,18 +6340,19 @@ function updateBlasts(dt){
     if(u >= 1){ root.remove(s3.m); s3.m.material.dispose(); smokes.splice(j, 1); }
   }
 }
-function boomSound(){
+function boomSound(k){
+  k = k || 1;
   var ctx = sfx.ctx;
   if(!ctx || ctx.state !== 'running') return;
   var now = ctx.currentTime;
   var o = ctx.createOscillator(), g = ctx.createGain();
-  o.type = 'sine'; o.frequency.setValueAtTime(110, now); o.frequency.exponentialRampToValueAtTime(28, now + 1.2);
-  g.gain.setValueAtTime(1, now); g.gain.exponentialRampToValueAtTime(0.01, now + 1.4);
-  o.connect(g); g.connect(ctx.destination); o.start(now); o.stop(now + 1.5);
-  var len = Math.floor(ctx.sampleRate*1.8), buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+  o.type = 'sine'; o.frequency.setValueAtTime(110/Math.sqrt(k), now); o.frequency.exponentialRampToValueAtTime(24, now + 1.2*k);
+  g.gain.setValueAtTime(1, now); g.gain.exponentialRampToValueAtTime(0.01, now + 1.4*k);
+  o.connect(g); g.connect(ctx.destination); o.start(now); o.stop(now + 1.5*k);
+  var len = Math.floor(ctx.sampleRate*1.8*k), buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
   for(var i=0;i<len;i++) d[i] = (Math.random()*2 - 1)*Math.pow(1 - i/len, 2.5);
   var n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), ng = ctx.createGain();
-  n.buffer = buf; f.type = 'lowpass'; f.frequency.setValueAtTime(2400, now); f.frequency.exponentialRampToValueAtTime(200, now + 1.5);
+  n.buffer = buf; f.type = 'lowpass'; f.frequency.setValueAtTime(2400, now); f.frequency.exponentialRampToValueAtTime(120, now + 1.5*k);
   ng.gain.value = 0.9;
   n.connect(f); f.connect(ng); ng.connect(ctx.destination); n.start(now);
 }
