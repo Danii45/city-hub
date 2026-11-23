@@ -120,6 +120,14 @@ button{font-family:'Press Start 2P', monospace;}
 #chauffard small{display:block; margin-top:4px; font-family:'VT323', monospace; font-size:20px;}
 #chauffard small:empty{display:none;}
 #chauffard.hidden{display:none;}
+#mika-board .mk-total{text-align:center; padding:6px 0 12px;}
+#mika-board .mk-total b{display:block; font-size:34px; color:#ff3b6b;}
+#mika-board .mk-total span{font-family:'VT323', monospace; font-size:19px; color:var(--ink-soft);}
+#mika-board .mk-row{display:flex; gap:10px; align-items:center; padding:5px 8px; font-family:'VT323', monospace; font-size:20px; border-bottom:2px solid var(--panel-border);}
+#mika-board .mk-row .mk-rank{width:34px; color:var(--ink-soft);}
+#mika-board .mk-row .mk-name{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+#mika-board .mk-row.me{background:#ffe3ea;}
+#mika-board .mk-note{font-family:'VT323', monospace; font-size:18px; color:var(--ink-soft); padding:10px 4px 0;}
 #chauffard.dark{background:#000; color:#ff1a1a; border-color:#ff1a1a; box-shadow:0 0 0 4px #000, 8px 8px 0 4px #000;}
 #chauffard.shake{animation:chauffard-shake 0.45s;}
 @keyframes chauffard-shake{0%{transform:translateX(-50%) scale(1.4) rotate(-4deg);} 40%{transform:translateX(-50%) scale(0.95) rotate(3deg);} 70%{transform:translateX(-50%) rotate(-2deg);} 100%{transform:translateX(-50%);}}
@@ -419,6 +427,7 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
       <button class="tab-btn hidden" id="tab-btn-players" data-t="tabPlayers">PLAYERS</button>
       <button class="tab-btn" id="tab-btn-help" data-t="tabHelp">HOW TO PLAY</button>
       <button class="tab-btn" id="tab-btn-log" data-t="tabLog">CHANGELOG</button>
+      <button class="tab-btn hidden" id="tab-btn-mika" data-t="tabMika">MIKA</button>
       <button class="tab-btn" id="tab-btn-credits" data-t="tabCredits">CREDITS</button>
     </div>
 
@@ -485,6 +494,8 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
 
     <div class="tab-panel hidden" id="tab-help"><div class="scroll-block" id="help-block"></div></div>
     <div class="tab-panel hidden" id="tab-log"><div class="scroll-block" id="log-block"></div></div>
+    <div class="tab-panel hidden" id="tab-mika"><div class="scroll-block" id="mika-board"></div></div>
+
     <div class="tab-panel hidden" id="tab-credits">
       <div class="credits-block">
         <p data-t="madeBy">Made by</p>
@@ -1903,6 +1914,9 @@ var pet = (function(){
   sp.center.set(0.5, 0); sp.visible = false; root.add(sp);
   return {sprite:sp, texs:texs, state:'gone', t:3, s:0, dir:1, speed:1.6, petT:0, x:0, z:0, vel:new THREE.Vector3()};
 })();
+/* her walk is worked out from the clock (the server's clock on the website), so every player sees her in the same spot */
+function sharedNow(){ return (Date.now() + (net.timeOffset || 0))/1000; }
+function sharedPetS(){ var L = PET_SIDE*4; return ((sharedNow()*pet.speed) % L + L) % L; }
 function petAt(s){
   var k = Math.floor(s/PET_SIDE) % 4, f = (s % PET_SIDE)/PET_SIDE, a = PET_LOOP[k], b = PET_LOOP[(k + 1) % 4];
   return [a[0] + (b[0] - a[0])*f, a[1] + (b[1] - a[1])*f];
@@ -1913,7 +1927,7 @@ function spawnPet(){
   pet.sprite.material.map = pet.texs[i]; pet.sprite.material.needsUpdate = true;
   var h = 2.6; pet.sprite.scale.set(h*img.width/img.height, h, 1);
   pet.sprite.material.rotation = 0;
-  pet.s = Math.random()*PET_SIDE*4; pet.dir = Math.random() < 0.5 ? 1 : -1;
+  pet.s = sharedPetS();
   pet.state = 'walk'; pet.sprite.visible = true;
 }
 /* ---------- The sentence: your car is executed ----------
@@ -1973,8 +1987,14 @@ function petMika(){
   pet.petT = 2.2;
   petCount++;
   try { localStorage.setItem('paris.mikaPets', String(petCount)); } catch(e){}
-  var lines = STR[LANG].petLines;
-  showToast(lines[Math.floor(Math.random()*lines.length)] + ' ' + t('petCount', {n:petCount}));
+  var lines = STR[LANG].petLines, line = lines[Math.floor(Math.random()*lines.length)];
+  if(mika.online){
+    var mine = (mika.pets[net.uid] && mika.pets[net.uid].n || 0) + 1;
+    showToast(line + ' ' + t('petGlobal', {total:fmtNum(mika.total + 1), n:fmtNum(mine)}));
+    net.db.ref('paris/mika/total').transaction(function(v){ return (v || 0) + 1; }).catch(function(){});
+    net.db.ref('paris/mika/pets/' + net.uid).transaction(function(d){ return {n:(d && d.n || 0) + 1, name:net.name}; }).catch(function(){});
+  } else showToast(line + ' ' + t('petCount', {n:petCount}));
+  unlockMikaBoard();
   for(var i=0;i<9;i++){
     var sp = new THREE.Sprite(new THREE.SpriteMaterial({map:HEART_TEX, transparent:true, depthWrite:false}));
     sp.scale.setScalar(0.35 + Math.random()*0.25);
@@ -2008,6 +2028,59 @@ function arfSound(){
     o.connect(f); f.connect(g); g.connect(ctx.destination); o.start(now); o.stop(now + 0.17);
   });
 }
+/* ---------- Global pets and the MIKA PET LEADERBOARD (website) ----------
+   paris/mika/total counts every pet from everyone; paris/mika/pets/<player> is each player's own count. Your first pet
+   unlocks the MIKA tab in the menu: the world total and the top petters. (The database only lets each pet add 1.) */
+STR.en.tabMika = 'MIKA'; STR.fr.tabMika = 'MIKA';
+STR.en.petGlobal = '({total} pets worldwide - you: {n})'; STR.fr.petGlobal = '({total} caresses dans le monde - toi : {n})';
+STR.en.mikaUnlocked = 'MIKA PET LEADERBOARD UNLOCKED! See it in MENU > MIKA'; STR.fr.mikaUnlocked = 'CLASSEMENT DES CARESSES À MIKA DÉBLOQUÉ ! Va voir MENU > MIKA';
+STR.en.mikaTotal = 'pets for Mika, from everyone'; STR.fr.mikaTotal = 'caresses pour Mika, de tout le monde';
+STR.en.mikaTop = 'TOP PETTERS'; STR.fr.mikaTop = 'MEILLEURS CARESSEURS';
+STR.en.mikaYou = 'You are #{r} with {n} pets.'; STR.fr.mikaYou = 'Tu es n°{r} avec {n} caresses.';
+STR.en.mikaNone = 'Nobody has petted Mika yet. Be the first!'; STR.fr.mikaNone = 'Personne n\'a encore caressé Mika. Sois le premier !';
+STR.en.mikaOffline = 'On this version, pets only count on this device. Play on the website to join the world leaderboard.';
+STR.fr.mikaOffline = 'Sur cette version, les caresses ne comptent que sur cet appareil. Joue sur le site web pour le classement mondial.';
+var mika = {online:false, total:0, pets:{}, unlocked:false};
+try { mika.unlocked = localStorage.getItem('paris.mikaBoard') === '1'; } catch(e){}
+function fmtNum(n){ return Number(n || 0).toLocaleString(LANG === 'fr' ? 'fr-FR' : 'en-CA'); }
+function listenMika(db){
+  mika.online = true;
+  db.ref('paris/mika/total').on('value', function(snap){ mika.total = snap.val() || 0; renderMikaBoard(); }, function(){ mika.online = false; });
+  db.ref('paris/mika/pets').on('value', function(snap){
+    mika.pets = snap.val() || {};
+    if(mika.pets[net.uid] && mika.pets[net.uid].n > 0 && !mika.unlocked) unlockMikaBoard(true);
+    renderMikaBoard();
+  }, function(){});
+}
+function unlockMikaBoard(quiet){
+  document.getElementById('tab-btn-mika').classList.remove('hidden');
+  if(mika.unlocked) return;
+  mika.unlocked = true;
+  try { localStorage.setItem('paris.mikaBoard', '1'); } catch(e){}
+  if(!quiet) setTimeout(function(){ showToast(t('mikaUnlocked')); }, 2300);
+  renderMikaBoard();
+}
+function renderMikaBoard(){
+  var el = document.getElementById('mika-board');
+  if(!el) return;
+  if(!mika.online){
+    el.innerHTML = '<div class="mk-total"><b>' + esc(fmtNum(petCount)) + '</b><span>' + esc(t('mikaTotal')) + '</span></div><div class="mk-note">' + esc(t('mikaOffline')) + '</div>';
+    return;
+  }
+  var list = Object.keys(mika.pets).map(function(u){ var d = mika.pets[u] || {}; return {u:u, n:d.n | 0, name:cleanNick(d.name) || memberName(u)}; })
+    .filter(function(r){ return r.n > 0; }).sort(function(a, b){ return b.n - a.n || a.name.localeCompare(b.name); });
+  var html = '<div class="mk-total"><b>' + esc(fmtNum(mika.total)) + '</b><span>' + esc(t('mikaTotal')) + '</span></div>';
+  html += '<div class="settings-label"><span>' + esc(t('mikaTop')) + '</span></div>';
+  if(!list.length) html += '<div class="mk-note">' + esc(t('mikaNone')) + '</div>';
+  list.slice(0, 10).forEach(function(r, i){
+    html += '<div class="mk-row' + (r.u === net.uid ? ' me' : '') + '"><span class="mk-rank">' + (i === 0 ? '👑' : '#' + (i + 1)) + '</span><span class="mk-name">' + esc(r.name) + '</span><b>' + esc(fmtNum(r.n)) + '</b></div>';
+  });
+  var me = -1; list.forEach(function(r, i){ if(r.u === net.uid) me = i; });
+  if(me >= 0) html += '<div class="mk-note">' + esc(t('mikaYou', {r:me + 1, n:fmtNum(list[me].n)})) + '</div>';
+  el.innerHTML = html;
+}
+langHooks.push(renderMikaBoard);
+if(mika.unlocked) setTimeout(function(){ unlockMikaBoard(true); }, 0);
 function updatePet(dt){
   updateDoom(dt);
   updateHearts(dt);
@@ -2023,7 +2096,7 @@ function updatePet(dt){
   if(pet.state === 'heaven'){ updateHeaven(dt); return; }
   var happy = pet.petT > 0;
   if(happy) pet.petT -= dt;
-  else pet.s = (pet.s + pet.dir*pet.speed*dt + PET_SIDE*4) % (PET_SIDE*4);
+  pet.s = sharedPetS();   // where she is right now - the same for everyone
   var at = petAt(pet.s); pet.x = at[0]; pet.z = at[1];
   pet.sprite.position.set(pet.x, surfaceAt(pet.x, pet.z, 0) + Math.abs(Math.sin(moveTime*(happy ? 13 : 7)))*(happy ? 0.45 : 0.25), pet.z);
   pet.sprite.material.rotation = Math.sin(moveTime*(happy ? 17 : 7))*(happy ? 0.16 : 0.06);
@@ -2072,6 +2145,7 @@ function startHeaven(){
   choirSound();
 }
 function updateHeaven(dt){
+  pet.s = sharedPetS();
   var T = heaven.t += dt, at = petAt(pet.s), ground = surfaceAt(at[0], at[1], 0);
   pet.x = at[0]; pet.z = at[1];
   var ease = function(u){ u = Math.max(0, Math.min(1, u)); return u*u*(3 - 2*u); };
@@ -4215,7 +4289,7 @@ function setMusic(on){
 }
 /* ---------- Title screen: tabs, settings, language ---------- */
 var titleScreen = document.getElementById('title-screen');
-var titleTabs = ['play', 'settings', 'players', 'help', 'log', 'credits'].map(function(n){
+var titleTabs = ['play', 'settings', 'players', 'help', 'log', 'mika', 'credits'].map(function(n){
   return {name:n, btn:document.getElementById('tab-btn-' + n), panel:document.getElementById('tab-' + n)};
 });
 function showTitleTab(name){ titleTabs.forEach(function(tb){ tb.btn.classList.toggle('active', tb.name === name); tb.panel.classList.toggle('hidden', tb.name !== name); }); }
@@ -4326,6 +4400,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 23, 2026 · 1:45 PM</span><br>Mika is now in the same spot for everyone. Every pet counts worldwide - and your first pet unlocks the MIKA PET LEADERBOARD (MENU > MIKA).</li>' +
   '<li><span class="when">Nov 23, 2026 · 12:30 PM</span><br>Player names can now be up to 100 letters long (long names wrap onto a few lines over your head).</li>' +
   '<li><span class="when">Nov 23, 2026 · 12:20 PM</span><br>In Walk Mode, walk up to Mika and press E to pet her. She keeps count!</li>' +
   '<li><span class="when">Nov 23, 2026 · 12:10 PM</span><br>Hit Mika and the sentence is carried out: 2 seconds later your car blows up - HUGE - and flips through the air.</li>' +
@@ -5544,6 +5619,8 @@ function startListening(){
     Object.keys(mp.avatars).forEach(function(k){ mp.avatars[k].tagText = null; });
     promptKey = ''; renderPlotPanel();
   }, function(){});
+  db.ref('.info/serverTimeOffset').on('value', function(snap){ net.timeOffset = snap.val() || 0; });
+  listenMika(db);
   var plots = db.ref('paris/plots');
   function got(s){ var p = PLOT_BY_ID[s.key]; if(p) plotChanged(p, cleanPlot(s.val(), p)); if(panelPlot === p) renderPlotPanel(); promptKey = ''; }
   plots.on('child_added', got);
