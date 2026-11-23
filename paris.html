@@ -426,7 +426,7 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
       <div class="settings-block" id="login-block">
         <div id="login-out">
           <div class="settings-label"><span data-t="name">NAME</span></div>
-          <input id="login-name" class="text-input login-input" maxlength="20" data-tp="namePh" placeholder="Your name" autocomplete="username" spellcheck="false">
+          <input id="login-name" class="text-input login-input" maxlength="100" data-tp="namePh" placeholder="Your name" autocomplete="username" spellcheck="false">
           <div class="settings-label second"><span data-t="password">PASSWORD</span></div>
           <input id="login-pw" class="text-input login-input" type="password" maxlength="40" data-tp="pwPh" placeholder="Your password" autocomplete="current-password">
           <div class="msg" id="login-msg" data-t="loginNote">Don't have a password? Ask Daniel.</div>
@@ -471,7 +471,7 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
     <div class="tab-panel hidden" id="tab-players">
       <div class="settings-block">
         <div class="settings-label"><span data-t="addPlayer">ADD A PLAYER</span></div>
-        <input id="add-name" class="text-input menu-input" maxlength="16" data-tp="namePh" placeholder="Their name" autocomplete="off" spellcheck="false">
+        <input id="add-name" class="text-input menu-input" maxlength="100" data-tp="namePh" placeholder="Their name" autocomplete="off" spellcheck="false">
         <input id="add-pw" class="text-input menu-input" maxlength="40" data-tp="newPwPh" placeholder="Their password" autocomplete="new-password" spellcheck="false" style="margin-top:6px">
         <div class="btn-row" style="margin-top:8px"><button class="btn go" id="add-btn" data-t="addBtn">ADD</button></div>
         <div class="msg" id="add-msg" data-t="addNote">Pick their password and tell it to them yourself.</div>
@@ -561,7 +561,7 @@ en: {
   /* owner */
   addPlayer:'ADD A PLAYER', addBtn:'ADD', playersList:'PLAYERS ON THE LIST',
   addNote:'Pick their password (6 or more letters or numbers) and tell it to them yourself. Every name must be different - add a letter (EMMA B) if two people share one.',
-  addNeedName:'Type their name (2 to 16 letters).', addPwShort:'The password needs 6 or more characters.',
+  addNeedName:'Type their name (2 to 100 letters).', addPwShort:'The password needs 6 or more characters.',
   addNameTaken:'That name is already on the list.', adding:'Adding...', added:'{name} can sign in now!',
   addFailed:"Couldn't add them ({why}).", addExists:'That name already has an account. To give them a new password, delete their old account first (see the guide).',
   removeMember:'REMOVE', removeMemberConfirm:'Take {name} off the list? They can\'t sign in after that.', removeMemberYes:'YES',
@@ -630,7 +630,7 @@ fr: {
   done:'TERMINÉ', noRoom:'Pas de place ici.', tooMany:'Tu as atteint le maximum ({n} objets).', keepDoor:'Laisse l\'entrée libre !',
   addPlayer:'AJOUTER UN JOUEUR', addBtn:'AJOUTER', playersList:'JOUEURS SUR LA LISTE',
   addNote:'Choisis son mot de passe (6 lettres ou chiffres ou plus) et donne-le-lui toi-même. Chaque nom doit être différent - ajoute une lettre (EMMA B) si deux personnes ont le même.',
-  addNeedName:'Écris son nom (2 à 16 lettres).', addPwShort:'Le mot de passe doit avoir 6 caractères ou plus.',
+  addNeedName:'Écris son nom (2 à 100 lettres).', addPwShort:'Le mot de passe doit avoir 6 caractères ou plus.',
   addNameTaken:'Ce nom est déjà sur la liste.', adding:'Ajout...', added:'{name} peut se connecter maintenant !',
   addFailed:'Impossible de l\'ajouter ({why}).', addExists:'Ce nom a déjà un compte. Pour un nouveau mot de passe, supprime d\'abord l\'ancien compte (voir le guide).',
   removeMember:'RETIRER', removeMemberConfirm:'Retirer {name} de la liste ? Il ou elle ne pourra plus se connecter.', removeMemberYes:'OUI',
@@ -4326,6 +4326,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 23, 2026 · 12:30 PM</span><br>Player names can now be up to 100 letters long (long names wrap onto a few lines over your head).</li>' +
   '<li><span class="when">Nov 23, 2026 · 12:20 PM</span><br>In Walk Mode, walk up to Mika and press E to pet her. She keeps count!</li>' +
   '<li><span class="when">Nov 23, 2026 · 12:10 PM</span><br>Hit Mika and the sentence is carried out: 2 seconds later your car blows up - HUGE - and flips through the air.</li>' +
   '<li><span class="when">Nov 23, 2026 · 12:00 PM</span><br>Hit Mika and, two seconds later, she rises again (as the other photo) with a halo and a heavenly choir - then walks on like nothing happened.</li>' +
@@ -5404,8 +5405,8 @@ var enterBtn = document.getElementById('enter-btn');
 var loginMsgKey = 'loginNote', loginMsgBad = false;
 function loginMsg(key, bad){ loginMsgKey = key; loginMsgBad = !!bad; loginMsgEl.textContent = t(key); loginMsgEl.className = 'msg' + (bad ? ' bad' : ''); loginMsgEl.removeAttribute('data-t'); }
 langHooks.push(function(){ loginMsgEl.textContent = t(loginMsgKey); if(net.member) loginWho.textContent = t('signedInAs', {name:net.name}); });
-function nameKey(name){ return String(name || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20); }
-function cleanNick(n){ return String(n || '').replace(/[^A-Za-z0-9 _.\-À-ÖØ-öø-ÿ]/g, '').replace(/\s+/g, ' ').trim().slice(0, 16); }
+function nameKey(name){ return String(name || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 60); }
+function cleanNick(n){ return String(n || '').replace(/[^A-Za-z0-9 _.\-À-ÖØ-öø-ÿ]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100); }
 function signedIn(){ return !!net.ready; }   // in (website: on the list; claude.ai: the page has met you)
 function memberName(uid){ var m = uid && net.members[uid]; return m && m.name ? m.name : t('someone'); }
 function myRole(){ return net.isOwner ? 'owner' : ''; }
@@ -5887,34 +5888,43 @@ function onRoomPeers(change){
 function nameTag(text, role){
   var badge = role === 'owner' ? t('ownerBadge') : '';
   var c = document.createElement('canvas'), ctx = c.getContext('2d');
+  var lines = [], words = String(text).split(' '), cur = '';
+  words.forEach(function(wd){
+    while(wd.length > 26){ if(cur){ lines.push(cur); cur = ''; } lines.push(wd.slice(0, 26)); wd = wd.slice(26); }
+    if((cur + ' ' + wd).trim().length > 26){ lines.push(cur); cur = wd; } else cur = (cur + ' ' + wd).trim();
+  });
+  if(cur || !lines.length) lines.push(cur);
   ctx.font = '20px monospace';
-  var nw = ctx.measureText(text).width;
+  var nw = 0; lines.forEach(function(l){ nw = Math.max(nw, ctx.measureText(l).width); });
   ctx.font = 'bold 18px monospace';
   var bw = badge ? ctx.measureText(badge).width + 16 : 0;
-  var w = Math.max(256, Math.ceil((nw + (badge ? bw + 10 : 0) + 36)/32)*32);
-  c.width = w; c.height = 64;
+  var w = Math.max(256, Math.ceil((nw + (badge ? bw + 10 : 0) + 36)/32)*32), h = 64 + 24*(lines.length - 1);
+  c.width = w; c.height = h;
   var tex = new THREE.CanvasTexture(c);
   tex.magFilter = THREE.NearestFilter;
   var sprite = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, depthTest:false}));
-  sprite.scale.set(5*w/256, 1.28, 1);
-  sprite.userData.tag = {ctx:ctx, tex:tex, w:w, text:text, nw:nw, badge:badge, bw:bw, lastShine:0};
+  sprite.scale.set(5*w/256, 1.28*h/64, 1);
+  sprite.center.set(0.5, 32/h);   // extra lines go upwards; the last line sits where a one-line tag would
+  sprite.userData.tag = {ctx:ctx, tex:tex, w:w, h:h, lines:lines, text:text, nw:nw, badge:badge, bw:bw, lastShine:0};
   drawNameTag(sprite.userData.tag, 0);
   root.add(sprite);
   return sprite;
 }
 function drawNameTag(tg, time){
-  var ctx = tg.ctx, w = tg.w;
-  ctx.clearRect(0, 0, w, 64);
-  ctx.fillStyle = 'rgba(25,30,50,0.86)'; ctx.fillRect(0, 0, w, 64);
-  ctx.strokeStyle = tg.badge ? '#9fe6ff' : '#f0ead9'; ctx.lineWidth = 4; ctx.strokeRect(2, 2, w - 4, 60);
+  var ctx = tg.ctx, w = tg.w, h = tg.h || 64, lines = tg.lines || [tg.text], yl = h - 30;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(25,30,50,0.86)'; ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = tg.badge ? '#9fe6ff' : '#f0ead9'; ctx.lineWidth = 4; ctx.strokeRect(2, 2, w - 4, h - 4);
   ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
   var x0 = (w - (tg.nw + (tg.badge ? tg.bw + 10 : 0)))/2;
-  ctx.font = '20px monospace'; ctx.fillStyle = '#f7f2e6'; ctx.fillText(tg.text, x0, 34);
+  ctx.font = '20px monospace'; ctx.fillStyle = '#f7f2e6';
+  lines.forEach(function(l, i){ ctx.fillText(l, x0, 34 + i*24); });
   if(tg.badge){
-    var bx = x0 + tg.nw + 10, s = (time*0.7) % 1, g = ctx.createLinearGradient(bx, 0, bx + tg.bw, 0);
-    ctx.fillStyle = '#0d1a24'; ctx.fillRect(bx, 16, tg.bw, 34);
+    var lastW = ctx.measureText(lines[lines.length - 1]).width;
+    var bx = x0 + lastW + 10, s = (time*0.7) % 1, g = ctx.createLinearGradient(bx, 0, bx + tg.bw, 0);
+    ctx.fillStyle = '#0d1a24'; ctx.fillRect(bx, yl - 18, tg.bw, 34);
     g.addColorStop(0, '#7fe3ff'); g.addColorStop(Math.max(0, s - 0.18), '#a9dcff'); g.addColorStop(s, '#ffffff'); g.addColorStop(Math.min(1, s + 0.18), '#e4d2ff'); g.addColorStop(1, '#7fe3ff');
-    ctx.font = 'bold 18px monospace'; ctx.fillStyle = g; ctx.fillText(tg.badge, bx + 8, 34);
+    ctx.font = 'bold 18px monospace'; ctx.fillStyle = g; ctx.fillText(tg.badge, bx + 8, yl);
   }
   tg.tex.needsUpdate = true;
 }
