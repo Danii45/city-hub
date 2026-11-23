@@ -2114,6 +2114,42 @@ function mikaBoardHtml(top, notes){
   if(me >= 0) html += '<div class="mk-note">' + esc(t('mikaYou', {r:me + 1, n:fmtNum(list[me].n)})) + '</div>';
   return html;
 }
+/* over Mika's head: her name, and her BEST FRIEND - whoever has petted her the most */
+STR.en.bestFriend = 'Best friend: {name} ({n})'; STR.fr.bestFriend = 'Meilleur ami : {name} ({n})';
+var mikaTag = (function(){
+  var c = document.createElement('canvas'); c.width = 512; c.height = 112;
+  var tex = new THREE.CanvasTexture(c), sp = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, depthWrite:false}));
+  sp.center.set(0.5, 0); sp.scale.set(3.6, 0.79, 1); sp.renderOrder = 6; sp.visible = false;
+  root.add(sp);
+  return {sprite:sp, canvas:c, tex:tex, key:''};
+})();
+function bestFriend(){
+  var best = null;
+  Object.keys(mika.pets || {}).forEach(function(u){ var d = mika.pets[u] || {}; if((d.n | 0) > 0 && (!best || (d.n | 0) > best.n)) best = {n:d.n | 0, name:cleanNick(d.name) || memberName(u)}; });
+  return best;
+}
+function drawMikaTag(){
+  var bf = mika.online ? bestFriend() : null, line2 = bf ? t('bestFriend', {name:bf.name.length > 28 ? bf.name.slice(0, 27) + '...' : bf.name, n:fmtNum(bf.n)}) : '';
+  var key = line2 + '|' + LANG;
+  if(key === mikaTag.key) return;
+  mikaTag.key = key;
+  var x = mikaTag.canvas.getContext('2d'), W = 512, H = line2 ? 112 : 64;
+  x.clearRect(0, 0, W, 112);
+  x.fillStyle = 'rgba(31,34,51,0.88)'; x.fillRect(0, 112 - H, W, H);
+  x.strokeStyle = '#ff7a9c'; x.lineWidth = 4; x.strokeRect(2, 114 - H, W - 4, H - 4);
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillStyle = '#ff7a9c'; x.font = 'bold 34px Georgia, serif'; x.fillText('MIKA', W/2, 112 - H + 34);
+  if(line2){ x.fillStyle = '#ffd23f'; x.font = '24px monospace'; x.fillText('\u2665 ' + line2, W/2, 84, W - 24); }
+  mikaTag.tex.needsUpdate = true;
+}
+function updateMikaTag(){
+  var on = pet.state === 'walk' || pet.state === 'heaven';
+  mikaTag.sprite.visible = on;
+  if(!on) return;
+  drawMikaTag();
+  var p = pet.sprite.position;
+  mikaTag.sprite.position.set(p.x, p.y + pet.sprite.scale.y + (pet.state === 'heaven' ? 1.1 : 0.25), p.z);
+}
 /* the pop-up on the middle right: shows for 6 seconds after each pet (once the leaderboard is unlocked) */
 STR.en.mikaHudHead = 'MIKA PET LEADERBOARD'; STR.fr.mikaHudHead = 'CLASSEMENT DES CARESSES';
 var mikaHud = {el:document.getElementById('mika-hud'), shown:false, timer:null, fadeTimer:null};
@@ -2131,6 +2167,7 @@ if(mika.unlocked) setTimeout(function(){ unlockMikaBoard(true); }, 0);
 function updatePet(dt){
   updateDoom(dt);
   updateHearts(dt);
+  updateMikaTag();
   if(pet.state === 'gone'){ pet.t -= dt; if(pet.t <= 0) spawnPet(); return; }
   if(pet.state === 'fly'){
     pet.vel.y -= 9*dt;
@@ -4456,6 +4493,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 23, 2026 · 1:55 PM</span><br>Mika now has a name tag showing her BEST FRIEND - whoever has petted her the most.</li>' +
   '<li><span class="when">Nov 23, 2026 · 1:50 PM</span><br>When anyone pets Mika she freezes for everyone, then walks on. The MIKA PET LEADERBOARD pops up on the right each time you pet her.</li>' +
   '<li><span class="when">Nov 23, 2026 · 1:45 PM</span><br>Mika is now in the same spot for everyone. Every pet counts worldwide - and your first pet unlocks the MIKA PET LEADERBOARD (MENU > MIKA).</li>' +
   '<li><span class="when">Nov 23, 2026 · 12:30 PM</span><br>Player names can now be up to 100 letters long (long names wrap onto a few lines over your head).</li>' +
