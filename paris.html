@@ -1893,7 +1893,7 @@ var peopleFrame = 0;
 /* ---------- The dog: a photo on a stick ----------
    One flat photo of Daniel's dog (a random one of the two, pets/pet-1.jpg or pet-2.jpg) walks a small square right under
    the Eiffel Tower, bobbing like a cardboard cutout. Hit it with a car and it spins off into the sky, and a black box says
-   HOW DARE YOU? / SENTENCE: EXECUTION. Twenty seconds later a new one (random photo again) shows up somewhere else. */
+   HOW DARE YOU? / SENTENCE: EXECUTION. Then she comes back from heaven (below). */
 STR.en.howDare = 'HOW DARE YOU?'; STR.fr.howDare = 'COMMENT OSES-TU ?';
 STR.en.sentence = 'SENTENCE: EXECUTION'; STR.fr.sentence = 'SENTENCE : EXÉCUTION';
 var PET_PHOTOS = ['pets/pet-1.jpg', 'pets/pet-2.jpg'], PET_LOOP = [[-10, 10], [10, 10], [10, -10], [-10, -10]], PET_SIDE = 20;   // a small square right under the Eiffel Tower, between its legs
@@ -1923,9 +1923,10 @@ function updatePet(dt){
     pet.sprite.position.addScaledVector(pet.vel, dt);
     pet.sprite.material.rotation += 9*dt;
     pet.t -= dt;
-    if(pet.t <= 0){ pet.state = 'gone'; pet.sprite.visible = false; pet.t = 20; }
+    if(pet.t <= 0) startHeaven();
     return;
   }
+  if(pet.state === 'heaven'){ updateHeaven(dt); return; }
   pet.s = (pet.s + pet.dir*pet.speed*dt + PET_SIDE*4) % (PET_SIDE*4);
   var at = petAt(pet.s); pet.x = at[0]; pet.z = at[1];
   pet.sprite.position.set(pet.x, surfaceAt(pet.x, pet.z, 0) + Math.abs(Math.sin(moveTime*7))*0.25, pet.z);
@@ -1934,7 +1935,7 @@ function updatePet(dt){
     var hx = pet.x - carPos.x, hz = pet.z - carPos.z, r = carSpec.radius + 0.6;
     if(hx*hx + hz*hz < r*r){
       var sp = Math.abs(driveSpeed), fx = -Math.sin(carYaw)*Math.sign(driveSpeed), fz = -Math.cos(carYaw)*Math.sign(driveSpeed);
-      pet.state = 'fly'; pet.t = 4;
+      pet.state = 'fly'; pet.t = 2;
       pet.vel.set(fx*sp*0.6, 10 + sp*0.4, fz*sp*0.6);
       showChauffard(t('howDare'), t('sentence'), true);
       thudSound(sp); screenShake = SHAKE_TIME; driveSpeed *= 0.9;
@@ -1942,6 +1943,87 @@ function updatePet(dt){
     }
   }
   if(!driving) remoteColliders.push({x:pet.x, z:pet.z, r:0.5, y0:0, y1:2.6});
+}
+/* ---------- Mika comes back from heaven ----------
+   Two seconds after you hit her: a beam of golden light shines down where she was walking, she rises up out of the
+   ground with a halo over her head and a heavenly choir singing AAAAAHHHH, floats, drifts back down - and walks on
+   as if nothing ever happened. */
+var heaven = (function(){
+  var g = new THREE.Group(); g.visible = false; root.add(g);
+  var halo = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.07, 10, 36), new THREE.MeshBasicMaterial({color:0xffc400, transparent:true, depthTest:false}));
+  halo.rotation.x = Math.PI/2.4; halo.renderOrder = 7; g.add(halo);
+  var glow = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.22, 8, 36), new THREE.MeshBasicMaterial({color:0xfff3b0, transparent:true, opacity:0.35, blending:THREE.AdditiveBlending, depthWrite:false}));
+  glow.rotation.x = Math.PI/2.4; g.add(glow);
+  var beamGeo = new THREE.CylinderGeometry(1.0, 1.8, 60, 24, 1, true); beamGeo.translate(0, 30, 0);
+  var beam = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({color:0xfff0b0, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide}));
+  root.add(beam); beam.visible = false;
+  var sparkGeo = new THREE.BufferGeometry(), N = 60, sp = new Float32Array(N*3);
+  sparkGeo.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+  var sparks = new THREE.Points(sparkGeo, new THREE.PointsMaterial({color:0xfff2a0, size:0.18, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false}));
+  root.add(sparks); sparks.visible = false;
+  var seeds = []; for(var i=0;i<N;i++) seeds.push({a:Math.random()*6.28, r:0.4 + Math.random()*1.3, h:Math.random()*4, v:0.6 + Math.random()*1.2});
+  return {g:g, halo:halo, glow:glow, beam:beam, sparks:sparks, seeds:seeds, t:0};
+})();
+var HEAVEN_TIME = 6.5;
+function startHeaven(){
+  pet.state = 'heaven'; heaven.t = 0;
+  // she comes back as the other photo
+  var cur = pet.texs.indexOf(pet.sprite.material.map), nxt = (cur + 1 + Math.floor(Math.random()*(pet.texs.length - 1))) % pet.texs.length, img = pet.texs[nxt].image;
+  if(img && img.width){ pet.sprite.material.map = pet.texs[nxt]; pet.sprite.material.needsUpdate = true; pet.sprite.scale.set(2.6*img.width/img.height, 2.6, 1); }
+  pet.sprite.material.rotation = 0; pet.sprite.material.opacity = 1;
+  heaven.g.visible = true; heaven.beam.visible = true; heaven.sparks.visible = true;
+  choirSound();
+}
+function updateHeaven(dt){
+  var T = heaven.t += dt, at = petAt(pet.s), ground = surfaceAt(at[0], at[1], 0);
+  pet.x = at[0]; pet.z = at[1];
+  var ease = function(u){ u = Math.max(0, Math.min(1, u)); return u*u*(3 - 2*u); };
+  var lift = 3.2*ease(T/2.2) - 3.2*ease((T - 4.0)/1.8);           // rises, floats, comes back down
+  var y = ground + lift + (T > 2.2 && T < 4.0 ? Math.sin((T - 2.2)*3)*0.15 : 0);
+  pet.sprite.position.set(pet.x, y, pet.z);
+  pet.sprite.material.rotation = Math.sin(T*1.6)*0.05;
+  var fadeIn = ease(T/0.6), fadeOut = 1 - ease((T - 5.6)/0.9), a = fadeIn*fadeOut;
+  heaven.g.position.set(pet.x, y + pet.sprite.scale.y + 0.35 + Math.sin(T*3)*0.06, pet.z);
+  heaven.halo.material.opacity = a; heaven.glow.material.opacity = 0.35*a;
+  heaven.g.rotation.y += dt*1.2;
+  heaven.beam.position.set(pet.x, ground, pet.z); heaven.beam.material.opacity = 0.14*a;
+  var arr = heaven.sparks.geometry.attributes.position.array;
+  heaven.seeds.forEach(function(sd, i){
+    var h = (sd.h + T*sd.v) % 5, ang = sd.a + T*0.8;
+    arr[i*3] = pet.x + Math.cos(ang)*sd.r; arr[i*3+1] = ground + h; arr[i*3+2] = pet.z + Math.sin(ang)*sd.r;
+  });
+  heaven.sparks.geometry.attributes.position.needsUpdate = true; heaven.sparks.material.opacity = a;
+  if(T >= HEAVEN_TIME){
+    heaven.g.visible = false; heaven.beam.visible = false; heaven.sparks.visible = false;
+    pet.state = 'walk';   // like nothing ever happened
+  }
+}
+/* a heavenly choir: four voices singing "aaaah" on a big major chord, swelling in and fading away, with an echo */
+function choirSound(){
+  var ctx = sfx.ctx;
+  if(!ctx || ctx.state !== 'running') return;
+  var now = ctx.currentTime, dur = 5.2;
+  var out = ctx.createGain(); out.gain.setValueAtTime(0.0001, now);
+  out.gain.exponentialRampToValueAtTime(0.5, now + 1.0); out.gain.setValueAtTime(0.5, now + 3.4); out.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+  var dly = ctx.createDelay(1.0), fb = ctx.createGain(), wet = ctx.createGain();
+  dly.delayTime.value = 0.23; fb.gain.value = 0.45; wet.gain.value = 0.35;
+  out.connect(ctx.destination); out.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(wet); wet.connect(ctx.destination);
+  // "ah" vowel: two resonances (formants) shape a buzzy voice into an open "aaah"
+  var f1 = ctx.createBiquadFilter(), f2 = ctx.createBiquadFilter(), f3 = ctx.createBiquadFilter(), mix = ctx.createGain();
+  f1.type = f2.type = f3.type = 'bandpass';
+  f1.frequency.value = 800; f1.Q.value = 6; f2.frequency.value = 1150; f2.Q.value = 7; f3.frequency.value = 2900; f3.Q.value = 9;
+  var g1 = ctx.createGain(), g2 = ctx.createGain(), g3 = ctx.createGain(); g1.gain.value = 1; g2.gain.value = 0.7; g3.gain.value = 0.25;
+  mix.gain.value = 0.18;
+  mix.connect(f1); mix.connect(f2); mix.connect(f3); f1.connect(g1); f2.connect(g2); f3.connect(g3); g1.connect(out); g2.connect(out); g3.connect(out);
+  var vib = ctx.createOscillator(), vibAmt = ctx.createGain(); vib.frequency.value = 5.2; vibAmt.gain.value = 3.5; vib.connect(vibAmt); vib.start(now); vib.stop(now + dur);
+  [196, 246.94, 293.66, 392, 493.88, 587.33].forEach(function(f, i){   // G major, two octaves: a choir of voices
+    [-1, 1].forEach(function(d){
+      var o = ctx.createOscillator(); o.type = 'sawtooth';
+      o.frequency.value = f*(1 + d*0.004*(1 + i*0.3));
+      vibAmt.connect(o.detune);
+      o.connect(mix); o.start(now + i*0.06); o.stop(now + dur);
+    });
+  });
 }
 /* everything French that moves: people, flags (only the ones near enough to see wave), the carousel */
 function updateFrance(dt){
@@ -4145,6 +4227,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 23, 2026 · 12:00 PM</span><br>Hit Mika and, two seconds later, she rises again (as the other photo) with a halo and a heavenly choir - then walks on like nothing happened.</li>' +
   '<li><span class="when">Nov 23, 2026 · 11:50 AM</span><br>Daniel\'s dog now walks around right under the Eiffel Tower. Don\'t you dare hit it.</li>' +
   '<li><span class="when">Nov 23, 2026 · 11:45 AM</span><br>TRACK COUPE: shift down into too low a gear for your speed and the engine might BLOW UP. Wait for the revs to drop before you shift down!</li>' +
   '<li><span class="when">Nov 23, 2026 · 11:30 AM</span><br>The TRACK COUPE now uses a real 3D model (it loads the first time you pick it).</li>' +
