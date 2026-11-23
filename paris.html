@@ -458,7 +458,7 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
         <div class="speed-hint" data-t="carColorHint">Each player gets their own color. Crossed-out ones are taken.</div>
         <div id="vehicle-block" class="hidden">
           <div class="settings-label second"><span data-t="vehicle">VEHICLE</span></div>
-          <div class="chips"><button class="chip on" data-vehicle="sedan" data-t="vCar">CAR</button><button class="chip" data-vehicle="f1">F1</button></div>
+          <div class="chips"><button class="chip on" data-vehicle="sedan" data-t="vCar">CAR</button><button class="chip" data-vehicle="f1">F1</button><button class="chip" data-vehicle="coupe" data-t="vCoupe">TRACK COUPE</button></div>
         </div>
         <div class="settings-label second"><span data-t="lowDetail">LOW DETAIL</span><button class="toggle" id="lowdetail-toggle">OFF</button></div>
         <div class="speed-hint" data-t="lowDetailHint">Draws at normal resolution. Turn it on if the game lags.</div>
@@ -2870,6 +2870,106 @@ function buildF1Model(){
   g.visible = false; root.add(g);
   return {group:g, wheels:wheels, wheelR:0.53, paint:NAVY};
 }
+/* the owner's TRACK COUPE: a low, wide, glossy white sports car with a big rear wing, a navy stripe, dark-blue wheels
+   and yellow brakes. Always this paint (it ignores the car color), and it has a 6-speed MANUAL gearbox (see below).
+   The body is one smooth side profile pushed out across the car's width, with fenders over each wheel. */
+function buildCoupeModel(){
+  var g = new THREE.Group();
+  function gloss(hex, shine, spec){ return new THREE.MeshPhongMaterial({color:hex, shininess:shine, specular:spec === undefined ? 0xffffff : spec}); }
+  var paint = gloss(0xf4f4f1, 160), glass = gloss(0x141b24, 200, 0xbfd8ff), carbon = gloss(0x1c1d21, 90, 0x666a70);
+  var black = solidMat(0x151517), navy = gloss(0x1d2b52, 120), rim = gloss(0x2b3a6b, 140, 0x9fb4ff), tire = solidMat(0x18181a);
+  var caliper = gloss(0xf2c21b, 80), disc = gloss(0x8d9096, 60), lampGlass = gloss(0xeaf2ff, 220), red = new THREE.MeshBasicMaterial({color:0xd81e1e});
+  var lampLit = new THREE.MeshBasicMaterial({color:0xf4f8ff});
+  /* a side profile (x = forwards, y = up) pushed out across 'width', centered on the car */
+  function profile(pts, width, mat, bevel, holes){
+    var sh = new THREE.Shape();
+    sh.moveTo(pts[0][0], pts[0][1]);
+    for(var i=1;i<pts.length;i++){ var q = pts[i]; if(q.arc) sh.absarc(q.arc[0], q.arc[1], q.arc[2], q.arc[3], q.arc[4], true); else sh.lineTo(q[0], q[1]); }
+    var b = bevel || 0;
+    var geo = new THREE.ExtrudeGeometry(sh, {depth:Math.max(0.01, width - 2*b), bevelEnabled:b > 0, bevelThickness:b, bevelSize:b, bevelSegments:3, curveSegments:18});
+    geo.translate(0, 0, -(width - 2*b)/2);
+    geo.rotateY(Math.PI/2);   // shape x (forwards) -> world -z, the push-out -> world x
+    var m = new THREE.Mesh(geo, mat); g.add(m); return m;
+  }
+  function add(w, h, d, mat, x, y, z, rx){ var m = box(w, h, d, mat); m.position.set(x, y, z); if(rx) m.rotation.x = rx; g.add(m); return m; }
+  var FW = 1.42, RW = -1.32, WR = 0.37;   // front and rear axles (forwards), wheel radius
+  // the main body: nose, hood, windscreen, roof, a long sloping fastback, the tail
+  profile([[-2.2, 0.34], [2.12, 0.34], [2.27, 0.5], [2.24, 0.68], [2.05, 0.8], [1.05, 0.9], [0.62, 0.96], [-0.08, 1.3],
+           [-0.62, 1.32], [-1.15, 1.2], [-1.85, 0.98], [-2.22, 0.93], [-2.3, 0.62]], 1.56, paint, 0.06);
+  // fenders over each wheel, wider than the body, with a round arch cut over the wheel
+  // fenders: 'lean' slopes the end facing the doors, so they flow into the body instead of ending in a wall
+  function fender(cx, z0, z1, top, w, xo, leanBack, leanFront){
+    [-1, 1].forEach(function(sd){
+      var m = profile([[z0, 0.36], [cx - WR - 0.07, 0.36], {arc:[cx, 0.37, WR + 0.07, Math.PI, 0]}, [z1, 0.37], [z1 - leanFront, top - 0.03],
+                       [z1 - leanFront - 0.15, top], [z0 + leanBack + 0.15, top], [z0 + leanBack, top - 0.03]], w, paint, 0.05);
+      m.position.x = sd*xo;
+    });
+  }
+  fender(FW, 0.75, 2.12, 0.86, 0.34, 0.85, 0.3, 0.1);
+  fender(RW, -2.12, -0.55, 0.98, 0.4, 0.87, 0.06, 0.45);
+  // glass: windscreen, side windows, the back window
+  add(1.4, 0.02, 0.8, glass, 0, 1.2, -0.27, -0.45);   // windscreen: from the cowl up to the roof
+  [-1, 1].forEach(function(sd){
+    var sw = profile([[0.5, 0.98], [-0.05, 1.27], [-0.6, 1.29], [-1.05, 1.17], [-1.1, 0.98]], 0.02, glass);
+    sw.position.x = sd*0.79;
+  });
+  add(1.2, 0.02, 0.52, glass, 0, 1.335, 0.88, 0.22);   // back window
+  // carbon hood vents and roof stripe
+  [-0.3, 0.3].forEach(function(x){ add(0.3, 0.03, 0.4, carbon, x, 0.945, -1.35, -0.1); });
+  add(1.0, 0.012, 0.95, carbon, 0, 0.935, -1.6, -0.1);
+  // the navy stripe along each side
+  [-1, 1].forEach(function(sd){ add(0.02, 0.09, 1.25, navy, sd*0.785, 0.5, -0.1); });
+  // splitter, side skirts, diffuser
+  add(1.92, 0.05, 0.4, carbon, 0, 0.3, -2.12);
+  [-1, 1].forEach(function(sd){ add(0.12, 0.08, 1.7, carbon, sd*0.86, 0.33, 0.05); });
+  add(1.6, 0.16, 0.3, carbon, 0, 0.38, 2.18);
+  [-0.12, 0.12].forEach(function(x){ var ex = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.16, 12), gloss(0x9a9ca2, 120)); ex.rotation.x = Math.PI/2; ex.position.set(x, 0.42, 2.3); g.add(ex); });
+  // round headlights on the front fenders, a light bar across the back
+  [-1, 1].forEach(function(sd){
+    var hl = new THREE.Mesh(new THREE.SphereGeometry(0.16, 18, 14), lampGlass); hl.scale.set(1, 0.85, 0.6); hl.position.set(sd*0.85, 0.79, -2.08); g.add(hl);
+    var bezel = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.018, 8, 22), black); bezel.scale.set(1, 0.85, 1); bezel.position.set(sd*0.85, 0.79, -2.12); g.add(bezel);
+    var lit = new THREE.Mesh(new THREE.CircleGeometry(0.08, 18), lampLit); lit.position.set(sd*0.85, 0.79, -2.18); lit.rotation.y = Math.PI; g.add(lit);
+    // air intakes in the front bumper
+    add(0.42, 0.18, 0.04, black, sd*0.55, 0.45, -2.25);
+    // mirrors
+    add(0.04, 0.05, 0.05, carbon, sd*0.84, 1.0, -0.55);
+    add(0.08, 0.1, 0.16, paint, sd*0.92, 1.02, -0.58);
+    // the vent behind each door
+    add(0.02, 0.24, 0.12, black, sd*0.79, 0.68, 0.42);
+  });
+  add(0.55, 0.12, 0.04, black, 0, 0.45, -2.27);
+  add(1.5, 0.05, 0.03, red, 0, 0.84, 2.36);
+  [-1, 1].forEach(function(sd){ add(0.2, 0.08, 0.04, red, sd*0.78, 0.84, 2.3); });
+  // the big rear wing: two swan-neck posts holding the wing from above
+  add(1.95, 0.05, 0.48, carbon, 0, 1.62, 1.62, -0.06);
+  add(1.95, 0.04, 0.16, paint, 0, 1.67, 1.82, -0.25);
+  [-1, 1].forEach(function(sd){
+    add(0.03, 0.26, 0.55, carbon, sd*0.98, 1.6, 1.66);          // end plates
+    add(0.05, 0.62, 0.1, carbon, sd*0.36, 1.3, 1.88, 0.35);       // posts
+  });
+  // wheels: black tires, dark-blue 5-spoke rims, yellow brake calipers (they don't spin)
+  var wheels = [];
+  [[0.9, -FW, 0.27], [-0.9, -FW, 0.27], [0.92, -RW, 0.32], [-0.92, -RW, 0.32]].forEach(function(w){
+    var pivot = new THREE.Group(); pivot.position.set(w[0], WR, w[1]);
+    var spin = new THREE.Group(); pivot.add(spin);
+    var tg = new THREE.CylinderGeometry(WR, WR, w[2], 22); tg.rotateZ(Math.PI/2); spin.add(new THREE.Mesh(tg, tire));
+    var face = Math.sign(w[0])*(w[2]/2 + 0.005);
+    var rg = new THREE.CylinderGeometry(WR*0.72, WR*0.72, 0.02, 22); rg.rotateZ(Math.PI/2);
+    var dk = new THREE.Mesh(rg, solidMat(0x0c0d10)); dk.position.x = face*0.98; spin.add(dk);
+    for(var k=0;k<5;k++){
+      var sp = box(0.03, WR*0.66, 0.06, rim); sp.position.set(face, 0, 0); sp.rotation.x = k*Math.PI*2/5;
+      sp.geometry.translate(0, WR*0.33, 0); spin.add(sp);
+    }
+    var ring = new THREE.Mesh(new THREE.TorusGeometry(WR*0.7, 0.025, 6, 22), rim); ring.rotation.y = Math.PI/2; ring.position.x = face; spin.add(ring);
+    var hb = new THREE.CylinderGeometry(0.06, 0.06, 0.04, 10); hb.rotateZ(Math.PI/2); var hub = new THREE.Mesh(hb, rim); hub.position.x = face; spin.add(hub);
+    var dg = new THREE.CylinderGeometry(WR*0.6, WR*0.6, 0.03, 18); dg.rotateZ(Math.PI/2); var dsc = new THREE.Mesh(dg, disc); dsc.position.x = face*0.75; pivot.add(dsc);
+    var cal = box(0.07, 0.2, 0.12, caliper); cal.position.set(face*0.72, WR*0.42, -0.08); pivot.add(cal);
+    pivot.spin = spin;
+    g.add(pivot); wheels.push(pivot);
+  });
+  g.visible = false; root.add(g);
+  return {group:g, wheels:wheels, wheelR:WR, paint:paint, fixedPaint:true};
+}
 function buildWalker(){
   var g = new THREE.Group(), paint = solidMat(0xc8382f), dark = solidMat(0x2b2a2e);
   var legs = box(0.5,0.85,0.3, dark); legs.position.y = 0.43; g.add(legs);
@@ -2902,6 +3002,7 @@ function colorCss(c){
   return hexCss(c.hex);
 }
 function paintModel(model, colorId){
+  if(model.fixedPaint) return;
   var c = carColor(colorId) || CAR_COLORS[0];
   setShinyPaint(model, c.shine || null);
   model.paint.color.setHex(c.hex);
@@ -2971,9 +3072,10 @@ function updateShinyPaints(time){
 
 var CAR_SPECS = {
   sedan: {accel:24, topMul:1.7, turnRate:1.6, grip:44, steerResp:3.2, yawInertia:6,  scrape:0.8,  radius:1.6, chaseDist:9,  chaseHeight:4.0},
-  f1:    {accel:44, topMul:2.3, turnRate:2.1, grip:82, steerResp:5.5, yawInertia:11, scrape:0.45, radius:1.7, chaseDist:10, chaseHeight:3.2}
+  f1:    {accel:44, topMul:2.3, turnRate:2.1, grip:82, steerResp:5.5, yawInertia:11, scrape:0.45, radius:1.7, chaseDist:10, chaseHeight:3.2},
+  coupe: {accel:34, topMul:2.15, turnRate:1.95, grip:70, steerResp:4.6, yawInertia:9, scrape:0.55, radius:1.65, chaseDist:8.5, chaseHeight:3.0, manual:true}
 };
-var cars = {sedan:buildCarModel(), f1:buildF1Model()};
+var cars = {sedan:buildCarModel(), f1:buildF1Model(), coupe:buildCoupeModel()};
 var car = cars.sedan, carSpec = CAR_SPECS.sedan, carName = 'sedan';
 var myColor = 'red', wantedSpecial = null;
 try {
@@ -2987,6 +3089,8 @@ function setCarModel(name){
   var shown = car.group.visible;
   car.group.visible = false;
   car = cars[name]; carSpec = CAR_SPECS[name]; carName = name;
+  manual.gear = 1; manual.revs = null; speedoText = '';
+  if(carSpec.manual && !IS_TOUCH) showToast(t('manualHint'));
   applyCarView();
   car.group.visible = shown;
   car.group.position.copy(carPos);
@@ -3007,7 +3111,8 @@ document.addEventListener('pointerdown', unlockAudio);
 document.addEventListener('keydown', unlockAudio);
 var SYNTH_ENGINES = {
   sedan: {gears:4, idle:34, top:96,  cut0:300, cut1:1100, level:0.20, wave2:'square',   chug:0.35},
-  f1:    {gears:6, idle:70, top:300, cut0:900, cut1:3600, level:0.12, wave2:'sawtooth', chug:0}
+  f1:    {gears:6, idle:70, top:300, cut0:900, cut1:3600, level:0.12, wave2:'sawtooth', chug:0},
+  coupe: {gears:6, idle:55, top:250, cut0:650, cut1:3200, level:0.15, wave2:'sawtooth', chug:0.12}
 };
 function startEngineSound(){
   var spec = SYNTH_ENGINES[carName];
@@ -3046,6 +3151,7 @@ function updateEngineSound(speedFrac, throttle){
   var spec = n.spec, now = sfx.ctx.currentTime, on = throttle ? 1 : 0;
   var g = Math.min(0.9999, speedFrac)*spec.gears, gear = Math.floor(g), inGear = g - gear;
   var revs = Math.min(1, (gear === 0 ? inGear : 0.45 + 0.55*inGear) + 0.08*on);
+  if(carSpec.manual && manual.revs !== null) revs = manual.revs;   // the manual: the revs come from the gear you're in
   var f = spec.idle + (spec.top - spec.idle)*revs;
   n.o1.frequency.setTargetAtTime(f, now, 0.06);
   n.o2.frequency.setTargetAtTime(spec.wave2 === 'sawtooth' ? f*2.01 : f*1.006, now, 0.06);
@@ -3326,7 +3432,8 @@ function updateDriveMovement(dt){
     else { throttle = -1; gas = stickAmount(); }
   }
   var topSpeed = Math.max(walkSpeed*carSpec.topMul, 10);
-  if(spin) driveSpeed *= Math.exp(-1.8*dt);
+  if(carSpec.manual){ manualDrive(dt, throttle, gas, topSpeed); }
+  else if(spin) driveSpeed *= Math.exp(-1.8*dt);
   else if(throttle > 0){
     var fwdCap = topSpeed*gas;
     if(driveSpeed < fwdCap) driveSpeed = Math.min(fwdCap, driveSpeed + carSpec.accel*dt);
@@ -3393,7 +3500,7 @@ function updateDriveMovement(dt){
   var roll = Math.max(-0.07, Math.min(0.07, -carYawRate*driveSpeed*0.005));
   car.group.position.copy(carPos);
   car.group.rotation.set(0, carYaw, roll, 'YXZ');
-  car.wheels.forEach(function(w){ w.rotation.x += driveSpeed*dt/car.wheelR; });
+  car.wheels.forEach(function(w){ (w.spin || w).rotation.x += driveSpeed*dt/car.wheelR; });
   updateEngineSound(Math.min(1, Math.abs(driveSpeed)/topSpeed), throttle);
   // the camera turns with the car as you steer (it used to wait a second, then catch up slowly). Mid spin-out it keeps
   // looking down the slide. A look round with the mouse is kept, and eases back to straight ahead once you leave the
@@ -3404,6 +3511,61 @@ function updateDriveMovement(dt){
   camBase += Math.atan2(Math.sin(camWant - camBase), Math.cos(camWant - camBase))*(carView === 'inside' ? 1 : Math.min(1, 15*dt));
   yaw = camBase + lookRel;
   if(!updateCarInside()) updateDriveCamera();   // inside the car, the camera sits in the driver's seat
+}
+
+/* ---------- The manual gearbox (TRACK COUPE) ----------
+   SHIFT + 1 to 6 picks the gear. W / up arrow is the gas, S / down arrow brakes, and once you've stopped, holding it
+   backs you up. Each gear has its own top speed (6th is the fastest); low gears pull hard, high gears pull gently, and
+   a high gear at low speed bogs down. Shift down too early and the engine holds you back (and bounces off the rev
+   limiter). On a phone (no keyboard) it shifts by itself. */
+var GEAR_TOP = [0, 0.24, 0.40, 0.56, 0.72, 0.87, 1.0];      // top speed in each gear, as a share of the car's top speed
+var GEAR_PULL = [0, 1.35, 1.15, 0.98, 0.84, 0.72, 0.6];     // how hard each gear pulls
+var manual = {gear:1, revs:null, limiter:0};
+STR.en.gearN = 'GEAR {n}'; STR.fr.gearN = 'VITESSE {n}';
+STR.en.manualHint = 'MANUAL: SHIFT + 1-6 to change gear - W gas - S brake (hold when stopped to reverse)';
+STR.fr.manualHint = 'MANUELLE : MAJ + 1-6 pour changer de vitesse - W gaz - S frein (reste appuyé à l\'arrêt pour reculer)';
+STR.en.vCoupe = 'TRACK COUPE'; STR.fr.vCoupe = 'COUPÉ PISTE';
+function setGear(n){
+  if(!carSpec.manual || n === manual.gear) return;
+  manual.gear = n;
+  showToast(t('gearN', {n:n}));
+  speedoText = '';
+}
+window.addEventListener('keydown', function(e){
+  if(chatOpen || typingInBox(e) || !e.shiftKey) return;
+  var m = /^Digit([1-6])$/.exec(e.code);
+  if(!m || !(flying && driving && carSpec.manual)) return;
+  e.preventDefault();
+  setGear(+m[1]);
+});
+function manualDrive(dt, throttle, gas, topSpeed){
+  var v = driveSpeed, accel = carSpec.accel;
+  if(touchPlay && throttle >= 0){   // no keyboard: pick the gear for the speed
+    var want = 1; while(want < 6 && v > topSpeed*GEAR_TOP[want]*0.92) want++;
+    manual.gear = want;
+  }
+  var gear = manual.gear, cap = topSpeed*GEAR_TOP[gear], low = topSpeed*GEAR_TOP[gear - 1]*0.55;
+  if(spin){ driveSpeed *= Math.exp(-1.8*dt); }
+  else if(throttle > 0 && v >= -0.3){
+    if(v < 0) driveSpeed = Math.min(0, v + accel*2*dt);
+    else if(v < cap*gas){
+      var bog = gear <= 2 ? 1 : Math.max(0.22, Math.min(1, (v + 1)/Math.max(1, low)));   // too high a gear for this speed: it bogs
+      driveSpeed = Math.min(cap*gas, v + accel*GEAR_PULL[gear]*bog*dt);
+    } else driveSpeed = Math.max(cap*gas, v - accel*0.9*dt);   // over this gear's top: the engine holds you back
+  } else if(throttle < 0){
+    if(v > 0.4) driveSpeed = Math.max(0, v - accel*2.1*dt);           // brakes
+    else driveSpeed = Math.max(-topSpeed*0.28*gas, v - accel*0.7*dt);  // stopped: reverse
+  } else if(throttle > 0 && v < -0.3){
+    driveSpeed = Math.min(0, v + accel*2.1*dt);                         // rolling back and pressing gas: brake first
+  } else {
+    var drag = accel*(0.35 + 0.12*(7 - gear)/6);                        // coasting: low gears slow you more
+    if(v > cap) drag += accel*0.9;
+    if(v > 0) driveSpeed = Math.max(0, v - drag*dt); else if(v < 0) driveSpeed = Math.min(0, v + drag*dt);
+  }
+  // revs for the engine sound: where you are inside this gear (the limiter bounces at the top)
+  var r = driveSpeed < 0 ? Math.min(1, -driveSpeed/(topSpeed*0.28)) : Math.min(1.08, driveSpeed/Math.max(1, cap));
+  if(r >= 0.99 && throttle > 0){ manual.limiter += dt*30; r = 0.96 + 0.04*Math.sin(manual.limiter); }
+  manual.revs = Math.max(0, Math.min(1, 0.12 + 0.88*r + (throttle > 0 ? 0.05 : 0)));
 }
 
 /* ---------- Speedometer ---------- */
@@ -3417,7 +3579,13 @@ function updateSpeedo(){
   if(show !== speedoShown){ speedoEl.classList.toggle('hidden', !show); speedoShown = show; }
   if(!show) return;
   var kmh = Math.abs(driveSpeed)*3.6, txt = String(Math.round(speedMiles ? kmh*0.621371 : kmh));
-  if(txt !== speedoText){ speedoNum.textContent = txt; speedoText = txt; }
+  if(carSpec.manual) txt += '|' + (driveSpeed < -0.3 ? 'R' : manual.gear);
+  if(txt !== speedoText){
+    speedoText = txt;
+    var parts = txt.split('|');
+    speedoNum.textContent = parts[0];
+    speedoUnit.textContent = (speedMiles ? 'MPH' : 'KM/H') + (parts.length > 1 ? '  ·  ' + (parts[1] === 'R' ? 'R' : t('gearN', {n:parts[1]})) : '');
+  }
 }
 /* ---------- Inside the car: drive from the driver's seat ----------
    V (or VIEW on a phone) switches between the view from behind and the view from the driver's seat: a dashboard with
@@ -3433,6 +3601,7 @@ var WHEEL_TURN = 2.3;   // how far the steering wheel turns at full lock (radian
 function addCockpit(model, kind){
   var g = new THREE.Group(), dash = solidMat(0x2a2a2e), dark = solidMat(0x18181a), grey = solidMat(0x55565c);
   var skin = solidMat(0xe2b894), sleeve = solidMat(0x22336e), glow = new THREE.MeshBasicMaterial({color:0xd8cfa8});
+  function carbon(){ return new THREE.MeshPhongMaterial({color:0x1c1d21, shininess:90}); }
   function add(geo, mat, x, y, z, rx, ry, rz, parent){ var m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, rz || 0); (parent || g).add(m); return m; }
   var eye, wheelAt, tiltX, hide = [];
   if(kind === 'f1'){
@@ -3440,6 +3609,28 @@ function addCockpit(model, kind){
     wheelAt = new THREE.Vector3(0, 0.97, -0.74); tiltX = -0.5;
     add(new THREE.BoxGeometry(0.62, 0.12, 0.5), dash, 0, 0.72, -1.15);           // the cockpit's front edge
     model.group.children.forEach(function(c){ if(c.geometry && c.geometry.type === 'SphereGeometry') hide.push(c); });   // the helmet (you're wearing it)
+  } else if(kind === 'coupe'){
+    eye = new THREE.Vector3(-0.38, 1.12, 0.05);
+    wheelAt = new THREE.Vector3(-0.38, 0.88, -0.48); tiltX = -0.35;
+    add(new THREE.BoxGeometry(1.5, 0.02, 1.6), dash, 0, 0.8, 0.1);              // the floor
+    add(new THREE.BoxGeometry(1.48, 0.14, 0.34), carbon(), 0, 0.92, -0.72);     // dashboard
+    add(new THREE.BoxGeometry(0.46, 0.09, 0.16), dark, -0.38, 0.99, -0.6);      // the hood over the dials
+    [-0.5, -0.38, -0.26].forEach(function(x, i){                                 // three round dials, the middle one bigger
+      var r = i === 1 ? 0.06 : 0.042;
+      add(new THREE.CylinderGeometry(r, r, 0.02, 16), dark, x, 0.93, -0.545, Math.PI/2);
+      add(new THREE.CylinderGeometry(r*0.82, r*0.82, 0.021, 16), glow, x, 0.93, -0.54, Math.PI/2);
+    });
+    add(new THREE.BoxGeometry(1.5, 0.03, 1.1), grey, 0, 1.28, -0.3);            // the roof lining
+    add(new THREE.BoxGeometry(0.14, 0.18, 0.5), dark, 0, 0.88, -0.05);          // the center tunnel
+    add(new THREE.BoxGeometry(0.03, 0.12, 0.03), grey, 0, 1.0, -0.08);          // the gear stick
+    add(new THREE.SphereGeometry(0.035, 10, 8), dark, 0, 1.07, -0.08);
+    [-1, 1].forEach(function(sd){                                                // windscreen pillars
+      var a = new THREE.Vector3(sd*0.72, 0.97, -0.62), b = new THREE.Vector3(sd*0.7, 1.29, -0.08), d = new THREE.Vector3().subVectors(b, a);
+      var pl = add(new THREE.BoxGeometry(0.035, d.length(), 0.05), dark, (a.x + b.x)/2, (a.y + b.y)/2, (a.z + b.z)/2);
+      pl.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+    });
+    add(new THREE.BoxGeometry(0.22, 0.06, 0.03), dark, 0.05, 1.22, -0.2);        // rear-view mirror
+    add(new THREE.BoxGeometry(0.2, 0.045, 0.02), solidMat(0x9fc4d6), 0.05, 1.22, -0.18);
   } else {
     eye = new THREE.Vector3(-0.45, 1.5, 0.25);
     wheelAt = new THREE.Vector3(-0.45, 1.22, -0.33); tiltX = -0.5;
@@ -3486,6 +3677,7 @@ function addCockpit(model, kind){
 }
 addCockpit(cars.sedan, 'sedan');
 addCockpit(cars.f1, 'f1');
+addCockpit(cars.coupe, 'coupe');
 function insideView(){ return flying && driving && carView === 'inside'; }
 /* show or hide the inside of your car, and the bits of it you'd be looking through */
 function applyCarView(){
@@ -3737,6 +3929,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 23, 2026 · 11:15 AM</span><br>Owner: the TRACK COUPE - a glossy white sports car with a big wing and a 6-speed manual. SHIFT + 1-6 changes gear, W gas, S brake and reverse.</li>' +
   '<li><span class="when">Nov 23, 2026 · 9:10 AM</span><br>Owner: ADD MANY AT ONCE in the PLAYERS tab - paste names and passwords from a sheet.</li>' +
   '<li><span class="when">Nov 23, 2026 · 8:55 AM</span><br>Change your password: MENU, PLAY tab, CHANGE PASSWORD (website version).</li>' +
   '<li><span class="when">Nov 23, 2026 · 8:45 AM</span><br>Building passcode: on claude.ai, type the passcode on a plot\'s card to unlock building. Daniel sets it in the PLAYERS tab.</li>' +
@@ -5327,13 +5520,13 @@ function updateRemotes(dt){
   var k = 1 - Math.exp(-dt*14);
   mp.others.forEach(function(p){
     var s = p.presence || {};
-    var want = s.mode === 'drive' ? (s.car === 'f1' ? 'f1' : 'sedan') : s.mode === 'walk' ? 'walker' : null;
+    var want = s.mode === 'drive' ? (s.car === 'f1' ? 'f1' : s.car === 'coupe' ? 'coupe' : 'sedan') : s.mode === 'walk' ? 'walker' : null;
     if(want && !(finite(s.x) && finite(s.y) && finite(s.z) && finite(s.yaw))) want = null;
     var a = mp.avatars[p.peer];
     if(!a) a = mp.avatars[p.peer] = {model:null, kind:null, color:null, tag:null, tagText:null, pos:new THREE.Vector3(), yaw:0, fresh:true};
     if(a.kind !== want){
       if(a.model){ root.remove(a.model.group); disposeObject(a.model.group); }
-      a.model = want === 'sedan' ? buildCarModel() : want === 'f1' ? buildF1Model() : want === 'walker' ? buildWalker() : null;
+      a.model = want === 'sedan' ? buildCarModel() : want === 'f1' ? buildF1Model() : want === 'coupe' ? buildCoupeModel() : want === 'walker' ? buildWalker() : null;
       a.kind = want; a.color = null; a.fresh = true;
     }
     if(!a.model){ if(a.tag) a.tag.visible = false; return; }
