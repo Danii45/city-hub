@@ -1901,7 +1901,7 @@ var pet = (function(){
   var loader = new THREE.TextureLoader(), texs = PET_PHOTOS.map(function(u){ return loader.load(u); });
   var sp = new THREE.Sprite(new THREE.SpriteMaterial({map:texs[0]}));
   sp.center.set(0.5, 0); sp.visible = false; root.add(sp);
-  return {sprite:sp, texs:texs, state:'gone', t:3, s:0, dir:1, speed:1.6, x:0, z:0, vel:new THREE.Vector3()};
+  return {sprite:sp, texs:texs, state:'gone', t:3, s:0, dir:1, speed:1.6, petT:0, x:0, z:0, vel:new THREE.Vector3()};
 })();
 function petAt(s){
   var k = Math.floor(s/PET_SIDE) % 4, f = (s % PET_SIDE)/PET_SIDE, a = PET_LOOP[k], b = PET_LOOP[(k + 1) % 4];
@@ -1946,8 +1946,71 @@ function executeCar(){
   stopEngineSound();
   if(carSpec.manual){ manual.blown = 0; manual.revs = null; }
 }
+/* ---------- Petting Mika (Walk Mode) ----------
+   Walk up to her and press E (or the E button on a phone): she stops, bounces and wiggles happily, hearts float up
+   out of her, a happy little "arf!" - and the game keeps count of how many times you've petted her on this device. */
+STR.en.petMika = 'Pet Mika'; STR.fr.petMika = 'Caresser Mika';
+STR.en.petLines = ['Mika loves you!', 'Good girl, Mika!', 'Mika is SO happy!', 'Mika wags her tail!', 'Best dog in Paris!'];
+STR.fr.petLines = ['Mika t\'adore !', 'Bonne fille, Mika !', 'Mika est TROP contente !', 'Mika remue la queue !', 'Le meilleur chien de Paris !'];
+STR.en.petCount = '(petted {n} times)'; STR.fr.petCount = '(caressée {n} fois)';
+var petCount = 0;
+try { petCount = parseInt(localStorage.getItem('paris.mikaPets'), 10) || 0; } catch(e){}
+function nearMika(){
+  if(!flying || driving || pet.state !== 'walk') return false;
+  var dx = camera.position.x - pet.x, dz = camera.position.z - pet.z;
+  return dx*dx + dz*dz < 3.4*3.4 && Math.abs(camera.position.y - EYE_HEIGHT - pet.sprite.position.y) < 2;
+}
+var HEART_TEX = (function(){
+  var c = document.createElement('canvas'); c.width = c.height = 64;
+  var x = c.getContext('2d');
+  x.fillStyle = '#ff3b6b'; x.strokeStyle = '#ffffff'; x.lineWidth = 4;
+  x.beginPath(); x.moveTo(32, 56); x.bezierCurveTo(4, 36, 6, 8, 22, 8); x.bezierCurveTo(28, 8, 32, 14, 32, 18);
+  x.bezierCurveTo(32, 14, 36, 8, 42, 8); x.bezierCurveTo(58, 8, 60, 36, 32, 56); x.closePath(); x.fill(); x.stroke();
+  return new THREE.CanvasTexture(c);
+})();
+var hearts = [];
+function petMika(){
+  pet.petT = 2.2;
+  petCount++;
+  try { localStorage.setItem('paris.mikaPets', String(petCount)); } catch(e){}
+  var lines = STR[LANG].petLines;
+  showToast(lines[Math.floor(Math.random()*lines.length)] + ' ' + t('petCount', {n:petCount}));
+  for(var i=0;i<9;i++){
+    var sp = new THREE.Sprite(new THREE.SpriteMaterial({map:HEART_TEX, transparent:true, depthWrite:false}));
+    sp.scale.setScalar(0.35 + Math.random()*0.25);
+    sp.position.set(pet.x + (Math.random() - 0.5)*1.2, pet.sprite.position.y + 1.6 + Math.random()*0.8, pet.z + (Math.random() - 0.5)*1.2);
+    root.add(sp);
+    hearts.push({s:sp, t:-i*0.09, vy:0.9 + Math.random()*0.7, sway:Math.random()*6});
+  }
+  arfSound();
+}
+function updateHearts(dt){
+  for(var i=hearts.length-1;i>=0;i--){
+    var h = hearts[i];
+    h.t += dt;
+    h.s.visible = h.t >= 0;
+    if(h.t < 0) continue;
+    h.s.position.y += h.vy*dt; h.s.position.x += Math.sin(h.t*4 + h.sway)*0.6*dt;
+    h.s.material.opacity = Math.max(0, 1 - h.t/1.8);
+    if(h.t > 1.8){ root.remove(h.s); h.s.material.dispose(); hearts.splice(i, 1); }
+  }
+}
+/* a happy little bark: a short squeaky "arf" that bends up, twice */
+function arfSound(){
+  var ctx = sfx.ctx;
+  if(!ctx || ctx.state !== 'running') return;
+  [0, 0.2].forEach(function(at, k){
+    var now = ctx.currentTime + at, o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(520 + k*60, now); o.frequency.exponentialRampToValueAtTime(900 + k*80, now + 0.05); o.frequency.exponentialRampToValueAtTime(420, now + 0.13);
+    f.type = 'bandpass'; f.frequency.value = 1400; f.Q.value = 1.5;
+    g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.35, now + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
+    o.connect(f); f.connect(g); g.connect(ctx.destination); o.start(now); o.stop(now + 0.17);
+  });
+}
 function updatePet(dt){
   updateDoom(dt);
+  updateHearts(dt);
   if(pet.state === 'gone'){ pet.t -= dt; if(pet.t <= 0) spawnPet(); return; }
   if(pet.state === 'fly'){
     pet.vel.y -= 9*dt;
@@ -1958,10 +2021,12 @@ function updatePet(dt){
     return;
   }
   if(pet.state === 'heaven'){ updateHeaven(dt); return; }
-  pet.s = (pet.s + pet.dir*pet.speed*dt + PET_SIDE*4) % (PET_SIDE*4);
+  var happy = pet.petT > 0;
+  if(happy) pet.petT -= dt;
+  else pet.s = (pet.s + pet.dir*pet.speed*dt + PET_SIDE*4) % (PET_SIDE*4);
   var at = petAt(pet.s); pet.x = at[0]; pet.z = at[1];
-  pet.sprite.position.set(pet.x, surfaceAt(pet.x, pet.z, 0) + Math.abs(Math.sin(moveTime*7))*0.25, pet.z);
-  pet.sprite.material.rotation = Math.sin(moveTime*7)*0.06;
+  pet.sprite.position.set(pet.x, surfaceAt(pet.x, pet.z, 0) + Math.abs(Math.sin(moveTime*(happy ? 13 : 7)))*(happy ? 0.45 : 0.25), pet.z);
+  pet.sprite.material.rotation = Math.sin(moveTime*(happy ? 17 : 7))*(happy ? 0.16 : 0.06);
   if(flying && driving && Math.abs(driveSpeed) > 2.5 && carPos.y < 3){
     var hx = pet.x - carPos.x, hz = pet.z - carPos.z, r = carSpec.radius + 0.6;
     if(hx*hx + hz*hz < r*r){
@@ -4261,6 +4326,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 23, 2026 · 12:20 PM</span><br>In Walk Mode, walk up to Mika and press E to pet her. She keeps count!</li>' +
   '<li><span class="when">Nov 23, 2026 · 12:10 PM</span><br>Hit Mika and the sentence is carried out: 2 seconds later your car blows up - HUGE - and flips through the air.</li>' +
   '<li><span class="when">Nov 23, 2026 · 12:00 PM</span><br>Hit Mika and, two seconds later, she rises again (as the other photo) with a halo and a heavenly choir - then walks on like nothing happened.</li>' +
   '<li><span class="when">Nov 23, 2026 · 11:50 AM</span><br>Daniel\'s dog now walks around right under the Eiffel Tower. Don\'t you dare hit it.</li>' +
@@ -4419,6 +4485,7 @@ function plotInFront(){
 function plotTitle(p){ var d = p.data; return d ? (d.nm || (p.kind === 'store' ? tx(shopType(d.ty)) : '...')) : t('forSale'); }
 function updatePrompt(){
   if(!flying || driving || panelPlot || builder.on || decor.on || blk.on || !titleScreen.classList.contains('hidden')){ setPrompt('', ''); return; }
+  if(nearMika()){ setPrompt('<b>E</b>' + esc(t('petMika')), 'mika|' + LANG); return; }
   if(nearElevator()){ setPrompt('<b>E</b>' + esc(t('promptElevator')), 'elev|' + LANG); return; }
   var room = roomAt(camera.position);
   if(room){
@@ -4437,6 +4504,7 @@ function updatePrompt(){
 }
 function interact(){
   if(!flying || driving) return;
+  if(nearMika()){ petMika(); return; }
   if(nearElevator()){ useElevator(); return; }
   var room = roomAt(camera.position);
   if(room){
