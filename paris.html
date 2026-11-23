@@ -2872,101 +2872,143 @@ function buildF1Model(){
 }
 /* the owner's TRACK COUPE: a low, wide, glossy white sports car with a big rear wing, a navy stripe, dark-blue wheels
    and yellow brakes. Always this paint (it ignores the car color), and it has a 6-speed MANUAL gearbox (see below).
-   The body is one smooth side profile pushed out across the car's width, with fenders over each wheel. */
+   Built from side profiles pushed out across the car with rounded edges: a wide lower body with the wheel arches cut
+   in, a narrower glass cabin on top (white roof and pillars), bulges over each wheel. The paint is a clear coat that
+   reflects a little sky made just for the car (CAR_ENV) - the rest of the city keeps its flat look. */
+var CAR_ENV = null;
+function carEnv(){
+  if(CAR_ENV) return CAR_ENV;
+  var es = new THREE.Scene(), geo = new THREE.SphereGeometry(50, 32, 16), cols = [], c = new THREE.Color(), pos = geo.attributes.position;
+  for(var i=0;i<pos.count;i++){
+    var y = pos.getY(i)/50;
+    if(y > 0.05) c.setHex(0x8fbbe6).lerp(new THREE.Color(0xf4f8ff), Math.pow(1 - y, 3));
+    else c.setHex(0xe9e4d8).lerp(new THREE.Color(0x6d665a), Math.min(1, -y*2.5));
+    cols.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+  es.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.BackSide})));
+  // soft-box lights, for those long bright streaks on the paint
+  [[0, 40, 0, 30, 2, 12], [30, 18, -20, 2, 10, 26], [-30, 16, 15, 2, 8, 22]].forEach(function(b){
+    var m = new THREE.Mesh(new THREE.BoxGeometry(b[3], b[4], b[5]), new THREE.MeshBasicMaterial({color:0xffffff})); m.position.set(b[0], b[1], b[2]); es.add(m);
+  });
+  var pm = new THREE.PMREMGenerator(renderer);
+  CAR_ENV = pm.fromScene(es, 0.02).texture;
+  pm.dispose();
+  return CAR_ENV;
+}
 function buildCoupeModel(){
-  var g = new THREE.Group();
-  function gloss(hex, shine, spec){ return new THREE.MeshPhongMaterial({color:hex, shininess:shine, specular:spec === undefined ? 0xffffff : spec}); }
-  var paint = gloss(0xf4f4f1, 160), glass = gloss(0x141b24, 200, 0xbfd8ff), carbon = gloss(0x1c1d21, 90, 0x666a70);
-  var black = solidMat(0x151517), navy = gloss(0x1d2b52, 120), rim = gloss(0x2b3a6b, 140, 0x9fb4ff), tire = solidMat(0x18181a);
-  var caliper = gloss(0xf2c21b, 80), disc = gloss(0x8d9096, 60), lampGlass = gloss(0xeaf2ff, 220), red = new THREE.MeshBasicMaterial({color:0xd81e1e});
-  var lampLit = new THREE.MeshBasicMaterial({color:0xf4f8ff});
-  /* a side profile (x = forwards, y = up) pushed out across 'width', centered on the car */
-  function profile(pts, width, mat, bevel, holes){
+  var g = new THREE.Group(), env = carEnv();
+  function phys(o){ var m = new THREE.MeshPhysicalMaterial(o); m.envMap = env; m.envMapIntensity = o.envI || 1; return m; }
+  var paint = phys({color:0xc9cac6, roughness:0.32, metalness:0, clearcoat:1, clearcoatRoughness:0.03, envI:0.55});
+  var glass = phys({color:0x0d1219, roughness:0.05, metalness:0.2, clearcoat:1, clearcoatRoughness:0.02, envI:1.4});
+  var carbon = phys({color:0x18191c, roughness:0.45, metalness:0.2, clearcoat:0.8, clearcoatRoughness:0.08, envI:0.5});
+  var satin = phys({color:0x111214, roughness:0.6, metalness:0.1});
+  var navy = phys({color:0x1b2a55, roughness:0.3, metalness:0.2, clearcoat:1, clearcoatRoughness:0.05});
+  var rim = phys({color:0x26356a, roughness:0.25, metalness:0.75, clearcoat:0.6, envI:1.3});
+  var tire = phys({color:0x141416, roughness:0.85, metalness:0, envI:0.3});
+  var caliper = phys({color:0xf0bf16, roughness:0.35, metalness:0.1, clearcoat:0.5});
+  var disc = phys({color:0x7c7f85, roughness:0.45, metalness:0.9});
+  var chrome = phys({color:0xb9bcc2, roughness:0.15, metalness:1, envI:1.3});
+  var lampGlass = phys({color:0xdfe8f5, roughness:0.05, metalness:0.1, clearcoat:1, envI:1.5});
+  var lampLit = new THREE.MeshBasicMaterial({color:0xf6faff}), red = new THREE.MeshBasicMaterial({color:0xe0141c}), redDim = new THREE.MeshBasicMaterial({color:0x7a0c10});
+  var white = new THREE.MeshBasicMaterial({color:0xf2f2f2});
+  /* a side profile (x = forwards, y = up) pushed out 'width' across the car; edges rounded by 'r' inwards (the outline
+     stays where it's drawn) */
+  function profile(pts, width, mat, r, x){
     var sh = new THREE.Shape();
     sh.moveTo(pts[0][0], pts[0][1]);
     for(var i=1;i<pts.length;i++){ var q = pts[i]; if(q.arc) sh.absarc(q.arc[0], q.arc[1], q.arc[2], q.arc[3], q.arc[4], true); else sh.lineTo(q[0], q[1]); }
-    var b = bevel || 0;
-    var geo = new THREE.ExtrudeGeometry(sh, {depth:Math.max(0.01, width - 2*b), bevelEnabled:b > 0, bevelThickness:b, bevelSize:b, bevelSegments:3, curveSegments:18});
-    geo.translate(0, 0, -(width - 2*b)/2);
-    geo.rotateY(Math.PI/2);   // shape x (forwards) -> world -z, the push-out -> world x
-    var m = new THREE.Mesh(geo, mat); g.add(m); return m;
+    r = r || 0;
+    var geo = new THREE.ExtrudeGeometry(sh, {depth:Math.max(0.005, width - 2*r), bevelEnabled:r > 0, bevelThickness:r, bevelSize:r, bevelOffset:-r, bevelSegments:4, curveSegments:24});
+    geo.translate(0, 0, -(width - 2*r)/2);
+    geo.rotateY(Math.PI/2);   // shape x (forwards) -> world -z, the width -> world x
+    var m = new THREE.Mesh(geo, mat); m.position.x = x || 0; g.add(m); return m;
   }
-  function add(w, h, d, mat, x, y, z, rx){ var m = box(w, h, d, mat); m.position.set(x, y, z); if(rx) m.rotation.x = rx; g.add(m); return m; }
-  var FW = 1.42, RW = -1.32, WR = 0.37;   // front and rear axles (forwards), wheel radius
-  // the main body: nose, hood, windscreen, roof, a long sloping fastback, the tail
-  profile([[-2.2, 0.34], [2.12, 0.34], [2.27, 0.5], [2.24, 0.68], [2.05, 0.8], [1.05, 0.9], [0.62, 0.96], [-0.08, 1.3],
-           [-0.62, 1.32], [-1.15, 1.2], [-1.85, 0.98], [-2.22, 0.93], [-2.3, 0.62]], 1.56, paint, 0.06);
-  // fenders over each wheel, wider than the body, with a round arch cut over the wheel
-  // fenders: 'lean' slopes the end facing the doors, so they flow into the body instead of ending in a wall
-  function fender(cx, z0, z1, top, w, xo, leanBack, leanFront){
-    [-1, 1].forEach(function(sd){
-      var m = profile([[z0, 0.36], [cx - WR - 0.07, 0.36], {arc:[cx, 0.37, WR + 0.07, Math.PI, 0]}, [z1, 0.37], [z1 - leanFront, top - 0.03],
-                       [z1 - leanFront - 0.15, top], [z0 + leanBack + 0.15, top], [z0 + leanBack, top - 0.03]], w, paint, 0.05);
-      m.position.x = sd*xo;
-    });
-  }
-  fender(FW, 0.75, 2.12, 0.86, 0.34, 0.85, 0.3, 0.1);
-  fender(RW, -2.12, -0.55, 0.98, 0.4, 0.87, 0.06, 0.45);
-  // glass: windscreen, side windows, the back window
-  add(1.4, 0.02, 0.8, glass, 0, 1.2, -0.27, -0.45);   // windscreen: from the cowl up to the roof
+  function add(w, h, d, mat, x, y, z, rx, ry, rz){ var m = box(w, h, d, mat); m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, rz || 0); g.add(m); return m; }
+  function cyl(r, len, mat, x, y, z, seg){ var geo = new THREE.CylinderGeometry(r, r, len, seg || 16); geo.rotateX(Math.PI/2); var m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); g.add(m); return m; }
+  var FW = 1.42, RW = -1.34, WR = 0.36, AR = 0.43;   // axles (forwards), wheel radius, arch radius
+  // lower body: nose, hood, sills, deck and tail, with both wheel arches cut out of it
+  profile([[-2.3, 0.33], [RW - AR, 0.33], {arc:[RW, 0.37, AR, Math.PI, 0]}, [FW - AR, 0.37], {arc:[FW, 0.37, AR, Math.PI, 0]}, [2.12, 0.33],
+           [2.3, 0.42], [2.34, 0.55], [2.22, 0.7], [1.5, 0.82], [0.8, 0.88], [-0.4, 0.9], [-1.4, 0.94], [-2.05, 0.97], [-2.32, 0.92], [-2.38, 0.62]],
+          1.86, paint, 0.16);
+  // the dark insides of the wheel arches (so you can't see through the car)
+  [[FW, 1.2], [RW, 1.24]].forEach(function(a){ add(a[1], 0.5, 0.95, satin, 0, 0.62, -a[0]); });
+  // bulges over each wheel: the front ones carry the headlights, the rear ones are wide hips
   [-1, 1].forEach(function(sd){
-    var sw = profile([[0.5, 0.98], [-0.05, 1.27], [-0.6, 1.29], [-1.05, 1.17], [-1.1, 0.98]], 0.02, glass);
-    sw.position.x = sd*0.79;
+    profile([[0.62, 0.8], [1.05, 0.88], [1.55, 0.93], [2.0, 0.88], [2.2, 0.72], [2.24, 0.62], [0.62, 0.62]], 0.46, paint, 0.14, sd*0.7);
+    profile([[-0.4, 0.86], [-0.9, 1.0], [-1.55, 1.04], [-2.08, 0.99], [-2.3, 0.88], [-2.3, 0.6], [-0.4, 0.6]], 0.5, paint, 0.15, sd*0.7);
   });
-  add(1.2, 0.02, 0.52, glass, 0, 1.335, 0.88, 0.22);   // back window
-  // carbon hood vents and roof stripe
-  [-0.3, 0.3].forEach(function(x){ add(0.3, 0.03, 0.4, carbon, x, 0.945, -1.35, -0.1); });
-  add(1.0, 0.012, 0.95, carbon, 0, 0.935, -1.6, -0.1);
-  // the navy stripe along each side
-  [-1, 1].forEach(function(sd){ add(0.02, 0.09, 1.25, navy, sd*0.785, 0.5, -0.1); });
-  // splitter, side skirts, diffuser
-  add(1.92, 0.05, 0.4, carbon, 0, 0.3, -2.12);
-  [-1, 1].forEach(function(sd){ add(0.12, 0.08, 1.7, carbon, sd*0.86, 0.33, 0.05); });
-  add(1.6, 0.16, 0.3, carbon, 0, 0.38, 2.18);
-  [-0.12, 0.12].forEach(function(x){ var ex = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.16, 12), gloss(0x9a9ca2, 120)); ex.rotation.x = Math.PI/2; ex.position.set(x, 0.42, 2.3); g.add(ex); });
-  // round headlights on the front fenders, a light bar across the back
+  // the cabin: glass, narrower than the body, with a white roof and pillars over it and a long fastback behind
+  profile([[0.92, 0.84], [0.05, 1.29], [-0.58, 1.32], [-1.0, 1.22], [-1.0, 0.84]], 1.38, glass, 0.13);
+  profile([[-0.98, 0.84], [-0.98, 1.23], [-1.35, 1.13], [-1.95, 0.96], [-1.95, 0.84]], 1.38, paint, 0.13);
+  profile([[0.08, 1.285], [-0.58, 1.315], [-1.0, 1.225], [-1.0, 1.255], [-0.58, 1.345], [0.08, 1.315]], 1.14, paint, 0);   // roof skin
   [-1, 1].forEach(function(sd){
-    var hl = new THREE.Mesh(new THREE.SphereGeometry(0.16, 18, 14), lampGlass); hl.scale.set(1, 0.85, 0.6); hl.position.set(sd*0.85, 0.79, -2.08); g.add(hl);
-    var bezel = new THREE.Mesh(new THREE.TorusGeometry(0.15, 0.018, 8, 22), black); bezel.scale.set(1, 0.85, 1); bezel.position.set(sd*0.85, 0.79, -2.12); g.add(bezel);
-    var lit = new THREE.Mesh(new THREE.CircleGeometry(0.08, 18), lampLit); lit.position.set(sd*0.85, 0.79, -2.18); lit.rotation.y = Math.PI; g.add(lit);
-    // air intakes in the front bumper
-    add(0.42, 0.18, 0.04, black, sd*0.55, 0.45, -2.25);
-    // mirrors
-    add(0.04, 0.05, 0.05, carbon, sd*0.84, 1.0, -0.55);
-    add(0.08, 0.1, 0.16, paint, sd*0.92, 1.02, -0.58);
-    // the vent behind each door
-    add(0.02, 0.24, 0.12, black, sd*0.79, 0.68, 0.42);
+    // A-pillars along the windscreen edges, B-pillar behind the door glass
+    var a = new THREE.Vector3(sd*0.63, 0.86, -0.9), b = new THREE.Vector3(sd*0.6, 1.29, -0.06), d = new THREE.Vector3().subVectors(b, a);
+    var p = add(0.09, d.length(), 0.07, paint, (a.x + b.x)/2, (a.y + b.y)/2, (a.z + b.z)/2); p.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+    add(0.02, 0.4, 0.09, paint, sd*0.69, 1.07, 0.66, 0.2);
+    // door line and handle
+    add(0.012, 0.42, 0.012, satin, sd*0.935, 0.62, -0.72); add(0.012, 0.36, 0.012, satin, sd*0.935, 0.62, 0.5);
+    add(0.02, 0.03, 0.16, chrome, sd*0.94, 0.8, 0.3);
+    // the navy stripe low on the door
+    add(0.012, 0.1, 1.2, navy, sd*0.94, 0.48, -0.1);
+    // mirrors on stalks
+    add(0.14, 0.03, 0.04, carbon, sd*0.75, 0.93, -0.62);
+    var mir = add(0.11, 0.11, 0.2, paint, sd*0.86, 0.97, -0.6); mir.rotation.y = sd*0.12;
+    add(0.005, 0.08, 0.15, glass, sd*0.86, 0.97, -0.495, 0, Math.PI/2);
+    // the air scoop in front of each rear wheel
+    add(0.012, 0.18, 0.26, satin, sd*0.936, 0.68, 0.72);
+    // headlights: a big round lamp at the front of each fender bulge, with a light ring inside
+    var hl = new THREE.Mesh(new THREE.SphereGeometry(0.16, 24, 16), lampGlass); hl.scale.set(1, 0.92, 0.5); hl.position.set(sd*0.7, 0.77, -2.17); g.add(hl);
+    var ring = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.014, 8, 28), lampLit); ring.position.set(sd*0.7, 0.77, -2.245); g.add(ring);
+    var bez = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.02, 8, 28), satin); bez.scale.set(1, 0.92, 1); bez.position.set(sd*0.7, 0.77, -2.2); g.add(bez);
+    // front air intakes and a canard each side
+    add(0.42, 0.17, 0.05, satin, sd*0.56, 0.46, -2.3);
+    add(0.22, 0.015, 0.12, carbon, sd*0.86, 0.5, -2.2, 0, 0, sd*-0.25);
+    // the rear lights: a dark strip with a glowing end at each corner
+    add(0.3, 0.07, 0.04, red, sd*0.72, 0.84, 2.39);
   });
-  add(0.55, 0.12, 0.04, black, 0, 0.45, -2.27);
-  add(1.5, 0.05, 0.03, red, 0, 0.84, 2.36);
-  [-1, 1].forEach(function(sd){ add(0.2, 0.08, 0.04, red, sd*0.78, 0.84, 2.3); });
-  // the big rear wing: two swan-neck posts holding the wing from above
-  add(1.95, 0.05, 0.48, carbon, 0, 1.62, 1.62, -0.06);
-  add(1.95, 0.04, 0.16, paint, 0, 1.67, 1.82, -0.25);
+  add(0.5, 0.12, 0.05, satin, 0, 0.47, -2.32);                    // middle intake
+  add(1.96, 0.04, 0.42, carbon, 0, 0.3, -2.18);                   // front splitter
+  [-1, 1].forEach(function(sd){ add(0.1, 0.07, 1.8, carbon, sd*0.93, 0.32, 0.03); });   // side skirts
+  add(1.25, 0.04, 0.04, redDim, 0, 0.84, 2.4); add(1.2, 0.015, 0.045, red, 0, 0.84, 2.405);   // light bar across the back
+  add(0.5, 0.11, 0.02, white, 0, 0.6, 2.39);                      // a blank plate
+  add(1.7, 0.2, 0.36, carbon, 0, 0.36, 2.22);                     // diffuser
+  [-0.5, -0.25, 0.25, 0.5].forEach(function(x){ add(0.02, 0.16, 0.34, carbon, x, 0.36, 2.22); });
+  [-0.11, 0.11].forEach(function(x){ cyl(0.065, 0.2, chrome, x, 0.42, 2.38, 18); cyl(0.045, 0.21, satin, x, 0.42, 2.385, 14); });
+  // carbon hood with two vents
+  profile([[2.08, 0.725], [1.5, 0.832], [1.0, 0.872], [1.0, 0.885], [1.5, 0.845], [2.08, 0.738]], 0.84, carbon, 0);
+  [-0.22, 0.22].forEach(function(x){ add(0.26, 0.02, 0.3, satin, x, 0.875, -1.35, -0.07); });
+  // the big rear wing: a curved blade on two swan-neck posts, carbon end plates
+  var wing = profile([[-1.7, 1.6], [-1.86, 1.64], [-2.1, 1.62], [-2.18, 1.58], [-1.95, 1.585]], 1.94, carbon, 0.01);
+  var flap = profile([[-1.95, 1.66], [-2.13, 1.72], [-2.2, 1.7], [-2.02, 1.65]], 1.94, paint, 0.01);
   [-1, 1].forEach(function(sd){
-    add(0.03, 0.26, 0.55, carbon, sd*0.98, 1.6, 1.66);          // end plates
-    add(0.05, 0.62, 0.1, carbon, sd*0.36, 1.3, 1.88, 0.35);       // posts
+    profile([[-1.66, 1.56], [-2.22, 1.55], [-2.22, 1.75], [-1.92, 1.73], [-1.66, 1.65]], 0.02, carbon, 0, sd*0.98);
+    add(0.04, 0.42, 0.09, carbon, sd*0.34, 1.32, 1.83, 0.42);
+    add(0.04, 0.2, 0.09, carbon, sd*0.34, 1.53, 1.98, -0.25);
   });
-  // wheels: black tires, dark-blue 5-spoke rims, yellow brake calipers (they don't spin)
+  // wheels: rounded tires, dark-blue ten-spoke rims, drilled discs and yellow calipers (the brakes don't spin)
   var wheels = [];
-  [[0.9, -FW, 0.27], [-0.9, -FW, 0.27], [0.92, -RW, 0.32], [-0.92, -RW, 0.32]].forEach(function(w){
+  [[0.8, -FW, 0.27], [-0.8, -FW, 0.27], [0.8, -RW, 0.31], [-0.8, -RW, 0.31]].forEach(function(w){
     var pivot = new THREE.Group(); pivot.position.set(w[0], WR, w[1]);
     var spin = new THREE.Group(); pivot.add(spin);
-    var tg = new THREE.CylinderGeometry(WR, WR, w[2], 22); tg.rotateZ(Math.PI/2); spin.add(new THREE.Mesh(tg, tire));
-    var face = Math.sign(w[0])*(w[2]/2 + 0.005);
-    var rg = new THREE.CylinderGeometry(WR*0.72, WR*0.72, 0.02, 22); rg.rotateZ(Math.PI/2);
-    var dk = new THREE.Mesh(rg, solidMat(0x0c0d10)); dk.position.x = face*0.98; spin.add(dk);
-    for(var k=0;k<5;k++){
-      var sp = box(0.03, WR*0.66, 0.06, rim); sp.position.set(face, 0, 0); sp.rotation.x = k*Math.PI*2/5;
-      sp.geometry.translate(0, WR*0.33, 0); spin.add(sp);
+    var side = Math.sign(w[0]), face = side*w[2]/2;
+    var tg = new THREE.CylinderGeometry(WR - 0.03, WR - 0.03, w[2] - 0.04, 28); tg.rotateZ(Math.PI/2); spin.add(new THREE.Mesh(tg, tire));
+    [-1, 1].forEach(function(e){ var tr = new THREE.Mesh(new THREE.TorusGeometry(WR - 0.05, 0.05, 8, 28), tire); tr.rotation.y = Math.PI/2; tr.position.x = e*(w[2]/2 - 0.05); spin.add(tr); });
+    var well = new THREE.CylinderGeometry(WR*0.7, WR*0.7, 0.02, 24); well.rotateZ(Math.PI/2);
+    var back = new THREE.Mesh(well, satin); back.position.x = face*0.55; spin.add(back);
+    for(var k=0;k<10;k++){
+      var sp = box(0.025, WR*0.6, k % 2 ? 0.035 : 0.05, rim); sp.geometry.translate(0, WR*0.33, 0);
+      sp.position.x = face*0.97; sp.rotation.x = k*Math.PI/5 + (k % 2 ? 0.12 : 0); spin.add(sp);
     }
-    var ring = new THREE.Mesh(new THREE.TorusGeometry(WR*0.7, 0.025, 6, 22), rim); ring.rotation.y = Math.PI/2; ring.position.x = face; spin.add(ring);
-    var hb = new THREE.CylinderGeometry(0.06, 0.06, 0.04, 10); hb.rotateZ(Math.PI/2); var hub = new THREE.Mesh(hb, rim); hub.position.x = face; spin.add(hub);
-    var dg = new THREE.CylinderGeometry(WR*0.6, WR*0.6, 0.03, 18); dg.rotateZ(Math.PI/2); var dsc = new THREE.Mesh(dg, disc); dsc.position.x = face*0.75; pivot.add(dsc);
-    var cal = box(0.07, 0.2, 0.12, caliper); cal.position.set(face*0.72, WR*0.42, -0.08); pivot.add(cal);
+    var lip = new THREE.Mesh(new THREE.TorusGeometry(WR*0.68, 0.02, 8, 28), rim); lip.rotation.y = Math.PI/2; lip.position.x = face*0.98; spin.add(lip);
+    var nut = new THREE.CylinderGeometry(0.055, 0.07, 0.05, 6); nut.rotateZ(Math.PI/2); var hub = new THREE.Mesh(nut, chrome); hub.position.x = face; spin.add(hub);
+    var dg = new THREE.CylinderGeometry(WR*0.58, WR*0.58, 0.03, 24); dg.rotateZ(Math.PI/2); var dsc = new THREE.Mesh(dg, disc); dsc.position.x = face*0.7; pivot.add(dsc);
+    var cal = box(0.08, 0.2, 0.13, caliper); cal.position.set(face*0.72, WR*0.38, 0.1); pivot.add(cal);
     pivot.spin = spin;
     g.add(pivot); wheels.push(pivot);
   });
+  g.traverse(function(o){ if(o.isMesh) o.castShadow = false; });
   g.visible = false; root.add(g);
   return {group:g, wheels:wheels, wheelR:WR, paint:paint, fixedPaint:true};
 }
@@ -3610,27 +3652,27 @@ function addCockpit(model, kind){
     add(new THREE.BoxGeometry(0.62, 0.12, 0.5), dash, 0, 0.72, -1.15);           // the cockpit's front edge
     model.group.children.forEach(function(c){ if(c.geometry && c.geometry.type === 'SphereGeometry') hide.push(c); });   // the helmet (you're wearing it)
   } else if(kind === 'coupe'){
-    eye = new THREE.Vector3(-0.38, 1.12, 0.05);
-    wheelAt = new THREE.Vector3(-0.38, 0.88, -0.48); tiltX = -0.35;
-    add(new THREE.BoxGeometry(1.5, 0.02, 1.6), dash, 0, 0.8, 0.1);              // the floor
-    add(new THREE.BoxGeometry(1.48, 0.14, 0.34), carbon(), 0, 0.92, -0.72);     // dashboard
-    add(new THREE.BoxGeometry(0.46, 0.09, 0.16), dark, -0.38, 0.99, -0.6);      // the hood over the dials
-    [-0.5, -0.38, -0.26].forEach(function(x, i){                                 // three round dials, the middle one bigger
-      var r = i === 1 ? 0.06 : 0.042;
-      add(new THREE.CylinderGeometry(r, r, 0.02, 16), dark, x, 0.93, -0.545, Math.PI/2);
-      add(new THREE.CylinderGeometry(r*0.82, r*0.82, 0.021, 16), glow, x, 0.93, -0.54, Math.PI/2);
+    eye = new THREE.Vector3(-0.36, 1.1, 0.22);
+    wheelAt = new THREE.Vector3(-0.36, 0.89, -0.22); tiltX = -0.35;
+    add(new THREE.BoxGeometry(1.4, 0.02, 1.7), dash, 0, 0.78, 0.0);              // the floor
+    add(new THREE.BoxGeometry(1.36, 0.12, 0.34), carbon(), 0, 0.88, -0.66);      // dashboard
+    add(new THREE.BoxGeometry(0.44, 0.08, 0.15), dark, -0.36, 0.95, -0.54);      // the hood over the dials
+    [-0.48, -0.36, -0.24].forEach(function(x, i){                                 // three round dials, the middle one bigger
+      var r = i === 1 ? 0.058 : 0.04;
+      add(new THREE.CylinderGeometry(r, r, 0.02, 16), dark, x, 0.9, -0.49, Math.PI/2);
+      add(new THREE.CylinderGeometry(r*0.82, r*0.82, 0.021, 16), glow, x, 0.9, -0.485, Math.PI/2);
     });
-    add(new THREE.BoxGeometry(1.5, 0.03, 1.1), grey, 0, 1.28, -0.3);            // the roof lining
-    add(new THREE.BoxGeometry(0.14, 0.18, 0.5), dark, 0, 0.88, -0.05);          // the center tunnel
-    add(new THREE.BoxGeometry(0.03, 0.12, 0.03), grey, 0, 1.0, -0.08);          // the gear stick
-    add(new THREE.SphereGeometry(0.035, 10, 8), dark, 0, 1.07, -0.08);
+    add(new THREE.BoxGeometry(1.2, 0.03, 1.0), grey, 0, 1.27, 0.1);             // the roof lining
+    add(new THREE.BoxGeometry(0.14, 0.16, 0.6), dark, 0, 0.86, 0.1);            // the center tunnel
+    add(new THREE.BoxGeometry(0.03, 0.12, 0.03), grey, 0, 0.98, 0.05);          // the gear stick
+    add(new THREE.SphereGeometry(0.035, 10, 8), dark, 0, 1.05, 0.05);
     [-1, 1].forEach(function(sd){                                                // windscreen pillars
-      var a = new THREE.Vector3(sd*0.72, 0.97, -0.62), b = new THREE.Vector3(sd*0.7, 1.29, -0.08), d = new THREE.Vector3().subVectors(b, a);
+      var a = new THREE.Vector3(sd*0.6, 0.88, -0.86), b = new THREE.Vector3(sd*0.58, 1.27, -0.08), d = new THREE.Vector3().subVectors(b, a);
       var pl = add(new THREE.BoxGeometry(0.035, d.length(), 0.05), dark, (a.x + b.x)/2, (a.y + b.y)/2, (a.z + b.z)/2);
       pl.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
     });
-    add(new THREE.BoxGeometry(0.22, 0.06, 0.03), dark, 0.05, 1.22, -0.2);        // rear-view mirror
-    add(new THREE.BoxGeometry(0.2, 0.045, 0.02), solidMat(0x9fc4d6), 0.05, 1.22, -0.18);
+    add(new THREE.BoxGeometry(0.22, 0.06, 0.03), dark, 0.05, 1.21, -0.1);        // rear-view mirror
+    add(new THREE.BoxGeometry(0.2, 0.045, 0.02), solidMat(0x9fc4d6), 0.05, 1.21, -0.08);
   } else {
     eye = new THREE.Vector3(-0.45, 1.5, 0.25);
     wheelAt = new THREE.Vector3(-0.45, 1.22, -0.33); tiltX = -0.5;
@@ -3929,7 +3971,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
-  '<li><span class="when">Nov 23, 2026 · 11:15 AM</span><br>Owner: the TRACK COUPE - a glossy white sports car with a big wing and a 6-speed manual. SHIFT + 1-6 changes gear, W gas, S brake and reverse.</li>' +
+  '<li><span class="when">Nov 23, 2026 · 11:15 AM</span><br>Owner: the TRACK COUPE - a glossy white sports car (clear-coat paint that reflects the sky) with a big wing and a 6-speed manual. SHIFT + 1-6 changes gear, W gas, S brake and reverse.</li>' +
   '<li><span class="when">Nov 23, 2026 · 9:10 AM</span><br>Owner: ADD MANY AT ONCE in the PLAYERS tab - paste names and passwords from a sheet.</li>' +
   '<li><span class="when">Nov 23, 2026 · 8:55 AM</span><br>Change your password: MENU, PLAY tab, CHANGE PASSWORD (website version).</li>' +
   '<li><span class="when">Nov 23, 2026 · 8:45 AM</span><br>Building passcode: on claude.ai, type the passcode on a plot\'s card to unlock building. Daniel sets it in the PLAYERS tab.</li>' +
