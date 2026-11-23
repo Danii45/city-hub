@@ -120,14 +120,23 @@ button{font-family:'Press Start 2P', monospace;}
 #chauffard small{display:block; margin-top:4px; font-family:'VT323', monospace; font-size:20px;}
 #chauffard small:empty{display:none;}
 #chauffard.hidden{display:none;}
+#mika-hud{position:absolute; right:16px; top:50%; transform:translateY(-50%); z-index:34; width:min(260px, 60vw); padding:10px 12px; pointer-events:none; transition:opacity 0.4s;}
+#mika-hud.hidden{display:none;}
+#mika-hud.fade{opacity:0;}
+#mika-hud .mk-head{font-size:10px; letter-spacing:1px; text-align:center; margin-bottom:4px;}
+#mika-hud .mk-total{padding:2px 0 8px;}
+#mika-hud .mk-total b{font-size:26px;}
+#mika-hud .mk-row{font-size:18px; padding:3px 4px;}
+#mika-board .mk-total, #mika-hud .mk-total{text-align:center;}
 #mika-board .mk-total{text-align:center; padding:6px 0 12px;}
+#mika-hud .mk-total b, #mika-hud .mk-total span{display:block;} #mika-hud .mk-total b{color:#ff3b6b;} #mika-hud .mk-total span{font-family:'VT323', monospace; font-size:16px; color:var(--ink-soft);}
 #mika-board .mk-total b{display:block; font-size:34px; color:#ff3b6b;}
 #mika-board .mk-total span{font-family:'VT323', monospace; font-size:19px; color:var(--ink-soft);}
-#mika-board .mk-row{display:flex; gap:10px; align-items:center; padding:5px 8px; font-family:'VT323', monospace; font-size:20px; border-bottom:2px solid var(--panel-border);}
-#mika-board .mk-row .mk-rank{width:34px; color:var(--ink-soft);}
-#mika-board .mk-row .mk-name{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-#mika-board .mk-row.me{background:#ffe3ea;}
-#mika-board .mk-note{font-family:'VT323', monospace; font-size:18px; color:var(--ink-soft); padding:10px 4px 0;}
+#mika-hud .mk-row, #mika-board .mk-row{display:flex; gap:10px; align-items:center; padding:5px 8px; font-family:'VT323', monospace; font-size:20px; border-bottom:2px solid var(--panel-border);}
+#mika-hud .mk-row .mk-rank, #mika-board .mk-row .mk-rank{width:34px; color:var(--ink-soft);}
+#mika-hud .mk-row .mk-name, #mika-board .mk-row .mk-name{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+#mika-hud .mk-row.me, #mika-board .mk-row.me{background:#ffe3ea;}
+#mika-hud .mk-note, #mika-board .mk-note{font-family:'VT323', monospace; font-size:18px; color:var(--ink-soft); padding:10px 4px 0;}
 #chauffard.dark{background:#000; color:#ff1a1a; border-color:#ff1a1a; box-shadow:0 0 0 4px #000, 8px 8px 0 4px #000;}
 #chauffard.shake{animation:chauffard-shake 0.45s;}
 @keyframes chauffard-shake{0%{transform:translateX(-50%) scale(1.4) rotate(-4deg);} 40%{transform:translateX(-50%) scale(0.95) rotate(3deg);} 70%{transform:translateX(-50%) rotate(-2deg);} 100%{transform:translateX(-50%);}}
@@ -354,6 +363,7 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
 
 <div id="crosshair" class="hidden">+</div>
 <div id="prompt" class="card hidden"></div>
+<div id="mika-hud" class="card hidden" aria-live="polite"></div>
 <div id="touch-ui">
   <div id="touch-stick" role="application" aria-label="Joystick"><div class="base"></div><div class="knob"></div></div>
   <div id="touch-acts">
@@ -1916,7 +1926,26 @@ var pet = (function(){
 })();
 /* her walk is worked out from the clock (the server's clock on the website), so every player sees her in the same spot */
 function sharedNow(){ return (Date.now() + (net.timeOffset || 0))/1000; }
-function sharedPetS(){ var L = PET_SIDE*4; return ((sharedNow()*pet.speed) % L + L) % L; }
+/* a pet freezes her for everyone: paris/mika/clock = {lost: seconds of walking lost to pets so far, until: when the
+   current freeze ends (server ms)}. Her walk uses (now - lost), held still until 'until' - so she stops and then
+   carries on from the same spot, for everyone at once. */
+var mikaClock = {lost:0, until:0};
+function sharedPetS(){
+  var L = PET_SIDE*4, nowMs = Date.now() + (net.timeOffset || 0), until = mikaClock.until || 0;
+  var walkT = (nowMs < until ? until : nowMs)/1000 - (mikaClock.lost || 0);
+  return ((walkT*pet.speed) % L + L) % L;
+}
+function freezeMikaForEveryone(){
+  if(!mika.online || !net.db) return;
+  var PAUSE = 2200;
+  net.db.ref('paris/mika/clock').transaction(function(c){
+    c = c || {lost:0, until:0};
+    var now = Date.now() + (net.timeOffset || 0), lost = +c.lost || 0, until = +c.until || 0;
+    if(until > now){ var nu = now + PAUSE; if(nu > until){ lost += (nu - until)/1000; until = nu; } }
+    else { lost += PAUSE/1000; until = now + PAUSE; }
+    return {lost:lost, until:until};
+  }).catch(function(){});
+}
 function petAt(s){
   var k = Math.floor(s/PET_SIDE) % 4, f = (s % PET_SIDE)/PET_SIDE, a = PET_LOOP[k], b = PET_LOOP[(k + 1) % 4];
   return [a[0] + (b[0] - a[0])*f, a[1] + (b[1] - a[1])*f];
@@ -1994,7 +2023,9 @@ function petMika(){
     net.db.ref('paris/mika/total').transaction(function(v){ return (v || 0) + 1; }).catch(function(){});
     net.db.ref('paris/mika/pets/' + net.uid).transaction(function(d){ return {n:(d && d.n || 0) + 1, name:net.name}; }).catch(function(){});
   } else showToast(line + ' ' + t('petCount', {n:petCount}));
+  freezeMikaForEveryone();
   unlockMikaBoard();
+  showMikaHud();
   for(var i=0;i<9;i++){
     var sp = new THREE.Sprite(new THREE.SpriteMaterial({map:HEART_TEX, transparent:true, depthWrite:false}));
     sp.scale.setScalar(0.35 + Math.random()*0.25);
@@ -2046,6 +2077,7 @@ function fmtNum(n){ return Number(n || 0).toLocaleString(LANG === 'fr' ? 'fr-FR'
 function listenMika(db){
   mika.online = true;
   db.ref('paris/mika/total').on('value', function(snap){ mika.total = snap.val() || 0; renderMikaBoard(); }, function(){ mika.online = false; });
+  db.ref('paris/mika/clock').on('value', function(snap){ var c = snap.val() || {}; mikaClock.lost = +c.lost || 0; mikaClock.until = +c.until || 0; }, function(){});
   db.ref('paris/mika/pets').on('value', function(snap){
     mika.pets = snap.val() || {};
     if(mika.pets[net.uid] && mika.pets[net.uid].n > 0 && !mika.unlocked) unlockMikaBoard(true);
@@ -2058,26 +2090,41 @@ function unlockMikaBoard(quiet){
   mika.unlocked = true;
   try { localStorage.setItem('paris.mikaBoard', '1'); } catch(e){}
   if(!quiet) setTimeout(function(){ showToast(t('mikaUnlocked')); }, 2300);
+  if(!quiet) setTimeout(showMikaHud, 0);
   renderMikaBoard();
 }
 function renderMikaBoard(){
   var el = document.getElementById('mika-board');
-  if(!el) return;
+  if(el) el.innerHTML = mikaBoardHtml(10, true);
+  if(mikaHud.shown) mikaHud.el.innerHTML = '<div class="mk-head">' + esc(t('mikaHudHead')) + '</div>' + mikaBoardHtml(5, false);
+}
+function mikaBoardHtml(top, notes){
   if(!mika.online){
-    el.innerHTML = '<div class="mk-total"><b>' + esc(fmtNum(petCount)) + '</b><span>' + esc(t('mikaTotal')) + '</span></div><div class="mk-note">' + esc(t('mikaOffline')) + '</div>';
-    return;
+    return '<div class="mk-total"><b>' + esc(fmtNum(petCount)) + '</b><span>' + esc(t('mikaTotal')) + '</span></div>' + (notes ? '<div class="mk-note">' + esc(t('mikaOffline')) + '</div>' : '');
   }
   var list = Object.keys(mika.pets).map(function(u){ var d = mika.pets[u] || {}; return {u:u, n:d.n | 0, name:cleanNick(d.name) || memberName(u)}; })
     .filter(function(r){ return r.n > 0; }).sort(function(a, b){ return b.n - a.n || a.name.localeCompare(b.name); });
   var html = '<div class="mk-total"><b>' + esc(fmtNum(mika.total)) + '</b><span>' + esc(t('mikaTotal')) + '</span></div>';
   html += '<div class="settings-label"><span>' + esc(t('mikaTop')) + '</span></div>';
   if(!list.length) html += '<div class="mk-note">' + esc(t('mikaNone')) + '</div>';
-  list.slice(0, 10).forEach(function(r, i){
+  list.slice(0, top).forEach(function(r, i){
     html += '<div class="mk-row' + (r.u === net.uid ? ' me' : '') + '"><span class="mk-rank">' + (i === 0 ? '👑' : '#' + (i + 1)) + '</span><span class="mk-name">' + esc(r.name) + '</span><b>' + esc(fmtNum(r.n)) + '</b></div>';
   });
   var me = -1; list.forEach(function(r, i){ if(r.u === net.uid) me = i; });
   if(me >= 0) html += '<div class="mk-note">' + esc(t('mikaYou', {r:me + 1, n:fmtNum(list[me].n)})) + '</div>';
-  el.innerHTML = html;
+  return html;
+}
+/* the pop-up on the middle right: shows for 6 seconds after each pet (once the leaderboard is unlocked) */
+STR.en.mikaHudHead = 'MIKA PET LEADERBOARD'; STR.fr.mikaHudHead = 'CLASSEMENT DES CARESSES';
+var mikaHud = {el:document.getElementById('mika-hud'), shown:false, timer:null, fadeTimer:null};
+function showMikaHud(){
+  if(!mika.unlocked) return;
+  mikaHud.shown = true;
+  mikaHud.el.classList.remove('hidden', 'fade');
+  renderMikaBoard();
+  clearTimeout(mikaHud.timer); clearTimeout(mikaHud.fadeTimer);
+  mikaHud.fadeTimer = setTimeout(function(){ mikaHud.el.classList.add('fade'); }, 5600);
+  mikaHud.timer = setTimeout(function(){ mikaHud.shown = false; mikaHud.el.classList.add('hidden'); }, 6000);
 }
 langHooks.push(renderMikaBoard);
 if(mika.unlocked) setTimeout(function(){ unlockMikaBoard(true); }, 0);
@@ -2096,7 +2143,16 @@ function updatePet(dt){
   if(pet.state === 'heaven'){ updateHeaven(dt); return; }
   var happy = pet.petT > 0;
   if(happy) pet.petT -= dt;
-  pet.s = sharedPetS();   // where she is right now - the same for everyone
+  // where she is for everyone; while you pet her she stands still, then trots a little faster to catch up
+  var L = PET_SIDE*4, goal = sharedPetS();
+  if(pet.ds === undefined || pet.state !== 'walk') pet.ds = goal;
+  if(!happy){
+    var gap = ((goal - pet.ds) % L + L) % L;
+    if(gap > L/2) gap -= L;
+    var step = pet.speed*2.2*dt;
+    pet.ds = Math.abs(gap) <= step || Math.abs(gap) > 12 ? goal : (pet.ds + Math.sign(gap)*step + L) % L;
+  }
+  pet.s = pet.ds;
   var at = petAt(pet.s); pet.x = at[0]; pet.z = at[1];
   pet.sprite.position.set(pet.x, surfaceAt(pet.x, pet.z, 0) + Math.abs(Math.sin(moveTime*(happy ? 13 : 7)))*(happy ? 0.45 : 0.25), pet.z);
   pet.sprite.material.rotation = Math.sin(moveTime*(happy ? 17 : 7))*(happy ? 0.16 : 0.06);
@@ -4400,6 +4456,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 23, 2026 · 1:50 PM</span><br>When anyone pets Mika she freezes for everyone, then walks on. The MIKA PET LEADERBOARD pops up on the right each time you pet her.</li>' +
   '<li><span class="when">Nov 23, 2026 · 1:45 PM</span><br>Mika is now in the same spot for everyone. Every pet counts worldwide - and your first pet unlocks the MIKA PET LEADERBOARD (MENU > MIKA).</li>' +
   '<li><span class="when">Nov 23, 2026 · 12:30 PM</span><br>Player names can now be up to 100 letters long (long names wrap onto a few lines over your head).</li>' +
   '<li><span class="when">Nov 23, 2026 · 12:20 PM</span><br>In Walk Mode, walk up to Mika and press E to pet her. She keeps count!</li>' +
