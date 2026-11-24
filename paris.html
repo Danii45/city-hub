@@ -2200,6 +2200,10 @@ function showMikaHud(){
 }
 langHooks.push(renderMikaBoard);
 if(mika.unlocked) setTimeout(function(){ unlockMikaBoard(true); }, 0);
+/* what Mika says when a car hits her - formal to the very end */
+var MIKA_OUCH = ['Oh, great heavens!', 'Good heavens, {name}! Have you no shame?', 'Oh my word! Unhand me, you brute!', 'Merciful heavens! I have been struck!', 'How utterly uncivilised, {name}!',
+  'Oh, the indignity!', 'Great heavens above, I am airborne!', 'Sacré bleu! My fur!', 'I shall be speaking to my lawyer, {name}.', 'Oh, good gracious me!', 'Heavens to Betsy!', 'Well, I never!'];
+var MIKA_BACK = ['I have returned, and I am most displeased.', 'Heaven was lovely, but I have unfinished business with your driving.', 'I am back. Do try to look where you are going.', 'As you were, everyone. Nothing to see here.'];
 function updatePet(dt){
   updateDoom(dt);
   updateUmbrella(dt);
@@ -2248,6 +2252,8 @@ function updatePet(dt){
       pet.vel.set(fx*sp*0.6, 10 + sp*0.4, fz*sp*0.6);
       showChauffard(t('howDare'), t('sentence'), true);
       doom.t = 2;   // the sentence is carried out in 2 seconds
+      var ouch = MIKA_OUCH[Math.floor(Math.random()*MIKA_OUCH.length)];
+      setTimeout(function(){ addChatLine('Mika', ouch.split('{name}').join(net.name || 'you'), 'orange', false, null); }, 250);
       thudSound(sp); screenShake = SHAKE_TIME; driveSpeed *= 0.9;
       return;
     }
@@ -2396,6 +2402,8 @@ function startHeaven(){
   pet.sprite.material.rotation = 0; pet.sprite.material.opacity = 1;
   heaven.g.visible = true; heaven.beam.visible = true; heaven.sparks.visible = true;
   choirSound();
+  var back = MIKA_BACK[Math.floor(Math.random()*MIKA_BACK.length)];
+  setTimeout(function(){ if(pet.state === 'walk' || pet.state === 'heaven') addChatLine('Mika', back, 'orange', false, null); }, 5200);
 }
 function updateHeaven(dt){
   pet.s = sharedPetS();
@@ -4740,6 +4748,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 24, 2026 · 2:50 PM</span><br>Mika now has something to say when a car hits her. "Oh, great heavens!"</li>' +
   '<li><span class="when">Nov 24, 2026 · 2:45 PM</span><br>Ranks! Daniel can make players VIP, MVP, LEGEND or HELPER - their badge shows by their name, over their head and in the chat.</li>' +
   '<li><span class="when">Nov 24, 2026 · 2:40 PM</span><br>60 car colours now, plus a ? button for a random colour from the whole colour wheel. If all 60 are taken, you get a random one.</li>' +
   '<li><span class="when">Nov 24, 2026 · 2:25 PM</span><br>Explosions are now seen by everyone - blown engines, executed cars and all. You also see other players\' cars flip through the air.</li>' +
