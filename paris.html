@@ -2011,6 +2011,7 @@ function updateDoom(dt){
 }
 function executeCar(){
   explode(carPos.x, carPos.y + 1, carPos.z, 2.8);
+  shareBoom(carPos.x, carPos.y + 1, carPos.z, 2.8);
   showChauffard(t('executed'), '', true);
   screenShake = SHAKE_TIME*4;
   wreck.on = true; wreck.t = 0; wreck.y = 0; wreck.vy = 15; wreck.flip = 0; wreck.flipV = (Math.random() < 0.5 ? -1 : 1)*(9 + Math.random()*4);
@@ -4233,12 +4234,19 @@ STR.en.closeCall = 'CLOSE ONE! The engine almost blew - wrong gear!'; STR.fr.clo
 STR.en.engineBlown = 'ENGINE BLOWN!'; STR.fr.engineBlown = 'MOTEUR EXPLOSÉ !';
 STR.en.wrongGear = 'wrong gear!'; STR.fr.wrongGear = 'mauvaise vitesse !';
 STR.en.engineFixed = 'Engine fixed - back in 1st. Shift carefully!'; STR.fr.engineFixed = 'Moteur réparé - retour en 1re. Change de vitesse prudemment !';
+var myBoom = null;   // {n:id, x, y, z, k} - sent to everyone for a few seconds
+function shareBoom(x, y, z, k){
+  myBoom = {n:Date.now(), x:r2(x), y:r2(y), z:r2(z), k:k};
+  sendPresence(true);
+  setTimeout(function(){ if(myBoom && Date.now() - myBoom.n >= 5900){ myBoom = null; sendPresence(true); } }, 6000);
+}
 function blowEngine(){
   manual.blown = 5;
   stopEngineSound();
   var back = 1.7;   // the engine is in the back
   var x = carPos.x + Math.sin(carYaw)*back, z = carPos.z + Math.cos(carYaw)*back;
   explode(x, carPos.y + 0.9, z);
+  shareBoom(x, carPos.y + 0.9, z, 1);
   showChauffard(t('engineBlown'), t('wrongGear'));
   screenShake = SHAKE_TIME*2.2;
   driveSpeed *= 0.6;
@@ -4671,6 +4679,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 24, 2026 · 2:25 PM</span><br>Explosions are now seen by everyone - blown engines, executed cars and all. You also see other players\'s cars flip through the air.</li>' +
   '<li><span class="when">Nov 24, 2026 · 2:15 PM</span><br>If it rains while Mika is napping, she gets a red and white umbrella.</li>' +
   '<li><span class="when">Nov 24, 2026 · 2:10 PM</span><br>When a new version of Paris comes out, a window pops up asking you to refresh. Players on an old version show OUTDATED VERSION to everyone else.</li>' +
   '<li><span class="when">Nov 24, 2026 · 2:00 PM</span><br>Mika knows about 1,500 words now: foods, animals, countries, music, sports, jobs, colours, games and more - and her answer mentions what you asked about.</li>' +
@@ -6397,6 +6406,8 @@ function presenceState(){
     s.x = r2(camera.position.x); s.y = r2(camera.position.y - EYE_HEIGHT); s.z = r2(camera.position.z); s.yaw = r2(yaw);
   }
   s.chat = myChat;
+  if(myBoom) s.boom = myBoom;
+  if(flying && driving && wreck.on){ s.wy = r2(wreck.y); s.wf = r2(wreck.flip); }
   s.ver = updateCheck.ver;
   if(updateCheck.outdated()) s.old = 1;
   if(net.isOwner){ s.role = 'owner'; if(myAnnounce) s.announce = myAnnounce; }
@@ -6583,6 +6594,18 @@ function updateRemotes(dt){
     if(want && !(finite(s.x) && finite(s.y) && finite(s.z) && finite(s.yaw))) want = null;
     var a = mp.avatars[p.peer];
     if(!a) a = mp.avatars[p.peer] = {model:null, kind:null, color:null, tag:null, tagText:null, pos:new THREE.Vector3(), yaw:0, fresh:true};
+    // their explosion: show it once (not ones that were already over before we saw them)
+    var bm = s.boom;
+    if(bm && finite(bm.n) && finite(bm.x) && finite(bm.y) && finite(bm.z)){
+      if(a.boomSeen === undefined) a.boomSeen = bm.n;
+      else if(a.boomSeen !== bm.n){
+        a.boomSeen = bm.n;
+        var bk = finite(bm.k) ? Math.max(0.5, Math.min(3, bm.k)) : 1;
+        var bdx = bm.x - camera.position.x, bdz = bm.z - camera.position.z;
+        explode(bm.x, bm.y, bm.z, bk);
+        if(bdx*bdx + bdz*bdz < 60*60) screenShake = SHAKE_TIME*(bk > 2 ? 2 : 1);
+      }
+    }
     if(a.kind !== want){
       if(a.model){ root.remove(a.model.group); disposeObject(a.model.group); }
       a.model = want === 'sedan' ? buildCarModel() : want === 'f1' ? buildF1Model() : want === 'coupe' ? (requestCoupeGLB(), buildCoupeModel()) : want === 'walker' ? buildWalker() : null;
@@ -6604,6 +6627,7 @@ function updateRemotes(dt){
     g.visible = true;
     g.position.copy(a.pos);
     g.rotation.set(0, a.yaw, finite(s.roll) ? s.roll : 0, 'YXZ');
+    if(want !== 'walker' && finite(s.wy) && finite(s.wf)){ g.position.y += s.wy; g.rotateX(s.wf); }   // their car is flying after an explosion
     a.model.wheels.forEach(function(w){ w.rotation.x += speed*dt/a.model.wheelR; });
     var text = playerName(p) + (peerOutdated(p) ? ' - ' + t('outdated') : ''), role = peerRole(p), tagKey = text + '|' + role + '|' + LANG;
     if(a.tagText !== tagKey){ if(a.tag){ root.remove(a.tag); disposeObject(a.tag); } a.tag = nameTag(text, role); a.tagText = tagKey; }
