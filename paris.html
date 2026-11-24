@@ -4622,6 +4622,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 24, 2026 · 1:40 PM</span><br>Mika now speaks very formally, calls you by your name - and once in a while answers in another language!</li>' +
   '<li><span class="when">Nov 24, 2026 · 1:35 PM</span><br>Talk to Mika! Say her name in the chat ("hi Mika", "Mika, are you hungry?") and she answers.</li>' +
   '<li><span class="when">Nov 24, 2026 · 9:45 AM</span><br>Building is closed for now - explore, drive, chat and pet Mika while you wait!</li>' +
   '<li><span class="when">Nov 23, 2026 · 2:30 PM</span><br>Day and night, and weather! A Paris day lasts 20 minutes: sunset, a starry night with glowing street lamps and a sparkling, golden Eiffel Tower, then sunrise. And sometimes it rains. Everyone sees the same sky. (SETTINGS > SKY to keep it sunny.)</li>' +
@@ -4728,36 +4729,57 @@ function runCommand(text){
    compliments, jokes, goodbyes and more. Everyone sees the same answer (it's picked from the message itself). */
 function mikaHash(str){ var h = 2166136261; for(var i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
 var MIKA_TALK = [
-  {re:/\b(bye|goodbye|good night|goodnight|see (you|ya)|au revoir|later|cya)\b/, say:['Goodbye! Come back soon, I will be right here under the Eiffel Tower.', 'See you later! Do not forget to pet me next time.', 'Bye bye! I will keep Paris safe while you are gone.']},
-  {re:/\b(thanks|thank you|merci)\b/, say:['You are very welcome!', 'Anytime, friend. That is what good dogs are for.', 'No problem at all!']},
-  {re:/\b(how are you|how r u|how are u|how is it going|how's it going|you ok|you good|ça va|ca va)\b/, say:['I am doing wonderfully, thank you for asking! How are you?', 'Fantastic! The sun is shining, people keep petting me, and life in Paris is good.', 'I am great! A little sleepy, but great.']},
-  {re:/\b(hungry|food|treat|treats|snack|eat|dinner|lunch|breakfast|croissant|bone)\b/, say:['Did somebody say TREAT? I would never say no to a treat.', 'I am always hungry. A croissant would be perfect right now, please.', 'Food? Yes please! I have been a very good girl today.']},
-  {re:/\b(walk|walkies|run|play|fetch|ball|zoomies)\b/, say:['A walk? I am ALREADY on a walk! I walk around the Eiffel Tower all day.', 'Throw the ball and I will fetch it, I promise. Well, maybe.', 'Yes! Let us go! Wait, where are we going?']},
-  {re:/\b(sleep|sleepy|tired|nap|bed|bedtime)\b/, say:['I love naps. My bed is right next to the fountain, it is the coziest spot in Paris.', 'Every few minutes I take a little nap. A dog needs her beauty sleep.', 'Yawn... now you made me sleepy.']},
-  {re:/\b(good girl|good dog|good puppy|cute|adorable|pretty|beautiful|best dog|so cute)\b/, say:['Thank you! I know I am a good girl, but it is always nice to hear it.', 'Aww, you are making me wag my tail so hard!', 'You are pretty great yourself!']},
-  {re:/\b(love you|i love|love u|ily)\b/, say:['I love you too! Come pet me and I will give you hearts.', 'Aww, I love you more!', 'Love you too! You are my favorite. Well, one of my favorites.']},
-  {re:/\b(bad dog|bad girl|ugly|stupid|dumb|hate you|smell)\b/, say:['Hey! That is not very nice. I am a very good girl.', 'Rude! I am telling everyone you said that.', 'I will pretend I did not hear that.']},
-  {re:/\b(best friend|favorite person|favourite person|who do you like)\b/, say:function(){ var bf = typeof bestFriend === 'function' ? bestFriend() : null; return bf ? ['My best friend is ' + bf.name + '. They have petted me ' + fmtNum(bf.n) + ' times!'] : ['I do not have a best friend yet. Pet me and it could be you!']; }},
-  {re:/\b(how old|your age|old are you|birthday)\b/, say:['A lady never tells her age!', 'Old enough to know every street in Paris, and young enough to still love zoomies.']},
-  {re:/\b(your name|who are you|what are you)\b/, say:['I am Mika, the most famous dog in Paris!', 'My name is Mika. I live under the Eiffel Tower and I love being petted.']},
-  {re:/\b(where|eiffel|tower|paris|france|fountain)\b/, say:['I live right under the Eiffel Tower. Best view in the whole city!', 'Paris is the best city in the world, and I have walked every inch of it.', 'My bed is next to the fountain by the Eiffel Tower. Come visit me!']},
-  {re:/\b(rain|raining|weather|sun|sunny|cloud|cloudy|snow)\b/, say:function(){ return skyState.rain > 0.4 ? ['It is raining and my fur is all wet. I need a towel!'] : skyState.cloud > 0.4 ? ['It is a little cloudy today, but that will not stop me from walking.'] : ['The weather is beautiful today. Perfect for a walk!']; }},
-  {re:/\b(night|day|time|dark|morning|evening)\b/, say:function(){ return skyState.night ? ['It is night time in Paris. Look at the Eiffel Tower sparkle!'] : ['It is daytime in Paris. The perfect time for a walk.']; }},
-  {re:/\b(french|français|francais|speak|talk|language)\b/, say:['I speak dog, English and a little bit of French. Woof means bonjour!', 'Je suis un chien! That means I am a dog. Pretty good, right?']},
-  {re:/\b(joke|funny|lol|haha|laugh)\b/, say:['Why did the dog sit in the shade? Because she did not want to be a hot dog!', 'What do you call a dog magician? A labracadabrador!', 'What is a dog\'s favorite city? Woof-ington. Okay, mine is still Paris.']},
-  {re:/\b(car|drive|driving|crash|hit me|run over|explode)\b/, say:['Please drive carefully around me! Hitting me has very serious consequences.', 'Cars are fun, but please do not run me over. You saw what happens.']},
-  {re:/\b(sit|stay|roll over|shake|paw|speak|trick|tricks)\b/, say:['Sit? Sure! I am sitting. Now where is my treat?', 'I know lots of tricks. Watch me roll over! Did you see it?', 'Here is my paw! Nice to meet you.']},
-  {re:/\b(hi|hello|hey|yo|bonjour|salut|sup|hiya|howdy|good morning)\b/, say:['Hi there! It is so nice to see you!', 'Hello, friend! Come and pet me!', 'Bonjour! Welcome to Paris!', 'Hey! I was hoping someone would say hi to me today.']},
-  {re:/\?/, say:['Hmm, that is a good question. I am just a dog, but I think the answer is treats.', 'I am not sure, but I will think about it during my next nap.', 'Great question! Ask me again after I eat.']}
+  {re:/\b(bye|goodbye|good night|goodnight|see (you|ya)|au revoir|later|cya)\b/, say:['Farewell, {name}. It has been an honour. I shall await your return beneath the Eiffel Tower.', 'Until we meet again, {name}. Do take care, and kindly remember to pet me upon your return.', 'Goodbye, {name}. Rest assured that I shall keep Paris safe in your absence.']},
+  {re:/\b(thanks|thank you|merci|ty)\b/, say:['You are most welcome, {name}. It was my pleasure.', 'Think nothing of it, {name}. Assisting you is the duty of any well-mannered dog.', 'The pleasure was entirely mine, {name}.']},
+  {re:/\b(how are you|how r u|how are u|how is it going|how's it going|you ok|you good|ça va|ca va)\b/, say:['I am exceedingly well, {name}, thank you kindly for enquiring. And how do you fare this fine day?', 'Most splendid, {name}. The city is lovely, and I have been petted a great deal.', 'I am in fine spirits, {name}, though I confess I am somewhat in need of a nap.']},
+  {re:/\b(hungry|food|treat|treats|snack|eat|dinner|lunch|breakfast|croissant|bone)\b/, say:['Did I hear the word "treat", {name}? I would be most grateful to receive one.', 'I must admit, {name}, that a croissant would be most welcome at this hour.', 'Indeed, {name}, I am rather peckish. I have been exceptionally well behaved today, if I may say so.']},
+  {re:/\b(walk|walkies|run|play|fetch|ball|zoomies)\b/, say:['A walk, {name}? I am, in point of fact, already on one. I circle the Eiffel Tower at all hours.', 'Should you throw the ball, {name}, I shall do my utmost to retrieve it. I make no guarantees, however.', 'What a delightful proposal, {name}. Do lead the way.']},
+  {re:/\b(sleep|sleepy|tired|nap|bed|bedtime)\b/, say:['I am rather fond of naps, {name}. My bed beside the fountain is the most comfortable spot in all of Paris.', 'Every few minutes I retire for a short rest, {name}. A lady requires her beauty sleep.', 'Do forgive me, {name}, but the mere mention of sleep has made me rather drowsy.']},
+  {re:/\b(good girl|good dog|good puppy|cute|adorable|pretty|beautiful|best dog|so cute)\b/, say:['You are far too kind, {name}. I am, admittedly, a very good girl.', 'Your compliment has set my tail wagging uncontrollably, {name}. Thank you.', 'How gracious of you, {name}. You are rather splendid yourself.']},
+  {re:/\b(love you|i love|love u|ily)\b/, say:['The feeling is entirely mutual, {name}. Do come and pet me, and I shall return your affection in hearts.', 'You warm my heart, {name}. I hold you in the very highest regard.', 'And I you, {name}. You are among my most cherished companions.']},
+  {re:/\b(bad dog|bad girl|ugly|stupid|dumb|hate you|smell)\b/, say:['I beg your pardon, {name}? That remark was most uncalled for.', 'How very rude, {name}. I shall choose to rise above it.', 'I shall pretend I did not hear that, {name}, out of courtesy.']},
+  {re:/\b(best friend|favorite person|favourite person|who do you like)\b/, say:function(who){ var bf = typeof bestFriend === 'function' ? bestFriend() : null; if(bf && who && bf.name.toLowerCase() === String(who).toLowerCase()) return ['Why, it is you, {name}! You have petted me no fewer than ' + fmtNum(bf.n) + ' times. I am most grateful.']; return bf ? ['My dearest friend is ' + bf.name + ', {name}, who has petted me no fewer than ' + fmtNum(bf.n) + ' times.'] : ['I have not yet chosen a best friend, {name}. Should you pet me, the honour may well be yours.']; }},
+  {re:/\b(how old|your age|old are you|birthday)\b/, say:['I am afraid, {name}, that a lady never discloses her age.', 'Old enough to know every street in Paris, {name}, and young enough to still enjoy the occasional zoomie.']},
+  {re:/\b(your name|who are you|what are you)\b/, say:['Allow me to introduce myself, {name}. I am Mika, the most distinguished dog in Paris.', 'My name is Mika, {name}. I reside beneath the Eiffel Tower and I am delighted to make your acquaintance.']},
+  {re:/\b(where|eiffel|tower|paris|france|fountain)\b/, say:['I reside directly beneath the Eiffel Tower, {name}. The view is quite unrivalled.', 'Paris is, without question, the finest city in the world, {name}. I have walked every last inch of it.', 'My bed lies beside the fountain near the Eiffel Tower, {name}. You are most welcome to visit.']},
+  {re:/\b(rain|raining|weather|sun|sunny|cloud|cloudy|snow)\b/, say:function(){ return skyState.rain > 0.4 ? ['It is raining at present, {name}, and I regret to say my fur is thoroughly soaked. A towel would be most appreciated.'] : skyState.cloud > 0.4 ? ['It is somewhat overcast today, {name}, though I assure you it shall not deter me from my walk.'] : ['The weather is simply glorious today, {name}. Ideal conditions for a stroll.']; }},
+  {re:/\b(night|day|time|dark|morning|evening)\b/, say:function(){ return skyState.night ? ['It is night-time in Paris, {name}. Do observe the Eiffel Tower as it sparkles.'] : ['It is daytime in Paris, {name}. A most agreeable hour for a walk.']; }},
+  {re:/\b(french|français|francais|speak|talk|language|languages)\b/, say:['I speak English, French and Dog fluently, {name}, and I dabble in several others.', 'Je suis une chienne très distinguée, {name}. That is to say, I am a most distinguished dog.']},
+  {re:/\b(joke|funny|lol|haha|laugh)\b/, say:['Why did the dog sit in the shade, {name}? Because she did not wish to become a hot dog.', 'What does one call a dog who performs magic, {name}? A labracadabrador.', 'Why are dogs such poor dancers, {name}? Because they have two left feet. And two right ones.']},
+  {re:/\b(car|drive|driving|crash|hit me|run over|explode)\b/, say:['I must ask you to drive with the utmost care around me, {name}. Striking me carries the gravest of consequences.', 'Motor cars are most amusing, {name}, but I would be obliged if you refrained from running me over.']},
+  {re:/\b(sit|stay|roll over|shake|paw|speak|trick|tricks)\b/, say:['Certainly, {name}. I am now seated. I trust a treat is forthcoming?', 'I have mastered a great many tricks, {name}. Observe as I roll over. Was that not splendid?', 'Permit me to offer you my paw, {name}. It is a pleasure to make your acquaintance.']},
+  {re:/\b(hi|hello|hey|yo|bonjour|salut|sup|hiya|howdy|good morning|good afternoon|good evening)\b/, say:['Good day to you, {name}. What a pleasure it is to see you.', 'Greetings, {name}. Do come closer, I would be delighted to be petted.', 'Bonjour, {name}, and welcome to Paris.', 'Why, hello there, {name}. I had so hoped someone would greet me today.']},
+  {re:/\?/, say:['An excellent question, {name}. I am merely a dog, but I suspect the answer is treats.', 'I am not entirely certain, {name}. I shall give it careful thought during my next nap.', 'A most thought-provoking enquiry, {name}. Do ask me again once I have eaten.']}
 ];
-var MIKA_DEFAULT = ['Did somebody say my name? Here I am!', 'You called? I am listening!', 'I heard my name! What is up?', 'That is me, Mika! How can I help?'];
+var MIKA_DEFAULT = ['Did someone call for me? Here I am, {name}, at your service.', 'You called, {name}? I am all ears. Quite literally.', 'I heard my name, {name}. How may I be of assistance?', 'Mika, at your service, {name}.'];
+/* now and then (1 time in 12) she answers in another language instead */
+var MIKA_LANGS = [
+  ['Spanish', 'Buenas tardes, {name}. Es un verdadero honor conversar con usted.'],
+  ['Italian', 'Buongiorno, {name}. È un vero onore parlare con Lei.'],
+  ['German', 'Guten Tag, {name}. Es ist mir eine große Ehre, mit Ihnen zu sprechen.'],
+  ['Portuguese', 'Boa tarde, {name}. É uma grande honra conversar consigo.'],
+  ['French', 'Bonjour, {name}. C\'est un véritable honneur de m\'entretenir avec vous.'],
+  ['Japanese', 'こんにちは、{name}様。お話しできて大変光栄です。'],
+  ['Korean', '안녕하십니까, {name}님. 말씀을 나누게 되어 영광입니다.'],
+  ['Chinese', '您好，{name}。能与您交谈，我深感荣幸。'],
+  ['Russian', 'Добрый день, {name}. Для меня большая честь беседовать с вами.'],
+  ['Arabic', 'مساء الخير يا {name}. إنه لشرف عظيم أن أتحدث إليك.'],
+  ['Latin', 'Salve, {name}. Magno mihi honori est tecum loqui.']
+];
 function mikaReply(text, who){
-  var low = String(text).toLowerCase(), list = null;
-  for(var i=0;i<MIKA_TALK.length;i++){ if(MIKA_TALK[i].re.test(low)){ list = MIKA_TALK[i].say; break; } }
-  if(typeof list === 'function') list = list();
-  if(!list) list = MIKA_DEFAULT;
-  var line = list[mikaHash(who + '|' + low) % list.length];
-  if(pet.sleeping) line = '*wakes up* ' + line;
+  var low = String(text).toLowerCase(), list = null, h = mikaHash(who + '|' + low), name = who || 'friend';
+  var line;
+  if(h % 12 === 0){
+    var lang = MIKA_LANGS[Math.floor(h/12) % MIKA_LANGS.length];
+    line = lang[1] + ' (' + lang[0] + ')';
+  } else {
+    for(var i=0;i<MIKA_TALK.length;i++){ if(MIKA_TALK[i].re.test(low)){ list = MIKA_TALK[i].say; break; } }
+    if(typeof list === 'function') list = list(name);
+    if(!list) list = MIKA_DEFAULT;
+    line = list[Math.floor(h/12) % list.length];
+  }
+  line = line.split('{name}').join(name);
+  if(pet.sleeping) line = '*awakens with a gentle yawn* ' + line;
   return line;
 }
 function mikaHeard(text, who){
@@ -4771,7 +4793,7 @@ function mikaHeard(text, who){
 function sendChat(text){
   text = filterChat(text);
   addChatLine(t('you'), text, myColor, false, myRole());
-  mikaHeard(text, net.name || 'me');
+  mikaHeard(text, net.name || 'friend');
   if(!mp.others.length) systemLine(t('chatAlone'));
   myChat = {n:Date.now(), t:text, at:Date.now()};
   sendPresence(true);
@@ -4811,7 +4833,7 @@ function receiveChat(p){
   mp.chatSeen[p.peer] = c.n;
   if(firstLook && finite(c.at) && Date.now() - c.at > 120000) return;
   var text = cleanChat(c.t);
-  if(text){ addChatLine(playerName(p), filterChat(text), peerColor(p), false, peerRole(p)); mikaHeard(filterChat(text), playerName(p)); }
+  if(text){ addChatLine(playerName(p), filterChat(text), peerColor(p), false, peerRole(p)); var m = net.members[p.by]; mikaHeard(filterChat(text), (m && m.name && cleanNick(m.name)) || playerName(p)); }
 }
 
 /* ---------- What's in front of you: the E prompt, and what E does ---------- */
