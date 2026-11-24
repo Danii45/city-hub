@@ -4622,6 +4622,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 24, 2026 · 1:35 PM</span><br>Talk to Mika! Say her name in the chat ("hi Mika", "Mika, are you hungry?") and she answers.</li>' +
   '<li><span class="when">Nov 24, 2026 · 9:45 AM</span><br>Building is closed for now - explore, drive, chat and pet Mika while you wait!</li>' +
   '<li><span class="when">Nov 23, 2026 · 2:30 PM</span><br>Day and night, and weather! A Paris day lasts 20 minutes: sunset, a starry night with glowing street lamps and a sparkling, golden Eiffel Tower, then sunrise. And sometimes it rains. Everyone sees the same sky. (SETTINGS > SKY to keep it sunny.)</li>' +
   '<li><span class="when">Nov 23, 2026 · 2:05 PM</span><br>Mika has a bed by the fountain next to the Eiffel Tower and naps in it every 5 minutes (Z z z). She also barks and snores in the chat.</li>' +
@@ -4721,9 +4722,56 @@ function runCommand(text){
   }
   systemLine(t('unknownCmd'));
 }
+/* ---------- Talk to Mika ----------
+   Say "Mika" in the chat (like "hi Mika" or "Mika, are you hungry?") and she answers, in proper English, a second
+   later. She understands greetings, questions about herself, food, walks, naps, Paris, the weather, the time of day,
+   compliments, jokes, goodbyes and more. Everyone sees the same answer (it's picked from the message itself). */
+function mikaHash(str){ var h = 2166136261; for(var i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+var MIKA_TALK = [
+  {re:/\b(bye|goodbye|good night|goodnight|see (you|ya)|au revoir|later|cya)\b/, say:['Goodbye! Come back soon, I will be right here under the Eiffel Tower.', 'See you later! Do not forget to pet me next time.', 'Bye bye! I will keep Paris safe while you are gone.']},
+  {re:/\b(thanks|thank you|merci)\b/, say:['You are very welcome!', 'Anytime, friend. That is what good dogs are for.', 'No problem at all!']},
+  {re:/\b(how are you|how r u|how are u|how is it going|how's it going|you ok|you good|ça va|ca va)\b/, say:['I am doing wonderfully, thank you for asking! How are you?', 'Fantastic! The sun is shining, people keep petting me, and life in Paris is good.', 'I am great! A little sleepy, but great.']},
+  {re:/\b(hungry|food|treat|treats|snack|eat|dinner|lunch|breakfast|croissant|bone)\b/, say:['Did somebody say TREAT? I would never say no to a treat.', 'I am always hungry. A croissant would be perfect right now, please.', 'Food? Yes please! I have been a very good girl today.']},
+  {re:/\b(walk|walkies|run|play|fetch|ball|zoomies)\b/, say:['A walk? I am ALREADY on a walk! I walk around the Eiffel Tower all day.', 'Throw the ball and I will fetch it, I promise. Well, maybe.', 'Yes! Let us go! Wait, where are we going?']},
+  {re:/\b(sleep|sleepy|tired|nap|bed|bedtime)\b/, say:['I love naps. My bed is right next to the fountain, it is the coziest spot in Paris.', 'Every few minutes I take a little nap. A dog needs her beauty sleep.', 'Yawn... now you made me sleepy.']},
+  {re:/\b(good girl|good dog|good puppy|cute|adorable|pretty|beautiful|best dog|so cute)\b/, say:['Thank you! I know I am a good girl, but it is always nice to hear it.', 'Aww, you are making me wag my tail so hard!', 'You are pretty great yourself!']},
+  {re:/\b(love you|i love|love u|ily)\b/, say:['I love you too! Come pet me and I will give you hearts.', 'Aww, I love you more!', 'Love you too! You are my favorite. Well, one of my favorites.']},
+  {re:/\b(bad dog|bad girl|ugly|stupid|dumb|hate you|smell)\b/, say:['Hey! That is not very nice. I am a very good girl.', 'Rude! I am telling everyone you said that.', 'I will pretend I did not hear that.']},
+  {re:/\b(best friend|favorite person|favourite person|who do you like)\b/, say:function(){ var bf = typeof bestFriend === 'function' ? bestFriend() : null; return bf ? ['My best friend is ' + bf.name + '. They have petted me ' + fmtNum(bf.n) + ' times!'] : ['I do not have a best friend yet. Pet me and it could be you!']; }},
+  {re:/\b(how old|your age|old are you|birthday)\b/, say:['A lady never tells her age!', 'Old enough to know every street in Paris, and young enough to still love zoomies.']},
+  {re:/\b(your name|who are you|what are you)\b/, say:['I am Mika, the most famous dog in Paris!', 'My name is Mika. I live under the Eiffel Tower and I love being petted.']},
+  {re:/\b(where|eiffel|tower|paris|france|fountain)\b/, say:['I live right under the Eiffel Tower. Best view in the whole city!', 'Paris is the best city in the world, and I have walked every inch of it.', 'My bed is next to the fountain by the Eiffel Tower. Come visit me!']},
+  {re:/\b(rain|raining|weather|sun|sunny|cloud|cloudy|snow)\b/, say:function(){ return skyState.rain > 0.4 ? ['It is raining and my fur is all wet. I need a towel!'] : skyState.cloud > 0.4 ? ['It is a little cloudy today, but that will not stop me from walking.'] : ['The weather is beautiful today. Perfect for a walk!']; }},
+  {re:/\b(night|day|time|dark|morning|evening)\b/, say:function(){ return skyState.night ? ['It is night time in Paris. Look at the Eiffel Tower sparkle!'] : ['It is daytime in Paris. The perfect time for a walk.']; }},
+  {re:/\b(french|français|francais|speak|talk|language)\b/, say:['I speak dog, English and a little bit of French. Woof means bonjour!', 'Je suis un chien! That means I am a dog. Pretty good, right?']},
+  {re:/\b(joke|funny|lol|haha|laugh)\b/, say:['Why did the dog sit in the shade? Because she did not want to be a hot dog!', 'What do you call a dog magician? A labracadabrador!', 'What is a dog\'s favorite city? Woof-ington. Okay, mine is still Paris.']},
+  {re:/\b(car|drive|driving|crash|hit me|run over|explode)\b/, say:['Please drive carefully around me! Hitting me has very serious consequences.', 'Cars are fun, but please do not run me over. You saw what happens.']},
+  {re:/\b(sit|stay|roll over|shake|paw|speak|trick|tricks)\b/, say:['Sit? Sure! I am sitting. Now where is my treat?', 'I know lots of tricks. Watch me roll over! Did you see it?', 'Here is my paw! Nice to meet you.']},
+  {re:/\b(hi|hello|hey|yo|bonjour|salut|sup|hiya|howdy|good morning)\b/, say:['Hi there! It is so nice to see you!', 'Hello, friend! Come and pet me!', 'Bonjour! Welcome to Paris!', 'Hey! I was hoping someone would say hi to me today.']},
+  {re:/\?/, say:['Hmm, that is a good question. I am just a dog, but I think the answer is treats.', 'I am not sure, but I will think about it during my next nap.', 'Great question! Ask me again after I eat.']}
+];
+var MIKA_DEFAULT = ['Did somebody say my name? Here I am!', 'You called? I am listening!', 'I heard my name! What is up?', 'That is me, Mika! How can I help?'];
+function mikaReply(text, who){
+  var low = String(text).toLowerCase(), list = null;
+  for(var i=0;i<MIKA_TALK.length;i++){ if(MIKA_TALK[i].re.test(low)){ list = MIKA_TALK[i].say; break; } }
+  if(typeof list === 'function') list = list();
+  if(!list) list = MIKA_DEFAULT;
+  var line = list[mikaHash(who + '|' + low) % list.length];
+  if(pet.sleeping) line = '*wakes up* ' + line;
+  return line;
+}
+function mikaHeard(text, who){
+  if(!/\bmika\b/i.test(String(text))) return;
+  var line = mikaReply(text, who);
+  setTimeout(function(){
+    addChatLine('Mika', line, 'orange', false, null);
+    if(pet.state === 'walk') pet.petT = Math.max(pet.petT, 0.8);   // a happy little wiggle
+  }, 1100);
+}
 function sendChat(text){
   text = filterChat(text);
   addChatLine(t('you'), text, myColor, false, myRole());
+  mikaHeard(text, net.name || 'me');
   if(!mp.others.length) systemLine(t('chatAlone'));
   myChat = {n:Date.now(), t:text, at:Date.now()};
   sendPresence(true);
@@ -4763,7 +4811,7 @@ function receiveChat(p){
   mp.chatSeen[p.peer] = c.n;
   if(firstLook && finite(c.at) && Date.now() - c.at > 120000) return;
   var text = cleanChat(c.t);
-  if(text) addChatLine(playerName(p), filterChat(text), peerColor(p), false, peerRole(p));
+  if(text){ addChatLine(playerName(p), filterChat(text), peerColor(p), false, peerRole(p)); mikaHeard(filterChat(text), playerName(p)); }
 }
 
 /* ---------- What's in front of you: the E prompt, and what E does ---------- */
