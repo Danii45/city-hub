@@ -4605,6 +4605,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 24, 2026 · 9:45 AM</span><br>Building is closed for now - explore, drive, chat and pet Mika while you wait!</li>' +
   '<li><span class="when">Nov 23, 2026 · 2:30 PM</span><br>Day and night, and weather! A Paris day lasts 20 minutes: sunset, a starry night with glowing street lamps and a sparkling, golden Eiffel Tower, then sunrise. And sometimes it rains. Everyone sees the same sky. (SETTINGS > SKY to keep it sunny.)</li>' +
   '<li><span class="when">Nov 23, 2026 · 2:05 PM</span><br>Mika has a bed by the fountain next to the Eiffel Tower and naps in it every 5 minutes (Z z z). She also barks and snores in the chat.</li>' +
   '<li><span class="when">Nov 23, 2026 · 1:55 PM</span><br>Mika now has a name tag showing her BEST FRIEND - whoever has petted her the most.</li>' +
@@ -4864,7 +4865,8 @@ function renderPlotPanel(){
     title.textContent = t('forSale');
     sub.textContent = t(p.kind === 'store' ? 'claimNoteStore' : 'claimNoteHouse');
     var have = myPlot(p.kind);
-    if(!net.canBuild){
+    if(buildLocked() && signedIn()){ msg.textContent = t('buildLocked'); }
+    else if(!net.canBuild){
       if(CLAUDE_MODE && net.canWrite && net.passHash) passBox(row, msg);
       else msg.textContent = t(CLAUDE_MODE && net.canWrite ? 'passNotSet' : 'cantBuild');
     }
@@ -4912,11 +4914,20 @@ function flyTo(p){
 }
 
 /* ---------- The builder: design the outside of your shop or house, watching it change ---------- */
+/* ---------- BUILDING LOCK ----------
+   While BUILD_LOCKED is true nobody but Daniel (the owner) can claim a plot, build, use blocks or decorate - everyone
+   can still walk, drive, chat and pet Mika. Set it to false to open building again. */
+var BUILD_LOCKED = true;
+STR.en.buildLocked = 'Building is closed for now. You can still explore Paris, drive, chat and pet Mika!';
+STR.fr.buildLocked = 'La construction est fermée pour l\'instant. Tu peux quand même explorer Paris, conduire, discuter et caresser Mika !';
+function buildLocked(){ return BUILD_LOCKED && !net.isOwner; }
+function lockedToast(){ showToast(t('buildLocked')); }
 var builder = {on:false, p:null, isNew:false, busy:false};
 var builderEl = document.getElementById('builder'), bdBody = document.getElementById('bd-body');
 function randInt(n){ return Math.floor(Math.random()*n); }
 function openBuilder(p, isNew){
   if(!signedIn() || !net.canBuild) return;
+  if(buildLocked()){ lockedToast(); return; }
   closeEditors();
   goOverview();
   var d;
@@ -5101,6 +5112,7 @@ canvasEl.addEventListener('contextmenu', function(e){ if(blk.on) e.preventDefaul
 var ghostMatBlocks = new THREE.MeshLambertMaterial({vertexColors:true, transparent:true, opacity:0.55, depthWrite:false});
 function openBlocks(p, where){
   if(!signedIn() || !p.data || p.data.o !== net.uid) return;
+  if(buildLocked()){ lockedToast(); return; }
   closeEditors();
   goOverview();
   var d = JSON.parse(JSON.stringify(p.data));
@@ -5412,6 +5424,7 @@ var decor = {on:false, p:null, placing:null, sel:-1, ghost:null, saveTimer:null,
 var decorEl = document.getElementById('decor');
 function openDecor(p){
   if(!signedIn() || !p.data || p.data.o !== net.uid) return;
+  if(buildLocked()){ lockedToast(); return; }
   closeEditors();
   goOverview();
   var d = JSON.parse(JSON.stringify(p.data));
@@ -5844,6 +5857,7 @@ function plotRecord(p, d){
           bk:blockData(d.bk, 9000), ib:blockData(d.ib, 4800), at:firebase.database.ServerValue.TIMESTAMP};
 }
 net.claimPlot = function(p, d){
+  if(buildLocked()) return Promise.reject(new Error('notAllowed'));
   if(p.data && p.data.o !== net.uid) return Promise.reject(new Error('taken'));
   if(myPlot(p.kind)) return Promise.reject(new Error('notAllowed'));
   var upd = {};
@@ -5852,6 +5866,7 @@ net.claimPlot = function(p, d){
   return net.db.ref().update(upd).catch(function(){ throw new Error(p.data && p.data.o !== net.uid ? 'taken' : 'saveFail'); });
 };
 net.savePlot = function(p, d){
+  if(buildLocked()) return Promise.reject(new Error('notAllowed'));
   if(!p.data || p.data.o !== net.uid) return Promise.reject(new Error('notAllowed'));
   return net.db.ref('paris/plots/' + p.id).set(plotRecord(p, d));
 };
@@ -6465,7 +6480,7 @@ function claudeRecord(p, d, at){
 }
 function setupClaudeNet(){
   net.claimPlot = function(p, d){
-    if(!net.canBuild) return Promise.reject(new Error('notAllowed'));
+    if(!net.canBuild || buildLocked()) return Promise.reject(new Error('notAllowed'));
     if(p.data && p.data.o !== net.uid) return Promise.reject(new Error('taken'));
     if(myPlot(p.kind)) return Promise.reject(new Error('notAllowed'));
     var upd = {}; upd[p.kind] = claudeRecord(p, d);
@@ -6473,6 +6488,7 @@ function setupClaudeNet(){
     return claudeWrite(function(){ return myClaudeDoc() ? ref.update(upd) : ref.set(upd); }).catch(function(){ throw new Error('saveFail'); });
   };
   net.savePlot = function(p, d){
+    if(buildLocked()) return Promise.reject(new Error('notAllowed'));
     if(!p.data || p.data.o !== net.uid) return Promise.reject(new Error('notAllowed'));
     var upd = {}; upd[p.kind] = claudeRecord(p, d, p.data.at);
     return claudeWrite(function(){ return net.cdb.doc('plots/' + net.uid).update(upd); });
