@@ -4622,6 +4622,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 24, 2026 · 1:50 PM</span><br>Mika understands almost 100 topics now - food, animals, school, Paris, games, feelings, French words and lots more. Ask her anything!</li>' +
   '<li><span class="when">Nov 24, 2026 · 1:40 PM</span><br>Mika now speaks very formally, calls you by your name - and once in a while answers in another language!</li>' +
   '<li><span class="when">Nov 24, 2026 · 1:35 PM</span><br>Talk to Mika! Say her name in the chat ("hi Mika", "Mika, are you hungry?") and she answers.</li>' +
   '<li><span class="when">Nov 24, 2026 · 9:45 AM</span><br>Building is closed for now - explore, drive, chat and pet Mika while you wait!</li>' +
@@ -4728,30 +4729,122 @@ function runCommand(text){
    later. She understands greetings, questions about herself, food, walks, naps, Paris, the weather, the time of day,
    compliments, jokes, goodbyes and more. Everyone sees the same answer (it's picked from the message itself). */
 function mikaHash(str){ var h = 2166136261; for(var i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
-var MIKA_TALK = [
-  {re:/\b(bye|goodbye|good night|goodnight|see (you|ya)|au revoir|later|cya)\b/, say:['Farewell, {name}. It has been an honour. I shall await your return beneath the Eiffel Tower.', 'Until we meet again, {name}. Do take care, and kindly remember to pet me upon your return.', 'Goodbye, {name}. Rest assured that I shall keep Paris safe in your absence.']},
-  {re:/\b(thanks|thank you|merci|ty)\b/, say:['You are most welcome, {name}. It was my pleasure.', 'Think nothing of it, {name}. Assisting you is the duty of any well-mannered dog.', 'The pleasure was entirely mine, {name}.']},
-  {re:/\b(how are you|how r u|how are u|how is it going|how's it going|you ok|you good|ça va|ca va)\b/, say:['I am exceedingly well, {name}, thank you kindly for enquiring. And how do you fare this fine day?', 'Most splendid, {name}. The city is lovely, and I have been petted a great deal.', 'I am in fine spirits, {name}, though I confess I am somewhat in need of a nap.']},
-  {re:/\b(hungry|food|treat|treats|snack|eat|dinner|lunch|breakfast|croissant|bone)\b/, say:['Did I hear the word "treat", {name}? I would be most grateful to receive one.', 'I must admit, {name}, that a croissant would be most welcome at this hour.', 'Indeed, {name}, I am rather peckish. I have been exceptionally well behaved today, if I may say so.']},
-  {re:/\b(walk|walkies|run|play|fetch|ball|zoomies)\b/, say:['A walk, {name}? I am, in point of fact, already on one. I circle the Eiffel Tower at all hours.', 'Should you throw the ball, {name}, I shall do my utmost to retrieve it. I make no guarantees, however.', 'What a delightful proposal, {name}. Do lead the way.']},
-  {re:/\b(sleep|sleepy|tired|nap|bed|bedtime)\b/, say:['I am rather fond of naps, {name}. My bed beside the fountain is the most comfortable spot in all of Paris.', 'Every few minutes I retire for a short rest, {name}. A lady requires her beauty sleep.', 'Do forgive me, {name}, but the mere mention of sleep has made me rather drowsy.']},
-  {re:/\b(good girl|good dog|good puppy|cute|adorable|pretty|beautiful|best dog|so cute)\b/, say:['You are far too kind, {name}. I am, admittedly, a very good girl.', 'Your compliment has set my tail wagging uncontrollably, {name}. Thank you.', 'How gracious of you, {name}. You are rather splendid yourself.']},
-  {re:/\b(love you|i love|love u|ily)\b/, say:['The feeling is entirely mutual, {name}. Do come and pet me, and I shall return your affection in hearts.', 'You warm my heart, {name}. I hold you in the very highest regard.', 'And I you, {name}. You are among my most cherished companions.']},
-  {re:/\b(bad dog|bad girl|ugly|stupid|dumb|hate you|smell)\b/, say:['I beg your pardon, {name}? That remark was most uncalled for.', 'How very rude, {name}. I shall choose to rise above it.', 'I shall pretend I did not hear that, {name}, out of courtesy.']},
-  {re:/\b(best friend|favorite person|favourite person|who do you like)\b/, say:function(who){ var bf = typeof bestFriend === 'function' ? bestFriend() : null; if(bf && who && bf.name.toLowerCase() === String(who).toLowerCase()) return ['Why, it is you, {name}! You have petted me no fewer than ' + fmtNum(bf.n) + ' times. I am most grateful.']; return bf ? ['My dearest friend is ' + bf.name + ', {name}, who has petted me no fewer than ' + fmtNum(bf.n) + ' times.'] : ['I have not yet chosen a best friend, {name}. Should you pet me, the honour may well be yours.']; }},
-  {re:/\b(how old|your age|old are you|birthday)\b/, say:['I am afraid, {name}, that a lady never discloses her age.', 'Old enough to know every street in Paris, {name}, and young enough to still enjoy the occasional zoomie.']},
-  {re:/\b(your name|who are you|what are you)\b/, say:['Allow me to introduce myself, {name}. I am Mika, the most distinguished dog in Paris.', 'My name is Mika, {name}. I reside beneath the Eiffel Tower and I am delighted to make your acquaintance.']},
-  {re:/\b(where|eiffel|tower|paris|france|fountain)\b/, say:['I reside directly beneath the Eiffel Tower, {name}. The view is quite unrivalled.', 'Paris is, without question, the finest city in the world, {name}. I have walked every last inch of it.', 'My bed lies beside the fountain near the Eiffel Tower, {name}. You are most welcome to visit.']},
-  {re:/\b(rain|raining|weather|sun|sunny|cloud|cloudy|snow)\b/, say:function(){ return skyState.rain > 0.4 ? ['It is raining at present, {name}, and I regret to say my fur is thoroughly soaked. A towel would be most appreciated.'] : skyState.cloud > 0.4 ? ['It is somewhat overcast today, {name}, though I assure you it shall not deter me from my walk.'] : ['The weather is simply glorious today, {name}. Ideal conditions for a stroll.']; }},
-  {re:/\b(night|day|time|dark|morning|evening)\b/, say:function(){ return skyState.night ? ['It is night-time in Paris, {name}. Do observe the Eiffel Tower as it sparkles.'] : ['It is daytime in Paris, {name}. A most agreeable hour for a walk.']; }},
-  {re:/\b(french|français|francais|speak|talk|language|languages)\b/, say:['I speak English, French and Dog fluently, {name}, and I dabble in several others.', 'Je suis une chienne très distinguée, {name}. That is to say, I am a most distinguished dog.']},
-  {re:/\b(joke|funny|lol|haha|laugh)\b/, say:['Why did the dog sit in the shade, {name}? Because she did not wish to become a hot dog.', 'What does one call a dog who performs magic, {name}? A labracadabrador.', 'Why are dogs such poor dancers, {name}? Because they have two left feet. And two right ones.']},
-  {re:/\b(car|drive|driving|crash|hit me|run over|explode)\b/, say:['I must ask you to drive with the utmost care around me, {name}. Striking me carries the gravest of consequences.', 'Motor cars are most amusing, {name}, but I would be obliged if you refrained from running me over.']},
-  {re:/\b(sit|stay|roll over|shake|paw|speak|trick|tricks)\b/, say:['Certainly, {name}. I am now seated. I trust a treat is forthcoming?', 'I have mastered a great many tricks, {name}. Observe as I roll over. Was that not splendid?', 'Permit me to offer you my paw, {name}. It is a pleasure to make your acquaintance.']},
-  {re:/\b(hi|hello|hey|yo|bonjour|salut|sup|hiya|howdy|good morning|good afternoon|good evening)\b/, say:['Good day to you, {name}. What a pleasure it is to see you.', 'Greetings, {name}. Do come closer, I would be delighted to be petted.', 'Bonjour, {name}, and welcome to Paris.', 'Why, hello there, {name}. I had so hoped someone would greet me today.']},
-  {re:/\?/, say:['An excellent question, {name}. I am merely a dog, but I suspect the answer is treats.', 'I am not entirely certain, {name}. I shall give it careful thought during my next nap.', 'A most thought-provoking enquiry, {name}. Do ask me again once I have eaten.']}
+/* Mika's topics: each has words (w), phrases (p) and her formal replies ({name} = whoever is talking).
+   The topic whose words best match the message wins; earlier topics win ties. */
+var MIKA_TOPICS = [
+  // --- special: the facts change, so these are worked out live ---
+  {w:'bestfriend bff', p:['best friend','favorite person','favourite person','who do you like','who pets you'], say:function(who){ var bf = typeof bestFriend === 'function' ? bestFriend() : null; if(bf && who && bf.name.toLowerCase() === String(who).toLowerCase()) return ['Why, it is you, {name}! You have petted me no fewer than ' + fmtNum(bf.n) + ' times. I am most grateful.']; return bf ? ['My dearest friend is ' + bf.name + ', {name}, who has petted me no fewer than ' + fmtNum(bf.n) + ' times.'] : ['I have not yet chosen a best friend, {name}. Should you pet me, the honour may well be yours.']; }},
+  {w:'weather rain raining rainy sun sunny cloud clouds cloudy umbrella wet storm', p:['is it raining','nice day'], say:function(){ return skyState.rain > 0.4 ? ['It is raining at present, {name}, and I regret to say my fur is thoroughly soaked. A towel would be most appreciated.'] : skyState.cloud > 0.4 ? ['It is somewhat overcast today, {name}, though I assure you it shall not deter me from my walk.'] : ['The weather is simply glorious today, {name}. Ideal conditions for a stroll.']; }},
+  {w:'night day time dark morning evening afternoon clock late early', p:['what time','is it night','is it day'], say:function(){ return skyState.night ? ['It is night-time in Paris, {name}. Do observe the Eiffel Tower as it sparkles.'] : ['It is daytime in Paris, {name}. A most agreeable hour for a walk.']; }},
+  {w:'pets petted petting pats', p:['how many pets','how many times'], say:function(){ return ['Altogether I have been petted ' + fmtNum(mika.total || petCount) + ' times, {name}. I treasure every single one.']; }},
+  // --- greetings and manners ---
+  {w:'bye goodbye goodnight cya later farewell adieu ciao', p:['good night','see you','see ya','au revoir','talk later','gotta go','got to go'], say:['Farewell, {name}. It has been an honour. I shall await your return beneath the Eiffel Tower.', 'Until we meet again, {name}. Do take care, and kindly remember to pet me upon your return.', 'Goodbye, {name}. Rest assured that I shall keep Paris safe in your absence.']},
+  {w:'thanks thank thx ty merci', p:['thank you'], say:['You are most welcome, {name}. It was my pleasure.', 'Think nothing of it, {name}. Assisting you is the duty of any well-mannered dog.']},
+  {w:'sorry apologize apologise apology oops pardon', p:['my bad','im sorry'], say:['Apology accepted, {name}. A true lady holds no grudges.', 'Think nothing of it, {name}. All is forgiven.']},
+  {w:'please plz pls', p:[], say:['Since you asked so politely, {name}, I shall consider it most favourably.', 'Your manners are impeccable, {name}. I am impressed.']},
+  {w:'hi hello hey yo hiya howdy sup greetings bonjour salut hola wassup heyy', p:['good morning','good afternoon','good evening','whats up'], say:['Good day to you, {name}. What a pleasure it is to see you.', 'Greetings, {name}. Do come closer, I would be delighted to be petted.', 'Bonjour, {name}, and welcome to Paris.', 'Why, hello there, {name}. I had so hoped someone would greet me today.']},
+  {w:'how', p:['how are you','how r u','how are u','hows it going','how is it going','you ok','you good','ca va','how was your day','how do you feel','are you okay'], say:['I am exceedingly well, {name}, thank you kindly for enquiring. And how do you fare this fine day?', 'Most splendid, {name}. The city is lovely, and I have been petted a great deal.', 'I am in fine spirits, {name}, though I confess I am somewhat in need of a nap.']},
+  // --- about her ---
+  {w:'name called', p:['your name','who are you','what are you','introduce yourself','whats your name'], say:['Allow me to introduce myself, {name}. I am Mika, the most distinguished dog in Paris.', 'My name is Mika, {name}. I reside beneath the Eiffel Tower and I am delighted to make your acquaintance.']},
+  {w:'age old older birthday born', p:['how old','your age','old are you','when were you born'], say:['I am afraid, {name}, that a lady never discloses her age.', 'Old enough to know every street in Paris, {name}, and young enough to still enjoy the occasional zoomie.']},
+  {w:'breed yorkie yorkshire terrier type kind', p:['what breed','what kind of dog','what type of dog'], say:['I am a Yorkshire Terrier, {name}. Small in stature, but enormous in dignity.', 'A Yorkshire Terrier, {name}. My ancestors hunted rats; I prefer to hunt compliments.']},
+  {w:'girl boy female male gender', p:['are you a girl','are you a boy'], say:['I am a lady, {name}, and a very well-mannered one at that.']},
+  {w:'real ai robot bot fake computer program alive chatgpt claude', p:['are you real','are you ai','are you a robot','are you alive','are you human'], say:['I am every bit as real as the Eiffel Tower in this game, {name}. Whether that is very real is a question for the philosophers.', 'I am a dog of words, {name}, not of wires. Well, mostly.']},
+  {w:'smart clever genius intelligent', p:['are you smart'], say:['I like to think so, {name}. I know every street in Paris and several words of Latin.', 'Smart enough to know where the treats are kept, {name}.']},
+  {w:'live home house', p:['where do you live','where is your home','where are you'], say:['I reside directly beneath the Eiffel Tower, {name}, with my bed beside the fountain. The view is quite unrivalled.']},
+  {w:'owner daniel', p:['who made you','who created you','who owns you','who is your owner'], say:['I belong to Daniel, {name}, who built this entire city. A most talented young man.', 'Daniel is my owner, {name}. He made Paris, and I keep it in order.']},
+  {w:'family mom mother mum dad father brother sister siblings parents', p:[], say:['My family is very dear to me, {name}. Do give my regards to yours.', 'Family is everything, {name}. Mine lives in Ontario, though my heart lives in Paris.']},
+  {w:'favorite favourite fav', p:['what do you like','what is your favorite'], say:['My favourite things, {name}, are naps, treats, being petted, and the Eiffel Tower at night. In that order. Possibly.']},
+  {w:'secret secrets', p:['tell me a secret'], say:['Very well, {name}, but tell no one: I sometimes pretend to be asleep so that people pet me gently.', 'A secret, {name}? When nobody is watching, I chase the pigeons. Shh.']},
+  {w:'tail wag wagging', p:[], say:['My tail is wagging most vigorously at this very moment, {name}.']},
+  {w:'fur hair groom groomer haircut brush fluffy', p:[], say:['My coat is groomed to perfection, {name}. It takes a great deal of effort to look this effortless.']},
+  {w:'flea fleas itchy itch scratch', p:[], say:['I beg your pardon, {name}! I do not have fleas. I simply enjoy a dignified scratch now and then.']},
+  // --- food ---
+  {w:'chocolate', p:[], say:['I must decline, {name}. Chocolate is dangerous for dogs, however delicious it may smell.', 'Alas, {name}, chocolate is poison to a dog. I shall admire it from afar.']},
+  {w:'grape grapes raisin raisins onion onions garlic', p:[], say:['I must politely refuse, {name}. That food is harmful to dogs.', 'Oh dear, {name}, that is not safe for a dog to eat. I shall pass.']},
+  {w:'chicken turkey heart hearts liver meat beef steak pork bacon ham sausage', p:['chicken hearts'], say:['Ah, {name}, you speak my language. Meat is, without doubt, the finest cuisine known to dogkind.', 'I would be absolutely delighted, {name}. Chicken is my weakness.', 'Mmm, {name}. You have my full and undivided attention.']},
+  {w:'cheese fromage brie camembert', p:[], say:['A little cheese, {name}? How very French of you. I accept with pleasure.']},
+  {w:'pizza burger burgers fries hotdog sandwich nuggets mcdonalds', p:['hot dog','fast food'], say:['I am told I ought not to eat such things, {name}, but I would not say no to a small bite.', 'Fast food, {name}? I prefer my meals slow, French, and served on porcelain.']},
+  {w:'croissant baguette bread crepe crepes pastry patisserie macaron macarons', p:[], say:['A croissant, {name}? Now you are speaking my language. Merci beaucoup!', 'Nothing compares to a warm baguette, {name}. I am, after all, a Parisian dog.']},
+  {w:'cake cookie cookies candy dessert sweets sugar icecream donut', p:['ice cream'], say:['Sweets are not terribly good for dogs, {name}, but I shall happily watch you enjoy them.']},
+  {w:'apple banana carrot carrots fruit vegetable vegetables veggies broccoli', p:[], say:['How healthy of you, {name}. A slice of apple or a carrot would suit me perfectly.']},
+  {w:'fish salmon tuna', p:[], say:['Fish, {name}? An unusual choice, but I am a dog of refined and adventurous taste.']},
+  {w:'water drink thirsty milk juice', p:[], say:['A bowl of fresh water would be most welcome, {name}. The fountain is lovely, but I am told I must not drink from it.']},
+  {w:'coffee tea latte', p:[], say:['Coffee is not for dogs, {name}, though I adore the smell of a Parisian café.']},
+  {w:'hungry food eat eating treat treats snack dinner lunch breakfast bone bones kibble feed starving', p:[], say:['Did I hear the word "treat", {name}? I would be most grateful to receive one.', 'I must admit, {name}, that a croissant would be most welcome at this hour.', 'Indeed, {name}, I am rather peckish. I have been exceptionally well behaved today, if I may say so.']},
+  // --- animals ---
+  {w:'cat cats kitty kitten meow', p:[], say:['Cats, {name}? We maintain a polite but distant relationship.', 'I have nothing against cats, {name}. I simply prefer they stay on their side of the Seine.']},
+  {w:'squirrel squirrels', p:[], say:['SQUIRREL? Where? Oh, do forgive me, {name}. I momentarily lost my composure.']},
+  {w:'pigeon pigeons bird birds duck ducks', p:[], say:['The pigeons of Paris and I have an understanding, {name}. They stay on the ground, and I pretend not to chase them.']},
+  {w:'mouse mice rat rats', p:[], say:['My ancestors were famous rat-catchers, {name}. I, however, prefer to delegate.']},
+  {w:'horse horses carousel', p:[], say:['The carousel horses are rather handsome, {name}, though none of them has ever wagged a tail.']},
+  {w:'dog dogs puppy puppies doggo pup', p:[], say:['Other dogs are perfectly charming, {name}, but I am, of course, the most distinguished dog in Paris.', 'Ah, a fellow admirer of dogs. You have excellent taste, {name}.']},
+  {w:'animal animals pet zoo', p:[], say:['I adore animals, {name}, though naturally I consider dogs the finest of them all.']},
+  // --- doing things ---
+  {w:'walk walkies stroll outside', p:['go for a walk'], say:['A walk, {name}? I am, in point of fact, already on one. I circle the Eiffel Tower at all hours.', 'What a delightful proposal, {name}. Do lead the way.']},
+  {w:'fetch ball toy toys frisbee stick throw', p:[], say:['Should you throw the ball, {name}, I shall do my utmost to retrieve it. I make no guarantees, however.', 'A toy, {name}? I accept, though I may chew it rather thoroughly.']},
+  {w:'play game games playing fun', p:['want to play','lets play'], say:['I should love to play, {name}. Shall we begin with hide and seek? I shall hide behind the Eiffel Tower.', 'Playtime, {name}? You have my enthusiastic agreement.']},
+  {w:'run running race zoomies fast speed', p:[], say:['I may be small, {name}, but when the zoomies take hold, no car in Paris can catch me.']},
+  {w:'sleep sleepy tired nap bed bedtime yawn rest', p:[], say:['I am rather fond of naps, {name}. My bed beside the fountain is the most comfortable spot in all of Paris.', 'Every few minutes I retire for a short rest, {name}. A lady requires her beauty sleep.', 'Do forgive me, {name}, but the mere mention of sleep has made me rather drowsy.']},
+  {w:'bath shower wash soap clean dirty', p:[], say:['A bath, {name}? I shall pretend I did not hear that.', 'I prefer to stay clean by avoiding puddles entirely, {name}. Baths are a last resort.']},
+  {w:'swim swimming pool fountain', p:[], say:['I admire the fountain greatly, {name}, but I have no intention of swimming in it.']},
+  {w:'vet doctor sick ill hurt injured hospital medicine', p:[], say:['I am in perfect health, thank you, {name}. And I would prefer not to discuss the vet.', 'The vet, {name}? Please do not say that word so loudly.']},
+  {w:'sit stay roll shake paw trick tricks speak beg', p:['roll over','high five','play dead'], say:['Certainly, {name}. I am now seated. I trust a treat is forthcoming?', 'I have mastered a great many tricks, {name}. Observe as I roll over. Was that not splendid?', 'Permit me to offer you my paw, {name}. It is a pleasure to make your acquaintance.']},
+  {w:'bark barking woof ruff arf bork', p:[], say:['WOOF, {name}. Forgive me, that slipped out. I meant to say: good day.', 'Ruff ruff, {name}. That is formal dog for "how do you do".']},
+  {w:'dance dancing', p:[], say:['I shall dance for you, {name}. Behold: a twirl. And another twirl. Magnifique.']},
+  {w:'sing song songs music singing', p:[], say:['Awoooo, {name}. That was an aria. You may applaud.', 'I adore music, {name}. Particularly accordion music, as befits a Parisian.']},
+  {w:'hug hugs cuddle cuddles kiss kisses lick', p:[], say:['A hug, {name}? I would be honoured. Do mind my fur.', 'Consider yourself warmly cuddled, {name}.']},
+  {w:'pet', p:['can i pet you','pet you','pet me'], say:['You may pet me at once, {name}. Simply walk up to me and press E.', 'Petting is always welcome, {name}. Walk up to me and press E.']},
+  // --- feelings ---
+  {w:'happy glad yay excited awesome great amazing', p:[], say:['Your happiness is contagious, {name}. My tail agrees.', 'How marvellous, {name}! I am delighted for you.']},
+  {w:'sad upset cry crying depressed unhappy', p:['feel bad','not okay'], say:['I am sorry you feel that way, {name}. Do come and pet me. I am told it helps.', 'Chin up, {name}. Every cloud passes, even over Paris.']},
+  {w:'angry mad furious annoyed', p:[], say:['Take a deep breath, {name}. Perhaps a stroll around the Eiffel Tower would calm the nerves.']},
+  {w:'scared afraid scary fear spooky ghost ghosts monster', p:[], say:['Fear not, {name}. I shall protect you. I am small, but I am very brave.']},
+  {w:'bored boring', p:['nothing to do'], say:['Bored, {name}? Might I suggest exploring Paris, driving, or, better yet, petting me?']},
+  {w:'lonely alone', p:[], say:['You are never alone in Paris, {name}. I am always here beneath the Eiffel Tower.']},
+  // --- compliments and insults ---
+  {w:'cute adorable pretty beautiful gorgeous lovely sweet', p:['good girl','good dog','good puppy','best dog','so cute'], say:['You are far too kind, {name}. I am, admittedly, a very good girl.', 'Your compliment has set my tail wagging uncontrollably, {name}. Thank you.', 'How gracious of you, {name}. You are rather splendid yourself.']},
+  {w:'love ily adore', p:['love you','i love','love u'], say:['The feeling is entirely mutual, {name}. Do come and pet me, and I shall return your affection in hearts.', 'You warm my heart, {name}. I hold you in the very highest regard.']},
+  {w:'ugly stupid dumb idiot hate smell smelly stinky gross annoying', p:['bad dog','bad girl','shut up'], say:['I beg your pardon, {name}? That remark was most uncalled for.', 'How very rude, {name}. I shall choose to rise above it.', 'I shall pretend I did not hear that, {name}, out of courtesy.']},
+  {w:'marry married date dating girlfriend boyfriend crush', p:['will you marry me','go out with me'], say:['How flattering, {name}, but I am married to my work: keeping Paris in order.', 'I am afraid my heart belongs to the Eiffel Tower, {name}.']},
+  // --- Paris and France ---
+  {w:'eiffel tower', p:['eiffel tower'], say:['The Eiffel Tower is my home, {name}. It is 330 metres tall in real life and was finished in 1889.', 'I live directly beneath it, {name}. At night it sparkles, and so, I like to think, do I.']},
+  {w:'louvre museum mona lisa art painting', p:['mona lisa'], say:['The Louvre is the largest art museum in the world, {name}. Sadly they do not allow dogs. A grave injustice.']},
+  {w:'notre dame cathedral church', p:['notre dame'], say:['Notre-Dame is magnificent, {name}. I hear the bells from my bed.']},
+  {w:'arc triomphe', p:['arc de triomphe'], say:['The Arc de Triomphe stands at the top of the Champs-Elysées, {name}. A most triumphant arch indeed.']},
+  {w:'seine river bridge bridges boat boats', p:[], say:['The Seine flows right through Paris, {name}. I enjoy watching the boats, though I do not care to board them.']},
+  {w:'montmartre moulin rouge windmill', p:['moulin rouge','sacre coeur'], say:['The Moulin Rouge and its red windmill, {name}! Paris has everything, does it not?']},
+  {w:'champs elysees', p:['champs elysees'], say:['The Champs-Elysées is the most elegant avenue in the world, {name}. I strut along it often.']},
+  {w:'paris city', p:[], say:['Paris is, without question, the finest city in the world, {name}. I have walked every last inch of it.']},
+  {w:'france french francais français', p:['speak french','do you speak'], say:['Je parle français couramment, {name}. That means I speak French fluently.', 'Je suis une chienne très distinguée, {name}. That is to say, I am a most distinguished dog.']},
+  {w:'translate translation', p:['how do you say','what does','in french','say in french','french word'], say:['A few useful phrases, {name}: bonjour means hello, merci means thank you, and chien means dog. Chienne means a lady dog, like me.', 'In French, {name}: s\'il vous plaît means please, au revoir means goodbye, and je t\'aime means I love you.']},
+  {w:'language languages spanish german italian english japanese chinese', p:[], say:['I speak English, French and Dog fluently, {name}, and I dabble in several others. Listen closely and you may hear them.']},
+  // --- school ---
+  {w:'school class classes teacher homework assignment project test exam quiz grade grades', p:[], say:['I hope your studies go splendidly, {name}. Do tell your teacher that Mika sends her regards.', 'Homework, {name}? Do not let the dog eat it. Not this dog, anyway. I have standards.']},
+  {w:'math maths science history geography reading writing', p:[], say:['A noble subject, {name}. I myself am rather good at counting treats.']},
+  // --- games and fun ---
+  {w:'minecraft fortnite roblox xbox playstation ps5 nintendo switch videogame videogames gaming gamer', p:['video game','video games'], say:['I am told I would be rather good at video games, {name}, were it not for my paws.', 'Games, {name}? I am, in a manner of speaking, inside one at this very moment.']},
+  {w:'soccer football hockey basketball baseball sport sports team', p:[], say:['I adore sport, {name}, especially any sport involving a ball I am permitted to chase.', 'Allez les Bleus, {name}! That is how one cheers for France.']},
+  {w:'joke jokes funny lol lmao haha hahaha laugh rofl', p:['tell me a joke'], say:['Why did the dog sit in the shade, {name}? Because she did not wish to become a hot dog.', 'What does one call a dog who performs magic, {name}? A labracadabrador.', 'Why are dogs such poor dancers, {name}? Because they have two left feet. And two right ones.']},
+  {w:'magic wizard spell', p:[], say:['Abracadabra, {name}! I have made a treat disappear. It is in my stomach.']},
+  {w:'phone tiktok youtube instagram snapchat internet wifi', p:[], say:['I do not care for screens, {name}, though I hear I would be very popular on the internet.']},
+  {w:'space moon stars star planet rocket alien aliens', p:[], say:['On clear nights, {name}, I gaze at the stars above Paris and wonder whether there are dogs on the moon.']},
+  {w:'superhero superman batman spiderman hero', p:[], say:['Every dog is a hero to someone, {name}. I am Paris\'s.']},
+  {w:'christmas halloween easter holiday holidays santa present presents gift gifts', p:[], say:['I adore the holidays, {name}, particularly any that involve wrapping paper I may shred.']},
+  {w:'winter summer spring autumn fall snow cold hot warm', p:[], say:['Every season in Paris is beautiful, {name}, though I prefer the ones without snow on my paws.']},
+  // --- the game itself ---
+  {w:'car cars drive driving porsche crash coupe speed', p:['hit me','run over','run you over'], say:['I must ask you to drive with the utmost care around me, {name}. Striking me carries the gravest of consequences.', 'Motor cars are most amusing, {name}, but I would be obliged if you refrained from running me over.']},
+  {w:'explode explosion boom bomb', p:[], say:['I would rather not discuss explosions, {name}. They are terribly bad for one\'s fur.']},
+  {w:'build building shop house plot', p:[], say:['Building is closed for the moment, {name}, but Daniel shall reopen it soon. In the meantime, do enjoy the sights.']},
+  {w:'heaven halo angel die died dead', p:[], say:['I have been to heaven and back, {name}. The choir was lovely, but I prefer it down here.']},
+  {w:'money euro euros rich buy shop shopping', p:[], say:['I have no money, {name}, but I am rich in pets and admiration.']},
+  {w:'travel vacation trip plane airport', p:[], say:['Why would I travel anywhere, {name}? I already live in Paris.']},
+  {w:'job work working', p:[], say:['My job, {name}, is to look adorable and keep Paris in order. I take it very seriously.']},
+  {w:'color colour colors colours red blue green yellow pink purple', p:['favorite color','favourite colour'], say:['My favourite colour is the gold of the Eiffel Tower at night, {name}.']}
 ];
-var MIKA_DEFAULT = ['Did someone call for me? Here I am, {name}, at your service.', 'You called, {name}? I am all ears. Quite literally.', 'I heard my name, {name}. How may I be of assistance?', 'Mika, at your service, {name}.'];
+var MIKA_DEFAULT = ['Did someone call for me? Here I am, {name}, at your service.', 'You called, {name}? I am all ears. Quite literally.', 'I heard my name, {name}. How may I be of assistance?', 'Mika, at your service, {name}.', 'An interesting thought, {name}. Do tell me more.', 'I am listening attentively, {name}.'];
+var MIKA_QUESTION = ['An excellent question, {name}. I am merely a dog, but I suspect the answer is treats.', 'I am not entirely certain, {name}. I shall give it careful thought during my next nap.', 'A most thought-provoking enquiry, {name}. Do ask me again once I have eaten.'];
+(function(){ MIKA_TOPICS.forEach(function(tp){ tp.words = tp.w.split(' ').filter(Boolean); }); })();
 /* now and then (1 time in 12) she answers in another language instead */
 var MIKA_LANGS = [
   ['Spanish', 'Buenas tardes, {name}. Es un verdadero honor conversar con usted.'],
@@ -4767,15 +4860,22 @@ var MIKA_LANGS = [
   ['Latin', 'Salve, {name}. Magno mihi honori est tecum loqui.']
 ];
 function mikaReply(text, who){
-  var low = String(text).toLowerCase(), list = null, h = mikaHash(who + '|' + low), name = who || 'friend';
-  var line;
+  var low = String(text).toLowerCase(), h = mikaHash(who + '|' + low), name = who || 'friend', line;
+  var clean = ' ' + low.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9?]+/g, ' ') + ' ';
+  var tokens = {}; clean.split(' ').forEach(function(w){ if(w) tokens[w.replace(/\?/g, '')] = true; });
   if(h % 12 === 0){
     var lang = MIKA_LANGS[Math.floor(h/12) % MIKA_LANGS.length];
     line = lang[1] + ' (' + lang[0] + ')';
   } else {
-    for(var i=0;i<MIKA_TALK.length;i++){ if(MIKA_TALK[i].re.test(low)){ list = MIKA_TALK[i].say; break; } }
+    var best = null, bestScore = 0;
+    MIKA_TOPICS.forEach(function(tp){
+      var sc = 0;
+      tp.words.forEach(function(w){ if(tokens[w]) sc += 1 + w.length/20; });   // longer words are more specific: they count a bit more
+      tp.p.forEach(function(ph){ var q = ' ' + ph.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim() + ' '; if(clean.indexOf(q) >= 0) sc += 3; });
+      if(sc > bestScore){ best = tp; bestScore = sc; }
+    });
+    var list = best ? best.say : (/\?/.test(low) ? MIKA_QUESTION : MIKA_DEFAULT);
     if(typeof list === 'function') list = list(name);
-    if(!list) list = MIKA_DEFAULT;
     line = list[Math.floor(h/12) % list.length];
   }
   line = line.split('{name}').join(name);
