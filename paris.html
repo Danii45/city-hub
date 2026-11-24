@@ -135,6 +135,7 @@ button{font-family:'Press Start 2P', monospace;}
 #mika-hud .mk-row, #mika-board .mk-row{display:flex; gap:10px; align-items:center; padding:5px 8px; font-family:'VT323', monospace; font-size:20px; border-bottom:2px solid var(--panel-border);}
 #mika-hud .mk-row .mk-rank, #mika-board .mk-row .mk-rank{width:34px; color:var(--ink-soft);}
 #mika-hud .mk-row .mk-name, #mika-board .mk-row .mk-name{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+#mika-hud .mk-row.me, #mika-board .mk-row.me, #mika-hud .mk-row.me .mk-rank, #mika-board .mk-row.me .mk-rank{color:#1f2233;}
 #mika-hud .mk-row.me, #mika-board .mk-row.me{background:#ffe3ea;}
 #mika-hud .mk-note, #mika-board .mk-note{font-family:'VT323', monospace; font-size:18px; color:var(--ink-soft); padding:10px 4px 0;}
 #chauffard.dark{background:#000; color:#ff1a1a; border-color:#ff1a1a; box-shadow:0 0 0 4px #000, 8px 8px 0 4px #000;}
@@ -4622,6 +4623,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 24, 2026 · 2:00 PM</span><br>Mika knows about 1,500 words now: foods, animals, countries, music, sports, jobs, colours, games and more - and her answer mentions what you asked about.</li>' +
   '<li><span class="when">Nov 24, 2026 · 1:50 PM</span><br>Mika understands almost 100 topics now - food, animals, school, Paris, games, feelings, French words and lots more. Ask her anything!</li>' +
   '<li><span class="when">Nov 24, 2026 · 1:40 PM</span><br>Mika now speaks very formally, calls you by your name - and once in a while answers in another language!</li>' +
   '<li><span class="when">Nov 24, 2026 · 1:35 PM</span><br>Talk to Mika! Say her name in the chat ("hi Mika", "Mika, are you hungry?") and she answers.</li>' +
@@ -4844,6 +4846,52 @@ var MIKA_TOPICS = [
 ];
 var MIKA_DEFAULT = ['Did someone call for me? Here I am, {name}, at your service.', 'You called, {name}? I am all ears. Quite literally.', 'I heard my name, {name}. How may I be of assistance?', 'Mika, at your service, {name}.', 'An interesting thought, {name}. Do tell me more.', 'I am listening attentively, {name}.'];
 var MIKA_QUESTION = ['An excellent question, {name}. I am merely a dog, but I suspect the answer is treats.', 'I am not entirely certain, {name}. I shall give it careful thought during my next nap.', 'A most thought-provoking enquiry, {name}. Do ask me again once I have eaten.'];
+/* Mika's big word lists: thousands of everyday words. Her answer mentions the word you used ({word}). */
+var MIKA_BIG = [
+  {w:'avocado avocados macadamia nuts alcohol wine beer xylitol gum caffeine energy redbull cherry cherries', say:['I must decline the {word}, {name}. It is not safe for dogs, I am afraid.', 'Thank you, {name}, but {word} is not good for a dog. I shall pass most politely.']},
+  {w:'mango mangoes pineapple watermelon melon strawberry strawberries blueberry blueberries raspberry raspberries blackberry blackberries peach peaches pear pears plum plums kiwi orange oranges lemon lemons lime limes coconut papaya apricot apricots fig figs pomegranate cranberry cranberries tangerine clementine grapefruit nectarine lychee guava dragonfruit passionfruit berries berry cantaloupe honeydew', say:['{word}, {name}? A most refreshing choice. I would accept a small piece with gratitude.', 'I have heard wonderful things about {word}, {name}. Do share, if you would be so kind.', 'Ah, {word}. How sophisticated your tastes are, {name}.']},
+  {w:'potato potatoes tomato tomatoes lettuce spinach kale cucumber cucumbers pepper peppers corn peas pea beans bean zucchini pumpkin squash celery cabbage cauliflower asparagus beet beets radish mushroom mushrooms eggplant leek leeks yam yams sweetpotato artichoke olives olive pickles pickle salad', say:['{word}, {name}? Very wholesome. I shall eat it if you insist, but I would prefer chicken.', 'Ah, {word}. My vet would be proud of you, {name}.']},
+  {w:'rice pasta spaghetti noodles ramen lasagna macaroni soup stew curry taco tacos burrito burritos nachos quesadilla sushi dumplings dumpling pho kebab falafel hummus omelette omelet eggs egg pancakes pancake waffles waffle toast cereal oatmeal porridge yogurt yoghurt butter jam honey syrup peanut peanutbutter popcorn chips crisps pretzel pretzels crackers bagel bagels muffin muffins brownie brownies pie cupcake cupcakes cheesecake pudding jelly jello marshmallow marshmallows lollipop gummy gummies skittles oreo oreos poutine meatballs meatball ribs wings shawarma gyro quiche ratatouille escargot fondue souffle soufflé tart eclair eclairs madeleine brioche',
+   say:['{word}, {name}? It smells absolutely heavenly from here.', 'I have never had the pleasure of trying {word}, {name}, but I would be honoured to do so.', 'Mmm, {word}. You certainly know how to tempt a lady, {name}.']},
+  {w:'lion lions tiger tigers bear bears wolf wolves fox foxes rabbit rabbits bunny bunnies deer moose elk elephant elephants giraffe giraffes zebra zebras monkey monkeys gorilla gorillas chimp chimpanzee panda pandas koala koalas kangaroo kangaroos hippo hippos rhino rhinos cow cows pig pigs sheep goat goats chicken chickens rooster hen chick llama alpaca camel camels donkey donkeys turtle turtles tortoise frog frogs toad snake snakes lizard lizards crocodile alligator dinosaur dinosaurs trex shark sharks whale whales dolphin dolphins octopus jellyfish crab crabs lobster seal seals penguin penguins owl owls eagle eagles hawk parrot parrots flamingo swan swans goose geese chickadee robin crow crows raven hamster hamsters gerbil guineapig ferret hedgehog porcupine raccoon raccoons skunk beaver otter otters badger bat bats spider spiders bee bees butterfly butterflies ant ants ladybug worm worms snail snails beetle mosquito fly flies dragon dragons unicorn unicorns',
+   say:['{word}, {name}? Fascinating creatures. Though, naturally, not quite as distinguished as a dog.', 'I have always wished to meet {word}, {name}. I would greet them most politely.', 'Ah, {word}. I respect them greatly, {name}, from a safe and dignified distance.']},
+  {cap:true, w:'canada toronto ontario vaughan montreal quebec vancouver ottawa calgary america usa us york newyork california florida texas chicago boston london england uk britain scotland ireland wales spain madrid barcelona italy rome venice milan germany berlin munich portugal lisbon netherlands amsterdam belgium brussels switzerland geneva austria vienna greece athens turkey istanbul russia moscow poland warsaw sweden norway denmark finland iceland egypt cairo morocco africa kenya nigeria southafrica china beijing shanghai japan tokyo kyoto korea seoul india mumbai delhi thailand bangkok vietnam philippines indonesia bali australia sydney melbourne newzealand mexico brazil rio argentina peru chile colombia cuba jamaica dubai iran iraq israel lebanon syria pakistan europe asia antarctica arctic hawaii alaska las vegas lasvegas',
+   say:['I have never been to {word}, {name}, but I hear it is quite lovely. Of course, nothing compares to Paris.', '{word}, {name}? A splendid place, I am told. Do send me a postcard.', 'Ah, {word}. Perhaps one day I shall visit, {name}. For now, Paris keeps me rather busy.']},
+  {w:'guitar piano drums drum violin cello flute trumpet saxophone accordion harp ukulele bass clarinet trombone harmonica keyboard microphone concert band orchestra rap rock jazz pop classical opera hiphop country kpop beat beats playlist spotify headphones',
+   say:['{word}, {name}? How cultured. I enjoy music very much, especially the accordion.', 'I would love to hear the {word}, {name}. I promise to howl only a little.']},
+  {w:'skateboard skateboarding bike bicycle cycling scooter skating skiing ski snowboard snowboarding surfing surf tennis golf volleyball rugby boxing karate judo wrestling gymnastics swimming track marathon jogging hiking climbing fishing bowling badminton pingpong cricket lacrosse curling skating archery fencing yoga gym workout exercise',
+   say:['{word}, {name}? How athletic of you. I prefer a more leisurely pace, but I admire your energy.', 'I would happily cheer you on at {word}, {name}. Allez, allez!']},
+  {w:'bus train trains subway metro taxi truck trucks motorcycle motorbike plane planes airplane helicopter jet boat ship ships yacht submarine rocket tractor ambulance firetruck van limo limousine tram',
+   say:['A {word}, {name}? Most impressive. I, however, travel exclusively on my own four paws.', 'I have seen many a {word} pass through Paris, {name}. None, I regret, have stopped to pet me.']},
+  {w:'shirt pants jeans dress skirt shoes sneakers boots socks hat cap hoodie sweater jacket coat scarf gloves mittens tie bowtie glasses sunglasses watch necklace bracelet ring earrings backpack bag purse beret pajamas uniform costume collar leash sweater',
+   say:['A {word}, {name}? How very stylish. Parisians are, after all, famous for their fashion.', 'I would look most fetching in a {word}, {name}, do you not agree?']},
+  {w:'table chair couch sofa bed pillow blanket lamp window door kitchen bathroom bedroom garden yard fence roof stairs mirror clock fridge oven microwave sink toilet carpet rug tv television computer laptop tablet ipad iphone camera remote book books pencil pen paper notebook desk backpack scissors glue crayons marker markers',
+   say:['A {word}, {name}? I shall inspect it thoroughly, by which I mean sniff it.', 'Ah, a {word}. Very useful, I am sure, {name}, though I mostly use mine for napping.']},
+  {w:'tree trees flower flowers rose roses tulip tulips grass leaf leaves forest woods jungle mountain mountains hill hills river rivers lake lakes ocean oceans sea beach sand island volcano desert cave waterfall rainbow sky sunset sunrise cloud clouds wind thunder lightning tornado hurricane earthquake ice fire rock rocks stone garden park nature',
+   say:['Ah, {word}. Nature is magnificent, {name}. I particularly enjoy sniffing it.', '{word}, {name}? How poetic. Paris has its own natural beauty, especially in the parks.']},
+  {w:'doctor nurse teacher police policeman firefighter chef cook baker farmer pilot astronaut scientist engineer artist painter singer actor actress dancer athlete lawyer judge mechanic builder plumber electrician programmer coder youtuber streamer president king queen prince princess knight soldier sailor pirate pirates ninja ninjas cowboy detective spy mailman waiter',
+   say:['A {word}, {name}? A most noble calling. I myself am a professional good girl.', 'If I were not a dog, {name}, I might have been a {word}. Though I suspect I would nap on the job.']},
+  {w:'red orange yellow green blue purple violet pink brown black white grey gray gold silver beige turquoise teal navy maroon magenta cyan lavender rainbow',
+   say:['{word}, {name}? A splendid colour. Though I remain partial to the gold of the Eiffel Tower at night.', 'Ah, {word}. It would suit you very well, {name}.']},
+  {cap:true, w:'monday tuesday wednesday thursday friday saturday sunday weekend today tomorrow yesterday week month year january february march april may june july august september october november december',
+   say:['{word}, {name}? Every day is a good day when one lives in Paris.', 'Ah, {word}. I shall mark it on my calendar, {name}, right between nap time and treat time.']},
+  {cap:true, w:'birthday party celebration wedding anniversary christmas hanukkah diwali eid ramadan easter halloween thanksgiving newyear valentine valentines', say:['How festive, {name}! Do save me a slice of {word} cake. Dog-friendly, if you please.', '{word}, {name}? I adore a celebration. I shall wear my finest collar.']},
+  {w:'happy joyful cheerful delighted thrilled ecstatic proud grateful thankful hopeful calm relaxed peaceful content', say:['I am so pleased to hear that you feel {word}, {name}. It warms my little heart.', 'How wonderful, {name}. A {word} friend is the best kind of friend.']},
+  {w:'sad unhappy miserable lonely hurt heartbroken stressed nervous anxious worried tired exhausted sick frustrated confused embarrassed jealous grumpy cranky', say:['I am sorry you feel {word}, {name}. Do come and pet me. I am told it helps a great deal.', 'There, there, {name}. Feeling {word} passes, just like the rain over Paris.']},
+  {cap:true, w:'roblox fortnite minecraft pokemon mario zelda sonic tetris pacman amongus among valorant overwatch fifa nba2k gta callofduty cod apex halo terraria stardew animalcrossing splatoon kirby smash chess checkers cards uno monopoly lego legos puzzle puzzles', say:['{word}, {name}? I have heard it is great fun. I would play, were it not for my paws.', 'Ah, {word}. You must teach me sometime, {name}. I am a quick learner, especially with treats.']},
+  {cap:true, w:'apple google microsoft amazon netflix disney nike adidas samsung tesla nintendo sony lego mcdonalds starbucks', say:['{word}, {name}? I am but a humble dog, and I do not follow such matters. I do, however, follow treats.']},
+  {w:'one two three four five six seven eight nine ten hundred thousand million billion number numbers count counting', say:['Numbers, {name}? I can count to {word}, provided each number is a treat.', 'I am rather good at counting, {name}. Especially pets.']},
+  {w:'head eyes eye ears ear nose mouth teeth tooth tongue paws paw tail legs leg belly tummy back fur whiskers', say:['My {word}, {name}? In excellent condition, thank you. I take very good care of myself.', 'Ah, the {word}. A most important feature of any distinguished dog, {name}.']},
+  {w:'yes yeah yep yup ok okay sure absolutely definitely correct right true', say:['Splendid, {name}. We are in complete agreement.', 'Very good, {name}. I thought you might say that.']},
+  {w:'no nope nah never wrong false', say:['Very well, {name}. I respect your decision entirely.', 'No? How intriguing, {name}. I shall reconsider my position. After my nap.']},
+  {w:'maybe perhaps idk dunno unsure', p:['i dont know','not sure'], say:['Uncertainty is perfectly natural, {name}. Even I am unsure at times. Mostly about whether it is dinner time.']},
+  {w:'wow omg whoa cool nice sick epic awesome amazing incredible wonderful fantastic brilliant', say:['I am delighted you think so, {name}.', 'Indeed, {name}. Quite remarkable, is it not?']},
+  {w:'boring meh whatever ugh', say:['Do not despair, {name}. Paris is full of wonders. Have you visited the Louvre yet?']},
+  {w:'teach learn lesson study studying', say:['I am always eager to learn, {name}. Today I learned that you are very kind.', 'Learning is a noble pursuit, {name}. I am currently studying the art of the nap.']},
+  {w:'god heaven pray church', say:['I have been to heaven and back, {name}. The choir was lovely, but I prefer it down here.']},
+  {w:'tired busy sleepy', say:['Do rest, {name}. Even the busiest Parisian needs a nap now and then.']}
+];
+MIKA_BIG.forEach(function(tp){ tp.p = tp.p || []; tp.big = true; MIKA_TOPICS.push(tp); });   // after the special topics: those win ties
 (function(){ MIKA_TOPICS.forEach(function(tp){ tp.words = tp.w.split(' ').filter(Boolean); }); })();
 /* now and then (1 time in 12) she answers in another language instead */
 var MIKA_LANGS = [
@@ -4867,18 +4915,23 @@ function mikaReply(text, who){
     var lang = MIKA_LANGS[Math.floor(h/12) % MIKA_LANGS.length];
     line = lang[1] + ' (' + lang[0] + ')';
   } else {
-    var best = null, bestScore = 0;
+    var best = null, bestScore = 0, bestWord = '';
     MIKA_TOPICS.forEach(function(tp){
-      var sc = 0;
-      tp.words.forEach(function(w){ if(tokens[w]) sc += 1 + w.length/20; });   // longer words are more specific: they count a bit more
+      var sc = 0, word = '';
+      tp.words.forEach(function(w){ if(tokens[w]){ sc += 1 + w.length/20; if(w.length > word.length) word = w; } });   // longer words are more specific: they count a bit more
       tp.p.forEach(function(ph){ var q = ' ' + ph.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim() + ' '; if(clean.indexOf(q) >= 0) sc += 3; });
-      if(sc > bestScore){ best = tp; bestScore = sc; }
+      if(sc > bestScore){ best = tp; bestScore = sc; bestWord = word; }
     });
     var list = best ? best.say : (/\?/.test(low) ? MIKA_QUESTION : MIKA_DEFAULT);
     if(typeof list === 'function') list = list(name);
     line = list[Math.floor(h/12) % list.length];
   }
   line = line.split('{name}').join(name);
+  if(line.indexOf('{word}') >= 0){
+    var wd = bestWord || 'that';
+    if(best && best.cap) wd = wd.charAt(0).toUpperCase() + wd.slice(1);
+    line = line.replace(/(^|[.!?]\s+)\{word\}/g, function(m, pre){ return pre + wd.charAt(0).toUpperCase() + wd.slice(1); }).split('{word}').join(wd);
+  }
   if(pet.sleeping) line = '*awakens with a gentle yawn* ' + line;
   return line;
 }
