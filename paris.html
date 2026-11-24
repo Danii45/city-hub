@@ -18,6 +18,11 @@
   --good:#2f8a4a;
   color-scheme:light;
 }
+/* DARK BLUE MODE: only for Daniel and the players he gives it to */
+:root.theme-navy{
+  --bg:#0a1433; --panel:#14245a; --panel-border:#9fc0ff; --ink:#e8f0ff; --ink-soft:#a9bbe6;
+  --accent:#4f8bff; --accent-2:#ff6b6b; --good:#5fd38a; color-scheme:dark;
+}
 /* light for everyone; dark only if you switch it on (SETTINGS > DARK MODE) */
 :root.theme-dark{
   --bg:#0e1424; --panel:#1b2030; --panel-border:#e6e1d4; --ink:#f1ebe0; --ink-soft:#b4b0a6;
@@ -95,6 +100,8 @@ button{font-family:'Press Start 2P', monospace;}
 }
 .old-badge{display:inline-block; margin-left:6px; padding:1px 4px; font-size:7px; color:#fff; background:#c8231a; border:2px solid var(--panel-border); vertical-align:middle;}
 .role-badge.rank i{font-style:normal;}
+.navy-give{font-size:8px; padding:6px 6px; margin-right:6px;}
+.navy-give.on{background:#14245a; color:#e8f0ff; border-color:#9fc0ff;}
 .rank-select{font-family:'VT323', monospace; font-size:17px; padding:2px 4px; margin-right:6px; background:var(--panel); color:var(--ink); border:2px solid var(--panel-border); cursor:pointer;}
 .role-badge.owner{background:#0d1a24; border-color:#9fe6ff; box-shadow:0 0 6px rgba(140,225,255,0.75);}
 .role-badge.owner i{
@@ -121,7 +128,7 @@ button{font-family:'Press Start 2P', monospace;}
 /* the "new version" window */
 #update-win{position:fixed; inset:0; z-index:200; display:flex; align-items:center; justify-content:center; background:rgba(10,12,24,0.45);}
 #update-win.hidden{display:none;}
-#pw-change.hidden, #pw-form.hidden, #pw-change .btn-row.hidden, #many-block.hidden, .btn.hidden{display:none;}
+#navy-row.hidden, #pw-change.hidden, #pw-form.hidden, #pw-change .btn-row.hidden, #many-block.hidden, .btn.hidden{display:none;}
 #update-win .uw{width:min(420px, 92vw); padding:0; animation:uwPop 0.18s ease-out;}
 @keyframes uwPop{from{transform:scale(0.9); opacity:0;} to{transform:scale(1); opacity:1;}}
 @media (prefers-reduced-motion: reduce){ #update-win .uw{animation:none;} }
@@ -508,6 +515,7 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
         <div class="settings-label second"><span data-t="music">MUSIC</span><button class="toggle" id="music-toggle">ON</button></div>
         <div class="speed-hint" data-t="musicHint">Accordion music.</div>
         <div class="settings-label second"><span data-t="darkLabel">DARK MODE</span><button class="toggle" id="dark-toggle">OFF</button></div>
+        <div class="settings-label second hidden" id="navy-row"><span data-t="navyLabel">DARK BLUE MODE</span><button class="toggle" id="navy-toggle">OFF</button></div>
         <div class="settings-label second"><span data-t="skyLabel">SKY</span><button class="toggle" id="sky-toggle">ON</button></div>
         <div class="speed-hint" data-t="skyHint">Day, night and weather.</div>
       </div>
@@ -4689,8 +4697,25 @@ STR.en.darkLabel = 'DARK MODE'; STR.fr.darkLabel = 'MODE SOMBRE';
 var darkMode = false;
 try { darkMode = localStorage.getItem('paris.dark') === 'on'; } catch(e){}
 var darkToggle = document.getElementById('dark-toggle');
-function applyDark(){ document.documentElement.classList.toggle('theme-dark', darkMode); setToggle(darkToggle, darkMode); }
-darkToggle.addEventListener('click', function(){ darkMode = !darkMode; try { localStorage.setItem('paris.dark', darkMode ? 'on' : 'off'); } catch(e){} applyDark(); });
+STR.en.navyLabel = 'DARK BLUE MODE'; STR.fr.navyLabel = 'MODE BLEU NUIT';
+STR.en.navyGive = 'DARK BLUE'; STR.fr.navyGive = 'BLEU NUIT';
+STR.en.navyGiven = '{name} can use dark blue mode now.'; STR.fr.navyGiven = '{name} peut utiliser le mode bleu nuit.';
+STR.en.navyTaken = '{name} can no longer use dark blue mode.'; STR.fr.navyTaken = '{name} ne peut plus utiliser le mode bleu nuit.';
+var navyMode = false;
+try { navyMode = localStorage.getItem('paris.navy') === 'on'; } catch(e){}
+var navyToggle = document.getElementById('navy-toggle'), navyRow = document.getElementById('navy-row');
+/* who may use it: the owner, or anyone Daniel gave it to (paris/members/<player>/navy) */
+function navyAllowed(){ if(typeof net === 'undefined' || !net) return false; return !!net.isOwner || !!(net.uid && net.members && net.members[net.uid] && net.members[net.uid].navy); }
+function applyDark(){
+  var navyOn = navyMode && navyAllowed();
+  document.documentElement.classList.toggle('theme-navy', navyOn);
+  document.documentElement.classList.toggle('theme-dark', darkMode && !navyOn);
+  setToggle(darkToggle, darkMode && !navyOn);
+  navyRow.classList.toggle('hidden', !navyAllowed());
+  setToggle(navyToggle, navyOn);
+}
+darkToggle.addEventListener('click', function(){ darkMode = !(darkMode && !(navyMode && navyAllowed())); if(darkMode) navyMode = false; try { localStorage.setItem('paris.dark', darkMode ? 'on' : 'off'); localStorage.setItem('paris.navy', navyMode ? 'on' : 'off'); } catch(e){} applyDark(); });
+navyToggle.addEventListener('click', function(){ if(!navyAllowed()) return; navyMode = !(navyMode && navyAllowed()); if(navyMode) darkMode = false; try { localStorage.setItem('paris.navy', navyMode ? 'on' : 'off'); localStorage.setItem('paris.dark', darkMode ? 'on' : 'off'); } catch(e){} applyDark(); });
 applyDark();
 langHooks.push(applyDark);
 var skyToggle = document.getElementById('sky-toggle');
@@ -4752,6 +4777,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 24, 2026 · 3:00 PM</span><br>DARK BLUE MODE - a special theme for Daniel and the players he gives it to (SETTINGS).</li>' +
   '<li><span class="when">Nov 24, 2026 · 2:55 PM</span><br>Everyone gets the light look now. Prefer dark? SETTINGS > DARK MODE.</li>' +
   '<li><span class="when">Nov 24, 2026 · 2:50 PM</span><br>Mika now has something to say when a car hits her. "Oh, great heavens!"</li>' +
   '<li><span class="when">Nov 24, 2026 · 2:45 PM</span><br>Ranks! Daniel can make players VIP, MVP, LEGEND or HELPER - their badge shows by their name, over their head and in the chat.</li>' +
@@ -6187,6 +6213,7 @@ function signInFromForm(){
 function afterSignIn(user, typedName){
   net.uid = user.uid;
   net.isOwner = (user.email || '').toLowerCase() === OWNER_EMAIL;
+  applyDark();
   var ref = net.db.ref('paris/members/' + user.uid);
   return ref.once('value').then(function(s){ return s.val(); }, function(){ return null; }).then(function(m){
     if(!m && net.isOwner){
@@ -6196,7 +6223,7 @@ function afterSignIn(user, typedName){
     return m;
   }).then(function(m){
     if(!m || typeof m.name !== 'string'){
-      net.uid = null; net.isOwner = false;
+      net.uid = null; net.isOwner = false; applyDark();
       firebase.auth().signOut();
       loginMsg('loginNotListed', true);
       return false;
@@ -6268,6 +6295,7 @@ function startListening(){
   var db = net.db;
   db.ref('paris/members').on('value', function(s){
     net.members = s.val() || {};
+    applyDark();
     renderMembers();
     mp.listKey = ''; renderPlayers();
     Object.keys(mp.avatars).forEach(function(k){ mp.avatars[k].tagText = null; });
@@ -6449,6 +6477,17 @@ function renderMembers(){
         }).catch(function(){ addMsg(t('saveFail'), 'bad'); });
       });
       row.appendChild(sel);
+      var nv = document.createElement('button');
+      nv.className = 'btn navy-give' + (m.navy ? ' on' : '');
+      nv.textContent = t('navyGive') + (m.navy ? ' ✓' : '');
+      nv.title = t('navyLabel');
+      nv.addEventListener('click', function(){
+        var give = !m.navy;
+        net.db.ref('paris/members/' + uid + '/navy').set(give ? true : null).then(function(){
+          addMsg(t(give ? 'navyGiven' : 'navyTaken', {name:m.name}), 'good');
+        }).catch(function(){ addMsg(t('saveFail'), 'bad'); });
+      });
+      row.appendChild(nv);
       var b = document.createElement('button');
       b.className = 'btn' + (memberConfirm === uid ? ' danger' : '');
       b.textContent = memberConfirm === uid ? t('removeMemberYes') : t('removeMember');
@@ -6846,6 +6885,7 @@ function initClaude(){
       net.uid = me && me.id ? me.id : null;
       net.name = (me && me.name) || t('you');
       net.isOwner = !!(me && me.isOwner);
+      applyDark();
       net.canWrite = !!(db && net.uid) && canWrite !== false;
       updateCanBuild();
       net.ready = true;
