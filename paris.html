@@ -18,13 +18,8 @@
   --good:#2f8a4a;
   color-scheme:light;
 }
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --bg:#0e1424; --panel:#1b2030; --panel-border:#e6e1d4; --ink:#f1ebe0; --ink-soft:#b4b0a6;
-    --accent:#6f93ff; --accent-2:#ff7a6e; --good:#6fd08a; color-scheme:dark;
-  }
-}
-:root[data-theme="dark"]{
+/* light for everyone; dark only if you switch it on (SETTINGS > DARK MODE) */
+:root.theme-dark{
   --bg:#0e1424; --panel:#1b2030; --panel-border:#e6e1d4; --ink:#f1ebe0; --ink-soft:#b4b0a6;
   --accent:#6f93ff; --accent-2:#ff7a6e; --good:#6fd08a; color-scheme:dark;
 }
@@ -512,6 +507,7 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
         <div class="speed-hint" data-t="lowDetailHint">Draws at normal resolution. Turn it on if the game lags.</div>
         <div class="settings-label second"><span data-t="music">MUSIC</span><button class="toggle" id="music-toggle">ON</button></div>
         <div class="speed-hint" data-t="musicHint">Accordion music.</div>
+        <div class="settings-label second"><span data-t="darkLabel">DARK MODE</span><button class="toggle" id="dark-toggle">OFF</button></div>
         <div class="settings-label second"><span data-t="skyLabel">SKY</span><button class="toggle" id="sky-toggle">ON</button></div>
         <div class="speed-hint" data-t="skyHint">Day, night and weather.</div>
       </div>
@@ -4689,6 +4685,14 @@ function applyDetail(){
 }
 lowDetailToggle.addEventListener('click', function(){ lowDetail = !lowDetail; try { localStorage.setItem('paris.lowDetail', lowDetail ? '1' : '0'); } catch(e){} applyDetail(); });
 applyDetail();
+STR.en.darkLabel = 'DARK MODE'; STR.fr.darkLabel = 'MODE SOMBRE';
+var darkMode = false;
+try { darkMode = localStorage.getItem('paris.dark') === 'on'; } catch(e){}
+var darkToggle = document.getElementById('dark-toggle');
+function applyDark(){ document.documentElement.classList.toggle('theme-dark', darkMode); setToggle(darkToggle, darkMode); }
+darkToggle.addEventListener('click', function(){ darkMode = !darkMode; try { localStorage.setItem('paris.dark', darkMode ? 'on' : 'off'); } catch(e){} applyDark(); });
+applyDark();
+langHooks.push(applyDark);
 var skyToggle = document.getElementById('sky-toggle');
 skyToggle.addEventListener('click', function(){ skyLive = !skyLive; try { localStorage.setItem('paris.sky', skyLive ? 'on' : 'off'); } catch(e){} setToggle(skyToggle, skyLive); skyAnnounce.wx = skyAnnounce.night = null; });
 setToggle(skyToggle, skyLive);
@@ -4748,6 +4752,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 24, 2026 · 2:55 PM</span><br>Everyone gets the light look now. Prefer dark? SETTINGS > DARK MODE.</li>' +
   '<li><span class="when">Nov 24, 2026 · 2:50 PM</span><br>Mika now has something to say when a car hits her. "Oh, great heavens!"</li>' +
   '<li><span class="when">Nov 24, 2026 · 2:45 PM</span><br>Ranks! Daniel can make players VIP, MVP, LEGEND or HELPER - their badge shows by their name, over their head and in the chat.</li>' +
   '<li><span class="when">Nov 24, 2026 · 2:40 PM</span><br>60 car colours now, plus a ? button for a random colour from the whole colour wheel. If all 60 are taken, you get a random one.</li>' +
