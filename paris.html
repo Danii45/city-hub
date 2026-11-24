@@ -99,6 +99,8 @@ button{font-family:'Press Start 2P', monospace;}
   font-style:normal; letter-spacing:0.5px; vertical-align:middle; border:1px solid;
 }
 .old-badge{display:inline-block; margin-left:6px; padding:1px 4px; font-size:7px; color:#fff; background:#c8231a; border:2px solid var(--panel-border); vertical-align:middle;}
+.role-badge.rank i{font-style:normal;}
+.rank-select{font-family:'VT323', monospace; font-size:17px; padding:2px 4px; margin-right:6px; background:var(--panel); color:var(--ink); border:2px solid var(--panel-border); cursor:pointer;}
 .role-badge.owner{background:#0d1a24; border-color:#9fe6ff; box-shadow:0 0 6px rgba(140,225,255,0.75);}
 .role-badge.owner i{
   font-style:normal; background:linear-gradient(110deg, #7fe3ff 0%, #ffffff 18%, #a9dcff 36%, #e4d2ff 54%, #ffffff 72%, #7fe3ff 100%);
@@ -242,6 +244,7 @@ button{font-family:'Press Start 2P', monospace;}
   position:relative; width:26px; height:26px; padding:0; border:2px solid var(--panel-border); box-shadow:2px 2px 0 0 var(--panel-border); cursor:pointer;
 }
 .swatch.picked{outline:3px solid var(--accent); outline-offset:2px;}
+.swatch.random{color:#fff; font-size:11px; line-height:1; text-shadow:1px 1px 0 #000;}
 .swatch.taken{cursor:not-allowed; opacity:0.45; box-shadow:none;}
 .swatch.taken::after{content:''; position:absolute; left:-2px; right:-2px; top:50%; height:3px; background:var(--panel-border); transform:rotate(-45deg);}
 .swatch.shiny, .dot.shiny{background-size:300% 300% !important; animation:paint-shine 2.4s linear infinite;}
@@ -3674,11 +3677,69 @@ var CAR_COLORS = [
   {id:'green', en:'GREEN', fr:'VERT', hex:0x2f7d46}, {id:'yellow', en:'YELLOW', fr:'JAUNE', hex:0xe3b52c},
   {id:'orange', en:'ORANGE', fr:'ORANGE', hex:0xe07b2c}, {id:'maroon', en:'MAROON', fr:'BORDEAUX', hex:0x6e2026},
   {id:'pink', en:'PINK', fr:'ROSE', hex:0xe86aa0}, {id:'purple', en:'PURPLE', fr:'VIOLET', hex:0x7a4fb0},
+  {id:'teal', en:'TEAL', fr:'SARCELLE', hex:0x1f8a8a},
+  {id:'turquoise', en:'TURQUOISE', fr:'TURQUOISE', hex:0x2fc4c0},
+  {id:'sky', en:'SKY', fr:'CIEL', hex:0x6fb7ec},
+  {id:'cyan', en:'CYAN', fr:'CYAN', hex:0x22c9e0},
+  {id:'mint', en:'MINT', fr:'MENTHE', hex:0x7fdcb0},
+  {id:'lime', en:'LIME', fr:'VERT CITRON', hex:0x8ccf2e},
+  {id:'olive', en:'OLIVE', fr:'OLIVE', hex:0x6b7a2a},
+  {id:'forest', en:'FOREST', fr:'FORÊT', hex:0x1f4d2c},
+  {id:'emerald', en:'EMERALD', fr:'ÉMERAUDE', hex:0x14a06a},
+  {id:'jade', en:'JADE', fr:'JADE', hex:0x3f9e83},
+  {id:'sage', en:'SAGE', fr:'SAUGE', hex:0x9cb28a},
+  {id:'khaki', en:'KHAKI', fr:'KAKI', hex:0xb3a36a},
+  {id:'beige', en:'BEIGE', fr:'BEIGE', hex:0xd8c7a0},
+  {id:'cream', en:'CREAM', fr:'CRÈME', hex:0xf3e8c8},
+  {id:'tan', en:'TAN', fr:'FAUVE', hex:0xc49a6c},
+  {id:'brown', en:'BROWN', fr:'MARRON', hex:0x6b4428},
+  {id:'chocolate', en:'CHOCOLATE', fr:'CHOCOLAT', hex:0x4a2c1b},
+  {id:'copper', en:'COPPER', fr:'CUIVRE', hex:0xb5622f},
+  {id:'bronze', en:'BRONZE', fr:'BRONZE', hex:0x8c6a2f},
+  {id:'mustard', en:'MUSTARD', fr:'MOUTARDE', hex:0xc9a227},
+  {id:'lemon', en:'LEMON', fr:'CITRON', hex:0xf2e14c},
+  {id:'peach', en:'PEACH', fr:'PÊCHE', hex:0xf5a982},
+  {id:'coral', en:'CORAL', fr:'CORAIL', hex:0xf06d5b},
+  {id:'salmon', en:'SALMON', fr:'SAUMON', hex:0xe8826f},
+  {id:'crimson', en:'CRIMSON', fr:'CRAMOISI', hex:0xa8142e},
+  {id:'cherry', en:'CHERRY', fr:'CERISE', hex:0xc21f4a},
+  {id:'ruby', en:'RUBY', fr:'RUBIS', hex:0x9b111e},
+  {id:'blush', en:'BLUSH', fr:'ROSE PÂLE', hex:0xf2b8c6},
+  {id:'magenta', en:'MAGENTA', fr:'MAGENTA', hex:0xc4268c},
+  {id:'fuchsia', en:'FUCHSIA', fr:'FUCHSIA', hex:0xe04bc4},
+  {id:'lavender', en:'LAVENDER', fr:'LAVANDE', hex:0xb79fe0},
+  {id:'lilac', en:'LILAC', fr:'LILAS', hex:0xc8a2c8},
+  {id:'plum', en:'PLUM', fr:'PRUNE', hex:0x6e2f5f},
+  {id:'grape', en:'GRAPE', fr:'RAISIN', hex:0x5a2a82},
+  {id:'indigo', en:'INDIGO', fr:'INDIGO', hex:0x3b2d8f},
+  {id:'royal', en:'ROYAL BLUE', fr:'BLEU ROI', hex:0x2747b8},
+  {id:'cobalt', en:'COBALT', fr:'COBALT', hex:0x1f4fbf},
+  {id:'steel', en:'STEEL', fr:'ACIER', hex:0x5f7c96},
+  {id:'slate', en:'SLATE', fr:'ARDOISE', hex:0x4f5a67},
+  {id:'charcoal', en:'CHARCOAL', fr:'ANTHRACITE', hex:0x3a3d42},
+  {id:'grey', en:'GREY', fr:'GRIS', hex:0x7b7f85},
+  {id:'ivory', en:'IVORY', fr:'IVOIRE', hex:0xf6f1e1},
+  {id:'sand', en:'SAND', fr:'SABLE', hex:0xd6c08f},
+  {id:'rust', en:'RUST', fr:'ROUILLE', hex:0x9c4a22},
+  {id:'tangerine', en:'TANGERINE', fr:'MANDARINE', hex:0xf28a1a},
+  {id:'amber', en:'AMBER', fr:'AMBRE', hex:0xe0a020},
+  {id:'seafoam', en:'SEAFOAM', fr:'ÉCUME', hex:0x8fd9c4},
+  {id:'denim', en:'DENIM', fr:'DENIM', hex:0x3e5f8a},
   {id:'gold', en:'GOLD', fr:'OR', hex:0xb8860b, shine:'gold'},
   {id:'diamond', en:'DIAMOND', fr:'DIAMANT', hex:0x6fd4ff, shine:'diamond'},
   {id:'aurora', en:'AURORA', fr:'AURORE', hex:0x7355ff, shine:'aurora'}
 ];
-function carColor(id){ for(var i=0;i<CAR_COLORS.length;i++) if(CAR_COLORS[i].id === id) return CAR_COLORS[i]; return null; }
+/* when all 60 are taken, players get a random colour from the whole colour wheel: its id is "c" + the hex code */
+var customColors = {};
+function carColor(id){
+  for(var i=0;i<CAR_COLORS.length;i++) if(CAR_COLORS[i].id === id) return CAR_COLORS[i];
+  if(typeof id === 'string' && /^c[0-9a-f]{6}$/.test(id)){
+    if(!customColors[id]){ var hx = id.slice(1).toUpperCase(); customColors[id] = {id:id, en:'CUSTOM #' + hx, fr:'PERSO #' + hx, hex:parseInt(id.slice(1), 16), custom:true}; }
+    return customColors[id];
+  }
+  return null;
+}
+function randomColorId(){ var n = Math.floor(Math.random()*0x1000000); return 'c' + ('00000' + n.toString(16)).slice(-6); }
 function colorAllowed(c, role){ return !!c && (!c.shine || role === 'owner'); }
 function colorCss(c){
   if(c.shine === 'gold') return 'linear-gradient(120deg, #8a5a00, #d9a520 25%, #fff4c2 45%, #d9a520 60%, #8a5a00 80%, #ffe27a)';
@@ -4679,6 +4740,8 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 24, 2026 · 2:45 PM</span><br>Ranks! Daniel can make players VIP, MVP, LEGEND or HELPER - their badge shows by their name, over their head and in the chat.</li>' +
+  '<li><span class="when">Nov 24, 2026 · 2:40 PM</span><br>60 car colours now, plus a ? button for a random colour from the whole colour wheel. If all 60 are taken, you get a random one.</li>' +
   '<li><span class="when">Nov 24, 2026 · 2:25 PM</span><br>Explosions are now seen by everyone - blown engines, executed cars and all. You also see other players\' cars flip through the air.</li>' +
   '<li><span class="when">Nov 24, 2026 · 2:15 PM</span><br>If it rains while Mika is napping, she gets a red and white umbrella.</li>' +
   '<li><span class="when">Nov 24, 2026 · 2:10 PM</span><br>When a new version of Paris comes out, a window pops up asking you to refresh. Players on an old version show OUTDATED VERSION to everyone else.</li>' +
@@ -6047,7 +6110,21 @@ function nameKey(name){ return String(name || '').normalize('NFD').replace(/[̀-
 function cleanNick(n){ return String(n || '').replace(/[^A-Za-z0-9 _.\-À-ÖØ-öø-ÿ]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100); }
 function signedIn(){ return !!net.ready; }   // in (website: on the list; claude.ai: the page has met you)
 function memberName(uid){ var m = uid && net.members[uid]; return m && m.name ? m.name : t('someone'); }
-function myRole(){ return net.isOwner ? 'owner' : ''; }
+/* ---------- Ranks: Daniel can give players a rank (PLAYERS tab). It shows as a coloured badge next to their name
+   in the player list, over their head and in the chat. Saved in paris/members/<player>/rank. ---------- */
+var RANKS = {
+  vip:    {en:'VIP', fr:'VIP', fg:'#ffcc33', bg:'#2b1d00'},
+  mvp:    {en:'MVP', fr:'MVP', fg:'#d48cff', bg:'#1d0033'},
+  legend: {en:'LEGEND', fr:'LÉGENDE', fg:'#ff6b6b', bg:'#2e0008'},
+  helper: {en:'HELPER', fr:'AIDE', fg:'#5affa0', bg:'#00281a'}
+};
+var RANK_ORDER = ['vip', 'mvp', 'legend', 'helper'];
+STR.en.rankNone = 'NO RANK'; STR.fr.rankNone = 'AUCUN RANG';
+STR.en.rankSet = '{name} is now {rank}.'; STR.fr.rankSet = '{name} est maintenant {rank}.';
+STR.en.rankCleared = '{name} has no rank now.'; STR.fr.rankCleared = '{name} n\'a plus de rang.';
+STR.en.rankLabel = 'Rank'; STR.fr.rankLabel = 'Rang';
+function rankOf(uid){ var m = net.members && net.members[uid]; return m && RANKS[m.rank] ? m.rank : ''; }
+function myRole(){ return net.isOwner ? 'owner' : rankOf(net.uid); }
 
 function loadScript(src){
   return new Promise(function(resolve, reject){ var s = document.createElement('script'); s.src = src; s.onload = resolve; s.onerror = reject; document.head.appendChild(s); });
@@ -6346,6 +6423,18 @@ function renderMembers(){
     nm.textContent = m.name + (owned ? ' - ' + t('owns', {n:owned}) : '');
     row.appendChild(nm);
     if(!m.owner){
+      var sel = document.createElement('select');
+      sel.className = 'rank-select'; sel.title = t('rankLabel'); sel.setAttribute('aria-label', t('rankLabel') + ' - ' + m.name);
+      [''].concat(RANK_ORDER).forEach(function(rk){ var o = document.createElement('option'); o.value = rk; o.textContent = rk ? tx(RANKS[rk]) : t('rankNone'); sel.appendChild(o); });
+      sel.value = RANKS[m.rank] ? m.rank : '';
+      sel.addEventListener('keydown', function(e){ e.stopPropagation(); });
+      sel.addEventListener('change', function(){
+        var v = sel.value;
+        net.db.ref('paris/members/' + uid + '/rank').set(v || null).then(function(){
+          addMsg(v ? t('rankSet', {name:m.name, rank:tx(RANKS[v])}) : t('rankCleared', {name:m.name}), 'good');
+        }).catch(function(){ addMsg(t('saveFail'), 'bad'); });
+      });
+      row.appendChild(sel);
       var b = document.createElement('button');
       b.className = 'btn' + (memberConfirm === uid ? ' danger' : '');
       b.textContent = memberConfirm === uid ? t('removeMemberYes') : t('removeMember');
@@ -6432,9 +6521,16 @@ function peerOutdated(p){
 }
 function playerName(p){ var m = net.members[p.by]; var n = m && m.name ? cleanNick(m.name) : 'PLAYER'; return n.length > 18 ? n.slice(0, 17) + '.' : n; }
 /* the OWNER badge only counts for the player the list says is the owner */
-function peerRole(p){ var m = net.members[p.by]; return m && m.owner && p.presence && p.presence.role === 'owner' ? 'owner' : ''; }
+function peerRole(p){ var m = net.members[p.by]; return m && m.owner && p.presence && p.presence.role === 'owner' ? 'owner' : rankOf(p.by); }
 function peerColor(p){ var id = p && p.presence && p.presence.color; return colorAllowed(carColor(id), peerRole(p)) ? id : 'red'; }
 function roleBadge(role){
+  if(RANKS[role]){
+    var rb = document.createElement('span'), ri = document.createElement('i'), rk = RANKS[role];
+    rb.className = 'role-badge rank'; rb.style.background = rk.bg; rb.style.borderColor = rk.fg; rb.style.color = rk.fg;
+    rb.style.boxShadow = '0 0 5px ' + rk.fg + '99';
+    ri.textContent = tx(rk); rb.appendChild(ri);
+    return rb;
+  }
   if(role !== 'owner') return null;
   var b = document.createElement('span'), i = document.createElement('i');
   b.className = 'role-badge owner'; i.textContent = t('ownerBadge'); b.appendChild(i);
@@ -6468,7 +6564,7 @@ function resolveColorClash(){
   });
   if(!clash) return;
   var taken = takenColors(), free = CAR_COLORS.filter(function(c){ return !c.shine && !taken[c.id]; })[0];
-  if(free) setMyColor(free.id);
+  setMyColor(free ? free.id : randomColorId());
 }
 function renderSwatches(){
   var taken = takenColors();
@@ -6486,8 +6582,15 @@ function renderSwatches(){
     b.addEventListener('click', function(){ setMyColor(c.id); });
     swatchesEl.appendChild(b);
   });
+  var rb = document.createElement('button'), mine = carColor(myColor);
+  rb.className = 'swatch random' + (mine && mine.custom ? ' picked' : '');
+  rb.style.background = mine && mine.custom ? colorCss(mine) : 'conic-gradient(red, yellow, lime, cyan, blue, magenta, red)';
+  rb.title = t('randomColor'); rb.setAttribute('aria-label', rb.title); rb.textContent = '?';
+  rb.addEventListener('click', function(){ setMyColor(randomColorId()); });
+  swatchesEl.appendChild(rb);
   colorNameEl.textContent = tx(carColor(myColor));
 }
+STR.en.randomColor = 'RANDOM - any colour from the whole colour wheel'; STR.fr.randomColor = 'ALÉATOIRE - n\'importe quelle couleur';
 langHooks.push(function(){ swatchKey = ''; renderSwatches(); mp.listKey = ''; renderPlayers(); });
 function renderPlayers(){
   if(mp.status === 'none'){ playersEl.classList.add('hidden'); return; }
@@ -6541,7 +6644,7 @@ function onRoomPeers(change){
 }
 /* a player's floating name tag (the owner's has a shining OWNER badge) */
 function nameTag(text, role){
-  var badge = role === 'owner' ? t('ownerBadge') : '';
+  var badge = role === 'owner' ? t('ownerBadge') : RANKS[role] ? tx(RANKS[role]) : '';
   var c = document.createElement('canvas'), ctx = c.getContext('2d');
   var lines = [], words = String(text).split(' '), cur = '';
   words.forEach(function(wd){
@@ -6560,7 +6663,7 @@ function nameTag(text, role){
   var sprite = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, depthTest:false}));
   sprite.scale.set(5*w/256, 1.28*h/64, 1);
   sprite.center.set(0.5, 32/h);   // extra lines go upwards; the last line sits where a one-line tag would
-  sprite.userData.tag = {ctx:ctx, tex:tex, w:w, h:h, lines:lines, text:text, nw:nw, badge:badge, bw:bw, lastShine:0};
+  sprite.userData.tag = {ctx:ctx, tex:tex, w:w, h:h, lines:lines, text:text, nw:nw, badge:badge, bw:bw, lastShine:0, rank:RANKS[role] || null};
   drawNameTag(sprite.userData.tag, 0);
   root.add(sprite);
   return sprite;
@@ -6569,7 +6672,7 @@ function drawNameTag(tg, time){
   var ctx = tg.ctx, w = tg.w, h = tg.h || 64, lines = tg.lines || [tg.text], yl = h - 30;
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = 'rgba(25,30,50,0.86)'; ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = tg.badge ? '#9fe6ff' : '#f0ead9'; ctx.lineWidth = 4; ctx.strokeRect(2, 2, w - 4, h - 4);
+  ctx.strokeStyle = tg.rank ? tg.rank.fg : tg.badge ? '#9fe6ff' : '#f0ead9'; ctx.lineWidth = 4; ctx.strokeRect(2, 2, w - 4, h - 4);
   ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
   var x0 = (w - (tg.nw + (tg.badge ? tg.bw + 10 : 0)))/2;
   ctx.font = '20px monospace'; ctx.fillStyle = '#f7f2e6';
@@ -6577,7 +6680,8 @@ function drawNameTag(tg, time){
   if(tg.badge){
     var lastW = ctx.measureText(lines[lines.length - 1]).width;
     var bx = x0 + lastW + 10, s = (time*0.7) % 1, g = ctx.createLinearGradient(bx, 0, bx + tg.bw, 0);
-    ctx.fillStyle = '#0d1a24'; ctx.fillRect(bx, yl - 18, tg.bw, 34);
+    ctx.fillStyle = tg.rank ? tg.rank.bg : '#0d1a24'; ctx.fillRect(bx, yl - 18, tg.bw, 34);
+    if(tg.rank){ ctx.font = 'bold 18px monospace'; ctx.fillStyle = tg.rank.fg; ctx.fillText(tg.badge, bx + 8, yl); tg.tex.needsUpdate = true; return; }
     g.addColorStop(0, '#7fe3ff'); g.addColorStop(Math.max(0, s - 0.18), '#a9dcff'); g.addColorStop(s, '#ffffff'); g.addColorStop(Math.min(1, s + 0.18), '#e4d2ff'); g.addColorStop(1, '#7fe3ff');
     ctx.font = 'bold 18px monospace'; ctx.fillStyle = g; ctx.fillText(tg.badge, bx + 8, yl);
   }
