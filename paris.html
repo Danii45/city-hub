@@ -98,6 +98,7 @@ button{font-family:'Press Start 2P', monospace;}
   display:inline-block; flex:none; margin-left:5px; padding:2px 4px 1px; font-family:'Press Start 2P', monospace; font-size:7px;
   font-style:normal; letter-spacing:0.5px; vertical-align:middle; border:1px solid;
 }
+.old-badge{display:inline-block; margin-left:6px; padding:1px 4px; font-size:7px; color:#fff; background:#c8231a; border:2px solid var(--panel-border); vertical-align:middle;}
 .role-badge.owner{background:#0d1a24; border-color:#9fe6ff; box-shadow:0 0 6px rgba(140,225,255,0.75);}
 .role-badge.owner i{
   font-style:normal; background:linear-gradient(110deg, #7fe3ff 0%, #ffffff 18%, #a9dcff 36%, #e4d2ff 54%, #ffffff 72%, #7fe3ff 100%);
@@ -120,6 +121,22 @@ button{font-family:'Press Start 2P', monospace;}
 #chauffard small{display:block; margin-top:4px; font-family:'VT323', monospace; font-size:20px;}
 #chauffard small:empty{display:none;}
 #chauffard.hidden{display:none;}
+/* the "new version" window */
+#update-win{position:fixed; inset:0; z-index:200; display:flex; align-items:center; justify-content:center; background:rgba(10,12,24,0.45);}
+#update-win.hidden{display:none;}
+#pw-change.hidden, #pw-form.hidden, #pw-change .btn-row.hidden, #many-block.hidden, .btn.hidden{display:none;}
+#update-win .uw{width:min(420px, 92vw); padding:0; animation:uwPop 0.18s ease-out;}
+@keyframes uwPop{from{transform:scale(0.9); opacity:0;} to{transform:scale(1); opacity:1;}}
+@media (prefers-reduced-motion: reduce){ #update-win .uw{animation:none;} }
+#update-win .uw-bar{display:flex; align-items:center; gap:8px; background:var(--panel-border); color:var(--panel); padding:7px 8px 7px 10px; font-size:10px; letter-spacing:0.5px;}
+#update-win .uw-bar span{flex:1;}
+#update-win .uw-x{width:24px; height:22px; padding:0; font-size:11px; line-height:1; background:var(--panel); color:var(--ink); border:2px solid var(--panel); cursor:pointer;}
+#update-win .uw-x:hover{background:#e8251a; color:#fff; border-color:#e8251a;}
+#update-win .uw-body{display:flex; gap:14px; align-items:flex-start; padding:18px 16px 8px;}
+#update-win .uw-icon{flex:none; width:40px; height:40px; border:3px solid var(--panel-border); background:#2f6fd6; color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; box-shadow:2px 2px 0 0 var(--panel-border);}
+#update-win .uw-text{font-family:'VT323', monospace; font-size:21px; line-height:1.2; color:var(--ink);}
+#update-win .uw-text b{display:block; font-family:'Press Start 2P', monospace; font-size:11px; margin-bottom:8px; line-height:1.5;}
+#update-win .uw-btns{display:flex; justify-content:flex-end; gap:10px; padding:10px 16px 16px;}
 #mika-hud{position:absolute; right:16px; top:50%; transform:translateY(-50%); z-index:34; width:min(260px, 60vw); padding:10px 12px; pointer-events:none; transition:opacity 0.4s;}
 #mika-hud.hidden{display:none;}
 #mika-hud.fade{opacity:0;}
@@ -379,6 +396,13 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
 <div id="speedo" class="card hidden"><span id="speedo-num">0</span><span id="speedo-unit">KM/H</span></div>
 <div id="toast" class="hidden"></div>
 <div id="chauffard" class="hidden" aria-live="polite"><b>CHAUFFARD !</b><small></small></div>
+<div id="update-win" class="hidden" role="dialog" aria-modal="true" aria-labelledby="uw-title">
+  <div class="uw card">
+    <div class="uw-bar"><span id="uw-title" data-t="uwTitle">PARIS - UPDATE</span><button class="uw-x" id="uw-x" aria-label="Close">X</button></div>
+    <div class="uw-body"><div class="uw-icon">&#8635;</div><div class="uw-text"><b data-t="uwHead">A new version has been detected.</b><span data-t="uwMsg">Please refresh the tab to get the newest Paris.</span></div></div>
+    <div class="uw-btns"><button class="btn" id="uw-later" data-t="uwLater">LATER</button><button class="btn go" id="uw-refresh" data-t="uwRefresh">REFRESH</button></div>
+  </div>
+</div>
 <div id="announce" class="hidden" aria-live="assertive"><div class="ann-head"></div><div class="ann-text"></div></div>
 <div id="hint" class="card"></div>
 
@@ -2154,7 +2178,9 @@ function updateMikaTag(){
   if(!on) return;
   drawMikaTag();
   var p = pet.sprite.position;
-  mikaTag.sprite.position.set(p.x, p.y + pet.sprite.scale.y + (pet.state === 'heaven' ? 1.1 : 0.25), p.z);
+  var ty = p.y + pet.sprite.scale.y + (pet.state === 'heaven' ? 1.1 : 0.25);
+  if(mikaUmbrella.a > 0.05) ty = Math.max(ty, 3.35*mikaUmbrella.a + ty*(1 - mikaUmbrella.a));   // above her umbrella
+  mikaTag.sprite.position.set(p.x, ty, p.z);
 }
 /* the pop-up on the middle right: shows for 6 seconds after each pet (once the leaderboard is unlocked) */
 STR.en.mikaHudHead = 'MIKA PET LEADERBOARD'; STR.fr.mikaHudHead = 'CLASSEMENT DES CARESSES';
@@ -2172,6 +2198,7 @@ langHooks.push(renderMikaBoard);
 if(mika.unlocked) setTimeout(function(){ unlockMikaBoard(true); }, 0);
 function updatePet(dt){
   updateDoom(dt);
+  updateUmbrella(dt);
   updateHearts(dt);
   updateMikaTag();
   if(pet.state === 'gone'){ pet.t -= dt; if(pet.t <= 0) spawnPet(); return; }
@@ -2247,6 +2274,27 @@ var MIKA_CYCLE = 300, MIKA_GO = 225, MIKA_SLEEP = 240, MIKA_WAKE = 290;
   var post = box(0.06, 0.6, 0.06, solidMat(0x6b4a32)); post.position.set(-1.27, 0.3, 0); g.add(post);
   root.add(g);
 })();
+/* when it rains while she naps, a striped umbrella stands over her bed */
+var mikaUmbrella = (function(){
+  var g = new THREE.Group(); g.position.set(MIKA_BED.x + 0.35, 0, MIKA_BED.z); g.rotation.z = -0.12;
+  var segs = 8, canopy = new THREE.Group(); canopy.position.y = 2.75; g.add(canopy);
+  for(var i=0;i<segs;i++){   // eight panels, red and white
+    var geo = new THREE.ConeGeometry(1.75, 0.75, 1, 1, true, i*Math.PI*2/segs, Math.PI*2/segs);
+    var m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({color:i % 2 ? 0xf4f1ea : 0xc8231a, side:THREE.DoubleSide}));
+    canopy.add(m);
+  }
+  var tip = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), solidMat(0x2a2a2e)); tip.position.y = 0.42; canopy.add(tip);
+  var pole = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 2.8, 8), solidMat(0x2a2a2e)); pole.position.y = 1.4; g.add(pole);
+  var hook = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.035, 6, 12, Math.PI), solidMat(0x6b4a32)); hook.position.y = 0.05; hook.rotation.z = Math.PI; hook.position.x = 0.12; g.add(hook);
+  g.visible = false; root.add(g);
+  return {g:g, a:0};
+})();
+function updateUmbrella(dt){
+  var want = pet.state === 'walk' && pet.sleeping && skyState.rain > 0.3;
+  mikaUmbrella.a += ((want ? 1 : 0) - mikaUmbrella.a)*Math.min(1, dt*3);
+  mikaUmbrella.g.visible = mikaUmbrella.a > 0.02;
+  mikaUmbrella.g.scale.setScalar(Math.max(0.01, mikaUmbrella.a));   // opens up, folds away
+}
 /* where she is in her 5 minutes: walking, going to bed, asleep, or heading back */
 function mikaPhase(){
   var T = (((Date.now() + (net.timeOffset || 0))/1000) % MIKA_CYCLE + MIKA_CYCLE) % MIKA_CYCLE;
@@ -4623,6 +4671,8 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 24, 2026 · 2:15 PM</span><br>If it rains while Mika is napping, she gets a red and white umbrella.</li>' +
+  '<li><span class="when">Nov 24, 2026 · 2:10 PM</span><br>When a new version of Paris comes out, a window pops up asking you to refresh. Players on an old version show OUTDATED VERSION to everyone else.</li>' +
   '<li><span class="when">Nov 24, 2026 · 2:00 PM</span><br>Mika knows about 1,500 words now: foods, animals, countries, music, sports, jobs, colours, games and more - and her answer mentions what you asked about.</li>' +
   '<li><span class="when">Nov 24, 2026 · 1:50 PM</span><br>Mika understands almost 100 topics now - food, animals, school, Paris, games, feelings, French words and lots more. Ask her anything!</li>' +
   '<li><span class="when">Nov 24, 2026 · 1:40 PM</span><br>Mika now speaks very formally, calls you by your name - and once in a while answers in another language!</li>' +
@@ -4726,6 +4776,48 @@ function runCommand(text){
   }
   systemLine(t('unknownCmd'));
 }
+/* ---------- "A new version has been detected" ----------
+   Every minute the game quietly downloads its own page again and compares its code with the code that is running.
+   If it changed (a new version was put up), a little window asks you to refresh. LATER hides it for 5 minutes. */
+STR.en.uwTitle = 'PARIS - UPDATE'; STR.fr.uwTitle = 'PARIS - MISE À JOUR';
+STR.en.uwHead = 'A new version has been detected.'; STR.fr.uwHead = 'Une nouvelle version a été détectée.';
+STR.en.uwMsg = 'Please refresh the tab to get the newest Paris.'; STR.fr.uwMsg = 'Actualise l\'onglet pour avoir la dernière version de Paris.';
+STR.en.uwLater = 'LATER'; STR.fr.uwLater = 'PLUS TARD';
+STR.en.uwRefresh = 'REFRESH'; STR.fr.uwRefresh = 'ACTUALISER';
+var updateCheck = (function(){
+  function biggestScript(html){
+    var best = '', re = /<script>([\s\S]*?)<\/script>/g, m;
+    while((m = re.exec(html))) if(m[1].length > best.length) best = m[1];
+    return best;
+  }
+  var mine = '';
+  Array.prototype.forEach.call(document.querySelectorAll('script:not([src])'), function(el){ if(el.textContent.length > mine.length) mine = el.textContent; });
+  var myHash = mikaHash(mine), snoozeUntil = 0, found = false, latest = 0, win = document.getElementById('update-win');
+  function show(){
+    if(Date.now() < snoozeUntil) return;
+    win.classList.remove('hidden');
+    document.getElementById('uw-refresh').focus();
+  }
+  function hide(){ win.classList.add('hidden'); snoozeUntil = Date.now() + 5*60*1000; }
+  document.getElementById('uw-refresh').addEventListener('click', function(){ location.reload(); });
+  document.getElementById('uw-later').addEventListener('click', hide);
+  document.getElementById('uw-x').addEventListener('click', hide);
+  win.addEventListener('keydown', function(e){ e.stopPropagation(); if(e.key === 'Escape') hide(); });
+  function check(){
+    if(found){ show(); return; }
+    if(!mine || !window.fetch || CLAUDE_MODE) return;   // claude.ai updates its own pages
+    var url = location.pathname + '?v=' + Date.now();
+    fetch(url, {cache:'no-store'}).then(function(r){ return r.ok ? r.text() : ''; }).then(function(html){
+      var theirs = html && biggestScript(html);
+      if(theirs && theirs.length > 1000){ latest = mikaHash(theirs); if(latest !== myHash){ found = true; sendPresence(true); show(); } }
+    }).catch(function(){});
+  }
+  setInterval(check, 60*1000);
+  setTimeout(check, 4000);
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) check(); });
+  return {check:check, ver:myHash, outdated:function(){ return found; }, latest:function(){ return latest; }};
+})();
+
 /* ---------- Talk to Mika ----------
    Say "Mika" in the chat (like "hi Mika" or "Mika, are you hungry?") and she answers, in proper English, a second
    later. She understands greetings, questions about herself, food, walks, naps, Paris, the weather, the time of day,
@@ -6305,6 +6397,8 @@ function presenceState(){
     s.x = r2(camera.position.x); s.y = r2(camera.position.y - EYE_HEIGHT); s.z = r2(camera.position.z); s.yaw = r2(yaw);
   }
   s.chat = myChat;
+  s.ver = updateCheck.ver;
+  if(updateCheck.outdated()) s.old = 1;
   if(net.isOwner){ s.role = 'owner'; if(myAnnounce) s.announce = myAnnounce; }
   return s;
 }
@@ -6316,6 +6410,14 @@ function sendPresence(force){
   if(key === mp.lastKey) return;
   mp.lastSent = now; mp.lastKey = key;
   mp.room.presence(s).catch(function(){});
+}
+STR.en.outdated = 'OUTDATED VERSION'; STR.fr.outdated = 'VERSION OBSOLÈTE';
+function peerOutdated(p){
+  var pr = p && p.presence;
+  if(!pr) return false;
+  if(pr.old || !pr.ver) return true;
+  var newest = updateCheck.latest();
+  return !!newest && pr.ver !== newest;
 }
 function playerName(p){ var m = net.members[p.by]; var n = m && m.name ? cleanNick(m.name) : 'PLAYER'; return n.length > 18 ? n.slice(0, 17) + '.' : n; }
 /* the OWNER badge only counts for the player the list says is the owner */
@@ -6380,7 +6482,7 @@ function renderPlayers(){
   if(mp.status === 'none'){ playersEl.classList.add('hidden'); return; }
   var statusText = mp.status === 'lost' ? t('disconnected') : mp.live ? t('live') : t('connecting');
   var rows = [{name:t('you'), color:myColor, role:myRole()}];
-  mp.others.forEach(function(p){ rows.push({name:playerName(p), color:peerColor(p), role:peerRole(p)}); });
+  mp.others.forEach(function(p){ rows.push({name:playerName(p), color:peerColor(p), role:peerRole(p), old:peerOutdated(p)}); });
   var key = JSON.stringify(rows) + statusText;
   if(key === mp.listKey) return;
   mp.listKey = key;
@@ -6396,6 +6498,7 @@ function renderPlayers(){
     row.appendChild(dot); row.appendChild(name);
     var badge = roleBadge(r.role);
     if(badge) row.appendChild(badge);
+    if(r.old){ var ob = document.createElement('span'); ob.className = 'old-badge'; ob.textContent = t('outdated'); row.appendChild(ob); }
     playersListEl.appendChild(row);
   });
 }
@@ -6502,7 +6605,7 @@ function updateRemotes(dt){
     g.position.copy(a.pos);
     g.rotation.set(0, a.yaw, finite(s.roll) ? s.roll : 0, 'YXZ');
     a.model.wheels.forEach(function(w){ w.rotation.x += speed*dt/a.model.wheelR; });
-    var text = playerName(p), role = peerRole(p), tagKey = text + '|' + role + '|' + LANG;
+    var text = playerName(p) + (peerOutdated(p) ? ' - ' + t('outdated') : ''), role = peerRole(p), tagKey = text + '|' + role + '|' + LANG;
     if(a.tagText !== tagKey){ if(a.tag){ root.remove(a.tag); disposeObject(a.tag); } a.tag = nameTag(text, role); a.tagText = tagKey; }
     if(role === 'owner'){ var now = performance.now()/1000, tg = a.tag.userData.tag; if(now - tg.lastShine > 0.08){ tg.lastShine = now; drawNameTag(tg, now); } }
     a.tag.visible = true;
