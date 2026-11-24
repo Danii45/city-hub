@@ -2310,7 +2310,46 @@ function updateUmbrella(dt){
   mikaUmbrella.g.scale.setScalar(Math.max(0.01, mikaUmbrella.a));   // opens up, folds away
 }
 /* where she is in her 5 minutes: walking, going to bed, asleep, or heading back */
+/* the owner's secret word: "mika ede spat" in the chat or an announcement sends her to bed right away, for everyone.
+   The owner's presence carries when it was said (server time), so everyone - even someone who just joined - sees the
+   same nap: 12 s to trot to bed, a nap, then back to her walk at 70 s. */
+var MIKA_NAP_RE = /\bmika\s+ede\s+spat\b/i, NAP_GO = 12, NAP_SLEEP = 60, NAP_END = 70;
+var mikaNap = {at:0}, myNap = null;
+function napPhase(){
+  if(!mikaNap.at) return null;
+  var s = (Date.now() + (net.timeOffset || 0) - mikaNap.at)/1000;
+  if(s < 0 || s >= NAP_END) return null;
+  if(s < NAP_GO) return {mode:'toBed', f:s/NAP_GO};
+  if(s < NAP_SLEEP) return {mode:'sleep', f:(s - NAP_GO)/(NAP_SLEEP - NAP_GO)};
+  return {mode:'back', f:(s - NAP_SLEEP)/(NAP_END - NAP_SLEEP)};
+}
+function startMikaNap(at){
+  if(!finite(at) || at === mikaNap.at) return false;
+  if(napPhase() || clockPhase().mode !== 'walk') return false;   // already napping
+  var age = Date.now() + (net.timeOffset || 0) - at;
+  if(age > NAP_END*1000) return false;
+  mikaNap.at = at;
+  if(age < 8000) setTimeout(function(){ addChatLine('Mika', '*yawns* As you wish. Goodnight, everyone.', 'orange', false, null); }, 600);
+  return true;
+}
+function ownerNap(){
+  if(!net.isOwner) return;
+  var at = Date.now() + (net.timeOffset || 0);
+  if(startMikaNap(at)){ myNap = {at:at}; sendPresence(true); }
+}
+function receiveNap(p){
+  var n = p.presence && p.presence.nap;
+  if(n && peerRole(p) === 'owner') startMikaNap(+n.at);
+}
 function mikaPhase(){
+  var n = clockPhase(), f = napPhase();
+  if(!f) return n;
+  if(f.mode === 'toBed') return f;
+  if(n.mode === 'back') return n;          // her usual nap is ending: go home with it
+  if(f.mode === 'back' && n.mode === 'walk') return f;
+  return {mode:'sleep', f:0};              // stay in bed if her usual nap has started
+}
+function clockPhase(){
   var T = (((Date.now() + (net.timeOffset || 0))/1000) % MIKA_CYCLE + MIKA_CYCLE) % MIKA_CYCLE;
   if(T < MIKA_GO) return {mode:'walk', f:0};
   if(T < MIKA_SLEEP) return {mode:'toBed', f:(T - MIKA_GO)/(MIKA_SLEEP - MIKA_GO)};
@@ -4777,6 +4816,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 24, 2026 · 3:10 PM</span><br>Mika now listens when the owner tells her it is bedtime.</li>' +
   '<li><span class="when">Nov 24, 2026 · 3:00 PM</span><br>DARK BLUE MODE - a special theme for Daniel and the players he gives it to (SETTINGS).</li>' +
   '<li><span class="when">Nov 24, 2026 · 2:55 PM</span><br>Everyone gets the light look now. Prefer dark? SETTINGS > DARK MODE.</li>' +
   '<li><span class="when">Nov 24, 2026 · 2:50 PM</span><br>Mika now has something to say when a car hits her. "Oh, great heavens!"</li>' +
@@ -5139,8 +5179,9 @@ function mikaReply(text, who){
   if(pet.sleeping) line = '*awakens with a gentle yawn* ' + line;
   return line;
 }
-function mikaHeard(text, who){
+function mikaHeard(text, who, fromOwner){
   if(!/\bmika\b/i.test(String(text))) return;
+  if(MIKA_NAP_RE.test(String(text)) && fromOwner) return;   // she just yawns and goes to bed
   var line = mikaReply(text, who);
   setTimeout(function(){
     addChatLine('Mika', line, 'orange', false, null);
@@ -5150,7 +5191,8 @@ function mikaHeard(text, who){
 function sendChat(text){
   text = filterChat(text);
   addChatLine(t('you'), text, myColor, false, myRole());
-  mikaHeard(text, net.name || 'friend');
+  mikaHeard(text, net.name || 'friend', net.isOwner);
+  if(net.isOwner && MIKA_NAP_RE.test(text)) ownerNap();
   if(!mp.others.length) systemLine(t('chatAlone'));
   myChat = {n:Date.now(), t:text, at:Date.now()};
   sendPresence(true);
@@ -5190,7 +5232,7 @@ function receiveChat(p){
   mp.chatSeen[p.peer] = c.n;
   if(firstLook && finite(c.at) && Date.now() - c.at > 120000) return;
   var text = cleanChat(c.t);
-  if(text){ addChatLine(playerName(p), filterChat(text), peerColor(p), false, peerRole(p)); var m = net.members[p.by]; mikaHeard(filterChat(text), (m && m.name && cleanNick(m.name)) || playerName(p)); }
+  if(text){ addChatLine(playerName(p), filterChat(text), peerColor(p), false, peerRole(p)); var m = net.members[p.by]; mikaHeard(filterChat(text), (m && m.name && cleanNick(m.name)) || playerName(p), peerRole(p) === 'owner'); }
 }
 
 /* ---------- What's in front of you: the E prompt, and what E does ---------- */
@@ -6514,6 +6556,7 @@ document.getElementById('announce-btn').addEventListener('click', function(){
   announceInput.value = '';
   showAnnouncement(net.name, text);
   sendPresence(true);
+  if(MIKA_NAP_RE.test(text)) ownerNap();
 });
 function showAnnouncement(name, text){
   annEl.querySelector('.ann-head').textContent = t('annHead', {name:name});
@@ -6552,7 +6595,7 @@ function presenceState(){
   if(flying && driving && wreck.on){ s.wy = r2(wreck.y); s.wf = r2(wreck.flip); }
   s.ver = updateCheck.ver;
   if(updateCheck.outdated()) s.old = 1;
-  if(net.isOwner){ s.role = 'owner'; if(myAnnounce) s.announce = myAnnounce; }
+  if(net.isOwner){ s.role = 'owner'; if(myAnnounce) s.announce = myAnnounce; if(myNap && napPhase()) s.nap = myNap; }
   return s;
 }
 function sendPresence(force){
@@ -6690,7 +6733,7 @@ function onRoomPeers(change){
   var live = {};
   others.forEach(function(p){ live[p.peer] = true; });
   Object.keys(mp.avatars).forEach(function(k){ if(!live[k]) removeAvatar(k); });
-  others.forEach(function(p){ receiveChat(p); receiveAnnounce(p); });
+  others.forEach(function(p){ receiveChat(p); receiveAnnounce(p); receiveNap(p); });
   resolveColorClash();
   renderPlayers();
   renderSwatches();
