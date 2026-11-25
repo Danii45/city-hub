@@ -5296,6 +5296,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 25, 2026 · 2:40 PM</span><br>New sign-ups from the Google Form are added to Paris automatically.</li>' +
   '<li><span class="when">Nov 25, 2026 · 12:30 PM</span><br>Daniel\'s House on residential plot 72: a two-storey Parisian house with a balcony and a mansard roof - and Mika has a bed in the front yard.</li>' +
   '<li><span class="when">Nov 25, 2026 · 11:50 AM</span><br>Daniel can now open or close building for everyone with one switch (PLAYERS tab).</li>' +
   '<li><span class="when">Nov 25, 2026 · 11:30 AM</span><br>HAPPY HOLIDAYS! A giant Christmas tree and a Hanukkah menorah (it lights one more candle each night of Hanukkah) on the Champ de Mars, wreaths on the street lamps, snow, and a Santa hat for Mika. And Mika can now go for walks on a leash with Daniel.</li>' +
@@ -7029,6 +7030,7 @@ function startListening(){
     var all = s.val() || {};
     var st = all._settings; delete all._settings;   // not a player: the owner's settings for everyone
     net.members = all;
+    if(net.isOwner) listenPending();
     setBuildOpen(st && st.buildOpen, true);
     var dp = PLOT_BY_ID[DANIEL_PLOT]; if(dp && dp.data && dp.data.builtIn && dp.data.o !== danielHouseData().o) plotChanged(dp, null);
     applyDark();
@@ -7110,6 +7112,40 @@ function makeAccount(name, key, pw){
       return net.db.ref('paris/members/' + uid).set({name:name, key:key, at:firebase.database.ServerValue.TIMESTAMP});
     });
   });
+}
+
+/* AUTO-ADD from the Google Form: a small script in the sign-up sheet puts each new answer in paris/pending (only Daniel's
+   account can read it). Whenever Daniel's account has the game open, it makes those accounts by itself - the same way
+   as ADD - and clears them from the list. Anyone it can't add (name taken, password too short) is said in the chat. */
+var pendingBusy = false, pendingOn = false;
+STR.en.autoAdded = 'Added from the sign-up form: {names}'; STR.fr.autoAdded = 'Ajouté(s) depuis le formulaire : {names}';
+STR.en.autoSkipped = 'Not added from the sign-up form: {names}'; STR.fr.autoSkipped = 'Pas ajouté(s) depuis le formulaire : {names}';
+function listenPending(){
+  if(pendingOn || CLAUDE_MODE || !net.isOwner || !net.db) return;
+  pendingOn = true;
+  net.db.ref('paris/pending').on('value', function(s){ processPending(s.val() || {}); }, function(){ pendingOn = false; });
+}
+function processPending(v){
+  var ids = Object.keys(v);
+  if(pendingBusy || !ids.length) return;
+  pendingBusy = true;
+  var taken = {}, added = [], skipped = [];
+  Object.keys(net.members).forEach(function(u){ if(net.members[u] && net.members[u].key) taken[net.members[u].key] = true; });
+  (function next(i){
+    if(i >= ids.length){
+      pendingBusy = false;
+      if(added.length){ showToast(t('autoAdded', {names:added.join(', ')})); systemLine(t('autoAdded', {names:added.join(', ')})); }
+      if(skipped.length) systemLine(t('autoSkipped', {names:skipped.join(', ')}));
+      return;
+    }
+    var id = ids[i], r = v[id] || {}, name = cleanNick(r.name), key = nameKey(name), pw = String(r.pw || '').trim();
+    function done(){ return net.db.ref('paris/pending/' + id).remove().catch(function(){}); }
+    var why = key.length < 2 ? t('whyName') : pw.length < 6 ? t('whyPw') : taken[key] ? t('whyTaken') : '';
+    if(why){ skipped.push((name || '?') + ' (' + why + ')'); done().then(function(){ next(i + 1); }); return; }
+    makeAccount(name, key, pw).then(function(){ taken[key] = true; added.push(name); }, function(err){
+      skipped.push(name + ' (' + (err && err.code === 'exists' ? t('whyExists') : (err && (err.code || err.message)) || '?') + ')');
+    }).then(done).then(function(){ setTimeout(function(){ next(i + 1); }, 400); });
+  })(0);
 }
 
 /* ADD MANY: paste the name and password columns from a spreadsheet (one player a line) and add them all */
