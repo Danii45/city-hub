@@ -5296,7 +5296,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
-  '<li><span class="when">Nov 25, 2026 · 3:30 PM</span><br>JAIL: inappropriate language in the chat sends you straight to jail. Only Madame can let you out.</li>' +
+  '<li><span class="when">Nov 25, 2026 · 3:30 PM</span><br>THE PUBLIC SHAME CHAMBER: inappropriate language in the chat sends you straight there. Only Madame can let you out.</li>' +
   '<li><span class="when">Nov 25, 2026 · 3:15 PM</span><br>Smarter Mika: she remembers what you tell her (your name, what you like, your favourites), answers follow-ups like "why?" or "tell me more" without saying Mika again, asks you questions, reads several keywords at once, and knows 42 new topics.</li>' +
   '<li><span class="when">Nov 25, 2026 · 2:45 PM</span><br>No account? Press REQUEST ONE on the sign-in screen: pick a name and password, and your account is made automatically.</li>' +
   '<li><span class="when">Nov 25, 2026 · 12:30 PM</span><br>Daniel\'s House on residential plot 72: a two-storey Parisian house with a balcony and a mansard roof - and Mika has a bed in the front yard.</li>' +
@@ -8517,15 +8517,15 @@ var clock = new THREE.Clock();
    (paris/members/<uid>/jail), which only Daniel's account can change. */
 var JAIL = {x:0, z:-700};
 var jail = {me:false, why:'', all:{}, mine:null, listened:null, banner:null, local:false};
-STR.en.jailBanner = '🚔 YOU ARE IN JAIL for using inappropriate language. Only Madame can let you out.';
-STR.fr.jailBanner = '🚔 TU ES EN PRISON pour avoir utilisé un langage inapproprié. Seule Madame peut te libérer.';
-STR.en.jailNoChat = 'You can\'t chat from jail.'; STR.fr.jailNoChat = 'Tu ne peux pas discuter en prison.';
-STR.en.jailSent = '{name} was sent to jail.'; STR.fr.jailSent = '{name} a été envoyé(e) en prison.';
-STR.en.jailFree = '{name} is out of jail.'; STR.fr.jailFree = '{name} est sorti(e) de prison.';
-STR.en.jailBtn = 'JAIL'; STR.fr.jailBtn = 'PRISON';
+STR.en.jailBanner = '🚔 YOU ARE IN THE PUBLIC SHAME CHAMBER for using inappropriate language. Only Madame can let you out.';
+STR.fr.jailBanner = '🚔 TU ES DANS LA CHAMBRE DE LA HONTE PUBLIQUE pour avoir utilisé un langage inapproprié. Seule Madame peut te libérer.';
+STR.en.jailNoChat = 'You can\'t chat from the Public Shame Chamber.'; STR.fr.jailNoChat = 'Tu ne peux pas discuter depuis la chambre de la honte.';
+STR.en.jailSent = '{name} was sent to the Public Shame Chamber.'; STR.fr.jailSent = '{name} a été envoyé(e) dans la chambre de la honte publique.';
+STR.en.jailFree = '{name} is out of the Public Shame Chamber.'; STR.fr.jailFree = '{name} est sorti(e) de la chambre de la honte.';
+STR.en.jailBtn = 'SHAME CHAMBER'; STR.fr.jailBtn = 'CHAMBRE DE LA HONTE';
 STR.en.jailRelease = 'RELEASE'; STR.fr.jailRelease = 'LIBÉRER';
-STR.en.jailTag = 'IN JAIL'; STR.fr.jailTag = 'EN PRISON';
-STR.en.jailedYou = 'You have been released from jail. Be kind in the chat!'; STR.fr.jailedYou = 'Tu es libéré(e) de prison. Sois gentil(le) dans le chat !';
+STR.en.jailTag = 'IN THE SHAME CHAMBER'; STR.fr.jailTag = 'DANS LA CHAMBRE DE LA HONTE';
+STR.en.jailedYou = 'You are out of the Public Shame Chamber. Be kind in the chat!'; STR.fr.jailedYou = 'Tu es sorti(e) de la chambre de la honte. Sois gentil(le) dans le chat !';
 try { jail.local = localStorage.getItem('paris.jail') === '1'; } catch(e){}
 (function buildJail(){
   var X = JAIL.x, Z = JAIL.z, stone = solidMat(0x7d7f86), dark = solidMat(0x2a2b30);
@@ -8538,8 +8538,8 @@ try { jail.local = localStorage.getItem('paris.jail') === '1'; } catch(e){}
   [[0, -5.4, 11.4, 0.4], [0, 5.4, 11.4, 0.4], [-5.4, 0, 0.4, 11.4], [5.4, 0, 0.4, 11.4]].forEach(function(r){ var b = box(r[2], 0.3, r[3], dark); b.position.set(X + r[0], 4.9, Z + r[1]); root.add(b); var b2 = box(r[2], 0.3, r[3], dark); b2.position.set(X + r[0], 0.15, Z + r[1]); root.add(b2); });
   var bench = box(3, 0.5, 1, solidMat(0x6b4a32)); bench.position.set(X, 0.25, Z - 4); root.add(bench);
   var c = document.createElement('canvas'); c.width = 512; c.height = 128; var k = c.getContext('2d');
-  k.fillStyle = '#8a1c1c'; k.fillRect(0, 0, 512, 128); k.fillStyle = '#fff'; k.font = 'bold 60px sans-serif'; k.textAlign = 'center'; k.textBaseline = 'middle'; k.fillText('PRISON · JAIL', 256, 66);
-  var sg = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c), side:THREE.DoubleSide})); sg.position.set(X, 6.6, Z + 5.5); root.add(sg);
+  k.fillStyle = '#8a1c1c'; k.fillRect(0, 0, 512, 128); k.fillStyle = '#fff'; k.textAlign = 'center'; k.textBaseline = 'middle'; k.font = 'bold 40px sans-serif'; k.fillText('PUBLIC SHAME CHAMBER', 256, 46, 490); k.font = 'bold 26px sans-serif'; k.fillText('CHAMBRE DE LA HONTE PUBLIQUE', 256, 96, 490);
+  var sg = new THREE.Mesh(new THREE.PlaneGeometry(9, 2.25), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c), side:THREE.DoubleSide})); sg.position.set(X, 6.6, Z + 5.5); root.add(sg);
   var el = document.createElement('div'); el.id = 'jail-banner'; el.className = 'card hidden';
   var st = document.createElement('style'); st.textContent = '#jail-banner{position:fixed; left:50%; top:calc(70px + env(safe-area-inset-top,0px)); transform:translateX(-50%); z-index:50; padding:10px 14px; font-family:"VT323", monospace; font-size:21px; background:#8a1c1c; color:#fff; border-color:#3a0a0a; max-width:90vw; text-align:center;} #jail-banner.hidden{display:none;}';
   document.head.appendChild(st); document.body.appendChild(el); jail.banner = el;
