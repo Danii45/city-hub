@@ -2405,6 +2405,7 @@ function updatePet(dt){
       pet.vel.set(fx*sp*0.6, 10 + sp*0.4, fz*sp*0.6);
       showChauffard(t('howDare'), t('sentence'), true);
       doom.t = 2;   // the sentence is carried out in 2 seconds
+      mikaStrike();
       var ouch = MIKA_OUCH[Math.floor(Math.random()*MIKA_OUCH.length)];
       setTimeout(function(){ addChatLine('Mika', ouch.split('{name}').join(net.name || 'you'), 'orange', false, null); }, 250);
       thudSound(sp); screenShake = SHAKE_TIME; driveSpeed *= 0.9;
@@ -5435,6 +5436,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 25, 2026 · 4:30 PM</span><br>Hit Mika 3 times and you go straight to the Public Shame Chamber.</li>' +
   '<li><span class="when">Nov 25, 2026 · 4:00 PM</span><br>CLASS VILLAGES: every class has its own quartier to build in (MENU → VILLAGES). Madame\'s Baguette Village on the mountain is for elite players 🥖.</li>' +
   '<li><span class="when">Nov 25, 2026 · 3:30 PM</span><br>THE PUBLIC SHAME CHAMBER: inappropriate language in the chat sends you straight there. Only Madame can let you out.</li>' +
   '<li><span class="when">Nov 25, 2026 · 3:15 PM</span><br>Smarter Mika: she remembers what you tell her (your name, what you like, your favourites), answers follow-ups like "why?" or "tell me more" without saying Mika again, asks you questions, reads several keywords at once, and knows 42 new topics.</li>' +
@@ -5983,7 +5985,7 @@ if(PILOT) window.parisPilot = {
 };
 function sendChat(text){
   if(typeof amJailed === 'function' && amJailed()){ showToast(t('jailNoChat')); return; }
-  if(!net.isOwner && filterChat(text) !== text){ jailUid(net.uid, text); systemLine(t('jailBanner')); return; }
+  if(!net.isOwner && filterChat(text) !== text){ jail.reason = ''; try { localStorage.removeItem('paris.jailWhy'); } catch(e){} jailUid(net.uid, text); systemLine(t('jailBanner')); return; }
   text = filterChat(text);
   addChatLine(t('you'), text, myColor, false, myRole());
   mikaHeard(text, net.name || 'friend', net.isOwner);
@@ -8738,17 +8740,34 @@ function jailListen(){
       if(on || inList){ jail.all[net.uid] = true; }
       else {
         if(jail.local || jail.all[net.uid]){ if(!first) showToast(t('jailedYou')); }
-        delete jail.all[net.uid]; jail.local = false; try { localStorage.removeItem('paris.jail'); } catch(e){}
+        delete jail.all[net.uid]; jail.local = false; try { localStorage.removeItem('paris.jail'); localStorage.removeItem('paris.jailWhy'); } catch(e){} jail.reason = '';
       }
       first = false;
     }, function(){});
   }
 }
 /* every frame: keep a jailed player in their cell, out of cars, and show the banner */
+/* hit Mika 3 times (with a car) and you go straight to the Public Shame Chamber. Counted per account on this device. */
+STR.en.jailBannerMika = '🚔 YOU ARE IN THE PUBLIC SHAME CHAMBER for hitting Mika 3 times. Only Madame can let you out.';
+STR.fr.jailBannerMika = '🚔 TU ES DANS LA CHAMBRE DE LA HONTE PUBLIQUE pour avoir frappé Mika 3 fois. Seule Madame peut te libérer.';
+STR.en.mikaStrike = 'STRIKE {n}/3 for hitting Mika! At 3 you go to the Public Shame Chamber.'; STR.fr.mikaStrike = 'AVERTISSEMENT {n}/3 pour avoir frappé Mika ! À 3, c\'est la chambre de la honte publique.';
+STR.en.mikaJailed = '{name} hit Mika 3 times and was sent to the Public Shame Chamber.'; STR.fr.mikaJailed = '{name} a frappé Mika 3 fois et a été envoyé(e) dans la chambre de la honte publique.';
+function mikaStrike(){
+  if(!net.uid || net.isOwner || !signedIn()) return;
+  var key = 'paris.mikaHits.' + net.uid, n = 0;
+  try { n = (parseInt(localStorage.getItem(key), 10) || 0) + 1; localStorage.setItem(key, n >= 3 ? '0' : String(n)); } catch(e){ n = 1; }
+  if(n < 3){ setTimeout(function(){ showToast(t('mikaStrike', {n:n})); }, 2600); return; }
+  setTimeout(function(){
+    jail.reason = 'mika'; try { localStorage.setItem('paris.jailWhy', 'mika'); } catch(e){}
+    jailUid(net.uid, 'MIKA x3');
+    systemLine(t('mikaJailed', {name:net.name || 'You'}));
+  }, 4500);   // after the car has been blown up and come back down
+}
+try { jail.reason = localStorage.getItem('paris.jailWhy') || ''; } catch(e){}
 function jailTick(){
   if(net.uid && signedIn()) jailListen();
   var on = amJailed();
-  if(on !== jail.me){ jail.me = on; jail.banner.textContent = t('jailBanner'); jail.banner.classList.toggle('hidden', !on); sendPresence(true); if(on) closeEditors(); }
+  if(on !== jail.me){ jail.me = on; jail.banner.textContent = t(jail.reason === 'mika' ? 'jailBannerMika' : 'jailBanner'); jail.banner.classList.toggle('hidden', !on); sendPresence(true); if(on) closeEditors(); }
   if(!on) return;
   if(flying && driving){ exitDriveMode(); driving = false; applyModeUI(); }
   if(flying){
@@ -8759,7 +8778,7 @@ function jailTick(){
     if(camera.position.distanceTo(controls.target) > 40) camera.position.set(JAIL.x + 14, 12, JAIL.z + 18);
   }
 }
-langHooks.push(function(){ if(jail.banner) jail.banner.textContent = t('jailBanner'); });
+langHooks.push(function(){ if(jail.banner) jail.banner.textContent = t(jail.reason === 'mika' ? 'jailBannerMika' : 'jailBanner'); });
 
 /* ---------- CLASS VILLAGES: your class, elite players, the VILLAGES menu and the flight there ---------- */
 STR.en.tabVillages = 'VILLAGES'; STR.fr.tabVillages = 'VILLAGES';
