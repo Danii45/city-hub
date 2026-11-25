@@ -4379,19 +4379,19 @@ function updateFlyMovement(dt){
    SPACE goes up, SHIFT goes down, W / S thrust forward and back, A / D turn. Come all the way down to the ground and it
    lands and drives again. Flames come out of the four rear nozzles when you thrust, and out of the ports underneath
    to hold it up - everyone can see you fly. On a phone: hold UP / DOWN (the joystick steers and thrusts). */
-STR.en.flyHint = 'ROADSTER: hold SPACE to fly - SHIFT to go down - W/S thrust - A/D turn - land to drive';
-STR.fr.flyHint = 'ROADSTER : maintiens ESPACE pour voler - MAJ pour descendre - W/S poussée - A/D tourner - pose-toi pour rouler';
+STR.en.flyHint = 'ROADSTER: hold SPACE to fly up - SHIFT to go down - W/S thrust - A/D turn and BARREL ROLL - land to drive';
+STR.fr.flyHint = 'ROADSTER : maintiens ESPACE pour monter - MAJ pour descendre - W/S poussée - A/D tourner et TONNEAU - pose-toi pour rouler';
 STR.en.liftOff = 'LIFT-OFF!'; STR.fr.liftOff = 'DÉCOLLAGE !';
 STR.en.landed = 'LANDED'; STR.fr.landed = 'ATTERRI';
 STR.en.tbUp = 'UP'; STR.fr.tbUp = 'HAUT'; STR.en.tbDown = 'DOWN'; STR.fr.tbDown = 'BAS';
-var fly = {on:false, vy:0, pitch:0, bank:0, rear:0, down:0, touchUp:false, touchDown:false};
+var fly = {on:false, vy:0, pitch:0, bank:0, roll:0, rolls:0, rear:0, down:0, touchUp:false, touchDown:false};
 var FLY_TOP = 150, FLY_UP = 14, FLY_DOWN = 12;
 function flyUpKey(){ return !!(keys.Space || fly.touchUp); }
 function flyDownKey(){ return !!(keys.ShiftLeft || keys.ShiftRight || fly.touchDown); }
 function canFly(){ return carName === 'roadster' && !wreck.on; }
 function landFlight(quiet){
   if(!fly.on) return;
-  fly.on = false; fly.vy = 0;
+  fly.on = false; fly.vy = 0; fly.roll = 0; fly.rolls = 0; fly.bank = 0;
   if(!quiet){ showToast(t('landed')); thudSound(6); }
 }
 function updateRoadsterFlight(dt){
@@ -4442,7 +4442,17 @@ function updateRoadsterFlight(dt){
   // how it looks: nose up when climbing, banks into turns, a gentle hover bob, and the flames
   var v = Math.abs(driveSpeed)/topSpeed;
   fly.pitch += ((fly.vy/FLY_UP)*0.18 - throttle*0.06 - (fly.pitch))*Math.min(1, 4*dt);
-  fly.bank += (Math.max(-0.4, Math.min(0.4, -carYawRate*0.2*(0.4 + v))) - fly.bank)*Math.min(1, 4*dt);
+  // A / D in the air: STUNTS - hold to barrel-roll all the way round (it still turns); let go and it rolls back level
+  if(steerInput !== 0 && carPos.y - ground > 2.5){
+    fly.roll -= steerInput*4.6*dt;
+    var turns = Math.floor(Math.abs(fly.roll)/(Math.PI*2));
+    if(turns > fly.rolls){ fly.rolls = turns; showToast(turns > 1 ? 'BARREL ROLL x' + turns + '!' : 'BARREL ROLL!'); }
+  } else {
+    var home = Math.round(fly.roll/(Math.PI*2))*Math.PI*2;
+    fly.roll += (home - fly.roll)*Math.min(1, 5*dt);
+    if(Math.abs(home - fly.roll) < 0.02){ fly.roll = 0; fly.rolls = 0; }
+  }
+  fly.bank = fly.roll;
   fly.rear += ((throttle > 0 ? 1 : 0.15) - fly.rear)*Math.min(1, 8*dt);
   fly.down += ((flyUpKey() ? 1 : flyDownKey() ? 0.25 : 0.55) - fly.down)*Math.min(1, 8*dt);
   var bob = fly.on ? Math.sin(performance.now()/420)*0.06 : 0;
@@ -4485,7 +4495,7 @@ function endSpin(){ driveSpeed *= Math.cos(carYaw - spin.travelYaw); spin = null
 function updateDriveMovement(dt){
   if(fly.on){ if(canFly()){ updateRoadsterFlight(dt); return; } landFlight(true); carPos.y = surfaceAt(carPos.x, carPos.z, 0); }
   if(canFly() && flyUpKey()){   // lift-off!
-    fly.on = true; fly.vy = 2; fly.pitch = 0; fly.bank = 0; fly.rear = 0; fly.down = 1;
+    fly.on = true; fly.vy = 2; fly.pitch = 0; fly.bank = 0; fly.roll = 0; fly.rolls = 0; fly.rear = 0; fly.down = 1;
     showToast(t('liftOff')); screenShake = SHAKE_TIME*0.6;
     updateRoadsterFlight(dt); return;
   }
@@ -5094,6 +5104,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 25, 2026 · 10:45 AM</span><br>ROADSTER stunts: hold A or D in the air to barrel-roll.</li>' +
   '<li><span class="when">Nov 25, 2026 · 10:30 AM</span><br>The ROADSTER is now the new production model - big wing, rocket nozzles - and it FLIES: hold SPACE to lift off, SHIFT to go down, land to drive.</li>' +
   '<li><span class="when">Nov 25, 2026 · 9:45 AM</span><br>NEW CAR: the ROADSTER - an electric sports car with the fastest launch in Paris. Pick it in SETTINGS.</li>' +
   '<li><span class="when">Nov 25, 2026 · 9:30 AM</span><br>Hit Mika and your car is now launched sky-high, then crashes down with a second explosion - everyone sees it.</li>' +
