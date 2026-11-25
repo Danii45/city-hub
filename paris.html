@@ -436,6 +436,9 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
   <div class="sp-body">
     <div id="dc-sel" class="hidden">
       <div id="dc-sel-name">-</div>
+      <div class="opt-label"><span data-t="labelFr">LABEL (IN FRENCH)</span></div>
+      <input id="dc-label" class="text-input" maxlength="40" autocomplete="off" spellcheck="false" placeholder="le / la / l' ...">
+      <div class="msg" id="dc-label-msg"></div>
       <div class="btn-row"><button class="btn" id="dc-rotate" data-t="rotate">TURN (R)</button><button class="btn danger" id="dc-delete" data-t="remove">REMOVE</button><button class="btn" id="dc-desel" data-t="deselect">OK</button></div>
       <div class="opt-label"><span data-t="itemColor">COLOR</span></div>
       <div class="swatches" id="dc-sel-colors"></div>
@@ -525,6 +528,7 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
 
     <div class="tab-panel hidden" id="tab-players">
       <div class="settings-block">
+        <div class="btn-row" style="margin-bottom:10px"><button class="btn go" id="class-btn" data-t="classBtn">CLASS PROGRESS (LIFE IN PARIS)</button></div>
         <div class="settings-label"><span data-t="buildAll">BUILDING FOR EVERYONE</span><button class="toggle" id="build-toggle">CLOSED</button></div>
         <div class="msg" id="build-msg" data-t="buildAllNote">When it's CLOSED only you can build. Everyone can still explore, drive, chat and pet Mika.</div>
         <div class="settings-label second"><span data-t="addPlayer">ADD A PLAYER</span></div>
@@ -2681,7 +2685,8 @@ function cleanPlot(d, p){
     ct: n(d.ct, 0, TRIM_COLORS.length - 1, 0), ca: n(d.ca, 0, AWNING_COLORS.length - 1, 0),
     dp: n(d.dp, 0, 2, 1), iw: n(d.iw, 0, INWALL_COLORS.length - 1, 0), if: n(d['if'], 0, FLOOR_TYPES.length - 1, 0),
     it: typeof d.it === 'string' ? d.it.slice(0, 1200) : '', at: typeof d.at === 'number' ? d.at : 0,
-    md: house && d.md === 'b' ? 'b' : '', bk: blockData(d.bk, 9000), ib: blockData(d.ib, 4800)
+    md: house && d.md === 'b' ? 'b' : '', bk: blockData(d.bk, 9000), ib: blockData(d.ib, 4800),
+    lb: typeof d.lb === 'string' ? d.lb.slice(0, 4000) : ''
   };
   if(hasBadWord(c.nm)) c.nm = '';
   return c;
@@ -4018,8 +4023,13 @@ function buildWalker(){
   [-1,1].forEach(function(s){ var arm = box(0.16,0.62,0.16, paint); arm.position.set(s*0.42,1.18,0); g.add(arm); });
   var head = new THREE.Mesh(new THREE.SphereGeometry(0.21,10,8), solidMat(0xe2b894)); head.position.y = 1.78; g.add(head);
   var beret = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.07, 12), solidMat(0x1f2233)); beret.position.set(0.03, 1.97, 0); beret.rotation.z = 0.2; g.add(beret);
+  // a character's own look (LIFE IN PARIS): hair, and a cap instead of the beret
+  var hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.225, 10, 6, 0, Math.PI*2, 0, Math.PI*0.55), solidMat(0x2a1d14)); hairCap.position.y = 1.8; hairCap.visible = false; g.add(hairCap);
+  var cap = new THREE.Group(); cap.position.y = 1.93; cap.visible = false; g.add(cap);
+  var capTop = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 6, 0, Math.PI*2, 0, Math.PI*0.5), paint); cap.add(capTop);
+  var visor = box(0.3, 0.03, 0.18, paint); visor.position.set(0, 0.0, -0.24); cap.add(visor);
   g.visible = false; root.add(g);
-  return {group:g, wheels:[], wheelR:1, paint:paint};
+  return {group:g, wheels:[], wheelR:1, paint:paint, parts:{head:head, legs:legs, beret:beret, cap:cap, hairCap:hairCap}};
 }
 
 /* ---------- Car colors: everyday paints, one per player; shiny GOLD / DIAMOND / AURORA for the owner ---------- */
@@ -4396,8 +4406,9 @@ function enterFirstPerson(){
     camera.position.y = surfaceAt(camera.position.x, camera.position.z, 0) + EYE_HEIGHT;
     camera.rotation.set(pitch, yaw, 0);
     if(pendingRoom && performance.now() - pendingRoom.t < 8000) enterRoom(pendingRoom.p);
+    if(pendingLandmark){ placeAtLandmark(pendingLandmark); }
   }
-  pendingRoom = null;
+  pendingRoom = null; pendingLandmark = null;
 }
 function leaveFirstPerson(){
   if(!flying) return;
@@ -5912,6 +5923,8 @@ buildToggle.addEventListener('click', function(){
   showToast(t(want ? 'buildNowOpen' : 'buildNowClosed'));
 });
 langHooks.push(renderBuildToggle);
+STR.en.classBtn = 'CLASS PROGRESS (LIFE IN PARIS)'; STR.fr.classBtn = 'SUIVI DE LA CLASSE (VIE À PARIS)';
+document.getElementById('class-btn').addEventListener('click', function(){ if(typeof openLife === 'function'){ titleScreen.classList.add('hidden'); openLife('class'); } });
 renderBuildToggle();
 STR.en.buildLocked = 'Building is closed for now. You can still explore Paris, drive, chat and pet Mika!';
 STR.fr.buildLocked = 'La construction est fermée pour l\'instant. Tu peux quand même explorer Paris, conduire, discuter et caresser Mika !';
@@ -6474,6 +6487,11 @@ function renderDecor(){
     var o = editing.items[decor.sel];
     selBox.classList.remove('hidden');
     document.getElementById('dc-sel-name').textContent = tx(ITEM_BY_ID[o.id]);
+    var lbm = {}; try { lbm = JSON.parse(editing.d.lb || '{}') || {}; } catch(err){}
+    var lin = document.getElementById('dc-label'), lv = lbm[labelKey(o)] || '';
+    if(document.activeElement !== lin) lin.value = lv;
+    var lg = gradeLabel(o.id, lv), lmsg = document.getElementById('dc-label-msg');
+    lmsg.textContent = lv ? (lg === 'ok' ? '✓ ' : '') + gradeNote(lg, o.id) : ''; lmsg.className = 'msg' + (lg === 'ok' ? ' good' : lg ? ' bad' : '');
     var cs = document.getElementById('dc-sel-colors'); cs.textContent = '';
     cs.appendChild(swatchRow(ITEM_COLORS, o.c, function(i){ o.c = i; decorChanged(); }));
   } else selBox.classList.add('hidden');
@@ -6515,6 +6533,20 @@ function decorDelete(){
   decorChanged(); renderDecor();
 }
 document.getElementById('dc-rotate').addEventListener('click', decorRotate);
+STR.en.labelFr = 'LABEL (IN FRENCH)'; STR.fr.labelFr = 'ÉTIQUETTE (EN FRANÇAIS)';
+(function(){
+  var lin = document.getElementById('dc-label');
+  lin.addEventListener('keydown', function(e){ e.stopPropagation(); if(e.key === 'Enter') lin.blur(); });
+  lin.addEventListener('keyup', function(e){ e.stopPropagation(); });
+  lin.addEventListener('change', function(){
+    var o = editing && editing.items[decor.sel]; if(!o) return;
+    var lbm = {}; try { lbm = JSON.parse(editing.d.lb || '{}') || {}; } catch(err){}
+    var val = cleanName(lin.value).slice(0, 40);
+    if(val) lbm[labelKey(o)] = val; else delete lbm[labelKey(o)];
+    editing.d.lb = JSON.stringify(lbm).slice(0, 4000);
+    decorChanged(); renderDecor();
+  });
+})();
 document.getElementById('dc-delete').addEventListener('click', decorDelete);
 document.getElementById('dc-desel').addEventListener('click', function(){ decorSelect(-1); });
 document.getElementById('dc-done').addEventListener('click', function(){ endDecor(); });
@@ -6633,6 +6665,7 @@ canvasEl.addEventListener('pointerup', function(e){
 function clickAt(cx, cy){
   if(decor.on){ decorClick(cx, cy); return; }
   if(blk.on){ blocksClick(cx, cy); return; }
+  if(!flying && !builder.on){ var lmk = landmarkAtScreen(cx, cy); if(lmk){ goLandmark(lmk); return; } }   // a monument: go and see it
   if(builder.on || !signedIn()) return;
   var targets = [ground];
   plotRows.forEach(function(r){ if(r.extMesh) targets.push(r.extMesh); });
@@ -6869,7 +6902,7 @@ function startListening(){
 function plotRecord(p, d){
   return {o:net.uid, k:p.kind, nm:cleanName(d.nm).slice(0, 22), ty:shopType(d.ty).id, st:d.st|0, fl:d.fl|0, cw:d.cw|0, cr:d.cr|0, ct:d.ct|0,
           ca:d.ca|0, dp:d.dp|0, iw:d.iw|0, 'if':d['if']|0, it:String(d.it || '').slice(0, 1200), md:p.kind === 'house' && d.md === 'b' ? 'b' : '',
-          bk:blockData(d.bk, 9000), ib:blockData(d.ib, 4800), at:firebase.database.ServerValue.TIMESTAMP};
+          bk:blockData(d.bk, 9000), ib:blockData(d.ib, 4800), lb:typeof d.lb === 'string' ? d.lb.slice(0, 4000) : '', at:firebase.database.ServerValue.TIMESTAMP};
 }
 net.claimPlot = function(p, d){
   if(buildLocked()) return Promise.reject(new Error('notAllowed'));
@@ -7109,6 +7142,7 @@ function presenceState(){
   if(flying && driving && wreck.on){ s.wy = r2(wreck.y); s.wf = r2(wreck.flip); }
   if(flying && driving && fly.on){ s.fly = [r2(fly.rear), r2(fly.down), r2(fly.pitch), r2(fly.bank)]; }
   s.ver = updateCheck.ver;
+  if(typeof lifeOn === 'function' && lifeOn() && life.eco.ch) s.look = lookCode(life.eco.ch);
   if(updateCheck.outdated()) s.old = 1;
   if(net.isOwner){ s.role = 'owner'; if(myAnnounce) s.announce = myAnnounce; if(myNap && napPhase()) s.nap = myNap; if(myLeash) s.leash = myLeash; }
   return s;
@@ -7329,6 +7363,7 @@ function updateRemotes(dt){
     if(!a.model){ if(a.tag) a.tag.visible = false; return; }
     var colorId = peerColor(p);
     if(a.color !== colorId){ paintModel(a.model, colorId); a.color = colorId; }
+    if(want === 'walker' && a.model.parts){ var lk = typeof s.look === 'string' && /^[0-9]{4}$/.test(s.look) ? s.look : '1000'; if(a.look !== lk){ a.look = lk; applyLook(a.model, lk); } }
     var ahead = Math.min(0.15, Math.max(0, (Date.now() - p.updatedAt)/1000)), speed = finite(s.speed) ? s.speed : 0;
     _fwd.set(-Math.sin(s.yaw), 0, -Math.cos(s.yaw)).multiplyScalar(want === 'walker' ? 0 : speed*ahead);
     var tx2 = s.x + _fwd.x, ty = s.y, tz = s.z + _fwd.z;
@@ -8250,6 +8285,1050 @@ document.getElementById('loading').classList.add('hidden');
 
 /* ---------- Render loop ---------- */
 var clock = new THREE.Clock();
+/* ======================================================================================================================
+   LIFE IN PARIS (VIE À PARIS) - a classroom mode for Madame's French class
+   1. LABELS: every thing inside your house and shop gets a label in French ("le lit", "la lampe"). The game checks
+      each one (article, spelling, accents) and shows it floating over the thing for everyone who walks in.
+   2. PLAYER MODE: once everything is labelled you pick a mode - EXPLORER (play as before) or VIE À PARIS - create your
+      own character (name, age, look) and choose a career.
+   3. WORK: each shift is a set of real tasks (take café orders in French, give change, scale recipes, deliver parcels
+      round Paris, guide tourists, advise bank customers). Your pay depends on how well you do.
+   4. MONEY: 1 class = 1 month. Each new school day closes last month: rent for the home you built (priced by its size
+      at real 2026 Paris rents), bills from your own budget choices, a Livret A savings account that earns interest,
+      a credit card with interest and a minimum payment, overdraft fees, a credit score, and life's surprises.
+   Teacher: the PLAYERS tab has a CLASS PROGRESS view with everyone's labels, job, money, savings, debt and score.
+   Saved per player (website: paris/owners/<uid>/eco, claude.ai: eco/<uid>); labels go with the plot (lb).
+   ==================================================================================================================== */
+function L2(en, fr){ return LANG === 'fr' ? fr : en; }
+function eur(n){ n = Math.round(Number(n || 0)*100)/100; var neg = n < 0; n = Math.abs(n);
+  var s = n.toLocaleString(LANG === 'fr' ? 'fr-FR' : 'en-CA', {minimumFractionDigits:2, maximumFractionDigits:2});
+  return (neg ? '-' : '') + (LANG === 'fr' ? s + ' €' : '€' + s); }
+function eur0(n){ n = Math.round(Number(n || 0)); return (n < 0 ? '-' : '') + (LANG === 'fr' ? Math.abs(n).toLocaleString('fr-FR') + ' €' : '€' + Math.abs(n).toLocaleString('en-CA')); }
+function todayKey(){ var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+function lifeRand(seed){ var h = 2166136261; seed = String(seed); for(var i=0;i<seed.length;i++){ h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619); } return function(){ h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 100000)/100000; }; }
+function pickR(r, a){ return a[Math.floor(r()*a.length)]; }
+function shuffleR(r, a){ a = a.slice(); for(var i=a.length-1;i>0;i--){ var j = Math.floor(r()*(i + 1)), x = a[i]; a[i] = a[j]; a[j] = x; } return a; }
+
+/* ---------- 1. LABELS ---------- */
+/* the French answer for each thing: gender (m / f / pl) and the noun (other accepted nouns after it) */
+var LABEL_FR = {
+  tb:['f', 'table'], ch:['f', 'chaise'], bt:['f', 'table de bistrot', 'table de café'], ct:['m', 'comptoir'], rg:['f', 'caisse', 'caisse enregistreuse'],
+  sh:['f', 'étagère'], dp:['f', 'vitrine'], br:['m', 'panier à pain', 'présentoir à pain'], ck:['m', 'présentoir à gâteaux', 'plateau à gâteaux'],
+  cf:['f', 'machine à café', 'cafetière'], fw:['pl', 'fleurs'], cr:['m', 'portant', 'portant à vêtements'], mn:['m', 'mannequin'],
+  bk:['f', 'bibliothèque'], tx:['m', 'coffre à jouets'], fz:['m', 'bac à glaces'], es:['m', 'tableau'], cz:['pl', 'fromages'],
+  bd:['m', 'lit'], sf:['m', 'canapé'], ac:['m', 'fauteuil'], tv:['f', 'télé', 'télévision'], lt:['f', 'table basse'], kt:['f', 'cuisine', 'cuisinière'],
+  fr:['m', 'frigo', 'réfrigérateur', 'frigidaire'], wd:['f', 'armoire'], ba:['f', 'baignoire'], pn:['m', 'piano'], dk:['m', 'bureau'],
+  ru:['m', 'tapis'], pl:['f', 'plante'], lp:['f', 'lampe']
+};
+function noAccents(s){ return s.normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+function startsVowel(s){ return /^[aeiouyhàâäéèêëîïôöùûü]/i.test(s); }
+function bestAnswer(id){ var a = LABEL_FR[id]; if(!a) return ''; var n = a[1]; return (a[0] === 'pl' ? 'les ' : startsVowel(n) ? 'l\'' : a[0] === 'm' ? 'le ' : 'la ') + n; }
+/* how good a label is: 'ok', 'article' (right word, wrong or missing article), 'accents', 'wrong' or '' (empty) */
+function gradeLabel(id, text){
+  var a = LABEL_FR[id];
+  text = String(text || '').toLowerCase().replace(/[’‘`´]/g, '\'').replace(/\s+/g, ' ').trim().replace(/[.!]+$/, '');
+  if(!text) return '';
+  if(!a) return 'ok';
+  var m = text.match(/^(?:(les|la|le|une|un|des)\s+|(l')\s*)(.+)$/), art = m ? (m[1] || m[2]) : '', noun = m ? m[3].trim() : text;
+  var nouns = a.slice(1), g = a[0], exact = nouns.indexOf(noun) >= 0;
+  var loose = !exact && nouns.some(function(n){ return noAccents(n) === noAccents(noun); });
+  if(!exact && !loose) return 'wrong';
+  var v = startsVowel(noun), okArt = g === 'pl' ? (art === 'les' || art === 'des') : g === 'm' ? (art === (v ? 'l\'' : 'le') || art === 'un') : (art === (v ? 'l\'' : 'la') || art === 'une');
+  if(!okArt) return 'article';
+  return exact ? 'ok' : 'accents';
+}
+function gradeNote(gr, id){
+  if(gr === 'ok') return L2('Correct!', 'Correct !');
+  if(gr === 'article') return L2('Check the article (le / la / l\' / les / un / une).', 'Vérifie l\'article (le / la / l\' / les / un / une).');
+  if(gr === 'accents') return L2('Almost - check the accents.', 'Presque - attention aux accents.');
+  if(gr === 'wrong') return L2('Not quite - try another word.', 'Pas tout à fait - essaie un autre mot.');
+  return L2('Not labelled yet.', 'Pas encore étiqueté.');
+}
+function labelKey(o){ return o.id + '.' + o.i + '.' + o.j; }
+function plotLabels(p){ var d = p && p.data; if(!d || !d.lb) return {}; try { var o = JSON.parse(d.lb); return o && typeof o === 'object' ? o : {}; } catch(e){ return {}; } }
+/* every thing in a plot, numbered per kind ("CHAIR 1", "CHAIR 2"), with its label and grade */
+function labelList(p){
+  if(!p || !p.data) return [];
+  var items = parseItems(p.data.it), lb = plotLabels(p), count = {}, seen = {};
+  return items.map(function(o){
+    var it = ITEM_BY_ID[o.id]; if(!it) return null;
+    count[o.id] = (count[o.id] || 0) + 1;
+    var k = labelKey(o); if(seen[k]) return null; seen[k] = true;
+    var text = typeof lb[k] === 'string' ? lb[k] : '';
+    return {o:o, key:k, it:it, n:count[o.id], text:text, gr:gradeLabel(o.id, text)};
+  }).filter(Boolean);
+}
+function labelStats(uid){
+  var n = 0, labelled = 0, ok = 0;
+  PLOTS.forEach(function(p){ if(p.data && p.data.o === uid){ labelList(p).forEach(function(r){ n++; if(r.text) labelled++; if(r.gr === 'ok') ok++; }); } });
+  return {n:n, labelled:labelled, ok:ok};
+}
+function saveLabels(p, lb){
+  var str = JSON.stringify(lb).slice(0, 4000), d = JSON.parse(JSON.stringify(p.data)); d.lb = str;
+  p.data.lb = str; labelSprites.dirty = true;
+  if(CLAUDE_MODE){
+    if(!net.cdb) return Promise.resolve();
+    var upd = {}; upd[p.kind] = claudeRecord(p, d, p.data.at);
+    return claudeWrite(function(){ return net.cdb.doc('plots/' + net.uid).update(upd); });
+  }
+  if(!net.db) return Promise.resolve();
+  if(p.data.builtIn){ delete d.builtIn; return net.db.ref('paris/plots/' + p.id).set(plotRecord(p, d)); }
+  return net.db.ref('paris/plots/' + p.id + '/lb').set(str);
+}
+/* the labels floating over things inside the houses near you */
+var labelSprites = {list:[], key:'', dirty:true, t:0};
+function labelSprite(text, gr){
+  var c = document.createElement('canvas'), x = c.getContext('2d'); x.font = 'bold 30px Georgia, serif';
+  var w = Math.min(500, Math.ceil(x.measureText(text).width) + 40); c.width = w; c.height = 52;
+  x.fillStyle = gr === 'ok' ? '#e9f8e4' : gr === 'wrong' ? '#fde4e4' : '#fff6d6'; x.fillRect(0, 0, w, 52);
+  x.strokeStyle = gr === 'ok' ? '#2f8a3a' : gr === 'wrong' ? '#c43c3c' : '#c99a1e'; x.lineWidth = 5; x.strokeRect(2, 2, w - 4, 48);
+  x.fillStyle = '#1f2233'; x.font = 'bold 30px Georgia, serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text, w/2, 28);
+  var sp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c), depthWrite:false}));
+  sp.scale.set(w/52*0.32, 0.32, 1); sp.renderOrder = 5; return sp;
+}
+function updateLabelSprites(dt){
+  labelSprites.t -= dt;
+  if(labelSprites.t > 0 && !labelSprites.dirty) return;
+  labelSprites.t = 0.6;
+  var cx = camera.position.x, cz = camera.position.z, cy = camera.position.y, near = [];
+  PLOTS.forEach(function(p){ if(p.data && p.data.lb && p.data.lb.length > 2 && Math.hypot(p.cx - cx, p.cz - cz) < 26) near.push(p); });
+  var key = near.map(function(p){ return p.id + p.data.lb + p.data.it; }).join('|') + (cy < -50 ? 'r' : '');
+  if(key === labelSprites.key && !labelSprites.dirty) return;
+  labelSprites.key = key; labelSprites.dirty = false;
+  labelSprites.list.forEach(function(s){ root.remove(s); s.material.map.dispose(); s.material.dispose(); });
+  labelSprites.list = [];
+  near.forEach(function(p){
+    var room = isBlockHouse(p, p.data), LY = room ? LAYOUT.room : layoutOf(p.kind), y0 = room ? ROOM_Y : 0;
+    labelList(p).forEach(function(r){
+      if(!r.text) return;
+      var s = itemSize(r.o), lx = LY.x0 + CELL*(r.o.i + s.w/2), lz = LY.z0 + CELL*(r.o.j + s.d/2), w = plotToWorld(p, lx, lz);
+      var sp = labelSprite(r.text, r.gr); sp.position.set(w.x, y0 + 1.9, w.z); root.add(sp); labelSprites.list.push(sp);
+    });
+  });
+}
+
+/* ---------- 2. CHARACTER ---------- */
+var LOOK = {
+  skin:[0xf1d2b6, 0xe2b894, 0xc68e5e, 0x9a6440, 0x6b4128],
+  hair:[0x2a1d14, 0x5a3a22, 0xb8863b, 0xe6cf8a, 0x9a3b22, 0x1b1b1d],
+  pants:[0x2b2a2e, 0x2a3f6e, 0x6b5a42, 0x7a7d84, 0x3f5a35, 0x5c2a2a],
+  hats:['beret', 'cap', 'none']
+};
+function lookCode(ch){ ch = ch || {}; return [ch.skin|0, ch.hair|0, ch.pants|0, ch.hat|0].join(''); }
+function applyLook(model, code){
+  if(!model || !model.parts) return;
+  var v = String(code || '').split('').map(Number), P = model.parts;
+  P.head.material.color.setHex(LOOK.skin[v[0]] || LOOK.skin[1]);
+  P.arms && P.arms.forEach(function(a){ a.material = P.armMat; });
+  P.legs.material.color.setHex(LOOK.pants[v[2]] || LOOK.pants[0]);
+  var hat = LOOK.hats[v[3]] || 'beret';
+  P.beret.visible = hat === 'beret'; P.cap.visible = hat === 'cap'; P.hairCap.visible = hat !== 'beret';
+  P.hairCap.material.color.setHex(LOOK.hair[v[1]] || LOOK.hair[0]);
+}
+var FIRST_NAMES = ['Camille', 'Léa', 'Chloé', 'Manon', 'Inès', 'Jade', 'Louise', 'Emma', 'Hugo', 'Lucas', 'Louis', 'Gabriel', 'Arthur', 'Jules', 'Nathan', 'Théo'];
+var LAST_NAMES = ['Martin', 'Bernard', 'Dubois', 'Thomas', 'Robert', 'Richard', 'Petit', 'Durand', 'Leroy', 'Moreau', 'Simon', 'Laurent', 'Lefebvre', 'Michel'];
+
+/* ---------- 3. CAREERS ---------- */
+/* gross monthly pay for full time (35 h): the SMIC (minimum wage) is 1 867,02 € gross / about 1 478 € net since June 2026.
+   Net is about 79 % of gross (about 21 % goes to social contributions: health, pension, unemployment). */
+var NET_RATE = 0.79, SHIFTS_PER_MONTH = 4;
+var JOBS = [
+  {id:'serveur', en:'Café server', fr:'Serveur / Serveuse', gross:1900, icon:'☕', tips:true,
+   about:['Take orders in a Paris café, add up the bill, use polite French. Good service earns tips.', 'Prends les commandes dans un café, calcule l\'addition, parle poliment. Un bon service rapporte des pourboires.']},
+  {id:'caissier', en:'Cashier', fr:'Caissier / Caissière', gross:1867, icon:'🧾',
+   about:['Ring up groceries at a supermarket and give the right change in euros.', 'Encaisse les courses au supermarché et rends la bonne monnaie en euros.']},
+  {id:'boulanger', en:'Baker', fr:'Boulanger / Boulangère', gross:2050, icon:'🥖',
+   about:['Know your ingredients, scale recipes and time the oven at a Paris bakery.', 'Connais tes ingrédients, adapte les recettes et surveille le four dans une boulangerie.']},
+  {id:'livreur', en:'Delivery rider', fr:'Livreur / Livreuse', gross:1950, icon:'📦',
+   about:['Deliver parcels to real addresses around Paris - walk or drive there before time runs out.', 'Livre des colis à de vraies adresses dans Paris - à pied ou en voiture, avant la fin du temps.']},
+  {id:'guide', en:'Tour guide', fr:'Guide touristique', gross:2150, icon:'🗼',
+   about:['Answer tourists\' questions about Paris and its monuments.', 'Réponds aux questions des touristes sur Paris et ses monuments.']},
+  {id:'banquier', en:'Bank adviser', fr:'Conseiller / Conseillère bancaire', gross:2500, icon:'🏦',
+   about:['Help customers with interest, budgets, savings and credit. The best-paid job - and the hardest questions.', 'Aide les clients : intérêts, budget, épargne et crédit. Le métier le mieux payé - et les questions les plus dures.']}
+];
+var JOB_BY_ID = {}; JOBS.forEach(function(j){ JOB_BY_ID[j.id] = j; });
+function jobName(j){ return j ? L2(j.en, j.fr) : '-'; }
+function shiftGross(j){ return j.gross/SHIFTS_PER_MONTH; }
+
+/* ---------- 4. MONEY ---------- */
+var RENT_M2 = 29.65;        // average rent for a house in Paris, 2026 (SeLoger): about 29,65 € per m² per month
+var CHARGES_M2 = 2.5;       // building charges (charges locatives) per m²
+var STUDIO = {m2:25, rent:990};   // no house yet? a 25 m² studio, about 39,55 €/m² charges included (Locservice, Nov 2026)
+var LIVRET_A = 0.017;       // Livret A savings rate since 1 August 2026 (tax-free)
+var OVERDRAFT_LIMIT = 400, OVERDRAFT_APR = 0.16, REJECT_FEE = 20, LATE_RENT = 0.10;
+var CARD_LIMIT = 1500, CARD_APR = 0.21, CARD_MIN_PCT = 0.03, CARD_MIN = 25;
+var NAVIGO = 90.80;         // Navigo monthly pass 2026; employers must pay back half (so you pay 45,40 €)
+var BUDGET = {
+  phone:{en:'Phone plan', fr:'Forfait mobile', opts:[[10, 'Basic (10 GB)', 'Basique (10 Go)'], [20, 'Standard (100 GB)', 'Standard (100 Go)'], [40, 'Premium (unlimited)', 'Premium (illimité)']]},
+  food:{en:'Groceries', fr:'Courses', opts:[[220, 'Thrifty (cook at home)', 'Économe (cuisine maison)'], [320, 'Normal', 'Normal'], [480, 'Fancy (eat out a lot)', 'Gourmand (souvent au resto)']]},
+  transport:{en:'Getting around', fr:'Transport', opts:[[NAVIGO/2, 'Navigo pass (half paid by your employer)', 'Passe Navigo (moitié payée par l\'employeur)'], [8, 'Bike (repairs)', 'Vélo (entretien)']]},
+  fun:{en:'Going out', fr:'Sorties', opts:[[0, 'Nothing', 'Rien'], [60, 'A little', 'Un peu'], [150, 'A lot', 'Beaucoup']]}
+};
+/* how big your home is: a ready-made house is about 61 m² per floor you can live in (8,6 x 8,4 m, less walls and
+   stairs); a block house counts the ground it covers (1 m blocks) times its storeys (3 blocks high each) */
+function homeInfo(uid){
+  var p = PLOTS.filter(function(q){ return q.kind === 'house' && q.data && q.data.o === uid; })[0];
+  if(!p) return {p:null, m2:STUDIO.m2, rent:STUDIO.rent, charges:0, studio:true};
+  var m2;
+  if(isBlockHouse(p, p.data)){
+    var cells = {}, top = 0;
+    parseBlocks(p.data.bk).forEach(function(b){ if(isFullBlock(b.t) || b.t === BS.window || b.t === BS.half){ cells[b.i + ',' + b.k] = 1; if(b.j > top) top = b.j; } });
+    m2 = Math.round(Object.keys(cells).length*Math.max(1, Math.ceil((top + 1)/3))*0.85);
+  } else m2 = Math.round(8.6*8.4*0.85)*(p.data.fl || 1);
+  m2 = Math.max(15, m2);
+  return {p:p, m2:m2, rent:Math.round(m2*RENT_M2), charges:Math.round(m2*CHARGES_M2), studio:false};
+}
+function monthlyBills(eco, home){
+  var B = eco.budget || {}, people = 1 + (eco.room|0);
+  var rows = [
+    {k:'rent', en:'Rent (your share)', fr:'Loyer (ta part)', a:(home.rent + home.charges)/people, rent:true},
+    {k:'elec', en:'Electricity (your share)', fr:'Électricité (ta part)', a:Math.round(home.m2*0.9 + 20)/people},
+    {k:'net', en:'Internet box (your share)', fr:'Box internet (ta part)', a:30/people},
+    {k:'ins', en:'Home insurance (required)', fr:'Assurance habitation (obligatoire)', a:12/people}
+  ];
+  ['phone', 'food', 'transport', 'fun'].forEach(function(k){ var o = BUDGET[k].opts[B[k] !== undefined ? B[k] : 1] || BUDGET[k].opts[0]; rows.push({k:k, en:BUDGET[k].en, fr:BUDGET[k].fr, a:o[0]}); });
+  rows.forEach(function(r){ r.a = Math.round(r.a*100)/100; });
+  return rows;
+}
+/* life's surprises: one each month, the same for everyone in that month (it's on the calendar, not luck) */
+var EVENTS = [
+  {a:-120, en:'Your phone screen cracked. Repair:', fr:'L\'écran de ton téléphone s\'est cassé. Réparation :'},
+  {a:-60, en:'Dentist (after the Sécurité sociale pays its part):', fr:'Dentiste (après le remboursement de la Sécu) :'},
+  {a:-45, en:'A friend\'s birthday present:', fr:'Cadeau d\'anniversaire pour un ami :'},
+  {a:-35, en:'Fine: no ticket on the metro!', fr:'Amende : pas de ticket dans le métro !'},
+  {a:-250, en:'The washing machine broke. New one:', fr:'La machine à laver est tombée en panne. Nouvelle machine :'},
+  {a:50, en:'Your grandmother sent you money:', fr:'Ta grand-mère t\'a envoyé de l\'argent :'},
+  {a:80, en:'Tax refund:', fr:'Remboursement d\'impôts :'},
+  {a:-90, en:'Winter coat (it\'s cold in Paris!):', fr:'Manteau d\'hiver (il fait froid à Paris !) :'},
+  {a:0, en:'A quiet month - no surprises.', fr:'Un mois calme - pas de surprise.'},
+  {a:-150, en:'Train ticket home for the holidays:', fr:'Billet de train pour les fêtes :'},
+  {a:30, en:'You sold old clothes online:', fr:'Tu as vendu de vieux vêtements en ligne :'}
+];
+var WANTS = [
+  {id:'phone', icon:'📱', a:799, en:'New smartphone', fr:'Nouveau smartphone'},
+  {id:'shoes', icon:'👟', a:140, en:'Sneakers', fr:'Baskets'},
+  {id:'concert', icon:'🎤', a:85, en:'Concert ticket', fr:'Billet de concert'},
+  {id:'resto', icon:'🍽', a:45, en:'Dinner at a restaurant', fr:'Dîner au restaurant'},
+  {id:'console', icon:'🎮', a:499, en:'Game console', fr:'Console de jeux'},
+  {id:'trip', icon:'🚄', a:220, en:'Weekend in Lyon (TGV + hotel)', fr:'Week-end à Lyon (TGV + hôtel)'},
+  {id:'cinema', icon:'🎬', a:13, en:'Cinema ticket', fr:'Place de cinéma'},
+  {id:'bike', icon:'🚲', a:350, en:'A bike (then pick "Bike" in your budget)', fr:'Un vélo (puis choisis « Vélo » dans ton budget)'}
+];
+function newEco(){
+  return {v:1, mode:'', ch:null, job:'', month:1, day:todayKey(), cash:600, sav:0, card:0, cardPlan:'full', score:650, shifts:0, earned:0,
+          budget:{phone:1, food:1, transport:0, fun:1}, room:0, goal:{n:'', a:0}, log:[], hist:[], stmt:null, items:[]};
+}
+function ecoLog(eco, a, en, fr, acct){ eco.log.unshift({m:eco.month, a:Math.round(a*100)/100, en:en, fr:fr, c:acct || 'cash'}); if(eco.log.length > 40) eco.log.length = 40; }
+/* pay something from the current account: within the overdraft limit it goes through; past it, it's rejected */
+function payBill(eco, amt, en, fr, isRent, stmt){
+  if(eco.cash - amt >= -OVERDRAFT_LIMIT){ eco.cash -= amt; ecoLog(eco, -amt, en, fr); stmt.rows.push({en:en, fr:fr, a:-amt}); return true; }
+  eco.cash -= REJECT_FEE; ecoLog(eco, -REJECT_FEE, 'Rejected payment fee', 'Frais de rejet de paiement'); eco.score -= 40;
+  stmt.rows.push({en:en + ' - REJECTED (not enough money)', fr:fr + ' - REJETÉ (pas assez d\'argent)', a:0, bad:true});
+  stmt.rows.push({en:'Rejected payment fee', fr:'Frais de rejet', a:-REJECT_FEE, bad:true});
+  eco.debt = (eco.debt || 0) + amt*(isRent ? 1 + LATE_RENT : 1);
+  if(isRent) stmt.rows.push({en:'Unpaid rent + 10 % late fee added to your debts', fr:'Loyer impayé + 10 % de pénalité ajoutés à tes dettes', a:0, bad:true});
+  return false;
+}
+/* the end of a month: everything that happens on the 1st, in order, written down on a statement */
+function closeMonth(eco){
+  var home = homeInfo(net.uid), stmt = {m:eco.month, rows:[], start:eco.cash}, rentPaid = true;
+  stmt.rows.push({en:'Pay this month (net, already in your account)', fr:'Salaire du mois (net, déjà sur ton compte)', a:eco.earned, info:true});
+  // old debts first (unpaid rent and bills from before)
+  if(eco.debt > 0){ var d = eco.debt; eco.debt = 0; payBill(eco, Math.round(d*100)/100, 'Old unpaid bills', 'Anciennes factures impayées', false, stmt); }
+  monthlyBills(eco, home).forEach(function(r){ var ok = payBill(eco, r.a, r.en, r.fr, !!r.rent, stmt); if(r.rent && !ok) rentPaid = false; });
+  // life's surprise
+  var ev = EVENTS[lifeRand(net.uid + ':' + eco.month)() * EVENTS.length | 0];
+  if(ev.a > 0){ eco.cash += ev.a; ecoLog(eco, ev.a, ev.en, ev.fr); stmt.rows.push({en:ev.en, fr:ev.fr, a:ev.a, ev:true}); }
+  else if(ev.a < 0) payBill(eco, -ev.a, ev.en, ev.fr, false, stmt);
+  else stmt.rows.push({en:ev.en, fr:ev.fr, a:0, ev:true});
+  // the credit card: pay in full, or the minimum - interest on whatever is left
+  if(eco.card > 0){
+    var minPay = Math.min(eco.card, Math.max(CARD_MIN, Math.round(eco.card*CARD_MIN_PCT*100)/100)), pay = eco.cardPlan === 'min' ? minPay : eco.card;
+    if(eco.cash - pay >= -OVERDRAFT_LIMIT){
+      eco.cash -= pay; eco.card -= pay; ecoLog(eco, -pay, 'Credit card payment', 'Remboursement carte de crédit');
+      stmt.rows.push({en:'Credit card payment' + (eco.cardPlan === 'min' ? ' (minimum)' : ' (in full)'), fr:'Remboursement carte' + (eco.cardPlan === 'min' ? ' (minimum)' : ' (total)'), a:-pay});
+      eco.score += eco.card <= 0.005 ? 6 : -2;
+    } else { eco.score -= 35; stmt.rows.push({en:'Credit card payment MISSED', fr:'Remboursement carte MANQUÉ', a:0, bad:true}); }
+    if(eco.card > 0.005){ var ci = Math.round(eco.card*CARD_APR/12*100)/100; eco.card += ci; stmt.rows.push({en:'Credit card interest (21 % a year)', fr:'Intérêts carte (21 % par an)', a:-ci, card:true}); }
+  }
+  // the overdraft costs interest (agios)
+  if(eco.cash < 0){ var ag = Math.round(-eco.cash*OVERDRAFT_APR/12*100)/100; eco.cash -= ag; ecoLog(eco, -ag, 'Overdraft interest (agios)', 'Agios (découvert)'); stmt.rows.push({en:'Overdraft interest (agios, 16 % a year)', fr:'Agios (découvert, 16 % par an)', a:-ag, bad:true}); eco.score -= 5; }
+  // savings earn interest (the Livret A pays once a year in real life; here a twelfth each month)
+  if(eco.sav > 0){ var si = Math.round(eco.sav*LIVRET_A/12*100)/100; eco.sav += si; stmt.rows.push({en:'Livret A interest (1,7 % a year)', fr:'Intérêts du Livret A (1,7 % par an)', a:si, sav:true}); }
+  if(rentPaid) eco.score += 8;
+  if(eco.card > CARD_LIMIT*0.8) eco.score -= 8;
+  eco.score = Math.max(300, Math.min(850, Math.round(eco.score)));
+  stmt.end = eco.cash; stmt.sav = eco.sav; stmt.card = eco.card; stmt.debt = eco.debt || 0; stmt.score = eco.score; stmt.earned = eco.earned;
+  eco.hist.push({m:eco.month, inc:Math.round(eco.earned), cash:Math.round(eco.cash), sav:Math.round(eco.sav), owe:Math.round(eco.card + (eco.debt || 0) + Math.max(0, -eco.cash))});
+  if(eco.hist.length > 24) eco.hist.shift();
+  eco.stmt = stmt; eco.month += 1; eco.earned = 0; eco.shifts = 0;
+  return stmt;
+}
+
+/* ---------- the tasks for each job: each makes a question with 4 answers (or a delivery round Paris) ---------- */
+var CAFE_MENU = [
+  {e:'☕', fr:'un café', en:'an espresso', p:2.5}, {e:'🥛', fr:'un café crème', en:'a coffee with milk', p:4.2},
+  {e:'🥐', fr:'un croissant', en:'a croissant', p:1.6}, {e:'🍫', fr:'un pain au chocolat', en:'a pain au chocolat', p:1.8},
+  {e:'🍊', fr:'un jus d\'orange', en:'an orange juice', p:4.5}, {e:'🥞', fr:'une crêpe au sucre', en:'a sugar crêpe', p:5},
+  {e:'🥪', fr:'un croque-monsieur', en:'a croque-monsieur (toasted ham & cheese)', p:9.5}, {e:'🥗', fr:'une salade niçoise', en:'a niçoise salad', p:13},
+  {e:'☕', fr:'un chocolat chaud', en:'a hot chocolate', p:4.8}, {e:'💧', fr:'une bouteille d\'eau', en:'a bottle of water', p:3.2},
+  {e:'🍵', fr:'un thé', en:'a tea', p:3.8}, {e:'🥧', fr:'une quiche lorraine', en:'a quiche lorraine', p:8.5}
+];
+function money2(n){ return (Math.round(n*100)/100).toFixed(2).replace('.', ','); }
+function numOpts(r, right, step, fmt){
+  var set = {}, out = [];
+  set[right.toFixed(2)] = 1; out.push(right);
+  var deltas = shuffleR(r, [-3, -2, -1, 1, 2, 3, 4, -4]);
+  for(var i=0; out.length < 4 && i < deltas.length; i++){ var v = Math.round((right + deltas[i]*step)*100)/100; if(v > 0 && !set[v.toFixed(2)]){ set[v.toFixed(2)] = 1; out.push(v); } }
+  out = shuffleR(r, out);
+  return {opts:out.map(fmt), ans:out.indexOf(right)};
+}
+function mc(r, right, wrongs){ var all = shuffleR(r, [right].concat(shuffleR(r, wrongs).slice(0, 3))); return {opts:all, ans:all.indexOf(right)}; }
+var TASKS = {
+  serveur:function(r, k){
+    var kind = k % 3;
+    if(kind === 0){   // understand the order
+      var a = pickR(r, CAFE_MENU), b; do { b = pickR(r, CAFE_MENU); } while(b === a);
+      var say = pickR(r, ['Bonjour ! Je voudrais ', 'Pour moi, ce sera ', 'Je vais prendre ', 'Bonjour, je prendrais ']) + a.fr + ' et ' + b.fr + ', s\'il vous plaît.';
+      var right = a.e + ' ' + L2(a.en, a.fr) + ' + ' + b.e + ' ' + L2(b.en, b.fr), wr = [];
+      for(var i=0;i<10;i++){ var x = pickR(r, CAFE_MENU), y = pickR(r, CAFE_MENU); if(x !== y && !(x === a && y === b)) wr.push(x.e + ' ' + L2(x.en, x.fr) + ' + ' + y.e + ' ' + L2(y.en, y.fr)); }
+      var m = mc(r, right, wr);
+      return {q:L2('The customer says: « ' + say + ' » What do you bring?', 'Le client dit : « ' + say + ' » Que lui apportes-tu ?'), opts:m.opts, ans:m.ans};
+    }
+    if(kind === 1){   // the bill
+      var items = shuffleR(r, CAFE_MENU).slice(0, 2 + (r()*2|0)), tot = items.reduce(function(s, it){ return s + it.p; }, 0);
+      var n = numOpts(r, tot, 0.5, function(v){ return money2(v) + ' €'; });
+      return {q:L2('Add up the bill: ', 'Calcule l\'addition : ') + items.map(function(it){ return it.fr + ' (' + money2(it.p) + ' €)'; }).join(' + '), opts:n.opts, ans:n.ans};
+    }
+    var phr = pickR(r, [
+      ['How do you politely bring the bill?', 'Comment apportes-tu l\'addition poliment ?', 'Voici l\'addition, madame.', ['Tiens, paie.', 'Donne-moi l\'argent.', 'C\'est fini, au revoir.']],
+      ['How do you ask what the customer wants?', 'Comment demandes-tu ce que le client veut ?', 'Qu\'est-ce que je vous sers ?', ['Tu veux quoi ?', 'Pourquoi tu es là ?', 'C\'est combien ?']],
+      ['How do you say "Enjoy your meal!"?', 'Que dis-tu quand tu sers le plat ?', 'Bon appétit !', ['Bonne nuit !', 'À demain !', 'Bonne chance !']],
+      ['A customer asks « Je peux payer par carte ? » - how do you say yes?', 'Un client demande « Je peux payer par carte ? » - comment dis-tu oui ?', 'Oui, bien sûr, voici le terminal.', ['Non, merci.', 'Je ne sais pas nager.', 'Il fait beau aujourd\'hui.']],
+      ['How do you greet customers in the evening?', 'Comment salues-tu les clients le soir ?', 'Bonsoir, messieurs-dames !', ['Bonne nuit, salut !', 'Au revoir !', 'Bon matin !']]
+    ]);
+    var m2 = mc(r, phr[2], phr[3]);
+    return {q:L2(phr[0], phr[1]), opts:m2.opts, ans:m2.ans};
+  },
+  caissier:function(r, k){
+    if(k % 3 === 2){
+      var it = shuffleR(r, [['du pain', 1.3], ['du lait', 1.15], ['des pommes', 3.2], ['du fromage', 4.6], ['des pâtes', 1.4], ['du café', 5.9], ['des œufs', 3.1]]).slice(0, 3);
+      var qty = it.map(function(){ return 1 + (r()*3|0); }), tot = it.reduce(function(s, x, i){ return s + x[1]*qty[i]; }, 0);
+      var n = numOpts(r, tot, 0.4, function(v){ return money2(v) + ' €'; });
+      return {q:L2('Ring up: ', 'Encaisse : ') + it.map(function(x, i){ return qty[i] + ' × ' + x[0] + ' (' + money2(x[1]) + ' €)'; }).join(', '), opts:n.opts, ans:n.ans};
+    }
+    var total = Math.round((2 + r()*45)*20)/20, paid = total < 5 ? 5 : total < 10 ? 10 : total < 20 ? 20 : 50, change = Math.round((paid - total)*100)/100;
+    var n2 = numOpts(r, change, 0.1 + (r()*2|0)*0.4, function(v){ return money2(v) + ' €'; });
+    return {q:L2('Total: ' + money2(total) + ' €. The customer pays with a ' + paid + ' € note. How much change?', 'Total : ' + money2(total) + ' €. Le client donne un billet de ' + paid + ' €. Combien rends-tu ?'), opts:n2.opts, ans:n2.ans};
+  },
+  boulanger:function(r, k){
+    var kind = k % 3;
+    if(kind === 0){
+      var ing = pickR(r, [['la farine', '🌾', 'flour'], ['le beurre', '🧈', 'butter'], ['les œufs', '🥚', 'eggs'], ['le sucre', '🍬', 'sugar'], ['le lait', '🥛', 'milk'], ['le sel', '🧂', 'salt'], ['la levure', '🫧', 'yeast'], ['le chocolat', '🍫', 'chocolate']]);
+      var others = [['🌾', 'flour'], ['🧈', 'butter'], ['🥚', 'eggs'], ['🍬', 'sugar'], ['🥛', 'milk'], ['🧂', 'salt'], ['🫧', 'yeast'], ['🍫', 'chocolate']].filter(function(o){ return o[0] !== ing[1]; }).map(function(o){ return o[0] + ' ' + L2(o[1], ''); });
+      var m = mc(r, ing[1] + ' ' + L2(ing[2], ''), others);
+      return {q:L2('The chef asks: « Passe-moi ' + ing[0] + ' ! » Which do you hand over?', 'Le chef demande : « Passe-moi ' + ing[0] + ' ! » Que lui donnes-tu ?'), opts:m.opts, ans:m.ans};
+    }
+    if(kind === 1){
+      var base = pickR(r, [[12, 'croissants', 500, 'g de farine'], [2, 'baguettes', 600, 'g de farine'], [8, 'pains au chocolat', 250, 'g de beurre'], [6, 'crêpes', 3, 'œufs'], [10, 'madeleines', 120, 'g de sucre']]), mult = pickR(r, [2, 3, 0.5, 4]);
+      var want = base[0]*mult, right = base[2]*mult, opts = shuffleR(r, [right, base[2]*(mult + 1), base[2] + mult, Math.round(base[2]*mult*1.5)].filter(function(v, i, a){ return a.indexOf(v) === i; })).slice(0, 4);
+      if(opts.indexOf(right) < 0) opts[0] = right;
+      return {q:L2('Recipe: ' + base[2] + ' ' + base[3] + ' for ' + base[0] + ' ' + base[1] + '. How much for ' + want + ' ' + base[1] + '?', 'Recette : ' + base[2] + ' ' + base[3] + ' pour ' + base[0] + ' ' + base[1] + '. Combien pour ' + want + ' ' + base[1] + ' ?'),
+              opts:opts.map(function(v){ return v + ' ' + base[3].split(' ')[0]; }), ans:opts.indexOf(right)};
+    }
+    var h = 6 + (r()*3|0), mi = [0, 10, 20, 30, 40, 50][r()*6|0], bake = pickR(r, [25, 35, 40, 45, 55]), endM = h*60 + mi + bake;
+    function hm(t){ return Math.floor(t/60) + ' h ' + ('0' + (t % 60)).slice(-2); }
+    var m3 = mc(r, hm(endM), [hm(endM + 10), hm(endM - 10), hm(endM + 60), hm(endM - 5)]);
+    return {q:L2('The bread goes in the oven at ' + hm(h*60 + mi) + ' and bakes for ' + bake + ' minutes. When does it come out?', 'Le pain entre au four à ' + hm(h*60 + mi) + ' et cuit ' + bake + ' minutes. À quelle heure sort-il ?'), opts:m3.opts, ans:m3.ans};
+  },
+  guide:function(r){
+    var Q = pickR(r, [
+      ['When was the Eiffel Tower finished?', 'En quelle année la tour Eiffel a-t-elle été terminée ?', '1889', ['1789', '1914', '1950']],
+      ['Which river flows through Paris?', 'Quel fleuve traverse Paris ?', 'La Seine', ['La Loire', 'Le Rhône', 'La Garonne']],
+      ['Which museum has the Mona Lisa (La Joconde)?', 'Quel musée a La Joconde ?', 'Le Louvre', ['Le musée d\'Orsay', 'Le Centre Pompidou', 'Le Grand Palais']],
+      ['Which monument stands at the top of the Champs-Élysées?', 'Quel monument est en haut des Champs-Élysées ?', 'L\'Arc de Triomphe', ['La tour Eiffel', 'Le Sacré-Cœur', 'Notre-Dame']],
+      ['Which white church sits on the hill of Montmartre?', 'Quelle église blanche est sur la colline de Montmartre ?', 'Le Sacré-Cœur', ['Notre-Dame', 'La Sainte-Chapelle', 'La Madeleine']],
+      ['Which famous cabaret has a red windmill?', 'Quel cabaret célèbre a un moulin rouge ?', 'Le Moulin Rouge', ['Le Lido', 'L\'Olympia', 'Le Bataclan']],
+      ['About how tall is the Eiffel Tower?', 'Quelle est la hauteur de la tour Eiffel, environ ?', '330 m', ['100 m', '550 m', '1 000 m']],
+      ['What is the Paris underground train called?', 'Comment s\'appelle le train souterrain de Paris ?', 'Le métro', ['Le tram', 'Le TGV', 'Le bus']],
+      ['Which cathedral was rebuilt after the 2019 fire?', 'Quelle cathédrale a été reconstruite après l\'incendie de 2019 ?', 'Notre-Dame de Paris', ['Le Sacré-Cœur', 'Saint-Sulpice', 'La Madeleine']],
+      ['How many arrondissements (districts) does Paris have?', 'Combien d\'arrondissements Paris a-t-il ?', '20', ['10', '12', '32']],
+      ['Which park is next to the Senate, in the 6th?', 'Quel jardin est à côté du Sénat, dans le 6e ?', 'Le jardin du Luxembourg', ['Le bois de Boulogne', 'Le parc Monceau', 'Les Tuileries']],
+      ['Which museum is in an old train station?', 'Quel musée est dans une ancienne gare ?', 'Le musée d\'Orsay', ['Le Louvre', 'Le musée Rodin', 'Le Petit Palais']],
+      ['What is the French national holiday (14 July) called?', 'Comment s\'appelle la fête nationale du 14 juillet ?', 'La fête nationale (le 14 Juillet)', ['La Toussaint', 'La fête du Travail', 'Noël']],
+      ['Whose company built the Eiffel Tower?', 'Quelle entreprise a construit la tour Eiffel ?', 'L\'entreprise de Gustave Eiffel', ['Coco Chanel', 'Louis Vuitton', 'Napoléon']],
+      ['A tourist asks « Où sont les toilettes ? » - what do they want?', 'Un touriste demande « Où sont les toilettes ? » - que cherche-t-il ?', L2('The restroom', 'Les toilettes'), [L2('The exit', 'La sortie'), L2('A taxi', 'Un taxi'), L2('Tickets', 'Des billets')]]
+    ]);
+    var m = mc(r, Q[2], Q[3]);
+    return {q:L2(Q[0], Q[1]), opts:m.opts, ans:m.ans};
+  },
+  banquier:function(r, k){
+    var kind = k % 4;
+    if(kind === 0){
+      var amt = pickR(r, [1000, 1200, 2000, 2500, 3000, 5000]), yr = Math.round(amt*LIVRET_A*100)/100;
+      var n = numOpts(r, yr, yr/4, function(v){ return money2(v) + ' €'; });
+      return {q:L2('A customer puts ' + amt + ' € in a Livret A at 1,7 % a year. How much interest after one year?', 'Un client met ' + amt + ' € sur un Livret A à 1,7 % par an. Combien d\'intérêts après un an ?'), opts:n.opts, ans:n.ans};
+    }
+    if(kind === 1){
+      var net = pickR(r, [1500, 1800, 2100, 2400, 3000]), maxR = Math.round(net/3);
+      var m = mc(r, maxR + ' €', [Math.round(net/2) + ' €', Math.round(net*0.8) + ' €', Math.round(net/5) + ' €']);
+      return {q:L2('Landlords in Paris want your income to be at least 3 times the rent. A customer earns ' + net + ' € net a month. What is the highest rent they should take?', 'À Paris, les propriétaires veulent des revenus d\'au moins 3 fois le loyer. Un client gagne ' + net + ' € net par mois. Quel loyer maximum ?'), opts:m.opts, ans:m.ans};
+    }
+    if(kind === 2){
+      var gross = pickR(r, [1900, 2000, 2200, 2500, 3000]), nt = Math.round(gross*NET_RATE);
+      var m2 = mc(r, 'about ' + nt + ' €', ['about ' + gross + ' €', 'about ' + Math.round(gross*0.5) + ' €', 'about ' + Math.round(gross*1.2) + ' €']);
+      m2.opts = m2.opts.map(function(o){ return LANG === 'fr' ? o.replace('about', 'environ') : o; });
+      return {q:L2('A job pays ' + gross + ' € gross (brut) a month. About 21 % goes to social contributions. What is the net pay?', 'Un emploi paie ' + gross + ' € brut par mois. Environ 21 % partent en cotisations sociales. Quel est le salaire net ?'), opts:m2.opts, ans:m2.ans};
+    }
+    var C = pickR(r, [
+      ['What is the 50/30/20 rule?', 'Qu\'est-ce que la règle 50/30/20 ?', L2('50 % needs, 30 % wants, 20 % savings', '50 % besoins, 30 % envies, 20 % épargne'), [L2('50 % rent, 30 % food, 20 % fun', '50 % loyer, 30 % courses, 20 % sorties'), L2('Save 50 %, spend the rest', 'Épargner 50 %, dépenser le reste'), L2('Pay 50/30/20 € on your card', 'Payer 50/30/20 € avec la carte')]],
+      ['A credit card balance of 1 000 € at 21 % a year. Paying only the minimum...', 'Un solde de carte de 1 000 € à 21 % par an. Payer seulement le minimum...', L2('costs much more in interest over time', 'coûte beaucoup plus cher en intérêts'), [L2('is free', 'est gratuit'), L2('makes the debt disappear', 'fait disparaître la dette'), L2('earns you interest', 'te rapporte des intérêts')]],
+      ['What is an emergency fund?', 'Qu\'est-ce qu\'une épargne de précaution ?', L2('Savings for surprises, like 3 months of expenses', 'De l\'argent mis de côté pour les imprévus, environ 3 mois de dépenses'), [L2('A loan from the bank', 'Un prêt de la banque'), L2('Money for holidays', 'L\'argent des vacances'), L2('The rent deposit', 'Le dépôt de garantie')]],
+      ['What happens if you go past your overdraft limit?', 'Que se passe-t-il si tu dépasses ton découvert autorisé ?', L2('Payments are rejected and you pay fees', 'Les paiements sont rejetés et tu paies des frais'), [L2('Nothing at all', 'Rien du tout'), L2('The bank gives you a bonus', 'La banque te donne une prime'), L2('Your salary doubles', 'Ton salaire double')]],
+      ['Which is a NEED, not a want?', 'Lequel est un BESOIN, pas une envie ?', L2('Rent', 'Le loyer'), [L2('A new game console', 'Une nouvelle console'), L2('Concert tickets', 'Des places de concert'), L2('Designer sneakers', 'Des baskets de marque')]],
+      ['What helps a credit score most?', 'Qu\'est-ce qui aide le plus un score de crédit ?', L2('Paying every bill on time', 'Payer toutes ses factures à temps'), [L2('Using the whole credit limit', 'Utiliser toute la limite de crédit'), L2('Missing a payment', 'Oublier un paiement'), L2('Opening ten cards at once', 'Ouvrir dix cartes d\'un coup')]]
+    ]);
+    var m3 = mc(r, C[2], C[3]);
+    return {q:L2(C[0], C[1]), opts:m3.opts, ans:m3.ans};
+  }
+};
+
+/* ---------- state, loading and saving ---------- */
+var life = {eco:null, loaded:false, uid:null, tab:'home', shift:null, del:null, all:{}, allOn:false, saveT:null, open:false, step:0, draft:null, pick:null, view:null, stmtShown:false};
+function lifeOn(){ return !!(life.eco && life.eco.mode === 'life' && life.eco.job); }
+function lifeLoad(){
+  var uid = net.uid; life.uid = uid; life.loaded = false; life.eco = null;
+  function got(v){
+    if(life.uid !== uid || life.loaded) return;
+    life.loaded = true;
+    life.eco = v && typeof v === 'object' && v.v ? v : null;
+    if(life.eco){
+      ['log', 'hist', 'items'].forEach(function(k){ if(!Array.isArray(life.eco[k])) life.eco[k] = []; });
+      life.eco.budget = life.eco.budget || {phone:1, food:1, transport:0, fun:1};
+      // a new school day = a new month
+      if(lifeOn() && life.eco.day !== todayKey()){ closeMonth(life.eco); life.eco.day = todayKey(); lifeSave(true); life.stmtShown = false; life.tab = 'stmt'; openLife(); }
+      else if(life.eco.day !== todayKey()){ life.eco.day = todayKey(); lifeSave(true); }
+    }
+    renderLifeBtn(); if(life.open) renderLife();
+  }
+  if(CLAUDE_MODE){ if(net.cdb) net.cdb.doc('eco/' + uid).onSnapshot(function(s){ got(s.exists ? s.data() : null); }, function(){ got(null); }); else got(null); }
+  else if(net.db) net.db.ref('paris/owners/' + uid + '/eco').once('value').then(function(s){ got(s.val()); }).catch(function(){ got(null); });
+  else got(null);
+}
+function lifeSave(now){
+  clearTimeout(life.saveT);
+  life.saveT = setTimeout(function(){
+    if(!life.eco || !net.uid) return;
+    var e = JSON.parse(JSON.stringify(life.eco));
+    if(CLAUDE_MODE){ if(net.cdb) claudeWrite(function(){ return net.cdb.doc('eco/' + net.uid).set(e); }).catch(function(){}); }
+    else if(net.db) net.db.ref('paris/owners/' + net.uid + '/eco').set(e).catch(function(){ showToast(L2('Could not save - check your connection', 'Sauvegarde impossible - vérifie ta connexion')); });
+  }, now ? 0 : 700);
+  renderLifeBtn();
+}
+function listenAllEco(){
+  if(life.allOn) return; life.allOn = true;
+  if(CLAUDE_MODE){ if(net.cdb) net.cdb.collection('eco').onSnapshot(function(snap){ var all = {}; snap.docs.forEach(function(d){ all[d.id] = d.data(); }); life.all = all; if(life.open && life.tab === 'class') renderLife(); }, function(){}); }
+  else if(net.db) net.db.ref('paris/owners').on('value', function(s){ var v = s.val() || {}, all = {}; Object.keys(v).forEach(function(u){ if(v[u] && v[u].eco) all[u] = v[u].eco; }); life.all = all; if(life.open && life.tab === 'class') renderLife(); }, function(){});
+}
+
+/* ---------- the window ---------- */
+(function(){
+  var css = document.createElement('style');
+  css.textContent = [
+    '#life{z-index:36;} #life .sp-body{font-size:18px; line-height:1.2;}',
+    '#life-tabs{display:flex; flex-wrap:wrap; gap:4px; padding:8px 10px; border-bottom:3px solid var(--panel-border);}',
+    '#life-tabs button{font-family:"Press Start 2P", monospace; font-size:7px; padding:6px 6px; background:var(--panel); color:var(--ink); border:2px solid var(--panel-border); cursor:pointer;}',
+    '#life-tabs button.on{background:var(--accent); color:#fff;}',
+    '.lf-card{border:2px solid var(--panel-border); padding:8px 10px; margin:8px 0; background:rgba(127,127,127,0.06);}',
+    '.lf-h{font-family:"Press Start 2P", monospace; font-size:9px; color:var(--accent); margin:12px 0 6px;}',
+    '.lf-row{display:flex; justify-content:space-between; gap:8px; padding:2px 0;} .lf-row b{white-space:nowrap;}',
+    '.lf-big{font-size:28px;} .lf-good{color:var(--good);} .lf-bad{color:var(--accent-2);} .lf-soft{color:var(--ink-soft); font-size:16px;}',
+    '.lf-opt{display:block; width:100%; text-align:left; margin:6px 0; padding:9px 10px; font-family:"VT323", monospace; font-size:19px; background:var(--panel); color:var(--ink); border:2px solid var(--panel-border); cursor:pointer; box-shadow:2px 2px 0 0 var(--panel-border);}',
+    '.lf-opt.right{background:#d8f2d0; color:#1f2233;} .lf-opt.wrongpick{background:#f7d4d4; color:#1f2233;} .lf-opt.on{outline:3px solid var(--accent);}',
+    '.lf-in{width:100%; box-sizing:border-box; font-family:"VT323", monospace; font-size:20px; padding:5px 8px; border:2px solid var(--panel-border); background:var(--bg, #fff); color:var(--ink);}',
+    '.lf-lab{display:grid; grid-template-columns:1fr 1.3fr; gap:6px; align-items:center; margin:6px 0;}',
+    '.lf-chip{display:inline-block; font-size:15px; padding:0 6px; border:2px solid var(--panel-border); margin-left:4px;}',
+    '.lf-chip.ok{background:#d8f2d0; color:#1f2233;} .lf-chip.no{background:#f7d4d4; color:#1f2233;} .lf-chip.mid{background:#fbecc0; color:#1f2233;}',
+    '.lf-sw{display:inline-block; width:26px; height:26px; margin:2px; border:3px solid var(--panel-border); cursor:pointer; vertical-align:middle;} .lf-sw.on{outline:3px solid var(--accent); outline-offset:1px;}',
+    '.lf-bars{display:flex; align-items:flex-end; gap:3px; height:70px; margin:6px 0;} .lf-bars i{flex:1; background:var(--accent); min-height:2px;} .lf-bars i.neg{background:var(--accent-2);}',
+    '.lf-meter{height:12px; border:2px solid var(--panel-border); background:rgba(127,127,127,0.15); position:relative;} .lf-meter i{position:absolute; left:0; top:0; bottom:0; background:var(--good);} .lf-meter i.bad{background:var(--accent-2);}',
+    '.lf-table{width:100%; border-collapse:collapse; font-size:16px;} .lf-table td, .lf-table th{border-bottom:1px solid rgba(127,127,127,0.35); padding:3px 4px; text-align:left;} .lf-table th{font-family:"Press Start 2P", monospace; font-size:7px;}',
+    '#life-btn.has{background:var(--accent); color:#fff;}',
+    '#life-beacon-hud{position:absolute; left:50%; top:calc(70px + env(safe-area-inset-top,0px)); transform:translateX(-50%); z-index:34; padding:8px 12px; font-family:"VT323", monospace; font-size:20px; text-align:center;}',
+    '#life-beacon-hud.hidden{display:none;}',
+    '@media (max-width:600px){ #life{top:auto; height:72vh;} }'
+  ].join('\n');
+  document.head.appendChild(css);
+  var el = document.createElement('div'); el.id = 'life'; el.className = 'side-panel card hidden';
+  el.innerHTML = '<div class="sp-head"><span id="life-title">VIE À PARIS</span><small id="life-sub"></small></div><div id="life-tabs"></div><div class="sp-body" id="life-body"></div>' +
+                 '<div class="sp-foot"><button class="btn" id="life-close">' + 'CLOSE' + '</button></div>';
+  document.body.appendChild(el);
+  var hud = document.createElement('div'); hud.id = 'life-beacon-hud'; hud.className = 'card hidden'; document.body.appendChild(hud);
+  var btn = document.createElement('button'); btn.className = 'bar-btn hidden'; btn.id = 'life-btn'; btn.textContent = 'VIE';
+  var bar = document.getElementById('top-bar'); bar.insertBefore(btn, bar.children[1]);
+  btn.addEventListener('click', function(){ if(life.open) closeLife(); else openLife(); });
+  document.getElementById('life-close').addEventListener('click', closeLife);
+  el.addEventListener('click', lifeClick);
+  el.addEventListener('change', lifeChange);
+  el.addEventListener('keydown', function(e){ e.stopPropagation(); });
+  el.addEventListener('keyup', function(e){ e.stopPropagation(); });
+})();
+function renderLifeBtn(){
+  var b = document.getElementById('life-btn');
+  b.classList.toggle('hidden', !signedIn());
+  b.textContent = lifeOn() ? L2('LIFE', 'VIE') + ' · ' + eur0(life.eco.cash) : L2('LIFE', 'VIE');
+  b.classList.toggle('has', lifeOn());
+}
+langHooks.push(function(){ renderLifeBtn(); if(life.open) renderLife(); });
+function openLife(tab){
+  if(!signedIn()){ openMenu(); return; }
+  if(tab) life.tab = tab;
+  if(flying) exitFirstPerson();
+  closeEditors();
+  life.open = true; document.getElementById('life').classList.remove('hidden');
+  if(net.isOwner) listenAllEco();
+  renderLife();
+}
+function closeLife(){ life.open = false; document.getElementById('life').classList.add('hidden'); }
+
+/* the tabs you can see right now */
+function lifeTabs(){
+  var t = [];
+  if(lifeOn()) t = [['home', 'HOME', 'ACCUEIL'], ['work', 'WORK', 'TRAVAIL'], ['bank', 'BANK', 'BANQUE'], ['budget', 'BUDGET', 'BUDGET'], ['shop', 'SHOP', 'ACHATS'], ['labels', 'LABELS', 'ÉTIQUETTES'], ['me', 'ME', 'MOI']];
+  else t = [['setup', 'START', 'DÉBUT'], ['labels', 'LABELS', 'ÉTIQUETTES']];
+  if(life.eco && life.eco.stmt) t.splice(1, 0, ['stmt', 'STATEMENT', 'RELEVÉ']);
+  if(net.isOwner) t.push(['class', 'CLASS', 'CLASSE']);
+  return t;
+}
+function renderLife(){
+  if(!life.open) return;
+  var tabs = lifeTabs();
+  if(!tabs.some(function(x){ return x[0] === life.tab; })) life.tab = tabs[0][0];
+  document.getElementById('life-title').textContent = L2('LIFE IN PARIS', 'VIE À PARIS');
+  var sub = '';
+  if(lifeOn()){ var e = life.eco; sub = (e.ch ? e.ch.fn + ' ' + e.ch.ln + ' · ' : '') + jobName(JOB_BY_ID[e.job]) + ' · ' + L2('Month ', 'Mois ') + e.month; }
+  else sub = L2('Label your home, then start your life in Paris.', 'Étiquette ta maison, puis commence ta vie à Paris.');
+  document.getElementById('life-sub').textContent = sub;
+  document.getElementById('life-close').textContent = L2('CLOSE', 'FERMER');
+  document.getElementById('life-tabs').innerHTML = tabs.map(function(x){ return '<button data-a="tab" data-v="' + x[0] + '" class="' + (x[0] === life.tab ? 'on' : '') + '">' + esc(L2(x[1], x[2])) + '</button>'; }).join('');
+  var body = document.getElementById('life-body');
+  if(!life.loaded){ body.innerHTML = '<p class="lf-soft">' + L2('Loading...', 'Chargement...') + '</p>'; return; }
+  var f = {setup:viewSetup, home:viewHome, work:viewWork, bank:viewBank, budget:viewBudget, shop:viewShop, labels:viewLabels, me:viewMe, stmt:viewStmt, 'class':viewClass}[life.tab];
+  body.innerHTML = f ? f() : '';
+}
+function row(a, b, cls){ return '<div class="lf-row' + (cls ? ' ' + cls : '') + '"><span>' + a + '</span><b>' + b + '</b></div>'; }
+function H(en, fr){ return '<div class="lf-h">' + esc(L2(en, fr)) + '</div>'; }
+function P(en, fr, cls){ return '<p class="' + (cls || 'lf-soft') + '">' + L2(en, fr) + '</p>'; }
+function B(a, en, fr, v, cls){ return '<button class="btn' + (cls ? ' ' + cls : '') + '" data-a="' + a + '"' + (v !== undefined ? ' data-v="' + esc(String(v)) + '"' : '') + '>' + esc(L2(en, fr)) + '</button>'; }
+
+/* ---------- START: labels first, then the mode, the character and the career ---------- */
+function labelsDone(){ var s = labelStats(net.uid); return {ok:(s.n > 0 && s.labelled >= s.n) || net.isOwner, s:s}; }
+function viewSetup(){
+  var ld = labelsDone(), h = '', e = life.eco;
+  h += H('Step 1 - Label your home', 'Étape 1 - Étiquette ta maison');
+  if(ld.s.n === 0) h += P('First build your house (and shop) and put things inside. Then label every one of them in French.', 'Construis d\'abord ta maison (et ta boutique) et mets des objets dedans. Ensuite, étiquette chaque objet en français.');
+  h += '<div class="lf-card">' + row(L2('Things labelled', 'Objets étiquetés'), ld.s.labelled + ' / ' + ld.s.n) + row(L2('Correct', 'Corrects'), '<span class="lf-good">' + ld.s.ok + '</span>') + '</div>';
+  if(!ld.ok){ h += B('tab', 'LABEL MY THINGS', 'ÉTIQUETER MES OBJETS', 'labels', 'go'); return h; }
+  h += '<p class="lf-good">✓ ' + L2('Everything is labelled!', 'Tout est étiqueté !') + '</p>';
+  var d = life.draft || (life.draft = {mode:e && e.mode || '', ch:(e && e.ch) || {fn:pickR(Math.random, FIRST_NAMES), ln:pickR(Math.random, LAST_NAMES), age:22, skin:1, hair:0, pants:0, hat:0}, job:e && e.job || ''});
+  h += H('Step 2 - Choose your player mode', 'Étape 2 - Choisis ton mode de jeu');
+  h += '<button class="lf-opt' + (d.mode === 'explore' ? ' on' : '') + '" data-a="dmode" data-v="explore">🗺 <b>' + L2('EXPLORER', 'EXPLORATEUR') + '</b> - ' + L2('walk, drive and visit Paris like before.', 'balade-toi, conduis et visite Paris comme avant.') + '</button>';
+  h += '<button class="lf-opt' + (d.mode === 'life' ? ' on' : '') + '" data-a="dmode" data-v="life">🏠 <b>' + L2('LIFE IN PARIS', 'VIE À PARIS') + '</b> - ' + L2('have a job, earn money, pay rent and bills, save and manage credit.', 'aie un métier, gagne de l\'argent, paie le loyer et les factures, épargne et gère le crédit.') + '</button>';
+  if(d.mode === 'explore'){ h += B('dexplore', 'START EXPLORING', 'COMMENCER À EXPLORER', null, 'go'); return h; }
+  if(d.mode !== 'life') return h;
+  h += H('Step 3 - Create your character', 'Étape 3 - Crée ton personnage');
+  h += '<div class="lf-lab"><span>' + L2('First name', 'Prénom') + '</span><input class="lf-in" maxlength="20" data-c="fn" value="' + esc(d.ch.fn) + '"></div>';
+  h += '<div class="lf-lab"><span>' + L2('Last name', 'Nom') + '</span><input class="lf-in" maxlength="20" data-c="ln" value="' + esc(d.ch.ln) + '"></div>';
+  h += '<div class="lf-lab"><span>' + L2('Age', 'Âge') + '</span><input class="lf-in" type="number" min="18" max="35" data-c="age" value="' + (d.ch.age|0) + '"></div>';
+  h += B('drandom', 'RANDOM FRENCH NAME', 'NOM FRANÇAIS AU HASARD');
+  h += lookPicker(d.ch);
+  h += H('Step 4 - Choose your career', 'Étape 4 - Choisis ton métier');
+  h += jobList(d.job);
+  if(d.job) h += '<div class="btn-row" style="margin-top:10px">' + B('dstart', 'START MY LIFE IN PARIS', 'COMMENCER MA VIE À PARIS', null, 'go') + '</div>';
+  return h;
+}
+function lookPicker(ch){
+  function sw(key, list){ return list.map(function(c, i){ return '<span class="lf-sw' + ((ch[key]|0) === i ? ' on' : '') + '" style="background:' + hexCss(c) + '" data-a="look" data-k="' + key + '" data-v="' + i + '"></span>'; }).join(''); }
+  var hats = [L2('Beret', 'Béret'), L2('Cap', 'Casquette'), L2('No hat', 'Sans chapeau')];
+  return '<div class="lf-card">' + '<div>' + L2('Skin', 'Peau') + '<br>' + sw('skin', LOOK.skin) + '</div><div>' + L2('Hair', 'Cheveux') + '<br>' + sw('hair', LOOK.hair) + '</div><div>' + L2('Trousers', 'Pantalon') + '<br>' + sw('pants', LOOK.pants) + '</div>' +
+    '<div>' + L2('Hat', 'Chapeau') + '<br>' + hats.map(function(n, i){ return '<button class="btn' + ((ch.hat|0) === i ? ' go' : '') + '" data-a="look" data-k="hat" data-v="' + i + '">' + esc(n) + '</button> '; }).join('') + '</div>' +
+    '<p class="lf-soft">' + L2('Your shirt is your player colour (MENU → SETTINGS).', 'Ton haut est ta couleur de joueur (MENU → RÉGLAGES).') + '</p></div>';
+}
+function jobList(sel){
+  return JOBS.map(function(j){
+    var net = Math.round(j.gross*NET_RATE);
+    return '<button class="lf-opt' + (sel === j.id ? ' on' : '') + '" data-a="djob" data-v="' + j.id + '">' + j.icon + ' <b>' + esc(jobName(j)) + '</b><br>' +
+      '<span class="lf-soft">' + eur0(j.gross) + ' ' + L2('gross', 'brut') + ' → ≈ ' + eur0(net) + ' ' + L2('net / month (full time)', 'net / mois (temps plein)') + '<br>' + esc(L2(j.about[0], j.about[1])) + '</span></button>';
+  }).join('');
+}
+
+/* ---------- HOME ---------- */
+function viewHome(){
+  var e = life.eco, home = homeInfo(net.uid), j = JOB_BY_ID[e.job], h = '';
+  h += '<div class="lf-card"><div class="lf-big">' + eur(e.cash) + '</div><div class="lf-soft">' + L2('Current account (compte courant)', 'Compte courant') + '</div></div>';
+  h += '<div class="lf-card">' + row('🐖 ' + L2('Savings (Livret A)', 'Épargne (Livret A)'), eur(e.sav)) + row('💳 ' + L2('Credit card owed', 'Dû sur la carte de crédit'), '<span class="' + (e.card > 0 ? 'lf-bad' : '') + '">' + eur(e.card) + '</span>') +
+       row('⚠️ ' + L2('Unpaid bills (debt)', 'Factures impayées (dettes)'), '<span class="' + (e.debt > 0 ? 'lf-bad' : '') + '">' + eur(e.debt || 0) + '</span>') +
+       row('📈 ' + L2('Credit score', 'Score de crédit'), scoreText(e.score)) + row('💼 ' + L2('Net worth', 'Patrimoine net'), eur(e.cash + e.sav - e.card - (e.debt || 0))) + '</div>';
+  h += H('This month', 'Ce mois-ci');
+  h += '<div class="lf-card">' + row(L2('Shifts worked', 'Services faits'), e.shifts + ' / ' + SHIFTS_PER_MONTH) + row(L2('Earned (net)', 'Gagné (net)'), eur(e.earned)) +
+       row(L2('Bills due at the end of the month', 'Factures à payer en fin de mois'), eur(monthlyBills(e, home).reduce(function(s, r){ return s + r.a; }, 0))) + '</div>';
+  h += P('The month ends when you come back to class on another day (1 class = 1 month). Then rent and bills are paid from your current account.', 'Le mois se termine quand tu reviens en cours un autre jour (1 cours = 1 mois). Alors le loyer et les factures sont payés depuis ton compte courant.');
+  h += H('Your home', 'Ton logement');
+  h += '<div class="lf-card">' + (home.studio ? P('You don\'t have a house yet, so you rent a 25 m² studio.', 'Tu n\'as pas encore de maison, alors tu loues un studio de 25 m².') : row(L2('Your house', 'Ta maison'), esc(plotTitle(home.p)))) +
+       row(L2('Size', 'Surface'), home.m2 + ' m²') + row(L2('Rent', 'Loyer'), eur0(home.rent)) + row(L2('Charges', 'Charges'), eur0(home.charges)) +
+       row(L2('Roommates', 'Colocataires'), e.room|0) + row(L2('Your share', 'Ta part'), eur0((home.rent + home.charges)/(1 + (e.room|0)))) + '</div>';
+  if(j && e.shifts < SHIFTS_PER_MONTH) h += B('tab', 'GO TO WORK', 'ALLER AU TRAVAIL', 'work', 'go');
+  return h;
+}
+function scoreText(s){ var c = s >= 700 ? 'lf-good' : s < 580 ? 'lf-bad' : ''; return '<span class="' + c + '">' + s + ' / 850</span>'; }
+
+/* ---------- WORK ---------- */
+function viewWork(){
+  var e = life.eco, j = JOB_BY_ID[e.job], h = '', sh = life.shift;
+  if(sh) return viewShift(sh, j);
+  h += '<div class="lf-card"><b>' + j.icon + ' ' + esc(jobName(j)) + '</b><br><span class="lf-soft">' + esc(L2(j.about[0], j.about[1])) + '</span>' +
+       row(L2('Gross pay (full time)', 'Salaire brut (temps plein)'), eur0(j.gross)) + row(L2('Social contributions (~21 %)', 'Cotisations sociales (~21 %)'), '-' + eur0(j.gross*(1 - NET_RATE))) +
+       row(L2('Net pay (full time)', 'Salaire net (temps plein)'), eur0(j.gross*NET_RATE)) + '</div>';
+  h += row(L2('Shifts this month', 'Services ce mois-ci'), e.shifts + ' / ' + SHIFTS_PER_MONTH);
+  h += P('Each shift is a quarter of a month\'s pay. Do the tasks well to earn it all - mistakes cost you part of it.', 'Chaque service vaut un quart du salaire. Fais bien les tâches pour tout gagner - les erreurs en coûtent une partie.');
+  if(e.shifts >= SHIFTS_PER_MONTH) h += P('You\'ve worked full time this month. Come back next class for a new month!', 'Tu as travaillé à temps plein ce mois-ci. Reviens au prochain cours pour un nouveau mois !', 'lf-good');
+  else h += B('startshift', 'START A SHIFT', 'COMMENCER UN SERVICE', null, 'go');
+  h += H('Change career', 'Changer de métier');
+  h += P('You can change once a month. The new job starts now.', 'Tu peux changer une fois par mois. Le nouveau métier commence tout de suite.');
+  h += e.jobMonth === e.month ? P('Already changed this month.', 'Déjà changé ce mois-ci.') : jobList(e.job).replace(/data-a="djob"/g, 'data-a="setjob"');
+  return h;
+}
+function startShift(){
+  var e = life.eco, j = JOB_BY_ID[e.job];
+  if(e.shifts >= SHIFTS_PER_MONTH) return;
+  if(j.id === 'livreur'){ startDeliveries(); return; }
+  var seed = net.uid + ':' + e.month + ':' + e.shifts + ':' + Date.now();
+  life.shift = {n:0, of:6, right:0, tips:0, q:null, picked:-1, r:lifeRand(seed)};
+  nextTask(); renderLife();
+}
+function nextTask(){ var s = life.shift, j = JOB_BY_ID[life.eco.job]; s.q = TASKS[j.id](s.r, s.n); s.picked = -1; }
+function viewShift(s, j){
+  if(s.done) return viewShiftDone(s, j);
+  var q = s.q, h = '<div class="lf-soft">' + j.icon + ' ' + esc(jobName(j)) + ' · ' + L2('Task ', 'Tâche ') + (s.n + 1) + ' / ' + s.of + '</div>';
+  h += '<div class="lf-card" style="font-size:21px">' + esc(q.q) + '</div>';
+  q.opts.forEach(function(o, i){
+    var cls = s.picked < 0 ? '' : i === q.ans ? ' right' : i === s.picked ? ' wrongpick' : '';
+    h += '<button class="lf-opt' + cls + '" data-a="answer" data-v="' + i + '"' + (s.picked >= 0 ? ' disabled' : '') + '>' + esc(o) + '</button>';
+  });
+  if(s.picked >= 0){
+    h += s.picked === q.ans ? P('✓ Correct!', '✓ Correct !', 'lf-good') : P('✗ The right answer: ', '✗ La bonne réponse : ', 'lf-bad').replace('</p>', esc(q.opts[q.ans]) + '</p>');
+    h += B('nexttask', s.n + 1 >= s.of ? 'FINISH THE SHIFT' : 'NEXT', s.n + 1 >= s.of ? 'FINIR LE SERVICE' : 'SUIVANT', null, 'go');
+  }
+  return h;
+}
+function finishShift(right, of, tips){
+  var e = life.eco, j = JOB_BY_ID[e.job], perf = right/of, gross = Math.round(shiftGross(j)*(0.5 + 0.5*perf)*100)/100, net = Math.round(gross*NET_RATE*100)/100;
+  e.cash += net + tips; e.earned += net + tips; e.shifts += 1;
+  ecoLog(e, net, 'Pay: ' + j.en + ' shift', 'Salaire : service ' + j.fr);
+  if(tips > 0) ecoLog(e, tips, 'Tips', 'Pourboires');
+  lifeSave(true);
+  return {gross:gross, net:net, tips:tips, perf:perf};
+}
+function viewShiftDone(s, j){
+  var r = s.result, h = '<div class="lf-card"><b>' + L2('Shift finished!', 'Service terminé !') + '</b>' + row(L2('Score', 'Résultat'), s.right + ' / ' + s.of) +
+    row(L2('Gross pay', 'Salaire brut'), eur(r.gross)) + row(L2('Social contributions', 'Cotisations sociales'), '-' + eur(r.gross - r.net)) + row(L2('Net pay', 'Salaire net'), '<span class="lf-good">' + eur(r.net) + '</span>') +
+    (r.tips ? row(L2('Tips', 'Pourboires'), '<span class="lf-good">+' + eur(r.tips) + '</span>') : '') + '</div>';
+  h += P(r.perf === 1 ? 'Perfect shift - full pay!' : 'Every mistake cost you part of your pay. Practise to earn the full amount!', r.perf === 1 ? 'Service parfait - salaire complet !' : 'Chaque erreur t\'a coûté une partie du salaire. Entraîne-toi pour tout gagner !');
+  h += B('closeshift', 'OK', 'OK', null, 'go');
+  return h;
+}
+
+/* deliveries: real parcels to real plots round Paris */
+var beacon = (function(){
+  var g = new THREE.Group();
+  var col = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 60, 20, 1, true), new THREE.MeshBasicMaterial({color:0xffd23f, transparent:true, opacity:0.28, depthWrite:false, side:THREE.DoubleSide}));
+  col.position.y = 30; g.add(col);
+  var ring = new THREE.Mesh(new THREE.TorusGeometry(2.2, 0.18, 8, 32), new THREE.MeshBasicMaterial({color:0xffd23f})); ring.rotation.x = Math.PI/2; ring.position.y = 0.2; g.add(ring);
+  var box = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 0.9), new THREE.MeshLambertMaterial({color:0xb5824a})); box.position.y = 2.6; g.add(box);
+  g.visible = false; root.add(g); return {g:g, box:box};
+})();
+function myPos(){ return flying && driving ? {x:carPos.x, z:carPos.z} : {x:camera.position.x, z:camera.position.z}; }
+function startDeliveries(){
+  life.del = {n:0, of:3, right:0, t:0, target:null};
+  nextDelivery();
+  closeLife();
+  showToast(L2('Deliveries! Walk or drive to the yellow light.', 'Livraisons ! Va à pied ou en voiture jusqu\'à la lumière jaune.'));
+  if(!flying) requestFirstPerson('walk');
+}
+function nextDelivery(){
+  var d = life.del, me = myPos(), cand = PLOTS.filter(function(p){ var dd = Math.hypot(p.cx - me.x, p.cz - me.z); return dd > 45 && dd < 190; });
+  if(!cand.length) cand = PLOTS;
+  var p = cand[Math.random()*cand.length | 0], w = plotToWorld(p, 0, 7.8);
+  d.target = {p:p, x:w.x, z:w.z}; d.t = 120;
+  beacon.g.position.set(w.x, surfaceAt(w.x, w.z, 0), w.z); beacon.g.visible = true;
+}
+function tickDelivery(dt){
+  var d = life.del, hud = document.getElementById('life-beacon-hud');
+  if(!d){ hud.classList.add('hidden'); beacon.g.visible = false; return; }
+  beacon.box.rotation.y += dt*1.5; beacon.box.position.y = 2.6 + Math.sin(performance.now()/300)*0.2;
+  d.t -= dt;
+  var me = myPos(), dist = Math.hypot(d.target.x - me.x, d.target.z - me.z);
+  hud.classList.remove('hidden');
+  hud.innerHTML = '📦 ' + esc(L2('Deliver to ', 'Livrer à : ') + plotLabel(d.target.p)) + '<br>' + Math.round(dist) + ' m · ⏱ ' + Math.max(0, Math.ceil(d.t)) + ' s · ' + (d.n + 1) + '/' + d.of;
+  var done = dist < 6.5, late = d.t <= 0;
+  if(done || late){
+    if(done){ d.right++; showToast(L2('Delivered! ✓', 'Livré ! ✓')); }
+    else showToast(L2('Too late - the customer left.', 'Trop tard - le client est parti.'));
+    d.n++;
+    if(d.n >= d.of){
+      var r = finishShift(d.right, d.of, 0);
+      life.del = null; beacon.g.visible = false; hud.classList.add('hidden');
+      life.shift = {done:true, right:d.right, of:d.of, result:r};
+      life.tab = 'work'; openLife();
+    } else nextDelivery();
+  }
+}
+
+/* ---------- STATEMENT (relevé de compte) ---------- */
+function viewStmt(){
+  var s = life.eco.stmt, h = '';
+  if(!s) return P('No statement yet. It comes at the start of your next month.', 'Pas encore de relevé. Il arrive au début du mois suivant.');
+  h += '<div class="lf-card"><b>' + L2('Bank statement - month ', 'Relevé de compte - mois ') + s.m + '</b>' + row(L2('Balance at the start', 'Solde au début'), eur(s.start)) + '</div>';
+  s.rows.forEach(function(r){ h += row((r.ev ? '🎲 ' : '') + esc(L2(r.en, r.fr)), r.info ? eur(r.a) : (r.a > 0 ? '<span class="lf-good">+' + eur(r.a) + '</span>' : r.a < 0 ? eur(r.a) : ''), r.bad ? 'lf-bad' : ''); });
+  h += '<div class="lf-card">' + row(L2('Current account now', 'Compte courant maintenant'), '<b>' + eur(s.end) + '</b>') + row('Livret A', eur(s.sav)) + row(L2('Credit card owed', 'Dû sur la carte'), eur(s.card)) +
+       row(L2('Unpaid bills', 'Factures impayées'), eur(s.debt)) + row(L2('Credit score', 'Score de crédit'), scoreText(s.score)) + '</div>';
+  if(s.end < 0) h += P('Your account is overdrawn: the bank charges interest (agios) every month until it\'s positive again.', 'Ton compte est à découvert : la banque prend des agios chaque mois jusqu\'à ce qu\'il redevienne positif.', 'lf-bad');
+  if(s.card > 0) h += P('You still owe money on your credit card. At 21 % a year it grows every month - pay it off as soon as you can.', 'Tu dois encore de l\'argent sur ta carte. À 21 % par an, ça augmente chaque mois - rembourse vite.', 'lf-bad');
+  return h + B('tab', 'OK', 'OK', 'home', 'go');
+}
+
+/* ---------- BANK ---------- */
+function viewBank(){
+  var e = life.eco, h = '';
+  h += H('Accounts', 'Comptes');
+  h += '<div class="lf-card">' + row(L2('Current account', 'Compte courant'), eur(e.cash)) + row(L2('Overdraft allowed', 'Découvert autorisé'), eur0(-OVERDRAFT_LIMIT)) +
+       P('Below 0 € you pay 16 % a year in agios. Past -400 €, payments are rejected (20 € fee each) and your credit score drops.', 'Sous 0 €, tu paies 16 % par an d\'agios. Au-delà de -400 €, les paiements sont rejetés (20 € de frais chacun) et ton score baisse.') + '</div>';
+  h += '<div class="lf-card">' + row('🐖 Livret A', eur(e.sav)) + P('A tax-free savings account from the French state, paying 1,7 % a year (since August 2026).', 'Un livret d\'épargne de l\'État, sans impôt, qui rapporte 1,7 % par an (depuis août 2026).') +
+       '<input class="lf-in" id="lf-amt" type="number" min="0" step="10" placeholder="' + L2('Amount in €', 'Montant en €') + '"><div class="btn-row" style="margin-top:6px">' +
+       B('tosav', 'SAVE →', 'ÉPARGNER →') + B('fromsav', '← WITHDRAW', '← RETIRER') + '</div>';
+  var yr = Math.round(e.sav*LIVRET_A*100)/100;
+  h += P('At this rate your savings earn about ' + eur(yr) + ' a year.', 'À ce taux, ton épargne rapporte environ ' + eur(yr) + ' par an.') + '</div>';
+  h += H('Savings goal', 'Objectif d\'épargne');
+  var g = e.goal || {n:'', a:0}, pct = g.a > 0 ? Math.min(100, Math.round(e.sav/g.a*100)) : 0;
+  h += '<div class="lf-card"><div class="lf-lab"><input class="lf-in" maxlength="30" id="lf-gname" placeholder="' + L2('What for?', 'Pour quoi ?') + '" value="' + esc(g.n) + '"><input class="lf-in" type="number" id="lf-gamt" placeholder="€" value="' + (g.a || '') + '"></div>' +
+       B('setgoal', 'SET GOAL', 'FIXER L\'OBJECTIF') + (g.a > 0 ? '<div class="lf-meter" style="margin-top:8px"><i style="width:' + pct + '%"></i></div><div class="lf-soft">' + pct + ' % - ' + eur0(e.sav) + ' / ' + eur0(g.a) + '</div>' : '') + '</div>';
+  h += H('Credit card', 'Carte de crédit');
+  var minPay = e.card > 0 ? Math.min(e.card, Math.max(CARD_MIN, e.card*CARD_MIN_PCT)) : 0;
+  h += '<div class="lf-card">' + row(L2('Owed', 'Dû'), '<span class="' + (e.card > 0 ? 'lf-bad' : '') + '">' + eur(e.card) + '</span>') + row(L2('Limit', 'Plafond'), eur0(CARD_LIMIT)) + row(L2('Interest', 'Taux'), '21 % ' + L2('a year', 'par an')) +
+       row(L2('Minimum payment', 'Paiement minimum'), eur(minPay)) +
+       '<div class="btn-row">' + '<button class="btn' + (e.cardPlan !== 'min' ? ' go' : '') + '" data-a="cardplan" data-v="full">' + L2('PAY IN FULL EACH MONTH', 'TOUT REMBOURSER CHAQUE MOIS') + '</button>' +
+       '<button class="btn' + (e.cardPlan === 'min' ? ' go' : '') + '" data-a="cardplan" data-v="min">' + L2('PAY THE MINIMUM', 'PAYER LE MINIMUM') + '</button></div>' +
+       (e.card > 0 ? '<div class="btn-row" style="margin-top:6px">' + B('paycard', 'PAY IT OFF NOW (from current account)', 'REMBOURSER MAINTENANT (depuis le compte)') + '</div>' : '') +
+       P('Paying only the minimum keeps your score OK but the interest keeps growing. Paying in full costs 0 € in interest.', 'Payer seulement le minimum garde ton score correct mais les intérêts continuent. Tout rembourser coûte 0 € d\'intérêts.') + '</div>';
+  if(e.debt > 0) h += '<div class="lf-card lf-bad">' + row(L2('Unpaid bills', 'Factures impayées'), eur(e.debt)) + B('paydebt', 'PAY MY DEBTS NOW', 'PAYER MES DETTES MAINTENANT') + '</div>';
+  h += H('Credit score', 'Score de crédit');
+  h += '<div class="lf-card">' + row(L2('Score', 'Score'), scoreText(e.score)) + '<div class="lf-meter"><i class="' + (e.score < 580 ? 'bad' : '') + '" style="width:' + Math.round((e.score - 300)/5.5) + '%"></i></div>' +
+       P('Goes up: rent paid on time, card paid in full. Goes down: rejected payments, missed card payments, overdraft, using most of your card limit. (France has no score like this - banks check the Banque de France\'s list of payment incidents instead.)', 'Monte : loyer payé à temps, carte remboursée en entier. Baisse : paiements rejetés, carte non remboursée, découvert, carte presque au plafond. (En France, il n\'y a pas de score comme ça - les banques consultent le fichier des incidents de la Banque de France.)') + '</div>';
+  if(e.hist.length){
+    h += H('Your money, month by month', 'Ton argent, mois par mois');
+    var mx = Math.max.apply(null, e.hist.map(function(x){ return Math.abs(x.cash + x.sav - x.owe); }).concat([1]));
+    h += '<div class="lf-bars">' + e.hist.map(function(x){ var v = x.cash + x.sav - x.owe; return '<i class="' + (v < 0 ? 'neg' : '') + '" title="' + esc(L2('Month ', 'Mois ') + x.m + ': ' + eur0(v)) + '" style="height:' + Math.max(3, Math.round(Math.abs(v)/mx*70)) + 'px"></i>'; }).join('') + '</div><div class="lf-soft">' + L2('Net worth at the end of each month (red = in debt).', 'Patrimoine net à la fin de chaque mois (rouge = en dette).') + '</div>';
+  }
+  h += H('Recent transactions', 'Dernières opérations');
+  h += e.log.slice(0, 12).map(function(l){ return row(esc(L2(l.en, l.fr)) + ' <span class="lf-soft">(' + L2('m', 'm') + l.m + ')</span>', l.a > 0 ? '<span class="lf-good">+' + eur(l.a) + '</span>' : eur(l.a)); }).join('') || P('Nothing yet.', 'Rien pour l\'instant.');
+  return h;
+}
+
+/* ---------- BUDGET ---------- */
+function viewBudget(){
+  var e = life.eco, home = homeInfo(net.uid), j = JOB_BY_ID[e.job], bills = monthlyBills(e, home), out = bills.reduce(function(s, r){ return s + r.a; }, 0);
+  var inc = Math.round(j.gross*NET_RATE), share = (home.rent + home.charges)/(1 + (e.room|0)), h = '';
+  h += H('Monthly budget', 'Budget mensuel');
+  h += '<div class="lf-card">' + row(L2('Income (net, full time)', 'Revenu (net, temps plein)'), '<span class="lf-good">' + eur0(inc) + '</span>');
+  bills.forEach(function(r){ h += row(esc(L2(r.en, r.fr)), '-' + eur(r.a)); });
+  h += row('<b>' + L2('Left over', 'Reste') + '</b>', '<b class="' + (inc - out < 0 ? 'lf-bad' : 'lf-good') + '">' + eur(inc - out) + '</b>') + '</div>';
+  if(inc - out < 0) h += P('You spend more than you earn: at the end of each month your account goes down. Cut costs, take roommates, or find a better-paid job.', 'Tu dépenses plus que tu ne gagnes : chaque fin de mois ton compte baisse. Réduis tes dépenses, prends des colocataires ou trouve un meilleur salaire.', 'lf-bad');
+  h += H('The rule of 3 (rent)', 'La règle des 3 (loyer)');
+  var ratio = share/inc;
+  h += '<div class="lf-card">' + row(L2('Your rent share', 'Ta part de loyer'), eur0(share)) + row(L2('Maximum (1/3 of income)', 'Maximum (1/3 du revenu)'), eur0(inc/3)) +
+       '<div class="lf-meter"><i class="' + (ratio > 1/3 ? 'bad' : '') + '" style="width:' + Math.min(100, Math.round(ratio*100)) + '%"></i></div><div class="lf-soft">' + Math.round(ratio*100) + ' % ' + L2('of your income goes on rent', 'de ton revenu part dans le loyer') + '</div>' +
+       P('Paris landlords usually ask for an income of 3 times the rent. Bigger home = higher rent: ' + home.m2 + ' m² × 29,65 €/m² (average house rent in Paris, 2026) + charges.', 'Les propriétaires parisiens demandent souvent des revenus égaux à 3 fois le loyer. Plus grand = plus cher : ' + home.m2 + ' m² × 29,65 €/m² (loyer moyen d\'une maison à Paris, 2026) + charges.') + '</div>';
+  h += H('Roommates (colocation)', 'Colocataires (colocation)');
+  h += '<div class="btn-row">' + [0, 1, 2, 3].map(function(n){ return '<button class="btn' + ((e.room|0) === n ? ' go' : '') + '" data-a="room" data-v="' + n + '">' + n + '</button>'; }).join('') + '</div>' +
+       P('Sharing your home splits the rent, electricity, internet and insurance.', 'Partager ton logement divise le loyer, l\'électricité, internet et l\'assurance.');
+  h += H('Your choices', 'Tes choix');
+  ['phone', 'food', 'transport', 'fun'].forEach(function(k){
+    var cur = e.budget[k] !== undefined ? e.budget[k] : 1;
+    h += '<div class="lf-soft" style="margin-top:6px">' + esc(L2(BUDGET[k].en, BUDGET[k].fr)) + '</div>' + BUDGET[k].opts.map(function(o, i){ return '<button class="lf-opt' + (cur === i ? ' on' : '') + '" data-a="budget" data-k="' + k + '" data-v="' + i + '">' + esc(L2(o[1], o[2])) + ' - ' + eur(o[0]) + '</button>'; }).join('');
+  });
+  h += H('50 / 30 / 20', '50 / 30 / 20');
+  h += '<div class="lf-card">' + row(L2('Needs (50 %)', 'Besoins (50 %)'), eur0(inc*0.5)) + row(L2('Wants (30 %)', 'Envies (30 %)'), eur0(inc*0.3)) + row(L2('Savings (20 %)', 'Épargne (20 %)'), eur0(inc*0.2)) +
+       P('A simple guide: half your income for needs (rent, food, transport), 30 % for wants, 20 % to save.', 'Un repère simple : la moitié pour les besoins (loyer, courses, transport), 30 % pour les envies, 20 % pour épargner.') + '</div>';
+  return h;
+}
+
+/* ---------- SHOP (wants) ---------- */
+function viewShop(){
+  var e = life.eco, h = P('These are WANTS, not needs. You can pay with your current account (money you have) or your credit card (money you borrow, at 21 % a year).', 'Ce sont des ENVIES, pas des besoins. Tu peux payer avec ton compte courant (ton argent) ou ta carte de crédit (de l\'argent emprunté, à 21 % par an).');
+  h += '<div class="lf-card">' + row(L2('Current account', 'Compte courant'), eur(e.cash)) + row(L2('Card available', 'Disponible sur la carte'), eur(CARD_LIMIT - e.card)) + '</div>';
+  WANTS.forEach(function(w){
+    var have = (e.items || []).indexOf(w.id) >= 0;
+    h += '<div class="lf-card"><b>' + w.icon + ' ' + esc(L2(w.en, w.fr)) + '</b> - ' + eur0(w.a) + (have ? ' <span class="lf-chip ok">' + L2('owned', 'acheté') + '</span>' : '') +
+         '<div class="btn-row" style="margin-top:6px">' + B('buy', 'PAY FROM ACCOUNT', 'PAYER (COMPTE)', w.id + ':cash') + B('buy', 'PAY BY CREDIT CARD', 'PAYER (CARTE DE CRÉDIT)', w.id + ':card') + '</div></div>';
+  });
+  return h;
+}
+
+/* ---------- LABELS ---------- */
+function viewLabels(){
+  var mine = PLOTS.filter(function(p){ return p.data && p.data.o === net.uid; }), h = '';
+  h += P('Write the French name of each thing, with its article: le, la, l\' or les (un / une / des work too). The labels float over your things for everyone who visits.', 'Écris le nom français de chaque objet, avec son article : le, la, l\' ou les (un / une / des marchent aussi). Les étiquettes flottent au-dessus de tes objets pour tous les visiteurs.');
+  if(!mine.length) return h + P('You don\'t have a house or shop yet. Build one, decorate the inside (DECORATE INSIDE), then come back here.', 'Tu n\'as pas encore de maison ni de boutique. Construis-en une, décore l\'intérieur (DÉCORER L\'INTÉRIEUR), puis reviens ici.', 'lf-bad');
+  mine.forEach(function(p){
+    var list = labelList(p), ok = list.filter(function(r){ return r.gr === 'ok'; }).length;
+    h += H(plotTitle(p) + ' (' + ok + '/' + list.length + ')', plotTitle(p) + ' (' + ok + '/' + list.length + ')');
+    if(!list.length) h += P('Nothing inside yet - add things with DECORATE INSIDE.', 'Rien à l\'intérieur - ajoute des objets avec DÉCORER L\'INTÉRIEUR.');
+    list.forEach(function(r){
+      var cls = r.gr === 'ok' ? 'ok' : r.gr === 'wrong' ? 'no' : r.gr ? 'mid' : '';
+      h += '<div class="lf-lab"><span>' + '<i class="lf-sw" style="width:14px;height:14px;background:' + hexCss(ITEM_COLORS[r.o.c] || 0x999999) + '"></i> ' + esc(r.it.en.toLowerCase()) + (r.n > 1 || list.filter(function(x){ return x.o.id === r.o.id; }).length > 1 ? ' #' + r.n : '') +
+           (cls ? ' <span class="lf-chip ' + cls + '">' + (r.gr === 'ok' ? '✓' : r.gr === 'wrong' ? '✗' : '~') + '</span>' : '') + '</span>' +
+           '<input class="lf-in" data-lbl="' + p.id + '|' + esc(r.key) + '" value="' + esc(r.text) + '" placeholder="' + L2('in French...', 'en français...') + '" autocomplete="off" spellcheck="false"></div>' +
+           (r.gr && r.gr !== 'ok' ? '<div class="lf-soft" style="margin:-4px 0 6px">' + esc(gradeNote(r.gr, r.o.id)) + '</div>' : '');
+    });
+  });
+  var st = labelStats(net.uid);
+  h += '<div class="lf-card">' + row(L2('Labelled', 'Étiquetés'), st.labelled + ' / ' + st.n) + row(L2('Correct', 'Corrects'), st.ok + ' / ' + st.n) + '</div>';
+  if(!lifeOn() && st.n > 0 && st.labelled >= st.n) h += B('tab', 'NEXT: START MY LIFE', 'SUITE : COMMENCER MA VIE', 'setup', 'go');
+  return h;
+}
+
+/* ---------- ME ---------- */
+function viewMe(){
+  var e = life.eco, ch = e.ch, h = '';
+  h += '<div class="lf-lab"><span>' + L2('First name', 'Prénom') + '</span><input class="lf-in" maxlength="20" data-me="fn" value="' + esc(ch.fn) + '"></div>';
+  h += '<div class="lf-lab"><span>' + L2('Last name', 'Nom') + '</span><input class="lf-in" maxlength="20" data-me="ln" value="' + esc(ch.ln) + '"></div>';
+  h += '<div class="lf-lab"><span>' + L2('Age', 'Âge') + '</span><input class="lf-in" type="number" min="18" max="35" data-me="age" value="' + (ch.age|0) + '"></div>';
+  h += lookPicker(ch).replace(/data-a="look"/g, 'data-a="melook"');
+  h += H('Player mode', 'Mode de jeu');
+  h += B('toexplore', 'SWITCH TO EXPLORER (keeps your money)', 'PASSER EN EXPLORATEUR (garde ton argent)');
+  return h;
+}
+
+/* ---------- CLASS (teacher) ---------- */
+function viewClass(){
+  if(!net.isOwner) return '';
+  var ids = Object.keys(net.members).filter(function(u){ return net.members[u] && typeof net.members[u].name === 'string'; });
+  ids.sort(function(a, b){ return net.members[a].name.localeCompare(net.members[b].name); });
+  if(life.view){ return viewStudent(life.view); }
+  var h = P('Everyone in the class. Tap a name to see their labels and money.', 'Toute la classe. Touche un nom pour voir ses étiquettes et son argent.');
+  h += '<table class="lf-table"><tr><th>' + L2('NAME', 'NOM') + '</th><th>' + L2('LABELS', 'ÉTIQ.') + '</th><th>' + L2('JOB', 'MÉTIER') + '</th><th>€</th><th>' + L2('SCORE', 'SCORE') + '</th></tr>';
+  ids.forEach(function(u){
+    var e = life.all[u], s = labelStats(u), j = e && JOB_BY_ID[e.job];
+    h += '<tr data-a="viewstu" data-v="' + u + '" style="cursor:pointer"><td>' + esc(cleanNick(net.members[u].name)) + (e && e.ch ? '<br><span class="lf-soft">' + esc(e.ch.fn + ' ' + e.ch.ln) + '</span>' : '') + '</td>' +
+         '<td>' + s.ok + '/' + s.n + (s.labelled < s.n ? '<br><span class="lf-soft">' + (s.n - s.labelled) + ' ' + L2('blank', 'vides') + '</span>' : '') + '</td>' +
+         '<td>' + (e && e.mode === 'explore' ? L2('explorer', 'explorateur') : j ? j.icon : '-') + (e && e.month ? '<br><span class="lf-soft">' + L2('m', 'm') + e.month + '</span>' : '') + '</td>' +
+         '<td>' + (e && e.job ? eur0(e.cash) + (e.sav ? '<br><span class="lf-soft">🐖' + eur0(e.sav) + '</span>' : '') + (e.card ? '<br><span class="lf-bad">💳' + eur0(e.card) + '</span>' : '') : '-') + '</td>' +
+         '<td>' + (e && e.job ? e.score : '-') + '</td></tr>';
+  });
+  return h + '</table>';
+}
+function viewStudent(u){
+  var m = net.members[u] || {}, e = life.all[u], h = B('classback', '← BACK TO THE CLASS', '← RETOUR À LA CLASSE');
+  h += H(cleanNick(m.name || ''), cleanNick(m.name || ''));
+  if(e && e.ch) h += P(esc(e.ch.fn + ' ' + e.ch.ln) + ', ' + (e.ch.age|0) + ' ' + L2('years old', 'ans') + ' · ' + esc(jobName(JOB_BY_ID[e.job])) + ' · ' + L2('month ', 'mois ') + e.month, esc(e.ch.fn + ' ' + e.ch.ln) + ', ' + (e.ch.age|0) + ' ans · ' + esc(jobName(JOB_BY_ID[e.job])) + ' · mois ' + e.month);
+  if(e && e.job) h += '<div class="lf-card">' + row(L2('Current account', 'Compte courant'), eur(e.cash)) + row('Livret A', eur(e.sav)) + row(L2('Credit card', 'Carte'), eur(e.card)) + row(L2('Unpaid bills', 'Impayés'), eur(e.debt || 0)) + row(L2('Score', 'Score'), e.score) + row(L2('Shifts this month', 'Services ce mois'), e.shifts + ' / 4') + '</div>';
+  PLOTS.filter(function(p){ return p.data && p.data.o === u; }).forEach(function(p){
+    h += H(plotTitle(p), plotTitle(p));
+    var list = labelList(p);
+    if(!list.length) h += P('Nothing inside.', 'Rien à l\'intérieur.');
+    h += '<table class="lf-table">' + list.map(function(r){
+      var mark = r.gr === 'ok' ? '<span class="lf-good">✓</span>' : r.gr === 'wrong' ? '<span class="lf-bad">✗</span>' : r.gr ? '~' : '-';
+      return '<tr><td>' + esc(r.it.en.toLowerCase()) + '</td><td>' + esc(r.text || '') + '</td><td>' + mark + '</td><td class="lf-soft">' + esc(bestAnswer(r.o.id)) + '</td></tr>';
+    }).join('') + '</table>';
+  });
+  return h;
+}
+
+/* ---------- clicks and typing in the window ---------- */
+function lifeClick(ev){
+  var b = ev.target.closest('[data-a]'); if(!b || b.disabled) return;
+  var a = b.getAttribute('data-a'), v = b.getAttribute('data-v'), k = b.getAttribute('data-k'), e = life.eco, d = life.draft;
+  function amt(){ var x = parseFloat(String((document.getElementById('lf-amt') || {}).value || '').replace(',', '.')); return isFinite(x) ? Math.round(x*100)/100 : 0; }
+  switch(a){
+    case 'tab': life.tab = v; life.view = null; break;
+    case 'dmode': d.mode = v; break;
+    case 'dexplore': life.eco = e || newEco(); life.eco.mode = 'explore'; lifeSave(true); showToast(L2('Explorer mode - have fun in Paris!', 'Mode explorateur - amuse-toi bien à Paris !')); closeLife(); return;
+    case 'drandom': d.ch.fn = pickR(Math.random, FIRST_NAMES); d.ch.ln = pickR(Math.random, LAST_NAMES); break;
+    case 'look': d.ch[k] = v|0; break;
+    case 'djob': d.job = v; break;
+    case 'dstart':
+      if(!d.ch.fn || !d.ch.ln){ showToast(L2('Give your character a first and last name.', 'Donne un prénom et un nom à ton personnage.')); return; }
+      life.eco = e || newEco();
+      e = life.eco; e.mode = 'life'; e.ch = {fn:cleanName(d.ch.fn).slice(0, 20), ln:cleanName(d.ch.ln).slice(0, 20), age:Math.max(18, Math.min(35, d.ch.age|0)), skin:d.ch.skin|0, hair:d.ch.hair|0, pants:d.ch.pants|0, hat:d.ch.hat|0};
+      e.job = d.job; e.jobMonth = e.month; e.day = todayKey();
+      if(!e.log.length) ecoLog(e, e.cash, 'Money you arrived in Paris with', 'L\'argent avec lequel tu arrives à Paris');
+      lifeSave(true); life.tab = 'home'; sendPresence(true);
+      showToast(L2('Welcome to Paris, ', 'Bienvenue à Paris, ') + e.ch.fn + ' !');
+      break;
+    case 'startshift': startShift(); return;
+    case 'answer':
+      var s = life.shift; if(!s || s.picked >= 0) return;
+      s.picked = v|0;
+      if(s.picked === s.q.ans){ s.right++; if(JOB_BY_ID[e.job].tips) s.tips = Math.round((s.tips + 1 + s.r()*3)*100)/100; }
+      break;
+    case 'nexttask':
+      var s2 = life.shift; s2.n++;
+      if(s2.n >= s2.of){ s2.result = finishShift(s2.right, s2.of, s2.tips); s2.done = true; } else nextTask();
+      break;
+    case 'closeshift': life.shift = null; break;
+    case 'setjob': if(e.jobMonth !== e.month){ e.job = v; e.jobMonth = e.month; lifeSave(); showToast(L2('New job: ', 'Nouveau métier : ') + jobName(JOB_BY_ID[v])); } break;
+    case 'tosav': var x = amt(); if(x <= 0 || x > e.cash){ showToast(L2('You can only save money you have in your current account.', 'Tu peux seulement épargner l\'argent de ton compte courant.')); return; }
+      e.cash -= x; e.sav += x; ecoLog(e, -x, 'To Livret A', 'Vers le Livret A'); lifeSave(); break;
+    case 'fromsav': var y = amt(); if(y <= 0 || y > e.sav){ showToast(L2('Not that much in your Livret A.', 'Pas assez sur ton Livret A.')); return; }
+      e.sav -= y; e.cash += y; ecoLog(e, y, 'From Livret A', 'Depuis le Livret A'); lifeSave(); break;
+    case 'setgoal': e.goal = {n:cleanName((document.getElementById('lf-gname') || {}).value || '').slice(0, 30), a:Math.max(0, parseFloat((document.getElementById('lf-gamt') || {}).value) || 0)}; lifeSave(); break;
+    case 'cardplan': e.cardPlan = v === 'min' ? 'min' : 'full'; lifeSave(); break;
+    case 'paycard': var pc = Math.min(e.card, Math.max(0, e.cash)); if(pc <= 0){ showToast(L2('No money in your current account to pay with.', 'Pas d\'argent sur ton compte pour rembourser.')); return; }
+      e.cash -= pc; e.card -= pc; ecoLog(e, -pc, 'Credit card payment', 'Remboursement carte'); lifeSave(); break;
+    case 'paydebt': var pd = Math.min(e.debt || 0, Math.max(0, e.cash)); if(pd <= 0){ showToast(L2('No money in your current account to pay with.', 'Pas d\'argent sur ton compte pour payer.')); return; }
+      e.cash -= pd; e.debt -= pd; e.score = Math.min(850, e.score + 5); ecoLog(e, -pd, 'Paid old bills', 'Factures payées'); lifeSave(); break;
+    case 'room': e.room = Math.max(0, Math.min(3, v|0)); lifeSave(); break;
+    case 'budget': e.budget[k] = v|0; lifeSave(); break;
+    case 'buy':
+      var pr = String(v).split(':'), w = WANTS.filter(function(x){ return x.id === pr[0]; })[0]; if(!w) return;
+      if(pr[1] === 'card'){
+        if(e.card + w.a > CARD_LIMIT){ showToast(L2('Card declined: over your 1 500 € limit.', 'Carte refusée : plafond de 1 500 € dépassé.')); return; }
+        e.card += w.a; ecoLog(e, -w.a, w.en + ' (credit card)', w.fr + ' (carte de crédit)', 'card');
+        showToast(L2('Bought on credit - remember to pay it back!', 'Acheté à crédit - pense à rembourser !'));
+      } else {
+        if(e.cash - w.a < -OVERDRAFT_LIMIT){ showToast(L2('Payment refused: not enough money, even with your overdraft.', 'Paiement refusé : pas assez d\'argent, même avec le découvert.')); return; }
+        e.cash -= w.a; ecoLog(e, -w.a, w.en, w.fr);
+        if(e.cash < 0) showToast(L2('Your account is now overdrawn - you\'ll pay agios.', 'Ton compte est à découvert - tu paieras des agios.'));
+      }
+      if(e.items.indexOf(w.id) < 0) e.items.push(w.id);
+      lifeSave(); break;
+    case 'toexplore': e.mode = 'explore'; lifeSave(true); life.draft = null; life.tab = 'setup'; sendPresence(true); break;
+    case 'melook': e.ch[k] = v|0; lifeSave(); sendPresence(true); break;
+    case 'viewstu': life.view = v; break;
+    case 'classback': life.view = null; break;
+    default: return;
+  }
+  renderLife();
+}
+function lifeChange(ev){
+  var t = ev.target, c = t.getAttribute('data-c'), me = t.getAttribute('data-me'), lbl = t.getAttribute('data-lbl');
+  if(c && life.draft){ life.draft.ch[c] = c === 'age' ? Math.max(18, Math.min(35, t.value|0)) : t.value; return; }
+  if(me && life.eco && life.eco.ch){ life.eco.ch[me] = me === 'age' ? Math.max(18, Math.min(35, t.value|0)) : cleanName(t.value).slice(0, 20); lifeSave(); return; }
+  if(lbl){
+    var bar = lbl.indexOf('|'), p = PLOT_BY_ID[lbl.slice(0, bar)], key = lbl.slice(bar + 1);
+    if(!p || !p.data || p.data.o !== net.uid) return;
+    var lb = plotLabels(p), val = cleanName(t.value).slice(0, 40);
+    if(val) lb[key] = val; else delete lb[key];
+    saveLabels(p, lb).catch(function(){ showToast(L2('Could not save the label', 'Étiquette non sauvegardée')); });
+    renderLife();
+  }
+}
+
+/* ---------- every frame ---------- */
+var lifeSigned = null;
+function lifeTick(dt){
+  var s = signedIn();
+  if(s !== lifeSigned){ lifeSigned = s; renderLifeBtn(); if(!s){ life.uid = null; life.eco = null; life.loaded = false; closeLife(); } }
+  if(s && net.uid && life.uid !== net.uid) lifeLoad();
+  if(life.del) tickDelivery(dt);
+  updateLabelSprites(dt);
+}
+
+
+/* ---------- LANDMARK GUIDE: hover a monument for its story (French and English); click to go there ----------
+   From the overview, move the mouse over the Eiffel Tower, the Arc de Triomphe, Notre-Dame, the Louvre, the Luxembourg
+   Garden, the Moulin Rouge or the Sacré-Cœur: a card shows what it is and its history, in both languages, for
+   students. Click and you're taken there on foot - up on the Eiffel Tower's 2nd floor, under the Arc, in the garden. */
+var LANDMARK_INFO = [
+  {id:'eiffel', x:0, y:40, z:0, r:30, fr:'La tour Eiffel', en:'The Eiffel Tower', go:{x:7, z:7, y:50.6, yaw:-2.36},
+   tfr:'La tour Eiffel a été construite par l\'entreprise de Gustave Eiffel pour l\'Exposition universelle de 1889, cent ans après la Révolution française. Elle mesure environ 330 mètres et compte plus de 18 000 pièces de fer, tenues par 2,5 millions de rivets. Au début, beaucoup de Parisiens la trouvaient laide ! Aujourd\'hui, c\'est le symbole de Paris, avec environ 6 millions de visiteurs par an.',
+   ten:'The Eiffel Tower was built by Gustave Eiffel\'s company for the 1889 World\'s Fair, 100 years after the French Revolution. It is about 330 metres tall and is made of more than 18,000 iron pieces held together by 2.5 million rivets. At first, many Parisians thought it was ugly! Today it is the symbol of Paris, with about 6 million visitors a year.'},
+  {id:'arc', x:-47, y:15, z:-133, r:16, fr:'L\'Arc de Triomphe', en:'The Arc de Triomphe', go:{x:-47, z:-133, yaw:0},
+   tfr:'Napoléon a commandé l\'Arc de Triomphe en 1806 pour honorer l\'armée française ; il a été terminé en 1836. Sous l\'arc se trouve la tombe du Soldat inconnu de la Première Guerre mondiale, avec une flamme ranimée chaque soir. Douze avenues partent de la place autour de lui, dont les Champs-Élysées.',
+   ten:'Napoleon ordered the Arc de Triomphe in 1806 to honour the French army; it was finished in 1836. Under the arch is the Tomb of the Unknown Soldier from the First World War, with a flame that is relit every evening. Twelve avenues start from the square around it, including the Champs-Élysées.'},
+  {id:'notredame', x:47, y:18, z:-133, r:26, fr:'Notre-Dame de Paris', en:'Notre-Dame Cathedral', go:{x:47, z:-116, yaw:0},
+   tfr:'Notre-Dame est une cathédrale gothique sur l\'île de la Cité. Sa construction a commencé en 1163 et a duré près de 200 ans. En avril 2019, un grand incendie a détruit son toit et sa flèche. Après cinq ans de travaux, elle a rouvert ses portes en décembre 2024.',
+   ten:'Notre-Dame is a Gothic cathedral on the Île de la Cité, an island in the Seine. Building began in 1163 and took nearly 200 years. In April 2019 a huge fire destroyed its roof and spire. After five years of work, it reopened in December 2024.'},
+  {id:'louvre', x:47, y:8, z:133, r:30, fr:'Le musée du Louvre', en:'The Louvre Museum', go:{x:47, z:116, yaw:Math.PI},
+   tfr:'Le Louvre était un palais royal avant de devenir un musée en 1793, pendant la Révolution française. C\'est le musée le plus visité du monde : on y voit La Joconde de Léonard de Vinci. La pyramide de verre de l\'entrée, imaginée par l\'architecte Ieoh Ming Pei, a ouvert en 1989.',
+   ten:'The Louvre was a royal palace before it became a museum in 1793, during the French Revolution. It is the most visited museum in the world and is home to Leonardo da Vinci\'s Mona Lisa (La Joconde). The glass pyramid at the entrance, designed by the architect I. M. Pei, opened in 1989.'},
+  {id:'garden', x:-47, y:4, z:133, r:30, fr:'Le jardin du Luxembourg', en:'The Luxembourg Garden', go:{x:-47, z:133, yaw:Math.PI},
+   tfr:'Le jardin du Luxembourg a été créé en 1612 pour la reine Marie de Médicis, avec le palais du Luxembourg, où siège aujourd\'hui le Sénat français. Les Parisiens viennent y lire, courir, jouer et faire naviguer de petits voiliers sur le grand bassin.',
+   ten:'The Luxembourg Garden was created in 1612 for Queen Marie de\' Medici, together with the Luxembourg Palace, which is now home to the French Senate. Parisians come here to read, run, play and sail little toy boats on the big pond.'},
+  {id:'moulin', x:141, y:12, z:-133, r:18, fr:'Le Moulin Rouge', en:'The Moulin Rouge', go:{x:136, z:-116, yaw:0},
+   tfr:'Le Moulin Rouge (« moulin rouge ») est un cabaret ouvert en 1889 à Montmartre, la même année que la tour Eiffel. Il est célèbre pour son moulin rouge et pour le french cancan, une danse très énergique. Le peintre Toulouse-Lautrec a fait des affiches et des tableaux de ses spectacles.',
+   ten:'The Moulin Rouge ("Red Mill") is a cabaret that opened in 1889 in Montmartre, the same year as the Eiffel Tower. It is famous for its red windmill and for the French cancan, a very energetic dance. The painter Toulouse-Lautrec made posters and paintings of its shows.'},
+  {id:'sacre', x:40, y:30, z:-360, r:50, fr:'La basilique du Sacré-Cœur', en:'The Sacré-Cœur Basilica', view:true,
+   tfr:'La basilique du Sacré-Cœur se trouve en haut de Montmartre, la plus haute colline de Paris. Elle a été construite entre 1875 et 1914. Sa pierre blanche, le travertin, se nettoie toute seule quand il pleut : c\'est pour ça qu\'elle reste toujours blanche !',
+   ten:'The Sacré-Cœur Basilica stands at the top of Montmartre, the highest hill in Paris. It was built between 1875 and 1914. Its white stone, called travertine, cleans itself when it rains - that is why it always stays white!'}
+];
+var lmTip = (function(){
+  var el = document.createElement('div'); el.id = 'lm-tip'; el.className = 'card hidden';
+  var st = document.createElement('style');
+  st.textContent = '#lm-tip{position:fixed; z-index:40; max-width:min(380px, 90vw); padding:10px 12px; font-family:"VT323", monospace; font-size:18px; line-height:1.15; pointer-events:none;}' +
+    '#lm-tip.hidden{display:none;} #lm-tip h4{margin:0 0 6px; font-family:"Press Start 2P", monospace; font-size:10px; line-height:1.5; color:var(--accent);}' +
+    '#lm-tip p{margin:0 0 6px;} #lm-tip .lm-2{color:var(--ink-soft);} #lm-tip .lm-go{font-family:"Press Start 2P", monospace; font-size:8px; color:var(--accent-2);}' +
+    '#lm-tip.pinned{left:50% !important; top:calc(70px + env(safe-area-inset-top,0px)) !important; transform:translateX(-50%);}';
+  document.head.appendChild(st); document.body.appendChild(el);
+  return {el:el, cur:null, pinT:null};
+})();
+function landmarkAtScreen(cx, cy){
+  var ray = rayFromScreen(cx, cy).ray, best = null, bestK = 1, v = new THREE.Vector3();
+  LANDMARK_INFO.forEach(function(l){
+    v.set(l.x, l.y, l.z);
+    if(ray.direction.dot(v.clone().sub(ray.origin)) < 0) return;
+    var k = ray.distanceToPoint(v)/l.r;
+    if(k < bestK){ bestK = k; best = l; }
+  });
+  return best;
+}
+function lmCard(l, go){
+  var first = LANG === 'fr' ? [l.fr, l.tfr, l.en, l.ten] : [l.en, l.ten, l.fr, l.tfr];
+  return '<h4>' + esc(first[0]) + ' · ' + esc(first[2]) + '</h4><p>' + esc(first[1]) + '</p><p class="lm-2">' + esc(first[3]) + '</p>' +
+         (go ? '<div class="lm-go">' + esc(l.view ? L2('CLICK TO LOOK AT IT', 'CLIQUE POUR LE VOIR') : L2('CLICK TO VISIT', 'CLIQUE POUR VISITER')) + '</div>' : '');
+}
+function showLmTip(l, cx, cy){
+  var el = lmTip.el;
+  if(lmTip.cur !== l){ lmTip.cur = l; el.innerHTML = lmCard(l, true); }
+  el.classList.remove('hidden', 'pinned');
+  var w = el.offsetWidth, h = el.offsetHeight;
+  el.style.left = Math.min(window.innerWidth - w - 8, cx + 18) + 'px';
+  el.style.top = Math.max(8, Math.min(window.innerHeight - h - 8, cy + 18)) + 'px';
+}
+function hideLmTip(){ if(lmTip.pinT) return; lmTip.cur = null; lmTip.el.classList.add('hidden'); }
+canvasEl.addEventListener('pointermove', function(e){
+  if(flying || e.buttons || e.pointerType === 'touch' || !titleScreen.classList.contains('hidden') || builder.on || decor.on || blk.on){ hideLmTip(); return; }
+  var l = landmarkAtScreen(e.clientX, e.clientY);
+  if(l) showLmTip(l, e.clientX, e.clientY); else hideLmTip();
+});
+canvasEl.addEventListener('pointerleave', hideLmTip);
+var pendingLandmark = null;
+function placeAtLandmark(l){
+  var g = l.go;
+  camera.position.set(g.x, (g.y || surfaceAt(g.x, g.z, 0)) + EYE_HEIGHT, g.z);
+  yaw = g.yaw || 0; pitch = 0; vertVelocity = 0; grounded = true;
+  camera.rotation.set(pitch, yaw, 0);
+}
+/* click a monument: walk there (or look at it, for the far-off Sacré-Cœur); its story stays at the top for a while */
+function goLandmark(l){
+  hideLmTip();
+  if(l.view || !signedIn()){
+    camera.position.set(l.x + 60, l.y + 50, l.z + (l.z < -200 ? 140 : 70));
+    controls.target.set(l.x, l.y*0.6, l.z); controls.update();
+  } else if(flying){
+    if(driving) exitDriveMode(), driving = false, applyModeUI();
+    placeAtLandmark(l);
+  } else {
+    pendingLandmark = l;
+    placeAtLandmark(l);
+    requestFirstPerson('walk');
+  }
+  // keep the story on screen while you look round
+  var el = lmTip.el; lmTip.cur = null; el.innerHTML = lmCard(l, false); el.classList.remove('hidden'); el.classList.add('pinned');
+  clearTimeout(lmTip.pinT);
+  lmTip.pinT = setTimeout(function(){ lmTip.pinT = null; el.classList.add('hidden'); el.classList.remove('pinned'); }, 20000);
+}
+
 function animate(){
   requestAnimationFrame(animate);
   var dt = Math.min(clock.getDelta(), 0.1);
@@ -8265,6 +9344,7 @@ function animate(){
   if(atlasDirty){ atlasTex.needsUpdate = true; atlasDirty = false; }
   updatePrompt();
   updateSpeedo();
+  lifeTick(dt);
   sendPresence(false);
   followSky();
   var wantNear = flying ? (insideView() ? 0.08 : 0.3) : 1.0;   // a closer near distance only when you're on foot, so depth stays precise
