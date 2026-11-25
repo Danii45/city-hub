@@ -296,7 +296,7 @@ body.touch-play #touch-ui{display:block;}
 #tb-jump{width:86px; height:86px; border-radius:50%;}
 body.touch-drive #tb-jump{display:none;}
 body:not(.touch-drive) #tb-view{display:none;}
-body:not(.touch-fly) #tb-up, body:not(.touch-fly) #tb-down{display:none;}
+body:not(.touch-fly) #tb-up, body:not(.touch-fly) #tb-down, body:not(.touch-fly) #tb-mode{display:none;}
 body.touch-play #hint{top:calc(160px + env(safe-area-inset-top,0px)); bottom:auto;}
 body.touch-play #chat-log{bottom:calc(230px + env(safe-area-inset-bottom,0px));}
 body.touch-play #chat-form{bottom:calc(190px + env(safe-area-inset-bottom,0px));}
@@ -395,7 +395,7 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
       <button class="tbtn" data-act="chat" aria-label="Chat">T<small data-t="tbChat">CHAT</small></button>
       <button class="tbtn" data-act="e" aria-label="Use">E<small data-t="tbUse">USE</small></button>
     </div>
-    <div class="row"><button class="tbtn" id="tb-up" data-act="up" aria-label="Fly up">▲<small data-t="tbUp">UP</small></button><button class="tbtn" id="tb-down" data-act="down" aria-label="Fly down">▼<small data-t="tbDown">DOWN</small></button></div>
+    <div class="row"><button class="tbtn" id="tb-up" data-act="up" aria-label="Fly up">▲<small data-t="tbUp">UP</small></button><button class="tbtn" id="tb-down" data-act="down" aria-label="Fly down">▼<small data-t="tbDown">DOWN</small></button><button class="tbtn" id="tb-mode" data-act="flymode" aria-label="Flight mode">M<small data-t="tbMode">MODE</small></button></div>
     <div class="row"><button class="tbtn" id="tb-view" data-act="view" aria-label="View from inside or behind">V<small data-t="tbView">VIEW</small></button></div>
     <button class="tbtn" id="tb-jump" data-act="jump" data-t="tbJump" aria-label="Jump">JUMP</button>
   </div>
@@ -4299,7 +4299,7 @@ function releaseStick(){
 })();
 (function(){
   var acts = {jump:tryJump, e:function(){ interact(); }, chat:function(){ openChat(''); }, view:function(){ toggleCarView(); },
-              up:function(){ fly.touchUp = true; }, down:function(){ fly.touchDown = true; }};
+              up:function(){ fly.touchUp = true; }, down:function(){ fly.touchDown = true; }, flymode:toggleFlyMode};
   [].forEach.call(document.querySelectorAll('#touch-ui [data-act]'), function(b){
     b.addEventListener('pointerdown', function(e){ e.preventDefault(); b.classList.add('held'); acts[b.getAttribute('data-act')](); });
     ['pointerup', 'pointercancel', 'pointerleave'].forEach(function(tp){ b.addEventListener(tp, function(){ b.classList.remove('held'); var a = b.getAttribute('data-act'); if(a === 'up') fly.touchUp = false; if(a === 'down') fly.touchDown = false; }); });
@@ -4379,13 +4379,28 @@ function updateFlyMovement(dt){
    SPACE goes up, SHIFT goes down, W / S thrust forward and back, A / D turn. Come all the way down to the ground and it
    lands and drives again. Flames come out of the four rear nozzles when you thrust, and out of the ports underneath
    to hold it up - everyone can see you fly. On a phone: hold UP / DOWN (the joystick steers and thrusts). */
-STR.en.flyHint = 'ROADSTER: hold SPACE to fly up - SHIFT to go down - W/S thrust - A/D turn and BARREL ROLL - land to drive';
-STR.fr.flyHint = 'ROADSTER : maintiens ESPACE pour monter - MAJ pour descendre - W/S poussée - A/D tourner et TONNEAU - pose-toi pour rouler';
+STR.en.flyHint = 'ROADSTER: SPACE to fly (bursts - let go and you fall) - W/S thrust - A/D turn and BARREL ROLL - M switches to HOVER';
+STR.fr.flyHint = 'ROADSTER : ESPACE pour voler (par poussées - lâche et tu tombes) - W/S poussée - A/D tourner et TONNEAU - M pour STATIONNAIRE';
 STR.en.liftOff = 'LIFT-OFF!'; STR.fr.liftOff = 'DÉCOLLAGE !';
 STR.en.landed = 'LANDED'; STR.fr.landed = 'ATTERRI';
 STR.en.tbUp = 'UP'; STR.fr.tbUp = 'HAUT'; STR.en.tbDown = 'DOWN'; STR.fr.tbDown = 'BAS';
-var fly = {on:false, vy:0, pitch:0, bank:0, roll:0, rolls:0, rear:0, down:0, touchUp:false, touchDown:false};
+var fly = {manual:true, wasUp:false, on:false, vy:0, pitch:0, bank:0, roll:0, rolls:0, rear:0, down:0, touchUp:false, touchDown:false};
 var FLY_TOP = 150, FLY_UP = 14, FLY_DOWN = 12;
+try { if(localStorage.getItem('paris.flyMode') === 'hover') fly.manual = false; } catch(e){}
+STR.en.flyManual = 'FLIGHT: MANUAL - SPACE bursts you up, let go and you fall (M to switch)';
+STR.fr.flyManual = 'VOL : MANUEL - ESPACE te propulse, lâche et tu tombes (M pour changer)';
+STR.en.flyHover = 'FLIGHT: HOVER - it holds its height, SPACE up, SHIFT down (M to switch)';
+STR.fr.flyHover = 'VOL : STATIONNAIRE - il garde sa hauteur, ESPACE monte, MAJ descend (M pour changer)';
+STR.en.tbMode = 'MODE'; STR.fr.tbMode = 'MODE';
+function toggleFlyMode(){
+  fly.manual = !fly.manual;
+  try { localStorage.setItem('paris.flyMode', fly.manual ? 'manual' : 'hover'); } catch(e){}
+  showToast(t(fly.manual ? 'flyManual' : 'flyHover'));
+}
+window.addEventListener('keydown', function(e){
+  if(e.code !== 'KeyM' || chatOpen || typingInBox(e) || !flying || !driving || carName !== 'roadster') return;
+  toggleFlyMode();
+});
 function flyUpKey(){ return !!(keys.Space || fly.touchUp); }
 function flyDownKey(){ return !!(keys.ShiftLeft || keys.ShiftRight || fly.touchDown); }
 function canFly(){ return carName === 'roadster' && !wreck.on; }
@@ -4409,8 +4424,16 @@ function updateRoadsterFlight(dt){
   carYawRate += (steerInput*1.9 - carYawRate)*Math.min(1, 5*dt);
   carYaw += carYawRate*dt;
   // up and down: it holds its height unless you ask
-  var want = flyUpKey() ? FLY_UP : flyDownKey() ? -FLY_DOWN : 0;
-  fly.vy += (want - fly.vy)*Math.min(1, 3.5*dt);
+  if(fly.manual){   // MANUAL: SPACE is a burst of thrust, let go and gravity takes over
+    var upNow = flyUpKey();
+    if(upNow && !fly.wasUp) fly.vy = Math.max(fly.vy, 0) + 7;   // the burst
+    fly.wasUp = upNow;
+    fly.vy += ((upNow ? 38 : 0) - 20 - (flyDownKey() ? 16 : 0))*dt;
+    fly.vy = Math.max(-45, Math.min(26, fly.vy));
+  } else {         // HOVER: it holds its height unless you ask
+    var want = flyUpKey() ? FLY_UP : flyDownKey() ? -FLY_DOWN : 0;
+    fly.vy += (want - fly.vy)*Math.min(1, 3.5*dt);
+  }
   var ny = carPos.y + fly.vy*dt, R = carSpec.radius*0.85;
   if(ny > FLY_TOP){ ny = FLY_TOP; fly.vy = Math.min(0, fly.vy); }
   // don't sink into a roof or rise into something above: rest on top of it instead
@@ -4436,12 +4459,15 @@ function updateRoadsterFlight(dt){
   var ground = surfaceAt(carPos.x, carPos.z, carPos.y);
   if(carPos.y <= ground){
     carPos.y = ground;
-    if(!flyUpKey()) landFlight(fly.vy > -3);
+    if(!flyUpKey()){
+      if(fly.vy < -20){ showToast('HARD LANDING!'); screenShake = SHAKE_TIME*2; thudSound(16); landFlight(true); }
+      else landFlight(fly.vy > -3);
+    }
     if(fly.vy < 0) fly.vy = 0;
   }
   // how it looks: nose up when climbing, banks into turns, a gentle hover bob, and the flames
   var v = Math.abs(driveSpeed)/topSpeed;
-  fly.pitch += ((fly.vy/FLY_UP)*0.18 - throttle*0.06 - (fly.pitch))*Math.min(1, 4*dt);
+  fly.pitch += (Math.max(-0.35, Math.min(0.3, (fly.vy/FLY_UP)*0.18)) - throttle*0.06 - (fly.pitch))*Math.min(1, 4*dt);
   // A / D in the air: STUNTS - hold to barrel-roll all the way round (it still turns); let go and it rolls back level
   if(steerInput !== 0 && carPos.y - ground > 2.5){
     fly.roll -= steerInput*4.6*dt;
@@ -4454,7 +4480,7 @@ function updateRoadsterFlight(dt){
   }
   fly.bank = fly.roll;
   fly.rear += ((throttle > 0 ? 1 : 0.15) - fly.rear)*Math.min(1, 8*dt);
-  fly.down += ((flyUpKey() ? 1 : flyDownKey() ? 0.25 : 0.55) - fly.down)*Math.min(1, 8*dt);
+  fly.down += ((flyUpKey() ? 1 : fly.manual ? 0 : flyDownKey() ? 0.25 : 0.55) - fly.down)*Math.min(1, 8*dt);
   var bob = fly.on ? Math.sin(performance.now()/420)*0.06 : 0;
   car.group.position.set(carPos.x, carPos.y + bob, carPos.z);
   car.group.rotation.set(fly.pitch, carYaw, fly.bank, 'YXZ');
@@ -4495,7 +4521,7 @@ function endSpin(){ driveSpeed *= Math.cos(carYaw - spin.travelYaw); spin = null
 function updateDriveMovement(dt){
   if(fly.on){ if(canFly()){ updateRoadsterFlight(dt); return; } landFlight(true); carPos.y = surfaceAt(carPos.x, carPos.z, 0); }
   if(canFly() && flyUpKey()){   // lift-off!
-    fly.on = true; fly.vy = 2; fly.pitch = 0; fly.bank = 0; fly.roll = 0; fly.rolls = 0; fly.rear = 0; fly.down = 1;
+    fly.on = true; fly.vy = fly.manual ? 9 : 2; fly.wasUp = true; fly.pitch = 0; fly.bank = 0; fly.roll = 0; fly.rolls = 0; fly.rear = 0; fly.down = 1;
     showToast(t('liftOff')); screenShake = SHAKE_TIME*0.6;
     updateRoadsterFlight(dt); return;
   }
@@ -5104,6 +5130,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 25, 2026 · 10:55 AM</span><br>ROADSTER MANUAL flight: SPACE is a burst of thrust - let go and you fall. M switches to HOVER.</li>' +
   '<li><span class="when">Nov 25, 2026 · 10:45 AM</span><br>ROADSTER stunts: hold A or D in the air to barrel-roll.</li>' +
   '<li><span class="when">Nov 25, 2026 · 10:30 AM</span><br>The ROADSTER is now the new production model - big wing, rocket nozzles - and it FLIES: hold SPACE to lift off, SHIFT to go down, land to drive.</li>' +
   '<li><span class="when">Nov 25, 2026 · 9:45 AM</span><br>NEW CAR: the ROADSTER - an electric sports car with the fastest launch in Paris. Pick it in SETTINGS.</li>' +
