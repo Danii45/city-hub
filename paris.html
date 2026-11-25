@@ -5296,6 +5296,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 25, 2026 · 3:30 PM</span><br>JAIL: inappropriate language in the chat sends you straight to jail. Only Madame can let you out.</li>' +
   '<li><span class="when">Nov 25, 2026 · 3:15 PM</span><br>Smarter Mika: she remembers what you tell her (your name, what you like, your favourites), answers follow-ups like "why?" or "tell me more" without saying Mika again, asks you questions, reads several keywords at once, and knows 42 new topics.</li>' +
   '<li><span class="when">Nov 25, 2026 · 2:45 PM</span><br>No account? Press REQUEST ONE on the sign-in screen: pick a name and password, and your account is made automatically.</li>' +
   '<li><span class="when">Nov 25, 2026 · 12:30 PM</span><br>Daniel\'s House on residential plot 72: a two-storey Parisian house with a balcony and a mansard roof - and Mika has a bed in the front yard.</li>' +
@@ -5841,6 +5842,8 @@ if(PILOT) window.parisPilot = {
   stop:function(){ ['KeyW', 'KeyS', 'KeyA', 'KeyD'].forEach(function(k){ keys[k] = false; }); return 'stopped'; }
 };
 function sendChat(text){
+  if(typeof amJailed === 'function' && amJailed()){ showToast(t('jailNoChat')); return; }
+  if(!net.isOwner && filterChat(text) !== text){ jailUid(net.uid, text); systemLine(t('jailBanner')); return; }
   text = filterChat(text);
   addChatLine(t('you'), text, myColor, false, myRole());
   mikaHeard(text, net.name || 'friend', net.isOwner);
@@ -5885,6 +5888,7 @@ function receiveChat(p){
   mp.chatSeen[p.peer] = c.n;
   if(firstLook && finite(c.at) && Date.now() - c.at > 120000) return;
   var text = cleanChat(c.t);
+  if(net.isOwner && text && filterChat(text) !== text && p.by && peerRole(p) !== 'owner'){ jailUid(p.by, text); systemLine(t('jailSent', {name:playerName(p)})); return; }
   if(text){ addChatLine(playerName(p), filterChat(text), peerColor(p), false, peerRole(p)); var m = net.members[p.by]; mikaHeard(filterChat(text), (m && m.name && cleanNick(m.name)) || playerName(p), peerRole(p) === 'owner'); }
 }
 
@@ -6087,7 +6091,7 @@ langHooks.push(renderBuildToggle);
 renderBuildToggle();
 STR.en.buildLocked = 'Building is closed for now. You can still explore Paris, drive, chat and pet Mika!';
 STR.fr.buildLocked = 'La construction est fermée pour l\'instant. Tu peux quand même explorer Paris, conduire, discuter et caresser Mika !';
-function buildLocked(){ return !net.buildOpen && !net.isOwner; }
+function buildLocked(){ return (!net.buildOpen || (typeof amJailed === 'function' && amJailed())) && !net.isOwner; }
 function lockedToast(){ showToast(t('buildLocked')); }
 var builder = {on:false, p:null, isNew:false, busy:false};
 var builderEl = document.getElementById('builder'), bdBody = document.getElementById('bd-body');
@@ -7288,6 +7292,14 @@ function renderMembers(){
         }).catch(function(){ addMsg(t('saveFail'), 'bad'); });
       });
       row.appendChild(nv);
+      var jailed = isJailedUid(uid), jb = document.createElement('button');
+      jb.className = 'btn navy-give' + (jailed ? ' on' : '');
+      jb.textContent = jailed ? '🚔 ' + t('jailRelease') : t('jailBtn');
+      jb.addEventListener('click', function(){
+        if(isJailedUid(uid)) releaseUid(uid).then(function(){ addMsg(t('jailFree', {name:m.name}), 'good'); renderMembers(); }).catch(function(){ addMsg(t('saveFail'), 'bad'); });
+        else { jailUid(uid, 'Madame'); addMsg(t('jailSent', {name:m.name}), 'good'); setTimeout(renderMembers, 600); }
+      });
+      row.appendChild(jb);
       var b = document.createElement('button');
       b.className = 'btn' + (memberConfirm === uid ? ' danger' : '');
       b.textContent = memberConfirm === uid ? t('removeMemberYes') : t('removeMember');
@@ -7354,6 +7366,7 @@ function presenceState(){
   if(flying && driving && wreck.on){ s.wy = r2(wreck.y); s.wf = r2(wreck.flip); }
   if(flying && driving && fly.on){ s.fly = [r2(fly.rear), r2(fly.down), r2(fly.pitch), r2(fly.bank)]; }
   s.ver = updateCheck.ver;
+  if(typeof jail !== 'undefined' && jail.me) s.jail = 1;
   if(updateCheck.outdated()) s.old = 1;
   if(net.isOwner){ s.role = 'owner'; if(myAnnounce) s.announce = myAnnounce; if(myNap && napPhase()) s.nap = myNap; if(myLeash) s.leash = myLeash; }
   return s;
@@ -7598,7 +7611,7 @@ function updateRemotes(dt){
       setFlames(a.model, fl ? fl[0] : 0, fl ? fl[1] : 0);
     }
     a.model.wheels.forEach(function(w){ w.rotation.x += speed*dt/a.model.wheelR; });
-    var text = playerName(p) + (peerOutdated(p) ? ' - ' + t('outdated') : ''), role = peerRole(p), tagKey = text + '|' + role + '|' + LANG;
+    var text = (s.jail ? '🚔 ' : '') + playerName(p) + (s.jail ? ' (' + t('jailTag') + ')' : '') + (peerOutdated(p) ? ' - ' + t('outdated') : ''), role = peerRole(p), tagKey = text + '|' + role + '|' + LANG;
     if(a.tagText !== tagKey){ if(a.tag){ root.remove(a.tag); disposeObject(a.tag); } a.tag = nameTag(text, role); a.tagText = tagKey; }
     if(role === 'owner'){ var now = performance.now()/1000, tg = a.tag.userData.tag; if(now - tg.lastShine > 0.08){ tg.lastShine = now; drawNameTag(tg, now); } }
     a.tag.visible = true;
@@ -8495,6 +8508,99 @@ document.getElementById('loading').classList.add('hidden');
 
 /* ---------- Render loop ---------- */
 var clock = new THREE.Clock();
+/* ---------- JAIL (for Madame's class) ----------
+   Say something inappropriate in the chat (anything the swear filter catches, English or French) and the message is
+   not sent: you go straight to jail - a cell with bars, far north of the city. In jail you can't walk out, drive,
+   build or chat, and everyone sees you behind bars (🚔 on your name tag). Only Daniel's account (Madame) can let you
+   out: MENU → PLAYERS shows who is in jail with RELEASE, and a JAIL button for anyone. Saved two ways so it sticks:
+   the player's own record (paris/owners/<uid>/jail) and, when Daniel's game sees it, the player list
+   (paris/members/<uid>/jail), which only Daniel's account can change. */
+var JAIL = {x:0, z:-700};
+var jail = {me:false, why:'', all:{}, mine:null, listened:null, banner:null, local:false};
+STR.en.jailBanner = '🚔 YOU ARE IN JAIL for using inappropriate language. Only Madame can let you out.';
+STR.fr.jailBanner = '🚔 TU ES EN PRISON pour avoir utilisé un langage inapproprié. Seule Madame peut te libérer.';
+STR.en.jailNoChat = 'You can\'t chat from jail.'; STR.fr.jailNoChat = 'Tu ne peux pas discuter en prison.';
+STR.en.jailSent = '{name} was sent to jail.'; STR.fr.jailSent = '{name} a été envoyé(e) en prison.';
+STR.en.jailFree = '{name} is out of jail.'; STR.fr.jailFree = '{name} est sorti(e) de prison.';
+STR.en.jailBtn = 'JAIL'; STR.fr.jailBtn = 'PRISON';
+STR.en.jailRelease = 'RELEASE'; STR.fr.jailRelease = 'LIBÉRER';
+STR.en.jailTag = 'IN JAIL'; STR.fr.jailTag = 'EN PRISON';
+STR.en.jailedYou = 'You have been released from jail. Be kind in the chat!'; STR.fr.jailedYou = 'Tu es libéré(e) de prison. Sois gentil(le) dans le chat !';
+try { jail.local = localStorage.getItem('paris.jail') === '1'; } catch(e){}
+(function buildJail(){
+  var X = JAIL.x, Z = JAIL.z, stone = solidMat(0x7d7f86), dark = solidMat(0x2a2b30);
+  PLAY_AREAS.push({x0:X - 4.2, x1:X + 4.2, z0:Z - 4.2, z1:Z + 4.2});
+  var fl = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), solidMat(0x9a9ca2)); fl.rotation.x = -Math.PI/2; fl.position.set(X, 0.02, Z); root.add(fl);
+  var roof = box(12, 0.6, 12, stone); roof.position.set(X, 5.3, Z); root.add(roof);
+  for(var i = -5; i <= 5; i += 0.8){
+    [[i, -5.4], [i, 5.4], [-5.4, i], [5.4, i]].forEach(function(p){ var b = box(0.14, 5, 0.14, dark); b.position.set(X + p[0], 2.5, Z + p[1]); root.add(b); });
+  }
+  [[0, -5.4, 11.4, 0.4], [0, 5.4, 11.4, 0.4], [-5.4, 0, 0.4, 11.4], [5.4, 0, 0.4, 11.4]].forEach(function(r){ var b = box(r[2], 0.3, r[3], dark); b.position.set(X + r[0], 4.9, Z + r[1]); root.add(b); var b2 = box(r[2], 0.3, r[3], dark); b2.position.set(X + r[0], 0.15, Z + r[1]); root.add(b2); });
+  var bench = box(3, 0.5, 1, solidMat(0x6b4a32)); bench.position.set(X, 0.25, Z - 4); root.add(bench);
+  var c = document.createElement('canvas'); c.width = 512; c.height = 128; var k = c.getContext('2d');
+  k.fillStyle = '#8a1c1c'; k.fillRect(0, 0, 512, 128); k.fillStyle = '#fff'; k.font = 'bold 60px sans-serif'; k.textAlign = 'center'; k.textBaseline = 'middle'; k.fillText('PRISON · JAIL', 256, 66);
+  var sg = new THREE.Mesh(new THREE.PlaneGeometry(6, 1.5), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c), side:THREE.DoubleSide})); sg.position.set(X, 6.6, Z + 5.5); root.add(sg);
+  var el = document.createElement('div'); el.id = 'jail-banner'; el.className = 'card hidden';
+  var st = document.createElement('style'); st.textContent = '#jail-banner{position:fixed; left:50%; top:calc(70px + env(safe-area-inset-top,0px)); transform:translateX(-50%); z-index:50; padding:10px 14px; font-family:"VT323", monospace; font-size:21px; background:#8a1c1c; color:#fff; border-color:#3a0a0a; max-width:90vw; text-align:center;} #jail-banner.hidden{display:none;}';
+  document.head.appendChild(st); document.body.appendChild(el); jail.banner = el;
+})();
+function isJailedUid(uid){ var m = net.members[uid]; return !!((m && m.jail) || jail.all[uid]); }
+function amJailed(){ return !net.isOwner && signedIn() && (jail.local || isJailedUid(net.uid)); }
+/* send someone (or yourself) to jail */
+function jailUid(uid, why){
+  if(!net.db || !uid) return;
+  var rec = {at:Date.now(), why:String(why || '').slice(0, 60)};
+  if(uid === net.uid && !net.isOwner){
+    jail.local = true; try { localStorage.setItem('paris.jail', '1'); } catch(e){}
+    net.db.ref('paris/owners/' + uid + '/jail').set(rec).catch(function(){});
+  }
+  if(net.isOwner){ net.db.ref('paris/members/' + uid + '/jail').set(rec).catch(function(){}); }
+}
+function releaseUid(uid){
+  if(!net.isOwner || !net.db) return Promise.resolve();
+  delete jail.all[uid];
+  return Promise.all([net.db.ref('paris/members/' + uid + '/jail').remove(), net.db.ref('paris/owners/' + uid + '/jail').remove()]);
+}
+/* who is in jail: the owner sees everyone's own records; a player watches their own */
+function jailListen(){
+  if(!net.db || !net.uid || jail.listened === net.uid) return;
+  jail.listened = net.uid;
+  if(net.isOwner){
+    net.db.ref('paris/owners').on('value', function(s){
+      var v = s.val() || {}, all = {};
+      Object.keys(v).forEach(function(u){ if(v[u] && v[u].jail){ all[u] = v[u].jail; if(!(net.members[u] && net.members[u].jail)) net.db.ref('paris/members/' + u + '/jail').set(v[u].jail).catch(function(){}); } });
+      jail.all = all; renderMembers();
+    }, function(){});
+  } else {
+    var first = true;
+    net.db.ref('paris/owners/' + net.uid + '/jail').on('value', function(s){
+      var on = !!s.val(), inList = !!(net.members[net.uid] && net.members[net.uid].jail);
+      if(on || inList){ jail.all[net.uid] = true; }
+      else {
+        if(jail.local || jail.all[net.uid]){ if(!first) showToast(t('jailedYou')); }
+        delete jail.all[net.uid]; jail.local = false; try { localStorage.removeItem('paris.jail'); } catch(e){}
+      }
+      first = false;
+    }, function(){});
+  }
+}
+/* every frame: keep a jailed player in their cell, out of cars, and show the banner */
+function jailTick(){
+  if(net.uid && signedIn()) jailListen();
+  var on = amJailed();
+  if(on !== jail.me){ jail.me = on; jail.banner.textContent = t('jailBanner'); jail.banner.classList.toggle('hidden', !on); sendPresence(true); if(on) closeEditors(); }
+  if(!on) return;
+  if(flying && driving){ exitDriveMode(); driving = false; applyModeUI(); }
+  if(flying){
+    var dx = camera.position.x - JAIL.x, dz = camera.position.z - JAIL.z;
+    if(Math.abs(dx) > 4.5 || Math.abs(dz) > 4.5 || camera.position.y > 20){ camera.position.set(JAIL.x, EYE_HEIGHT, JAIL.z); vertVelocity = 0; }
+  } else {
+    controls.target.set(JAIL.x, 1, JAIL.z);
+    if(camera.position.distanceTo(controls.target) > 40) camera.position.set(JAIL.x + 14, 12, JAIL.z + 18);
+  }
+}
+langHooks.push(function(){ if(jail.banner) jail.banner.textContent = t('jailBanner'); });
+
 function animate(){
   requestAnimationFrame(animate);
   var dt = Math.min(clock.getDelta(), 0.1);
@@ -8510,6 +8616,7 @@ function animate(){
   if(atlasDirty){ atlasTex.needsUpdate = true; atlasDirty = false; }
   updatePrompt();
   updateSpeedo();
+  jailTick();
   sendPresence(false);
   followSky();
   var wantNear = flying ? (insideView() ? 0.08 : 0.3) : 1.0;   // a closer near distance only when you're on foot, so depth stays precise
