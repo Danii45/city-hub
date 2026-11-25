@@ -2170,10 +2170,11 @@ function mikaBoardHtml(top, notes){
 }
 /* over Mika's head: her name, and her BEST FRIEND - whoever has petted her the most */
 STR.en.bestFriend = 'Best friend: {name} ({n})'; STR.fr.bestFriend = 'Meilleur ami : {name} ({n})';
+STR.en.mikaOwner = 'Owner: Daniel'; STR.fr.mikaOwner = 'Propriétaire : Daniel';
 var mikaTag = (function(){
-  var c = document.createElement('canvas'); c.width = 512; c.height = 112;
+  var c = document.createElement('canvas'); c.width = 512; c.height = 150;
   var tex = new THREE.CanvasTexture(c), sp = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, depthWrite:false}));
-  sp.center.set(0.5, 0); sp.scale.set(3.6, 0.79, 1); sp.renderOrder = 6; sp.visible = false;
+  sp.center.set(0.5, 0); sp.scale.set(3.6, 3.6*150/512, 1); sp.renderOrder = 6; sp.visible = false;
   root.add(sp);
   return {sprite:sp, canvas:c, tex:tex, key:''};
 })();
@@ -2187,13 +2188,14 @@ function drawMikaTag(){
   var key = line2 + '|' + LANG;
   if(key === mikaTag.key) return;
   mikaTag.key = key;
-  var x = mikaTag.canvas.getContext('2d'), W = 512, H = line2 ? 112 : 64;
-  x.clearRect(0, 0, W, 112);
-  x.fillStyle = 'rgba(31,34,51,0.88)'; x.fillRect(0, 112 - H, W, H);
-  x.strokeStyle = '#ff7a9c'; x.lineWidth = 4; x.strokeRect(2, 114 - H, W - 4, H - 4);
+  var x = mikaTag.canvas.getContext('2d'), W = 512, B = 150, H = line2 ? 150 : 108, top = B - H;
+  x.clearRect(0, 0, W, B);
+  x.fillStyle = 'rgba(31,34,51,0.88)'; x.fillRect(0, top, W, H);
+  x.strokeStyle = '#ff7a9c'; x.lineWidth = 4; x.strokeRect(2, top + 2, W - 4, H - 4);
   x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.fillStyle = '#ff7a9c'; x.font = 'bold 34px Georgia, serif'; x.fillText('MIKA', W/2, 112 - H + 34);
-  if(line2){ x.fillStyle = '#ffd23f'; x.font = '24px monospace'; x.fillText('\u2665 ' + line2, W/2, 84, W - 24); }
+  x.fillStyle = '#ff7a9c'; x.font = 'bold 34px Georgia, serif'; x.fillText('MIKA', W/2, top + 32);
+  x.fillStyle = '#9fd0ff'; x.font = '24px monospace'; x.fillText(t('mikaOwner'), W/2, top + 72, W - 24);
+  if(line2){ x.fillStyle = '#ffd23f'; x.font = '24px monospace'; x.fillText('\u2665 ' + line2, W/2, top + 112, W - 24); }
   mikaTag.tex.needsUpdate = true;
 }
 function updateMikaTag(){
@@ -2202,7 +2204,7 @@ function updateMikaTag(){
   if(!on) return;
   drawMikaTag();
   var p = pet.sprite.position;
-  var ty = p.y + pet.sprite.scale.y + (pet.state === 'heaven' ? 1.1 : 0.25);
+  var ty = p.y + pet.sprite.scale.y + (pet.state === 'heaven' ? 1.1 : 0.25) + (holiday.hat && holiday.hat.visible ? pet.sprite.scale.y*0.3 : 0);   // above her Santa hat
   if(mikaUmbrella.a > 0.05) ty = Math.max(ty, 3.35*mikaUmbrella.a + ty*(1 - mikaUmbrella.a));   // above her umbrella
   mikaTag.sprite.position.set(p.x, ty, p.z);
 }
