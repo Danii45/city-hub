@@ -525,7 +525,9 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
 
     <div class="tab-panel hidden" id="tab-players">
       <div class="settings-block">
-        <div class="settings-label"><span data-t="addPlayer">ADD A PLAYER</span></div>
+        <div class="settings-label"><span data-t="buildAll">BUILDING FOR EVERYONE</span><button class="toggle" id="build-toggle">CLOSED</button></div>
+        <div class="msg" id="build-msg" data-t="buildAllNote">When it's CLOSED only you can build. Everyone can still explore, drive, chat and pet Mika.</div>
+        <div class="settings-label second"><span data-t="addPlayer">ADD A PLAYER</span></div>
         <input id="add-name" class="text-input menu-input" maxlength="100" data-tp="namePh" placeholder="Their name" autocomplete="off" spellcheck="false">
         <input id="add-pw" class="text-input menu-input" maxlength="40" data-tp="newPwPh" placeholder="Their password" autocomplete="new-password" spellcheck="false" style="margin-top:6px">
         <div class="btn-row" style="margin-top:8px"><button class="btn go" id="add-btn" data-t="addBtn">ADD</button></div>
@@ -5208,6 +5210,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 25, 2026 · 11:50 AM</span><br>Daniel can now open or close building for everyone with one switch (PLAYERS tab).</li>' +
   '<li><span class="when">Nov 25, 2026 · 11:30 AM</span><br>HAPPY HOLIDAYS! A giant Christmas tree and a Hanukkah menorah (it lights one more candle each night of Hanukkah) on the Champ de Mars, wreaths on the street lamps, snow, and a Santa hat for Mika. And Mika can now go for walks on a leash with Daniel.</li>' +
   '<li><span class="when">Nov 25, 2026 · 10:55 AM</span><br>ROADSTER MANUAL flight: SPACE is a burst of thrust - let go and you fall. M switches to HOVER.</li>' +
   '<li><span class="when">Nov 25, 2026 · 10:45 AM</span><br>ROADSTER stunts: hold A or D in the air to barrel-roll.</li>' +
@@ -5805,12 +5808,40 @@ function flyTo(p){
 
 /* ---------- The builder: design the outside of your shop or house, watching it change ---------- */
 /* ---------- BUILDING LOCK ----------
-   While BUILD_LOCKED is true nobody but Daniel (the owner) can claim a plot, build, use blocks or decorate - everyone
-   can still walk, drive, chat and pet Mika. Set it to false to open building again. */
-var BUILD_LOCKED = true;
+   While building is CLOSED nobody but Daniel (the owner) can claim a plot, build, use blocks or decorate - everyone
+   can still walk, drive, chat and pet Mika. */
+/* the switch is in the owner's PLAYERS tab; it's saved for everyone (website: paris/members/_settings/buildOpen, which
+   only the owner can write; claude.ai: meta/build). Until it's switched on, building stays CLOSED. */
+STR.en.buildAll = 'BUILDING FOR EVERYONE'; STR.fr.buildAll = 'CONSTRUCTION POUR TOUS';
+STR.en.buildAllNote = 'When it\'s CLOSED only you can build. Everyone can still explore, drive, chat and pet Mika.';
+STR.fr.buildAllNote = 'Quand c\'est FERMÉ, toi seul peux construire. Tout le monde peut quand même explorer, conduire, discuter et caresser Mika.';
+STR.en.buildOpenLbl = 'OPEN'; STR.fr.buildOpenLbl = 'OUVERTE';
+STR.en.buildClosedLbl = 'CLOSED'; STR.fr.buildClosedLbl = 'FERMÉE';
+STR.en.buildNowOpen = 'Building is OPEN! Claim a plot and build your shop and house.'; STR.fr.buildNowOpen = 'La construction est OUVERTE ! Choisis un terrain et construis ta boutique et ta maison.';
+STR.en.buildNowClosed = 'Building is closed for now.'; STR.fr.buildNowClosed = 'La construction est fermée pour l\'instant.';
+var buildToggle = document.getElementById('build-toggle');
+function renderBuildToggle(){ var open = typeof net !== 'undefined' && net && !!net.buildOpen; buildToggle.textContent = t(open ? 'buildOpenLbl' : 'buildClosedLbl'); buildToggle.classList.toggle('on', open); }
+function setBuildOpen(open, fromServer){
+  open = !!open;
+  var changed = open !== net.buildOpen;
+  net.buildOpen = open;
+  renderBuildToggle();
+  if(changed && fromServer && net.buildSeen) systemLine(t(open ? 'buildNowOpen' : 'buildNowClosed'));
+  if(fromServer) net.buildSeen = true;
+  if(changed){ promptKey = ''; if(typeof renderPlotPanel === 'function') renderPlotPanel(); }
+}
+buildToggle.addEventListener('click', function(){
+  if(!net.isOwner) return;
+  var want = !net.buildOpen;
+  if(CLAUDE_MODE){ if(net.cdb) claudeWrite(function(){ return net.cdb.doc('meta/build').set({open:want}); }).catch(function(){ showToast('Could not save - try again'); }); }
+  else if(net.db) net.db.ref('paris/members/_settings/buildOpen').set(want).catch(function(){ showToast('Could not save - try again'); });
+  showToast(t(want ? 'buildNowOpen' : 'buildNowClosed'));
+});
+langHooks.push(renderBuildToggle);
+renderBuildToggle();
 STR.en.buildLocked = 'Building is closed for now. You can still explore Paris, drive, chat and pet Mika!';
 STR.fr.buildLocked = 'La construction est fermée pour l\'instant. Tu peux quand même explorer Paris, conduire, discuter et caresser Mika !';
-function buildLocked(){ return BUILD_LOCKED && !net.isOwner; }
+function buildLocked(){ return !net.buildOpen && !net.isOwner; }
 function lockedToast(){ showToast(t('buildLocked')); }
 var builder = {on:false, p:null, isNew:false, busy:false};
 var builderEl = document.getElementById('builder'), bdBody = document.getElementById('bd-body');
@@ -6585,7 +6616,7 @@ var FIREBASE_SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 var EMAIL_DOMAIN = '@paris.cityhub.example';
 var OWNER_EMAIL = 'daniel' + EMAIL_DOMAIN;   // the owner: adds and removes players, can remove any building
 var WEB_SEND_MS = 100;
-var net = {uid:null, name:'', member:null, isOwner:false, members:{}, db:null, listening:false};
+var net = {uid:null, name:'', member:null, isOwner:false, members:{}, db:null, listening:false, buildOpen:false};
 var loginOut = document.getElementById('login-out'), loginIn = document.getElementById('login-in'), loginWho = document.getElementById('login-who');
 var loginNameEl = document.getElementById('login-name'), loginPwEl = document.getElementById('login-pw'), loginMsgEl = document.getElementById('login-msg');
 var enterBtn = document.getElementById('enter-btn');
@@ -6740,7 +6771,10 @@ function startListening(){
   net.listening = true;
   var db = net.db;
   db.ref('paris/members').on('value', function(s){
-    net.members = s.val() || {};
+    var all = s.val() || {};
+    var st = all._settings; delete all._settings;   // not a player: the owner's settings for everyone
+    net.members = all;
+    setBuildOpen(st && st.buildOpen, true);
     applyDark();
     renderMembers();
     mp.listKey = ''; renderPlayers();
@@ -7382,6 +7416,7 @@ function listenClaude(db){
     if(net.ownerId){ net.members[net.ownerId] = net.members[net.ownerId] || {name:''}; net.members[net.ownerId].owner = true; }
     resolveClaudeNames();
   }, function(){});
+  db.doc('meta/build').onSnapshot(function(s){ setBuildOpen(s.exists && (s.data() || {}).open, true); }, function(){});
   db.doc('meta/pass').onSnapshot(function(s){
     var h = s.exists ? (s.data() || {}).h : null;
     net.passHash = typeof h === 'string' ? h : null;
