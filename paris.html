@@ -296,6 +296,7 @@ body.touch-play #touch-ui{display:block;}
 #tb-jump{width:86px; height:86px; border-radius:50%;}
 body.touch-drive #tb-jump{display:none;}
 body:not(.touch-drive) #tb-view{display:none;}
+body:not(.touch-fly) #tb-up, body:not(.touch-fly) #tb-down{display:none;}
 body.touch-play #hint{top:calc(160px + env(safe-area-inset-top,0px)); bottom:auto;}
 body.touch-play #chat-log{bottom:calc(230px + env(safe-area-inset-bottom,0px));}
 body.touch-play #chat-form{bottom:calc(190px + env(safe-area-inset-bottom,0px));}
@@ -394,6 +395,7 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
       <button class="tbtn" data-act="chat" aria-label="Chat">T<small data-t="tbChat">CHAT</small></button>
       <button class="tbtn" data-act="e" aria-label="Use">E<small data-t="tbUse">USE</small></button>
     </div>
+    <div class="row"><button class="tbtn" id="tb-up" data-act="up" aria-label="Fly up">▲<small data-t="tbUp">UP</small></button><button class="tbtn" id="tb-down" data-act="down" aria-label="Fly down">▼<small data-t="tbDown">DOWN</small></button></div>
     <div class="row"><button class="tbtn" id="tb-view" data-act="view" aria-label="View from inside or behind">V<small data-t="tbView">VIEW</small></button></div>
     <button class="tbtn" id="tb-jump" data-act="jump" data-t="tbJump" aria-label="Jump">JUMP</button>
   </div>
@@ -2027,11 +2029,13 @@ function updateDoom(dt){
   if(wreck.ground > 2.5){ wreck.on = false; wreck.y = 0; wreck.flip = 0; if(flying && driving) startEngineSound(); }
 }
 function executeCar(){
-  explode(carPos.x, carPos.y + 1, carPos.z, 2.8);
+  var fallFrom = 0;
+  if(fly.on){ var gy = surfaceAt(carPos.x, carPos.z, 0); fallFrom = Math.max(0, carPos.y - gy); landFlight(true); carPos.y = gy; setFlames(car, 0, 0); updateThrustSound(0); }
+  explode(carPos.x, carPos.y + fallFrom + 1, carPos.z, 2.8);
   shareBoom(carPos.x, carPos.y + 1, carPos.z, 2.8);
   showChauffard(t('executed'), '', true);
   screenShake = SHAKE_TIME*4;
-  wreck.on = true; wreck.t = 0; wreck.y = 0; wreck.vy = 46; wreck.ground = 0; wreck.flip = 0; wreck.flipV = (Math.random() < 0.5 ? -1 : 1)*(4 + Math.random()*2);   // ~45 m up, about 4 seconds in the air
+  wreck.on = true; wreck.t = 0; wreck.y = fallFrom; wreck.vy = 46; wreck.ground = 0; wreck.flip = 0; wreck.flipV = (Math.random() < 0.5 ? -1 : 1)*(4 + Math.random()*2);   // ~45 m up, about 4 seconds in the air
   driveSpeed *= 0.25;
   stopEngineSound();
   if(carSpec.manual){ manual.blown = 0; manual.revs = null; }
@@ -3642,9 +3646,10 @@ function buildCoupeModel(){
   if(coupeGLB.state === 'ready') setTimeout(function(){ useCoupeGLB(model); }, 0);
   return model;
 }
-/* the ROADSTER: an electric sports car (inspired by the new Tesla Roadster) - long, low and smooth, no grille, slim
-   LED headlights, a dark glass roof, a thin red light bar across the back and big turbine wheels. Takes your car color
-   with a glossy clear coat. Electric: no gears, a rising whine instead of an engine, and the fastest launch in Paris. */
+/* the ROADSTER: inspired by the production Tesla Roadster shown in October 2026 - long, low and smooth, no grille,
+   slim LED headlights, a dark glass roof, a big rear wing, a full-width light bar, an extreme diffuser with four
+   rocket nozzles, and small thruster ports round the body (the "SpaceX package"). Takes your car color with a glossy
+   clear coat. Electric: no gears, a rising whine, the fastest launch in Paris - and it FLIES (see below). */
 function buildRoadsterModel(){
   var g = new THREE.Group(), env = carEnv();
   function phys(o){ var ei = o.envI || 1; delete o.envI; var m = new THREE.MeshPhysicalMaterial(o); m.envMap = env; m.envMapIntensity = ei; return m; }
@@ -3702,9 +3707,45 @@ function buildRoadsterModel(){
   });
   add(0.9, 0.06, 0.05, satin, 0, 0.4, -2.27);                       // the low intake (no grille)
   add(0.12, 0.08, 0.02, chrome, 0, 0.6, -2.3);                      // badge
-  add(1.1, 0.025, 0.04, redDim, 0, 0.86, 2.28); add(1.06, 0.012, 0.045, red, 0, 0.86, 2.285);   // light bar across the back
-  add(0.14, 0.05, 0.02, chrome, 0, 0.7, 2.29);                      // badge
-  add(1.5, 0.16, 0.3, satin, 0, 0.36, 2.12);                         // diffuser
+  add(1.7, 0.04, 0.04, redDim, 0, 0.86, 2.27); add(1.66, 0.018, 0.045, red, 0, 0.86, 2.275);   // full-width light bar
+  add(0.14, 0.05, 0.02, chrome, 0, 0.72, 2.29);                     // badge
+  add(1.7, 0.22, 0.4, satin, 0, 0.38, 2.1);                          // the extreme diffuser
+  [-0.72, -0.42, 0.42, 0.72].forEach(function(x){ add(0.02, 0.26, 0.44, satin, x, 0.36, 2.12); });
+  // four rocket nozzles in the diffuser, with a glow inside
+  var glowMat = new THREE.MeshBasicMaterial({color:0x9fd8ff});
+  var flameMat = new THREE.MeshBasicMaterial({color:0xbfe8ff, transparent:true, opacity:0.75, blending:THREE.AdditiveBlending, depthWrite:false});
+  var flameCore = new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.9, blending:THREE.AdditiveBlending, depthWrite:false});
+  var flames = {rear:[], down:[]};
+  [-0.58, -0.2, 0.2, 0.58].forEach(function(x){
+    var ng = new THREE.CylinderGeometry(0.085, 0.11, 0.16, 18, 1, true); ng.rotateX(Math.PI/2);
+    var noz = new THREE.Mesh(ng, chrome); noz.position.set(x, 0.42, 2.3); g.add(noz);
+    var ig = new THREE.CircleGeometry(0.07, 16); var inner = new THREE.Mesh(ig, glowMat); inner.position.set(x, 0.42, 2.26); g.add(inner);
+    var f = new THREE.Group(); f.position.set(x, 0.42, 2.38);
+    var fg = new THREE.ConeGeometry(0.1, 1, 14, 1, true); fg.translate(0, 0.5, 0); fg.rotateX(Math.PI/2);   // wide at the nozzle, its tip backwards (+z)
+    f.add(new THREE.Mesh(fg, flameMat));
+    var cg = new THREE.ConeGeometry(0.05, 0.6, 10, 1, true); cg.translate(0, 0.3, 0); cg.rotateX(Math.PI/2);
+    f.add(new THREE.Mesh(cg, flameCore));
+    f.visible = false; g.add(f); flames.rear.push(f);
+  });
+  // thruster ports underneath, one by each wheel: they point down to hold it up in the air
+  [[0.62, -1.9], [-0.62, -1.9], [0.62, 1.85], [-0.62, 1.85]].forEach(function(q){
+    var port = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.03, 16), satin); port.position.set(q[0], 0.3, q[1]); g.add(port);
+    var f = new THREE.Group(); f.position.set(q[0], 0.28, q[1]);
+    var fg = new THREE.ConeGeometry(0.12, 1, 14, 1, true); fg.translate(0, 0.5, 0); fg.rotateX(Math.PI);   // wide at the port, its tip down
+    f.add(new THREE.Mesh(fg, flameMat));
+    var cg = new THREE.ConeGeometry(0.06, 0.6, 10, 1, true); cg.translate(0, 0.3, 0); cg.rotateX(Math.PI);
+    f.add(new THREE.Mesh(cg, flameCore));
+    f.visible = false; g.add(f); flames.down.push(f);
+  });
+  // small side thruster ports
+  [-1, 1].forEach(function(sd){ [-1.75, 1.7].forEach(function(z){ var sp = new THREE.Mesh(new THREE.CircleGeometry(0.045, 12), satin); sp.rotation.y = sd*Math.PI/2; sp.position.set(sd*0.958, 0.55, z); g.add(sp); }); });
+  // the big rear wing on two posts
+  var wingMat = phys({color:0x15161a, roughness:0.4, metalness:0.3, clearcoat:0.9, clearcoatRoughness:0.08});
+  profile([[-1.82, 1.3], [-1.98, 1.34], [-2.24, 1.32], [-2.3, 1.28], [-2.05, 1.285]], 1.8, wingMat, 0.01);
+  [-1, 1].forEach(function(sd){
+    profile([[-1.8, 1.24], [-2.32, 1.24], [-2.32, 1.42], [-1.95, 1.4], [-1.8, 1.32]], 0.02, wingMat, 0, sd*0.9);
+    add(0.04, 0.4, 0.08, wingMat, sd*0.42, 1.08, 2.0, -0.25);
+  });
   // wheels: big turbine-style wheels, dark with bright blade edges
   var wheels = [];
   [[0.82, -FW, 0.27], [-0.82, -FW, 0.27], [0.82, -RW, 0.31], [-0.82, -RW, 0.31]].forEach(function(w){
@@ -3725,7 +3766,20 @@ function buildRoadsterModel(){
   });
   g.traverse(function(o){ if(o.isMesh) o.castShadow = false; });
   g.visible = false; root.add(g);
-  return {group:g, wheels:wheels, wheelR:WR, paint:paint};
+  return {group:g, wheels:wheels, wheelR:WR, paint:paint, flames:flames};
+}
+/* show the thruster flames: 'rear' and 'down' from 0 (off) to 1 (full), flickering */
+function setFlames(model, rear, down){
+  if(!model.flames) return;
+  var t = performance.now()/1000;
+  model.flames.rear.forEach(function(f, i){
+    f.visible = rear > 0.03;
+    if(f.visible){ var fl = 0.85 + 0.15*Math.sin(t*41 + i*1.7) + 0.08*Math.sin(t*67 + i); f.scale.set(1 + rear*0.3, 1 + rear*0.3, (0.4 + rear*1.6)*fl); }
+  });
+  model.flames.down.forEach(function(f, i){
+    f.visible = down > 0.03;
+    if(f.visible){ var fl = 0.85 + 0.15*Math.sin(t*37 + i*2.1) + 0.08*Math.sin(t*59 + i); f.scale.set(1, (0.3 + down*1.3)*fl, 1); }
+  });
 }
 /* ---------- The TRACK COUPE's real 3D model ----------
    The drawn coupe above is a stand-in: the first time someone needs the coupe (you pick it, or another player drives
@@ -3981,11 +4035,14 @@ Object.keys(cars).forEach(function(k){ paintModel(cars[k], myColor); });
 function setCarModel(name){
   var shown = car.group.visible;
   car.group.visible = false;
+  if(fly.on){ landFlight(true); carPos.y = surfaceAt(carPos.x, carPos.z, 0); }
+  setFlames(car, 0, 0); updateThrustSound(0);
   car = cars[name]; carSpec = CAR_SPECS[name]; carName = name;
   manual.gear = 1; manual.lastGear = 1; manual.revs = null; manual.blown = 0; speedoText = '';
   if(name === 'coupe') requestCoupeGLB();
   if(carSpec.manual && !IS_TOUCH) showToast(t('manualHint'));
-  applyCarView();
+  if(name === 'roadster') showToast(t('flyHint'));
+  applyModeUI();
   car.group.visible = shown;
   car.group.position.copy(carPos);
   car.group.rotation.y = carYaw;
@@ -4113,6 +4170,7 @@ function applyModeUI(){
   walkBtn.textContent = (flying && !driving) ? exit : t('walk');
   driveBtn.textContent = (flying && driving) ? exit : t('drive');
   document.body.classList.toggle('touch-drive', touchPlay && driving);
+  document.body.classList.toggle('touch-fly', touchPlay && driving && carName === 'roadster');
 }
 function exitFirstPerson(){
   if(!flying) return;
@@ -4140,6 +4198,8 @@ function enterDriveMode(feetY){
   startEngineSound();
 }
 function exitDriveMode(){
+  if(fly.on){ landFlight(true); carPos.y = surfaceAt(carPos.x, carPos.z, 0); }
+  setFlames(car, 0, 0); updateThrustSound(0);
   stopEngineSound();
   car.group.visible = false;
   camera.position.set(carPos.x, carPos.y + EYE_HEIGHT, carPos.z);
@@ -4151,7 +4211,7 @@ function updateDriveCamera(snap){
   var look = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
   var up = wreck.on ? wreck.y : 0, far = carSpec.chaseDist*(1 + Math.min(1.2, up/30));   // follow the car up when it's blown sky-high
   var desiredX = carPos.x - look.x*far, desiredY = carPos.y + up*0.8 + carSpec.chaseHeight - look.y*far*0.3, desiredZ = carPos.z - look.z*far;
-  var k = snap ? 1 : 0.14;
+  var k = snap ? 1 : fly.on ? 0.3 : 0.14;
   camera.position.x += (desiredX - camera.position.x)*k;
   camera.position.y += (desiredY - camera.position.y)*k;
   camera.position.z += (desiredZ - camera.position.z)*k;
@@ -4238,10 +4298,11 @@ function releaseStick(){
   ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function(tp){ el.addEventListener(tp, function(e){ if(e.pointerId === id){ id = null; releaseStick(); } }); });
 })();
 (function(){
-  var acts = {jump:tryJump, e:function(){ interact(); }, chat:function(){ openChat(''); }, view:function(){ toggleCarView(); }};
+  var acts = {jump:tryJump, e:function(){ interact(); }, chat:function(){ openChat(''); }, view:function(){ toggleCarView(); },
+              up:function(){ fly.touchUp = true; }, down:function(){ fly.touchDown = true; }};
   [].forEach.call(document.querySelectorAll('#touch-ui [data-act]'), function(b){
     b.addEventListener('pointerdown', function(e){ e.preventDefault(); b.classList.add('held'); acts[b.getAttribute('data-act')](); });
-    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function(tp){ b.addEventListener(tp, function(){ b.classList.remove('held'); }); });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function(tp){ b.addEventListener(tp, function(){ b.classList.remove('held'); var a = b.getAttribute('data-act'); if(a === 'up') fly.touchUp = false; if(a === 'down') fly.touchDown = false; }); });
   });
   var look = null;
   canvasEl.addEventListener('pointerdown', function(e){ if(!touchPlay || look) return; look = {id:e.pointerId, x:e.clientX, y:e.clientY, sx:e.clientX, sy:e.clientY}; });
@@ -4313,11 +4374,122 @@ function updateFlyMovement(dt){
   if(camera.position.y < -50){ var rr = roomAt(camera.position); if(!rr || !isBlockHouse(rr, rr.data)){ camera.position.y = EYE_HEIGHT; vertVelocity = 0; } }
 }
 
+/* ---------- Flying the ROADSTER (its rocket thrusters) ----------
+   In the Roadster, hold SPACE to fire the thrusters and lift off. In the air it holds its height by itself:
+   SPACE goes up, SHIFT goes down, W / S thrust forward and back, A / D turn. Come all the way down to the ground and it
+   lands and drives again. Flames come out of the four rear nozzles when you thrust, and out of the ports underneath
+   to hold it up - everyone can see you fly. On a phone: hold UP / DOWN (the joystick steers and thrusts). */
+STR.en.flyHint = 'ROADSTER: hold SPACE to fly - SHIFT to go down - W/S thrust - A/D turn - land to drive';
+STR.fr.flyHint = 'ROADSTER : maintiens ESPACE pour voler - MAJ pour descendre - W/S poussée - A/D tourner - pose-toi pour rouler';
+STR.en.liftOff = 'LIFT-OFF!'; STR.fr.liftOff = 'DÉCOLLAGE !';
+STR.en.landed = 'LANDED'; STR.fr.landed = 'ATTERRI';
+STR.en.tbUp = 'UP'; STR.fr.tbUp = 'HAUT'; STR.en.tbDown = 'DOWN'; STR.fr.tbDown = 'BAS';
+var fly = {on:false, vy:0, pitch:0, bank:0, rear:0, down:0, touchUp:false, touchDown:false};
+var FLY_TOP = 150, FLY_UP = 14, FLY_DOWN = 12;
+function flyUpKey(){ return !!(keys.Space || fly.touchUp); }
+function flyDownKey(){ return !!(keys.ShiftLeft || keys.ShiftRight || fly.touchDown); }
+function canFly(){ return carName === 'roadster' && !wreck.on; }
+function landFlight(quiet){
+  if(!fly.on) return;
+  fly.on = false; fly.vy = 0;
+  if(!quiet){ showToast(t('landed')); thudSound(6); }
+}
+function updateRoadsterFlight(dt){
+  var throttle = 0, steerInput = 0, gas = 1;
+  if(keyFwd()) throttle = 1; else if(keyBack()) throttle = -1;
+  if(keyLeft()) steerInput += 1;
+  if(keyRight()) steerInput -= 1;
+  if(throttle === 0 && steerInput === 0 && stickAmount() > STICK_DEAD){ throttle = stick.y > 0.2 ? 1 : stick.y < -0.4 ? -1 : 0; steerInput = -stick.x; gas = stickAmount(); }
+  var topSpeed = Math.max(walkSpeed*carSpec.topMul, 10)*0.85;
+  // forward / back thrust, and the air slows you down when you let go
+  if(throttle > 0) driveSpeed = Math.min(topSpeed*gas, driveSpeed + carSpec.accel*0.7*dt);
+  else if(throttle < 0) driveSpeed = Math.max(-topSpeed*0.4, driveSpeed - carSpec.accel*0.6*dt);
+  else driveSpeed *= Math.exp(-0.9*dt);
+  // turning: steady and easy (no spin-outs up here)
+  carYawRate += (steerInput*1.9 - carYawRate)*Math.min(1, 5*dt);
+  carYaw += carYawRate*dt;
+  // up and down: it holds its height unless you ask
+  var want = flyUpKey() ? FLY_UP : flyDownKey() ? -FLY_DOWN : 0;
+  fly.vy += (want - fly.vy)*Math.min(1, 3.5*dt);
+  var ny = carPos.y + fly.vy*dt, R = carSpec.radius*0.85;
+  if(ny > FLY_TOP){ ny = FLY_TOP; fly.vy = Math.min(0, fly.vy); }
+  // don't sink into a roof or rise into something above: rest on top of it instead
+  if(solidContact(carPos.x, carPos.z, R, ny + 0.3, ny + 1.4) && !solidContact(carPos.x, carPos.z, R, carPos.y + 0.3, carPos.y + 1.4)){ ny = carPos.y; fly.vy = 0; }
+  carPos.y = ny;
+  // move, sliding along walls
+  var subN = Math.max(1, Math.ceil(Math.abs(driveSpeed*dt)/0.8)), sdt = dt/subN;
+  for(var sub=0; sub<subN; sub++){
+    var fx = -Math.sin(carYaw), fz = -Math.cos(carYaw), stepX = fx*driveSpeed*sdt, stepZ = fz*driveSpeed*sdt;
+    var hit = solidContact(carPos.x + stepX, carPos.z + stepZ, R, carPos.y + 0.3, carPos.y + 1.4);
+    if(!hit){ carPos.x += stepX; carPos.z += stepZ; wasColliding = false; }
+    else {
+      var into = Math.min(0, stepX*hit.nx + stepZ*hit.nz);
+      if(!wasColliding && Math.abs(driveSpeed) > topSpeed*0.5){ showToast('CRASH!'); thudSound(10); }
+      if(!wasColliding) driveSpeed *= 1 - Math.abs(fx*hit.nx + fz*hit.nz)*0.8;
+      carPos.x += stepX - hit.nx*into; carPos.z += stepZ - hit.nz*into;
+      var dig = solidContact(carPos.x, carPos.z, R, carPos.y + 0.3, carPos.y + 1.4);
+      if(dig){ carPos.x += dig.nx*dig.depth; carPos.z += dig.nz*dig.depth; }
+      wasColliding = true;
+    }
+  }
+  // the ground: touch down and you're driving again
+  var ground = surfaceAt(carPos.x, carPos.z, carPos.y);
+  if(carPos.y <= ground){
+    carPos.y = ground;
+    if(!flyUpKey()) landFlight(fly.vy > -3);
+    if(fly.vy < 0) fly.vy = 0;
+  }
+  // how it looks: nose up when climbing, banks into turns, a gentle hover bob, and the flames
+  var v = Math.abs(driveSpeed)/topSpeed;
+  fly.pitch += ((fly.vy/FLY_UP)*0.18 - throttle*0.06 - (fly.pitch))*Math.min(1, 4*dt);
+  fly.bank += (Math.max(-0.4, Math.min(0.4, -carYawRate*0.2*(0.4 + v))) - fly.bank)*Math.min(1, 4*dt);
+  fly.rear += ((throttle > 0 ? 1 : 0.15) - fly.rear)*Math.min(1, 8*dt);
+  fly.down += ((flyUpKey() ? 1 : flyDownKey() ? 0.25 : 0.55) - fly.down)*Math.min(1, 8*dt);
+  var bob = fly.on ? Math.sin(performance.now()/420)*0.06 : 0;
+  car.group.position.set(carPos.x, carPos.y + bob, carPos.z);
+  car.group.rotation.set(fly.pitch, carYaw, fly.bank, 'YXZ');
+  setFlames(car, fly.on ? fly.rear : 0, fly.on ? fly.down : 0);
+  car.wheels.forEach(function(w){ (w.spin || w).rotation.x += driveSpeed*dt/car.wheelR*0.2; });
+  updateEngineSound(Math.min(1, 0.3 + Math.abs(driveSpeed)/topSpeed*0.7), 1);
+  updateThrustSound(fly.on ? 0.35 + 0.4*fly.rear + 0.3*(flyUpKey() ? 1 : 0) : 0);
+  var camWant = carYaw, lookRel = Math.atan2(Math.sin(yaw - camBase), Math.cos(yaw - camBase));
+  if(performance.now() - lastMouseMove > 600) lookRel *= Math.exp(-4*dt);
+  camBase += Math.atan2(Math.sin(camWant - camBase), Math.cos(camWant - camBase))*(carView === 'inside' ? 1 : Math.min(1, 15*dt));
+  yaw = camBase + lookRel;
+  if(!updateCarInside()) updateDriveCamera();
+}
+/* the thrusters' rushing hiss (filtered noise) */
+var thrustSnd = null;
+function updateThrustSound(level){
+  if(!sfx.ctx){ return; }
+  if(!thrustSnd){
+    if(level <= 0) return;
+    var ctx = sfx.ctx, len = ctx.sampleRate*2, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+    for(var i=0;i<len;i++) d[i] = Math.random()*2 - 1;
+    var src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+    var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 0.7;
+    var gn = ctx.createGain(); gn.gain.value = 0;
+    src.connect(bp); bp.connect(gn); gn.connect(ctx.destination); src.start();
+    thrustSnd = {src:src, bp:bp, gn:gn};
+  }
+  var now = sfx.ctx.currentTime;
+  thrustSnd.gn.gain.setTargetAtTime(level*0.09, now, 0.08);
+  thrustSnd.bp.frequency.setTargetAtTime(600 + level*900, now, 0.1);
+  if(level <= 0){ var ts = thrustSnd; thrustSnd = null; setTimeout(function(){ try { ts.src.stop(); ts.gn.disconnect(); } catch(e){} }, 400); }
+}
+
 /* spin-outs, as in Cell City: corner harder than the tires hold and the back end lets go */
 var spin = null, overGrip = 0, SPIN_TIME = 1.3, SPIN_AFTER = 0.25;
 function startSpin(){ spin = {t:0, dur:SPIN_TIME, dir:(carYawRate < 0 ? -1 : 1), rate0:9, travelYaw:carYaw}; overGrip = 0; steerAngle = 0; showToast('SPIN OUT!'); }
 function endSpin(){ driveSpeed *= Math.cos(carYaw - spin.travelYaw); spin = null; carYawRate = 0; steerAngle = 0; }
 function updateDriveMovement(dt){
+  if(fly.on){ if(canFly()){ updateRoadsterFlight(dt); return; } landFlight(true); carPos.y = surfaceAt(carPos.x, carPos.z, 0); }
+  if(canFly() && flyUpKey()){   // lift-off!
+    fly.on = true; fly.vy = 2; fly.pitch = 0; fly.bank = 0; fly.rear = 0; fly.down = 1;
+    showToast(t('liftOff')); screenShake = SHAKE_TIME*0.6;
+    updateRoadsterFlight(dt); return;
+  }
+  if(carName === 'roadster'){ setFlames(car, 0, 0); updateThrustSound(0); }
   var throttle = 0, steerInput = 0, gas = 1;
   if(keyFwd()) throttle = 1; else if(keyBack()) throttle = -1;
   if(keyLeft()) steerInput += 1;
@@ -4521,11 +4693,12 @@ function updateSpeedo(){
   if(!show) return;
   var kmh = Math.abs(driveSpeed)*3.6, txt = String(Math.round(speedMiles ? kmh*0.621371 : kmh));
   if(carSpec.manual) txt += '|' + (driveSpeed < -0.3 ? 'R' : manual.gear);
+  if(fly.on) txt += '|ALT ' + Math.round(carPos.y) + ' m';
   if(txt !== speedoText){
     speedoText = txt;
     var parts = txt.split('|');
     speedoNum.textContent = parts[0];
-    speedoUnit.textContent = (speedMiles ? 'MPH' : 'KM/H') + (parts.length > 1 ? '  ·  ' + (parts[1] === 'R' ? 'R' : t('gearN', {n:parts[1]})) : '');
+    speedoUnit.textContent = (speedMiles ? 'MPH' : 'KM/H') + (parts.length > 1 ? '  ·  ' + (parts[1] === 'R' ? 'R' : /^ALT/.test(parts[1]) ? parts[1] : t('gearN', {n:parts[1]})) : '');
   }
 }
 /* ---------- Inside the car: drive from the driver's seat ----------
@@ -4921,6 +5094,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 25, 2026 · 10:30 AM</span><br>The ROADSTER is now the new production model - big wing, rocket nozzles - and it FLIES: hold SPACE to lift off, SHIFT to go down, land to drive.</li>' +
   '<li><span class="when">Nov 25, 2026 · 9:45 AM</span><br>NEW CAR: the ROADSTER - an electric sports car with the fastest launch in Paris. Pick it in SETTINGS.</li>' +
   '<li><span class="when">Nov 25, 2026 · 9:30 AM</span><br>Hit Mika and your car is now launched sky-high, then crashes down with a second explosion - everyone sees it.</li>' +
   '<li><span class="when">Nov 24, 2026 · 3:10 PM</span><br>Mika now listens when the owner tells her it is bedtime.</li>' +
@@ -6700,6 +6874,7 @@ function presenceState(){
   s.chat = myChat;
   if(myBoom) s.boom = myBoom;
   if(flying && driving && wreck.on){ s.wy = r2(wreck.y); s.wf = r2(wreck.flip); }
+  if(flying && driving && fly.on){ s.fly = [r2(fly.rear), r2(fly.down), r2(fly.pitch), r2(fly.bank)]; }
   s.ver = updateCheck.ver;
   if(updateCheck.outdated()) s.old = 1;
   if(net.isOwner){ s.role = 'owner'; if(myAnnounce) s.announce = myAnnounce; if(myNap && napPhase()) s.nap = myNap; }
@@ -6939,6 +7114,11 @@ function updateRemotes(dt){
       a.wy += (s.wy - a.wy)*Math.min(1, dt*12); a.wf += (s.wf - a.wf)*Math.min(1, dt*12);
       g.position.y += a.wy; g.rotateX(a.wf);
     } else a.wrecking = false;
+    if(a.model.flames){   // a flying Roadster: tilt it and light its thrusters
+      var fl = Array.isArray(s.fly) && s.fly.length === 4 && s.fly.every(finite) ? s.fly : null;
+      if(fl){ g.rotation.set(fl[2], a.yaw, fl[3], 'YXZ'); g.position.y += Math.sin(performance.now()/420)*0.06; }
+      setFlames(a.model, fl ? fl[0] : 0, fl ? fl[1] : 0);
+    }
     a.model.wheels.forEach(function(w){ w.rotation.x += speed*dt/a.model.wheelR; });
     var text = playerName(p) + (peerOutdated(p) ? ' - ' + t('outdated') : ''), role = peerRole(p), tagKey = text + '|' + role + '|' + LANG;
     if(a.tagText !== tagKey){ if(a.tag){ root.remove(a.tag); disposeObject(a.tag); } a.tag = nameTag(text, role); a.tagText = tagKey; }
