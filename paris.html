@@ -1997,7 +1997,8 @@ function spawnPet(){
 }
 /* ---------- The sentence: your car is executed ----------
    Two seconds after HOW DARE YOU?, whatever car you're driving blows up - a much bigger blast than a blown engine -
-   and is thrown into the air, flipping, then crashes down wrecked and smoking. Five seconds later it works again. */
+   and is thrown very high into the air (about 45 m), flipping, then crashes down with a second blast, wrecked and smoking.
+   A couple of seconds after it lands it works again. Everyone sees both blasts and the flight. */
 STR.en.executed = 'SENTENCE CARRIED OUT'; STR.fr.executed = 'SENTENCE EXÉCUTÉE';
 var doom = {t:0}, wreck = {on:false, t:0, y:0, vy:0, flip:0, flipV:0, roll:0};
 function updateDoom(dt){
@@ -2009,19 +2010,28 @@ function updateDoom(dt){
   wreck.t += dt;
   if(wreck.y > 0 || wreck.vy > 0){
     wreck.vy -= 24*dt; wreck.y += wreck.vy*dt; wreck.flip += wreck.flipV*dt;
-    if(wreck.y <= 0){ wreck.y = 0; if(wreck.vy < -6){ wreck.vy *= -0.3; wreck.flipV *= 0.4; screenShake = SHAKE_TIME; thudSound(12); } else { wreck.vy = 0; wreck.flipV = 0; } }
+    if(wreck.y <= 0){
+      wreck.y = 0;
+      if(wreck.vy < -20){   // the big crash landing from way up: a second blast, for everyone
+        explode(carPos.x, carPos.y + 0.6, carPos.z, 1.6);
+        shareBoom(carPos.x, carPos.y + 0.6, carPos.z, 1.6);
+        screenShake = SHAKE_TIME*3; thudSound(20);
+      } else if(wreck.vy < -6){ screenShake = SHAKE_TIME; thudSound(12); }
+      if(wreck.vy < -6){ wreck.vy *= -0.3; wreck.flipV *= 0.4; } else { wreck.vy = 0; wreck.flipV = 0; }
+    }
   } else {
     wreck.flip += (Math.round(wreck.flip/(Math.PI*2))*Math.PI*2 - wreck.flip)*Math.min(1, dt*3);   // settles back on its wheels
   }
   if(Math.random() < dt*14) smokePuff(carPos.x, carPos.y + wreck.y + 1, carPos.z, 1.2);
-  if(wreck.t > 5.5){ wreck.on = false; wreck.y = 0; wreck.flip = 0; if(flying && driving) startEngineSound(); }
+  if(wreck.y > 0 || wreck.vy !== 0) wreck.ground = 0; else wreck.ground = (wreck.ground || 0) + dt;
+  if(wreck.ground > 2.5){ wreck.on = false; wreck.y = 0; wreck.flip = 0; if(flying && driving) startEngineSound(); }
 }
 function executeCar(){
   explode(carPos.x, carPos.y + 1, carPos.z, 2.8);
   shareBoom(carPos.x, carPos.y + 1, carPos.z, 2.8);
   showChauffard(t('executed'), '', true);
   screenShake = SHAKE_TIME*4;
-  wreck.on = true; wreck.t = 0; wreck.y = 0; wreck.vy = 15; wreck.flip = 0; wreck.flipV = (Math.random() < 0.5 ? -1 : 1)*(9 + Math.random()*4);
+  wreck.on = true; wreck.t = 0; wreck.y = 0; wreck.vy = 46; wreck.ground = 0; wreck.flip = 0; wreck.flipV = (Math.random() < 0.5 ? -1 : 1)*(4 + Math.random()*2);   // ~45 m up, about 4 seconds in the air
   driveSpeed *= 0.25;
   stopEngineSound();
   if(carSpec.manual){ manual.blown = 0; manual.revs = null; }
@@ -4052,12 +4062,13 @@ function exitDriveMode(){
 function updateDriveCamera(snap){
   var q = new THREE.Quaternion().setFromEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'));
   var look = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
-  var desiredX = carPos.x - look.x*carSpec.chaseDist, desiredY = carPos.y + carSpec.chaseHeight - look.y*carSpec.chaseDist*0.3, desiredZ = carPos.z - look.z*carSpec.chaseDist;
+  var up = wreck.on ? wreck.y : 0, far = carSpec.chaseDist*(1 + Math.min(1.2, up/30));   // follow the car up when it's blown sky-high
+  var desiredX = carPos.x - look.x*far, desiredY = carPos.y + up*0.8 + carSpec.chaseHeight - look.y*far*0.3, desiredZ = carPos.z - look.z*far;
   var k = snap ? 1 : 0.14;
   camera.position.x += (desiredX - camera.position.x)*k;
   camera.position.y += (desiredY - camera.position.y)*k;
   camera.position.z += (desiredZ - camera.position.z)*k;
-  camera.lookAt(carPos.x, carPos.y + 1.3, carPos.z);
+  camera.lookAt(carPos.x, carPos.y + up + 1.3, carPos.z);
 }
 document.addEventListener('pointerlockchange', function(){
   if(document.pointerLockElement === canvasEl) enterFirstPerson();
@@ -4816,6 +4827,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 25, 2026 · 9:30 AM</span><br>Hit Mika and your car is now launched sky-high, then crashes down with a second explosion - everyone sees it.</li>' +
   '<li><span class="when">Nov 24, 2026 · 3:10 PM</span><br>Mika now listens when the owner tells her it is bedtime.</li>' +
   '<li><span class="when">Nov 24, 2026 · 3:00 PM</span><br>DARK BLUE MODE - a special theme for Daniel and the players he gives it to (SETTINGS).</li>' +
   '<li><span class="when">Nov 24, 2026 · 2:55 PM</span><br>Everyone gets the light look now. Prefer dark? SETTINGS > DARK MODE.</li>' +
@@ -6827,13 +6839,17 @@ function updateRemotes(dt){
     g.visible = true;
     g.position.copy(a.pos);
     g.rotation.set(0, a.yaw, finite(s.roll) ? s.roll : 0, 'YXZ');
-    if(want !== 'walker' && finite(s.wy) && finite(s.wf)){ g.position.y += s.wy; g.rotateX(s.wf); }   // their car is flying after an explosion
+    if(want !== 'walker' && finite(s.wy) && finite(s.wf)){   // their car is flying after an explosion (smoothed between updates)
+      if(!a.wrecking){ a.wy = s.wy; a.wf = s.wf; a.wrecking = true; }
+      a.wy += (s.wy - a.wy)*Math.min(1, dt*12); a.wf += (s.wf - a.wf)*Math.min(1, dt*12);
+      g.position.y += a.wy; g.rotateX(a.wf);
+    } else a.wrecking = false;
     a.model.wheels.forEach(function(w){ w.rotation.x += speed*dt/a.model.wheelR; });
     var text = playerName(p) + (peerOutdated(p) ? ' - ' + t('outdated') : ''), role = peerRole(p), tagKey = text + '|' + role + '|' + LANG;
     if(a.tagText !== tagKey){ if(a.tag){ root.remove(a.tag); disposeObject(a.tag); } a.tag = nameTag(text, role); a.tagText = tagKey; }
     if(role === 'owner'){ var now = performance.now()/1000, tg = a.tag.userData.tag; if(now - tg.lastShine > 0.08){ tg.lastShine = now; drawNameTag(tg, now); } }
     a.tag.visible = true;
-    a.tag.position.set(a.pos.x, a.pos.y + (want === 'walker' ? 2.7 : 3.0), a.pos.z);
+    a.tag.position.set(a.pos.x, a.pos.y + (a.wrecking ? a.wy : 0) + (want === 'walker' ? 2.7 : 3.0), a.pos.z);
     if(want === 'walker') remoteColliders.push({x:a.pos.x, z:a.pos.z, r:0.4, y0:a.pos.y, y1:a.pos.y + 1.9});
     else remoteColliders.push({x:a.pos.x, z:a.pos.z, r:CAR_SPECS[want].radius, y0:a.pos.y + 0.2, y1:a.pos.y + 1.6});
   });
