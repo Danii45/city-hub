@@ -481,6 +481,15 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
           <div class="settings-label second"><span data-t="password">PASSWORD</span></div>
           <input id="login-pw" class="text-input login-input" type="password" maxlength="40" data-tp="pwPh" placeholder="Your password" autocomplete="current-password">
           <div class="msg" id="login-msg" data-t="loginNote">Don't have a password? Ask Daniel.</div>
+          <div class="btn-row hidden" id="req-row" style="margin-top:8px"><button class="btn" id="req-open" data-t="reqOpen">NO ACCOUNT? REQUEST ONE</button></div>
+          <div id="req-form" class="hidden">
+            <div class="settings-label second"><span data-t="reqTitle">REQUEST AN ACCOUNT</span></div>
+            <input id="req-name" class="text-input menu-input" maxlength="100" data-tp="reqNamePh" placeholder="Your name (first name + last initial)" autocomplete="off" spellcheck="false">
+            <input id="req-pw" class="text-input menu-input" type="password" maxlength="40" data-tp="reqPwPh" placeholder="Pick a password (6+)" autocomplete="new-password" style="margin-top:6px">
+            <input id="req-pw2" class="text-input menu-input" type="password" maxlength="40" data-tp="pwNew2Ph" placeholder="Password again" autocomplete="new-password" style="margin-top:6px">
+            <div class="btn-row" style="margin-top:8px"><button class="btn go" id="req-send" data-t="reqSend">SEND REQUEST</button><button class="btn" id="req-cancel" data-t="cancel">CANCEL</button></div>
+            <div class="msg" id="req-msg"></div>
+          </div>
         </div>
         <div id="login-in" class="hidden"><span id="login-who">-</span><button class="btn" id="signout-btn" data-t="signOut">SIGN OUT</button></div>
         <div id="pw-change" class="hidden">
@@ -571,7 +580,7 @@ en: {
   tabPlay:'PLAY', tabSettings:'SETTINGS', tabPlayers:'PLAYERS', tabHelp:'HOW TO PLAY', tabLog:'CHANGELOG', tabCredits:'CREDITS',
   subtitle:"Claim a plot, build your shop and your house, then visit everyone else's.",
   name:'NAME', password:'PASSWORD', namePh:'Your name', pwPh:'Your password', newPwPh:'Their password (6+ letters)',
-  loginNote:"Don't have a password? Ask Daniel.", enter:'ENTER PARIS', backHub:'< BACK TO CITY HUB',
+  loginNote:"Don't have a password? Request an account below.", enter:'ENTER PARIS', backHub:'< BACK TO CITY HUB',
   signedInAs:'Signed in as {name}', signOut:'SIGN OUT', signingIn:'Signing in...',
   loginEmpty:'Type your name and your password.', loginWrong:'Wrong name or password.',
   loginTooMany:'Too many tries - wait a minute, then try again.', loginNotListed:"You're not on the list yet - ask Daniel to add you.",
@@ -644,7 +653,7 @@ fr: {
   tabPlay:'JOUER', tabSettings:'RÉGLAGES', tabPlayers:'JOUEURS', tabHelp:'COMMENT JOUER', tabLog:'NOUVEAUTÉS', tabCredits:'CRÉDITS',
   subtitle:'Choisis un terrain, construis ta boutique et ta maison, puis visite celles des autres.',
   name:'NOM', password:'MOT DE PASSE', namePh:'Ton nom', pwPh:'Ton mot de passe', newPwPh:'Son mot de passe (6+ lettres)',
-  loginNote:'Pas de mot de passe ? Demande à Daniel.', enter:'ENTRER DANS PARIS', backHub:'< RETOUR AU CITY HUB',
+  loginNote:'Pas de mot de passe ? Demande un compte ci-dessous.', enter:'ENTRER DANS PARIS', backHub:'< RETOUR AU CITY HUB',
   signedInAs:'Connecté : {name}', signOut:'SE DÉCONNECTER', signingIn:'Connexion...',
   loginEmpty:'Écris ton nom et ton mot de passe.', loginWrong:'Nom ou mot de passe incorrect.',
   loginTooMany:'Trop d\'essais - attends une minute, puis réessaie.', loginNotListed:'Tu n\'es pas encore sur la liste - demande à Daniel de t\'ajouter.',
@@ -5283,7 +5292,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
-  '<li><span class="when">Nov 25, 2026 · 2:40 PM</span><br>New sign-ups from the Google Form are added to Paris automatically.</li>' +
+  '<li><span class="when">Nov 25, 2026 · 2:45 PM</span><br>No account? Press REQUEST ONE on the sign-in screen: pick a name and password, and your account is made automatically.</li>' +
   '<li><span class="when">Nov 25, 2026 · 12:30 PM</span><br>Daniel\'s House on residential plot 72: a two-storey Parisian house with a balcony and a mansard roof - and Mika has a bed in the front yard.</li>' +
   '<li><span class="when">Nov 25, 2026 · 11:50 AM</span><br>Daniel can now open or close building for everyone with one switch (PLAYERS tab).</li>' +
   '<li><span class="when">Nov 25, 2026 · 11:30 AM</span><br>HAPPY HOLIDAYS! A giant Christmas tree and a Hanukkah menorah (it lights one more candle each night of Hanukkah) on the Champ de Mars, wreaths on the street lamps, snow, and a Santa hat for Mika. And Mika can now go for walks on a leash with Daniel.</li>' +
@@ -6966,6 +6975,44 @@ function processPending(v){
     }).then(done).then(function(){ setTimeout(function(){ next(i + 1); }, 400); });
   })(0);
 }
+
+/* REQUEST AN ACCOUNT (website): on the sign-in screen, a student picks a name and password; it goes on the waiting list
+   (paris/pending) and the next time Daniel's account has the game open it becomes a real account (see AUTO-ADD). */
+STR.en.reqOpen = 'NO ACCOUNT? REQUEST ONE'; STR.fr.reqOpen = 'PAS DE COMPTE ? DEMANDES-EN UN';
+STR.en.reqTitle = 'REQUEST AN ACCOUNT'; STR.fr.reqTitle = 'DEMANDER UN COMPTE';
+STR.en.reqNamePh = 'Your name (first name + last initial)'; STR.fr.reqNamePh = 'Ton nom (prénom + initiale du nom)';
+STR.en.reqPwPh = 'Pick a password (6+)'; STR.fr.reqPwPh = 'Choisis un mot de passe (6+)';
+STR.en.reqSend = 'SEND REQUEST'; STR.fr.reqSend = 'ENVOYER';
+STR.en.reqBadName = 'Type your name (at least 2 letters).'; STR.fr.reqBadName = 'Écris ton nom (au moins 2 lettres).';
+STR.en.reqBadPw = 'Your password needs 6 or more letters or numbers.'; STR.fr.reqBadPw = 'Ton mot de passe doit avoir au moins 6 lettres ou chiffres.';
+STR.en.reqMismatch = 'The two passwords are different.'; STR.fr.reqMismatch = 'Les deux mots de passe sont différents.';
+STR.en.reqWait = 'You already sent a request - wait a few minutes.'; STR.fr.reqWait = 'Tu as déjà envoyé une demande - attends quelques minutes.';
+STR.en.reqDone = 'Request sent! Your account will be ready soon (when Daniel or Madame opens the game). Then sign in with this name and password - remember them!';
+STR.fr.reqDone = 'Demande envoyée ! Ton compte sera bientôt prêt (quand Daniel ou Madame ouvre le jeu). Ensuite connecte-toi avec ce nom et ce mot de passe - retiens-les !';
+STR.en.reqFail = 'Could not send - check your connection and try again.'; STR.fr.reqFail = 'Envoi impossible - vérifie ta connexion et réessaie.';
+(function(){
+  if(CLAUDE_MODE) return;
+  var row = document.getElementById('req-row'), form = document.getElementById('req-form'), msg = document.getElementById('req-msg');
+  row.classList.remove('hidden');
+  ['req-name', 'req-pw', 'req-pw2'].forEach(function(id){ var el = document.getElementById(id); el.addEventListener('keydown', function(e){ e.stopPropagation(); }); el.addEventListener('keyup', function(e){ e.stopPropagation(); }); });
+  function say(key, bad){ msg.textContent = t(key); msg.className = 'msg' + (bad ? ' bad' : ' good'); }
+  document.getElementById('req-open').addEventListener('click', function(){ form.classList.remove('hidden'); row.classList.add('hidden'); msg.textContent = ''; });
+  document.getElementById('req-cancel').addEventListener('click', function(){ form.classList.add('hidden'); row.classList.remove('hidden'); });
+  document.getElementById('req-send').addEventListener('click', function(){
+    var name = cleanNick(document.getElementById('req-name').value), pw = document.getElementById('req-pw').value, pw2 = document.getElementById('req-pw2').value;
+    if(nameKey(name).length < 2){ say('reqBadName', true); return; }
+    if(pw.length < 6){ say('reqBadPw', true); return; }
+    if(pw !== pw2){ say('reqMismatch', true); return; }
+    var last = 0; try { last = +localStorage.getItem('paris.reqAt') || 0; } catch(e){}
+    if(Date.now() - last < 5*60*1000){ say('reqWait', true); return; }
+    var btn = this; btn.disabled = true;
+    startFirebase().then(function(){ return net.db.ref('paris/pending').push({name:name, pw:pw.slice(0, 64), at:Date.now()}); }).then(function(){
+      try { localStorage.setItem('paris.reqAt', String(Date.now())); } catch(e){}
+      say('reqDone'); document.getElementById('login-name').value = name;
+      document.getElementById('req-pw').value = ''; document.getElementById('req-pw2').value = '';
+    }).catch(function(){ say('reqFail', true); }).then(function(){ btn.disabled = false; });
+  });
+})();
 
 /* ADD MANY: paste the name and password columns from a spreadsheet (one player a line) and add them all */
 STR.en.addMany = 'ADD MANY AT ONCE'; STR.fr.addMany = 'EN AJOUTER PLUSIEURS';
