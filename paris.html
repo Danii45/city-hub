@@ -5626,6 +5626,50 @@ var MIKA_BIG = [
   {w:'god heaven pray church', say:['I have been to heaven and back, {name}. The choir was lovely, but I prefer it down here.']},
   {w:'tired busy sleepy', say:['Do rest, {name}. Even the busiest Parisian needs a nap now and then.']}
 ];
+MIKA_BIG.push(
+  {w:'school class classes classroom lesson lessons homework teacher teachers madame monsieur prof professeur test tests quiz exam exams grade grades report assignment project ecole classe devoirs examen', say:['I do hope your {word} goes splendidly, {name}. I am told dogs are excellent study companions.', 'Ah, the {word}. Do work diligently, {name} - and perhaps take a short break to pet me.', 'Madame would be very proud of your hard work, {name}.']},
+  {cap:true, w:'french francais english anglais spanish espanol language languages vocabulary grammar verb verbs conjugate conjugation translate translation accent accents', say:['{word}, {name}? A most noble pursuit. Je parle un peu français, bien sûr.', 'Learning {word} is a wonderful thing, {name}. Every word is a little treasure.', 'I adore languages, {name}. Woof is my first, but French is a close second.']},
+  {w:'label labels labelling labeling article articles le la les un une des etiquette etiquettes', p:['how do i label','what is the article'], say:['Every thing in your home deserves a proper French label, {name}: le lit, la lampe, l\'armoire. Do remember the article!', 'A small tip, {name}: le for masculine words, la for feminine, l\' before a vowel, and les for more than one.']},
+  {w:'job jobs work working career careers shift shifts boss employee salary salaire travail metier emploi', say:['An honest day\'s work, {name}! Do your tasks carefully and you shall earn your full pay.', 'Every career in Paris has its charms, {name}. Mine is professional napping.', 'A good worker is a happy worker, {name}. And a well-paid one, if all the tasks are correct.']},
+  {w:'waiter waitress server serveur serveuse cafe bistro order orders tips tip pourboire addition bill', say:['Do bring me a croissant while you are serving, {name}. I tip generously in tail wags.', 'Say « Bonjour, qu\'est-ce que je vous sers ? » and the customers shall adore you, {name}.']},
+  {w:'cashier caissier caissiere change coins euro euros cents centimes note notes cash', say:['Always count the change twice, {name}. A euro saved is a euro earned.', 'The euro has 100 centimes, {name}. I have never held one myself - no pockets, you see.']},
+  {w:'baker boulanger boulangere bakery boulangerie bread baguette baguettes flour farine dough oven four recipe recette', say:['Fresh bread from the boulangerie, {name}! The smell alone could make a dog weep with joy.', 'A good baguette must be crisp outside and soft inside, {name}. I have tasted precisely none, but I am certain.']},
+  {w:'delivery deliver delivering parcel parcels package packages livreur livreuse livraison colis courier', say:['Deliveries! Follow the yellow light, {name}, and do hurry - the clock is ticking.', 'I once chased a delivery rider, {name}. Purely professional curiosity, I assure you.']},
+  {w:'guide tour tourist tourists touriste monument monuments museum musee visit visiting sightseeing', say:['Paris has more monuments than I have toys, {name} - and I have a great many toys.', 'Hover over a monument from the sky, {name}, and you shall learn its whole history in French and English.']},
+  {w:'bank banque banker banquier account accounts compte savings epargne save saving interest interets livret', p:['livret a','savings account'], say:['The Livret A pays 1,7 % a year, {name}. Slow and steady, like a well-behaved dog on a walk.', 'Saving a little each month is very wise, {name}. I myself save bones for a rainy day.', 'Interest is money that grows while you sleep, {name}. Much like my love of naps.']},
+  {w:'money cash rich poor broke expensive cheap price prices cost costs afford budget budgets argent cher pascher prix', say:['A budget is simply a plan for your money, {name}. Needs first, then wants, then savings.', 'Paris is rather expensive, {name}. Do check your budget before buying anything shiny.', 'Spend less than you earn, {name}, and you shall always sleep soundly. Like me.']},
+  {w:'rent loyer landlord proprietaire apartment appartement studio roommate roommates colocataire colocation lease bail', say:['Rent in Paris is rather steep, {name}. A roommate or two can be a great help.', 'Landlords often ask for an income of three times the rent, {name}. The rule of three!', 'My own bed by the fountain is rent-free, {name}. I highly recommend it.']},
+  {w:'credit card cards debt debts loan loans borrow overdraft decouvert agios fee fees score', p:['credit card','credit score'], say:['A credit card is borrowed money, {name}, at about 21 % a year. Pay it back in full if you can!', 'Debt grows quietly, {name}, like weeds in a garden. Best to pull it out early.', 'Paying every bill on time is the secret to a fine credit score, {name}.']},
+  {w:'bills bill electricity electricite internet phone forfait groceries courses insurance assurance navigo metro transport', say:['Bills, bills, bills, {name}. Mine are paid entirely in cuddles.', 'Do not forget your Navigo pass, {name}. Your employer pays half, you know.']},
+  {w:'shopping buy buying bought shop store stores mall sale sales discount soldes acheter magasin', say:['Before you buy, ask yourself: is it a need or a want, {name}?', 'Les soldes! The sales in Paris are legendary, {name}. Do mind your budget.']},
+  {w:'character avatar outfit clothes clothing shirt hat beret cap trousers pants look style', say:['You look très chic today, {name}. A beret suits everyone, I find.', 'Fashion is very important in Paris, {name}. I myself wear only my natural fur coat.']},
+  {w:'house home maison build building built decorate decoration furniture meubles room rooms chambre', say:['Your home sounds lovely, {name}. Is there room for a small dog bed?', 'Do label all your furniture in French, {name}. Le canapé, la table, le lit...']},
+  {w:'bed lit sofa canape couch chair chaise table lamp lampe fridge frigo wardrobe armoire bath baignoire desk bureau', say:['Ah, the {word}! A fine piece of furniture, {name}. Do you know its French name?', 'I would very much like to nap on that {word}, {name}. Purely for testing purposes.']},
+  {cap:true, w:'eiffel louvre notredame arc triomphe luxembourg montmartre sacrecoeur seine champs elysees versailles', say:['{word}! One of the treasures of Paris, {name}. Hover over it from the sky to learn its story.', 'I have visited the {word} many times, {name}. Mostly to look for dropped croissants.']},
+  {w:'history historic histoire revolution napoleon king kings queen queens roi reine medieval war', say:['Paris has over two thousand years of history, {name}. It began as a little village called Lutetia.', 'The French Revolution began in 1789, {name}. Exactly one hundred years before the Eiffel Tower was finished.']},
+  {w:'happy glad excited great awesome amazing wonderful fantastic yay heureux heureuse content contente super genial', say:['How wonderful, {name}! Your happiness makes my tail wag.', 'I am delighted to hear it, {name}! Shall we celebrate with a walk?']},
+  {w:'sad upset unhappy cry crying lonely triste depressed down bad', say:['Oh, {name}, I am sorry to hear that. Would a little pet on the head help? It usually helps me.', 'Everyone has hard days, {name}. Do talk to a friend or a grown-up you trust - and I am always here for a cuddle.']},
+  {w:'tired sleepy exhausted fatigue fatigued bored boring ennui ennuye', say:['Then you must rest, {name}. I am an expert in this field.', 'Bored, {name}? Why not explore Paris - or pet a certain distinguished dog.']},
+  {w:'angry mad annoyed furious frustrated colere fache', say:['Deep breaths, {name}. Count to ten in French: un, deux, trois...', 'I understand, {name}. Perhaps a stroll by the Seine would calm the nerves.']},
+  {w:'hungry starving food snack snacks faim manger lunch dinner breakfast dejeuner diner gouter', say:['I too am always hungry, {name}. It is a lifelong condition.', 'Perhaps a croissant from the café, {name}? With a small piece for me, naturally.']},
+  {w:'game games play playing gaming minecraft fortnite roblox video console controller', say:['Games are great fun, {name}! My favourite is fetch. I am undefeated.', 'Do finish your work first, {name}, then play. That is what Madame would say.']},
+  {w:'music song songs sing singing accordion piano guitar dance dancing musique chanson danser', say:['The accordion music of Paris is rather charming, {name}. I howl along, occasionally.', 'I do enjoy a good song, {name}. My singing voice is, regrettably, a howl.']},
+  {w:'sport sports football soccer basketball hockey tennis run running swim swimming olympics', say:['Paris hosted the Olympic Games in 2024, {name}! I trained very hard for the 100-metre fetch.', 'Exercise is excellent for the body, {name}. I take three walks a day, minimum.']},
+  {w:'birthday anniversaire cake gateau candles party fete gift gifts cadeau cadeaux', say:['Joyeux anniversaire, {name}! I shall wear my party collar.', 'A cake, {name}? Do save me the crumbs.']},
+  {w:'snow snowing snowman winter cold froid neige hiver christmas noel hanukkah menorah', say:['The snow in Paris is magical, {name}. My paws, however, disagree.', 'Have you seen the great Christmas tree and the menorah on the Champ de Mars, {name}? Splendid!']},
+  {w:'vacation holiday holidays vacances trip travel travelling airplane plane beach', say:['Bon voyage, {name}! Do send me a postcard. I shall chew it lovingly.', 'Holidays are for resting, {name}. I take mine every five minutes in my bed.']},
+  {w:'daniel owner creator maker made', p:['who made you','who made this game','who is your owner'], say:['Daniel is my owner, {name}, and he built all of Paris for this game. Rather impressive, I must say.', 'My owner is Daniel, {name}. He is very kind and gives excellent pets.']},
+  {w:'leash walk walkies promenade balade follow', say:['A walk? Oh, how I adore a good walk, {name}! Only Daniel holds my leash, however.', 'Walks are my favourite activity, {name}, after naps and snacks.']},
+  {w:'smart clever intelligent genius brilliant dumb stupid', say:['I am told I am remarkably clever for a dog, {name}. I can even open the treat cupboard.', 'Everyone is clever in their own way, {name}. Do be kind to yourself.']},
+  {w:'joke jokes funny laugh lol haha mdr blague drole', say:['Why did the dog sit in the shade, {name}? Because it did not want to be a hot dog!', 'What do you call a French dog? A poodle, of course, {name}. Oui oui!', 'I am famously hilarious, {name}. Ask anyone at the fountain.']},
+  {w:'secret secrets password passwords hack hacking cheat cheats', say:['I am very good at keeping secrets, {name}. But never share your password with anyone!', 'Cheating is not very sporting, {name}. Do play fair.']},
+  {w:'weather sunny sun rain raining cloudy wind windy storm meteo soleil pluie', say:['The weather in Paris changes every few minutes, {name}. Rather like my mood near a sausage.']},
+  {w:'night day morning evening afternoon time clock hour heure soir matin nuit', say:['Day turns to night quite quickly in this Paris, {name}. Do watch the tower sparkle after dark!']},
+  {w:'animal animals cat cats chat chats bird birds pigeon pigeons squirrel squirrels horse horses', say:['Pigeons, {name}! Paris is full of them. I have chased approximately four thousand.', 'Cats are... acceptable, {name}. From a distance.']},
+  {w:'love like adore aime aimer favorite favourite best', say:['I love you too, {name}! In a strictly dog-and-friend sort of way.', 'You are one of my favourite people, {name}. Do not tell the others.']},
+  {w:'sorry pardon desole desolee oops apologize apologise excuse', say:['All is forgiven, {name}. Dogs do not hold grudges. Except against the vacuum cleaner.']},
+  {w:'please merci thanks thank grateful svp', say:['You are most welcome, {name}! Your manners are impeccable.', 'De rien, {name}! It is always a pleasure.']}
+);
 MIKA_BIG.forEach(function(tp){ tp.p = tp.p || []; tp.big = true; MIKA_TOPICS.push(tp); });   // after the special topics: those win ties
 (function(){ MIKA_TOPICS.forEach(function(tp){ tp.words = tp.w.split(' ').filter(Boolean); }); })();
 /* now and then (1 time in 12) she answers in another language instead */
@@ -5644,6 +5688,7 @@ var MIKA_LANGS = [
 ];
 function mikaReply(text, who){
   var low = String(text).toLowerCase(), h = mikaHash(who + '|' + low), name = who || 'friend', line;
+  if(/\*{3,}/.test(low)){ var rude = ['I beg your pardon, {name}! Such language. A dog has delicate ears.', 'Goodness, {name}! We do not use words like that in Paris. Let us try again, politely.', 'Language, {name}! Madame would not approve.']; return rude[mikaHash(who + low) % rude.length].split('{name}').join(name); }
   var clean = ' ' + low.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9?]+/g, ' ') + ' ';
   var tokens = {}; clean.split(' ').forEach(function(w){ if(w) tokens[w.replace(/\?/g, '')] = true; });
   if(h % 12 === 0){
@@ -9272,14 +9317,31 @@ var lmTip = (function(){
   document.head.appendChild(st); document.body.appendChild(el);
   return {el:el, cur:null, pinT:null};
 })();
+/* each monument's shape, as a few boxes [x0, y0, z0, x1, y1, z1]: the card shows only while the mouse is ON one */
+var LANDMARK_BOXES = {
+  eiffel:[[-21, 0, -21, 21, 26, 21], [-13, 26, -13, 13, 56, 13], [-6, 56, -6, 6, 120, 6]],
+  arc:[[-59, 0, -141, -35, 29, -125]],
+  notredame:[[23, 0, -144, 71, 24, -122], [27, 24, -140, 43, 48, -126]],
+  louvre:[[8, 0, 122, 86, 14, 144], [39, 0, 115, 55, 9, 125]],
+  garden:[[-87, 0, 121, -7, 4, 145]],
+  moulin:[[125, 0, -144, 157, 26, -121]],
+  sacre:[[0, 0, -400, 80, 70, -320]]
+};
+var _lmBox = new THREE.Box3(), _lmHit = new THREE.Vector3();
 function landmarkAtScreen(cx, cy){
-  var ray = rayFromScreen(cx, cy).ray, best = null, bestK = 1, v = new THREE.Vector3();
+  var ray = rayFromScreen(cx, cy).ray, best = null, bestD = Infinity;
   LANDMARK_INFO.forEach(function(l){
-    v.set(l.x, l.y, l.z);
-    if(ray.direction.dot(v.clone().sub(ray.origin)) < 0) return;
-    var k = ray.distanceToPoint(v)/l.r;
-    if(k < bestK){ bestK = k; best = l; }
+    (LANDMARK_BOXES[l.id] || []).forEach(function(b){
+      _lmBox.min.set(b[0], b[1], b[2]); _lmBox.max.set(b[3], b[4], b[5]);
+      if(ray.intersectBox(_lmBox, _lmHit)){ var d = _lmHit.distanceTo(ray.origin); if(d < bestD){ bestD = d; best = l; } }
+    });
   });
+  // something nearer in the way (a building in front)? then it's not the monument you're pointing at
+  if(best){
+    var near = [ground]; plotRows.forEach(function(r){ if(r.extMesh) near.push(r.extMesh); });
+    var hits = rayFromScreen(cx, cy).intersectObjects(near, false);
+    if(hits.length && hits[0].distance < bestD - 2) return null;
+  }
   return best;
 }
 function lmCard(l, go){
@@ -9289,13 +9351,14 @@ function lmCard(l, go){
 }
 function showLmTip(l, cx, cy){
   var el = lmTip.el;
+  if(lmTip.pinT){ clearTimeout(lmTip.pinT); lmTip.pinT = null; }
   if(lmTip.cur !== l){ lmTip.cur = l; el.innerHTML = lmCard(l, true); }
   el.classList.remove('hidden', 'pinned');
   var w = el.offsetWidth, h = el.offsetHeight;
   el.style.left = Math.min(window.innerWidth - w - 8, cx + 18) + 'px';
   el.style.top = Math.max(8, Math.min(window.innerHeight - h - 8, cy + 18)) + 'px';
 }
-function hideLmTip(){ if(lmTip.pinT) return; lmTip.cur = null; lmTip.el.classList.add('hidden'); }
+function hideLmTip(){ if(lmTip.pinT) return; if(lmTip.cur){ lmTip.cur = null; lmTip.el.classList.add('hidden'); } }
 canvasEl.addEventListener('pointermove', function(e){
   if(flying || e.buttons || e.pointerType === 'touch' || !titleScreen.classList.contains('hidden') || builder.on || decor.on || blk.on){ hideLmTip(); return; }
   var l = landmarkAtScreen(e.clientX, e.clientY);
@@ -9323,10 +9386,6 @@ function goLandmark(l){
     placeAtLandmark(l);
     requestFirstPerson('walk');
   }
-  // keep the story on screen while you look round
-  var el = lmTip.el; lmTip.cur = null; el.innerHTML = lmCard(l, false); el.classList.remove('hidden'); el.classList.add('pinned');
-  clearTimeout(lmTip.pinT);
-  lmTip.pinT = setTimeout(function(){ lmTip.pinT = null; el.classList.add('hidden'); el.classList.remove('pinned'); }, 20000);
 }
 
 function animate(){
