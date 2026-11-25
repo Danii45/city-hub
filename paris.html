@@ -102,6 +102,7 @@ button{font-family:'Press Start 2P', monospace;}
 .role-badge.rank i{font-style:normal;}
 .navy-give{font-size:8px; padding:6px 6px; margin-right:6px;}
 .navy-give.on{background:#14245a; color:#e8f0ff; border-color:#9fc0ff;}
+.rank-select.class-pick{width:100%; margin-right:0; font-size:19px; padding:6px;}
 .rank-select{font-family:'VT323', monospace; font-size:17px; padding:2px 4px; margin-right:6px; background:var(--panel); color:var(--ink); border:2px solid var(--panel-border); cursor:pointer;}
 .role-badge.owner{background:#0d1a24; border-color:#9fe6ff; box-shadow:0 0 6px rgba(140,225,255,0.75);}
 .role-badge.owner i{
@@ -488,6 +489,7 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
           <div id="req-form" class="hidden">
             <div class="settings-label second"><span data-t="reqTitle">REQUEST AN ACCOUNT</span></div>
             <input id="req-name" class="text-input menu-input" maxlength="100" data-tp="reqNamePh" placeholder="Your name (first name + last initial)" autocomplete="off" spellcheck="false">
+            <select id="req-cls" class="rank-select class-pick" style="margin-top:6px"></select>
             <input id="req-pw" class="text-input menu-input" type="password" maxlength="40" data-tp="reqPwPh" placeholder="Pick a password (6+)" autocomplete="new-password" style="margin-top:6px">
             <input id="req-pw2" class="text-input menu-input" type="password" maxlength="40" data-tp="pwNew2Ph" placeholder="Password again" autocomplete="new-password" style="margin-top:6px">
             <div class="btn-row" style="margin-top:8px"><button class="btn go" id="req-send" data-t="reqSend">SEND REQUEST</button><button class="btn" id="req-cancel" data-t="cancel">CANCEL</button></div>
@@ -545,6 +547,7 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
         <div class="settings-label second"><span data-t="addPlayer">ADD A PLAYER</span></div>
         <input id="add-name" class="text-input menu-input" maxlength="100" data-tp="namePh" placeholder="Their name" autocomplete="off" spellcheck="false">
         <input id="add-pw" class="text-input menu-input" maxlength="40" data-tp="newPwPh" placeholder="Their password" autocomplete="new-password" spellcheck="false" style="margin-top:6px">
+        <select id="add-cls" class="rank-select class-pick" style="margin-top:6px"></select>
         <div class="btn-row" style="margin-top:8px"><button class="btn go" id="add-btn" data-t="addBtn">ADD</button></div>
         <div class="msg" id="add-msg" data-t="addNote">Pick their password and tell it to them yourself.</div>
         <div class="settings-label second"><span data-t="playersList">PLAYERS ON THE LIST</span><span id="member-count"></span></div>
@@ -7291,7 +7294,9 @@ document.getElementById('add-btn').addEventListener('click', function(){
   var clash = Object.keys(net.members).some(function(u){ return net.members[u] && net.members[u].key === key; });
   if(clash){ addMsg(t('addNameTaken'), 'bad'); return; }
   addMsg(t('adding'));
-  makeAccount(name, key, pw).then(function(){
+  var addCls = document.getElementById('add-cls').value;
+  makeAccount(name, key, pw).then(function(uid){
+    setClassOf(uid, addCls);
     addMsg(t('added', {name:name}), 'good');
     addNameEl.value = ''; addPwEl.value = '';
   }).catch(function(err){
@@ -7312,9 +7317,11 @@ function makeAccount(name, key, pw){
     var uid = cred.user.uid;
     return auth2.signOut().then(function(){
       return net.db.ref('paris/members/' + uid).set({name:name, key:key, at:firebase.database.ServerValue.TIMESTAMP});
-    });
+    }).then(function(){ return uid; });
   });
 }
+/* save a new player's class (from the request form or the ADD form) */
+function setClassOf(uid, cls){ if(uid && cls && V_BY_ID[cls] && !V_BY_ID[cls].elite) return net.db.ref('paris/owners/' + uid + '/cls').set(cls).catch(function(){}); }
 
 /* AUTO-ADD from the Google Form: a small script in the sign-up sheet puts each new answer in paris/pending (only Daniel's
    account can read it). Whenever Daniel's account has the game open, it makes those accounts by itself - the same way
@@ -7344,7 +7351,7 @@ function processPending(v){
     function done(){ return net.db.ref('paris/pending/' + id).remove().catch(function(){}); }
     var why = key.length < 2 ? t('whyName') : pw.length < 6 ? t('whyPw') : taken[key] ? t('whyTaken') : '';
     if(why){ skipped.push((name || '?') + ' (' + why + ')'); done().then(function(){ next(i + 1); }); return; }
-    makeAccount(name, key, pw).then(function(){ taken[key] = true; added.push(name); }, function(err){
+    makeAccount(name, key, pw).then(function(uid){ taken[key] = true; added.push(name); setClassOf(uid, r.cls); }, function(err){
       skipped.push(name + ' (' + (err && err.code === 'exists' ? t('whyExists') : (err && (err.code || err.message)) || '?') + ')');
     }).then(done).then(function(){ setTimeout(function(){ next(i + 1); }, 400); });
   })(0);
@@ -7363,11 +7370,24 @@ STR.en.reqMismatch = 'The two passwords are different.'; STR.fr.reqMismatch = 'L
 STR.en.reqWait = 'You already sent a request - wait a few minutes.'; STR.fr.reqWait = 'Tu as déjà envoyé une demande - attends quelques minutes.';
 STR.en.reqDone = 'Request sent! Your account will be ready soon (when Daniel or Madame opens the game). Then sign in with this name and password - remember them!';
 STR.fr.reqDone = 'Demande envoyée ! Ton compte sera bientôt prêt (quand Daniel ou Madame ouvre le jeu). Ensuite connecte-toi avec ce nom et ce mot de passe - retiens-les !';
+STR.en.reqNeedCls = 'Pick your French class.'; STR.fr.reqNeedCls = 'Choisis ta classe de français.';
+STR.en.clsPick = 'Your French class...'; STR.fr.clsPick = 'Ta classe de français...';
+STR.en.clsPickOwner = 'Their class...'; STR.fr.clsPickOwner = 'Sa classe...';
+function fillClassPickers(){
+  [['req-cls', 'clsPick'], ['add-cls', 'clsPickOwner']].forEach(function(q){
+    var sel = document.getElementById(q[0]); if(!sel) return;
+    var was = sel.value; sel.textContent = '';
+    var o0 = document.createElement('option'); o0.value = ''; o0.textContent = t(q[1]); sel.appendChild(o0);
+    VILLAGES.forEach(function(v){ if(v.elite) return; var o = document.createElement('option'); o.value = v.id; o.textContent = t('vgClassOf', {t:tx(v.t)}) + ' (' + v.q + ')'; sel.appendChild(o); });
+    sel.value = was;
+  });
+}
 STR.en.reqFail = 'Could not send - check your connection and try again.'; STR.fr.reqFail = 'Envoi impossible - vérifie ta connexion et réessaie.';
 (function(){
   if(CLAUDE_MODE) return;
   var row = document.getElementById('req-row'), form = document.getElementById('req-form'), msg = document.getElementById('req-msg');
   row.classList.remove('hidden');
+  fillClassPickers(); langHooks.push(fillClassPickers);
   ['req-name', 'req-pw', 'req-pw2'].forEach(function(id){ var el = document.getElementById(id); el.addEventListener('keydown', function(e){ e.stopPropagation(); }); el.addEventListener('keyup', function(e){ e.stopPropagation(); }); });
   function say(key, bad){ msg.textContent = t(key); msg.className = 'msg' + (bad ? ' bad' : ' good'); }
   document.getElementById('req-open').addEventListener('click', function(){ form.classList.remove('hidden'); row.classList.add('hidden'); msg.textContent = ''; });
@@ -7377,10 +7397,15 @@ STR.en.reqFail = 'Could not send - check your connection and try again.'; STR.fr
     if(nameKey(name).length < 2){ say('reqBadName', true); return; }
     if(pw.length < 6){ say('reqBadPw', true); return; }
     if(pw !== pw2){ say('reqMismatch', true); return; }
+    var cls = document.getElementById('req-cls').value;
+    if(!cls){ say('reqNeedCls', true); return; }
     var last = 0; try { last = +localStorage.getItem('paris.reqAt') || 0; } catch(e){}
     if(Date.now() - last < 5*60*1000){ say('reqWait', true); return; }
     var btn = this; btn.disabled = true;
-    startFirebase().then(function(){ return net.db.ref('paris/pending').push({name:name, pw:pw.slice(0, 64), at:Date.now()}); }).then(function(){
+    startFirebase().then(function(){
+      // (if the database rules don't allow the class yet, send without it - Madame can set it in PLAYERS)
+      return net.db.ref('paris/pending').push({name:name, pw:pw.slice(0, 64), cls:cls, at:Date.now()}).catch(function(){ return net.db.ref('paris/pending').push({name:name, pw:pw.slice(0, 64), at:Date.now()}); });
+    }).then(function(){
       try { localStorage.setItem('paris.reqAt', String(Date.now())); } catch(e){}
       say('reqDone'); document.getElementById('login-name').value = name;
       document.getElementById('req-pw').value = ''; document.getElementById('req-pw2').value = '';
@@ -10456,6 +10481,7 @@ function renderVillages(){
 }
 langHooks.push(function(){ var b = document.getElementById('tab-btn-villages'); if(b) b.textContent = t('tabVillages'); renderVillages(); });
 renderVillages();
+if(!CLAUDE_MODE) fillClassPickers();
 
 function animate(){
   requestAnimationFrame(animate);
