@@ -1049,7 +1049,8 @@ function cityPick(list){ return list[Math.floor(cityRand()*list.length)]; }
    one big canvas, in slots of 256 x 32 pixels, so all the signs in Paris are one texture and one mesh ---------- */
 var ATLAS = 2048, SLOT_W = 256, SLOT_H = 32, SLOTS_PER_ROW = ATLAS/SLOT_W;
 var atlasCanvas = document.createElement('canvas');
-atlasCanvas.width = atlasCanvas.height = ATLAS;
+var ATLAS_H = 4096;
+atlasCanvas.width = ATLAS; atlasCanvas.height = ATLAS_H;
 var actx = atlasCanvas.getContext('2d');
 var atlasTex = new THREE.CanvasTexture(atlasCanvas);
 atlasTex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
@@ -1084,7 +1085,7 @@ function rebuildSigns(){
   var pos = [], uv = [], pad = 1;
   Object.keys(signQuads).forEach(function(k){
     signQuads[k].forEach(function(q){
-      var s = slotXY(q.slot), u0 = (s.x + pad)/ATLAS, u1 = (s.x + SLOT_W - pad)/ATLAS, v1 = 1 - (s.y + pad)/ATLAS, v0 = 1 - (s.y + SLOT_H - pad)/ATLAS;
+      var s = slotXY(q.slot), u0 = (s.x + pad)/ATLAS, u1 = (s.x + SLOT_W - pad)/ATLAS, v1 = 1 - (s.y + pad)/ATLAS_H, v0 = 1 - (s.y + SLOT_H - pad)/ATLAS_H;
       var P = q.p, U = [[u0,v0],[u1,v0],[u1,v1],[u0,v1]];
       [0,1,2, 0,2,3].forEach(function(i){ pos.push(P[i][0], P[i][1], P[i][2]); uv.push(U[i][0], U[i][1]); });
     });
@@ -1114,6 +1115,28 @@ var STREETS = [
   {v:0, at:114, a:-195, b:195, name:'Boulevard Haussmann'},
   {v:0, at:152, a:-195, b:195, name:'Rue Mouffetard'}
 ];
+/* ---------- THE CLASS VILLAGES ----------
+   Every French class gets its own quartier of Paris to build in: Mr. Kaiman's class has the city round the Eiffel
+   Tower, and each other class has a village of 64 plots (32 shops on its main street, 32 houses round the edge) with
+   its own streets, a fountain and a big welcome sign. MENU → VILLAGES takes you to any of them. Your first plot decides
+   your class (or pick it in VILLAGES); you can only claim plots in your own class's village. The BAGUETTE VILLAGE is
+   Madame's village for elite players: a giant golden baguette towers over it, and only players Madame marks ELITE 🥖
+   (MENU → PLAYERS) can build there. */
+var VILLAGES = [
+  {id:'kaiman', x:0, z:0, t:{en:'Mr. Kaiman', fr:'M. Kaiman'}, q:'Tour Eiffel', col:'#2b4c9b', main:true},
+  {id:'mani', x:-650, z:0, t:{en:'Mrs. Mani', fr:'Mme Mani'}, q:'Montmartre', st:'Rue de Montmartre', col:'#7a3fa0', fn:0x8e6ab8},
+  {id:'baglieri', x:650, z:0, t:{en:'Mrs. Baglieri', fr:'Mme Baglieri'}, q:'Le Marais', st:'Rue des Rosiers', col:'#2f7d46', fn:0x5f9a4a},
+  {id:'sadiki', x:-650, z:420, t:{en:'Mrs. Sadiki', fr:'Mme Sadiki'}, q:'Quartier Latin', st:'Rue Saint-Jacques', col:'#c8382f', fn:0xd06a5a},
+  {id:'chitiz', x:650, z:420, t:{en:'Mrs. Chitiz', fr:'Mme Chitiz'}, q:'Belleville', st:'Rue de Belleville', col:'#e07b2c', fn:0xe3a04c},
+  {id:'clancy', x:0, z:470, t:{en:'Mrs. Clancy', fr:'Mme Clancy'}, q:'Bastille', st:'Rue de la Roquette', col:'#2b6fb8', fn:0x5a8fd0},
+  {id:'baguette', x:0, z:-2600, t:{en:'Madame', fr:'Madame'}, q:'Village de la Baguette', st:'Avenue de la Baguette', col:'#b8822e', fn:0xe3b52c, elite:true}
+];
+var V_BY_ID = {}; VILLAGES.forEach(function(v){ V_BY_ID[v.id] = v; });
+VILLAGES.forEach(function(v){
+  if(v.main) return;
+  [-94, 0, 94].forEach(function(dx){ STREETS.push({v:1, at:v.x + dx, a:v.z - 45, b:v.z + 45, name:v.st}); });
+  [-38, 0, 38].forEach(function(dz){ STREETS.push({v:0, at:v.z + dz, a:v.x - 101, b:v.x + 101, name:v.st}); });
+});
 var mapBatch = new MeshBatch();   // everything static that isn't flat paint: lamps, trees, benches, landmarks...
 var M = new Lot(mapBatch, 0, 0, 0);
 (function buildStreets(){
@@ -1489,12 +1512,32 @@ plotRows.forEach(function(r, ri){ r.kind = ri < STORE_ROWS ? 'store' : 'house'; 
    so every other plot keeps its number (shops 153-155, houses 153-155) */
 plotRows.push({bx:141, bz:-133, side:1, x0:151, n:3, cx:166, cz:-127, plots:[], kind:'store'});
 plotRows.push({bx:141, bz:-133, side:-1, x0:151, n:3, cx:166, cz:-139, plots:[], kind:'house'});
+/* the class villages' plots: 2 x 2 blocks, the rows facing the middle street are shops, the outer rows houses */
+VILLAGES.forEach(function(v){
+  if(v.main) return;
+  // (Madame's elite village is smaller and more exclusive: 12 shops and 12 houses on the south side)
+  var n = v.elite ? 6 : ROW_N;
+  (v.elite ? [19] : [-19, 19]).forEach(function(dz){ [-47, 47].forEach(function(dx){ [-1, 1].forEach(function(side){
+    var bz = v.z + dz, inner = (dz < 0) === (side > 0);
+    plotRows.push({bx:v.x + dx, bz:bz, side:side, x0:v.x + dx - n*5, n:n, cx:v.x + dx, cz:bz + side*6, plots:[], kind:inner ? 'store' : 'house', village:v.id});
+  }); }); });
+});
+var VSLOT = 505, vCount = {}, vSlotNext = VSLOT;   // 96 sign slots a village (24 for the elite one): slots 505-1020 of 1024
 plotRows.forEach(function(r, ri){
   r.index = ri;
   r.rot = r.side < 0 ? Math.PI : 0;   // the fronts face the street on their side
   for(var i=0;i<r.n;i++){
     // numbered left to right as you face the row from its street
     var k = r.side < 0 ? r.n - 1 - i : i;
+    if(r.village){
+      if(!vCount[r.village]){ var vel = V_BY_ID[r.village].elite; vCount[r.village] = {s:0, h:0, slot:vSlotNext, hoff:vel ? 24 : 64}; vSlotNext += vel ? 36 : 96; }
+      var vc = vCount[r.village];
+      var vn = r.kind === 'store' ? ++vc.s : ++vc.h;
+      var p = {id:r.village + '-' + (r.kind === 'store' ? 's' : 'h') + vn, kind:r.kind, num:vn, row:r, rot:r.rot, cx:r.x0 + 5 + 10*k, cz:r.cz, data:null, village:r.village};
+      p.slot = r.kind === 'store' ? vc.slot + 2*(vn - 1) : vc.slot + vc.hoff + (vn - 1);
+      r.plots.push(p); PLOTS.push(p); PLOT_BY_ID[p.id] = p;
+      continue;
+    }
     var num = r.kind === 'store' ? ++nStore : ++nHouse;
     var p = {id:(r.kind === 'store' ? 's' : 'h') + num, kind:r.kind, num:num, row:r, rot:r.rot,
              cx:r.x0 + 5 + 10*k, cz:r.cz, data:null};
@@ -1527,7 +1570,7 @@ function plotAt(x, z, reach){
   }
   return null;
 }
-function plotLabel(p){ return t(p.kind === 'store' ? 'storePlot' : 'housePlot', {n:p.num}); }
+function plotLabel(p){ return t(p.kind === 'store' ? 'storePlot' : 'housePlot', {n:p.num}) + (p.village ? ' · ' + V_BY_ID[p.village].q : ''); }
 /* ---------- More France ----------
    Paris street furniture (green Métro entrances, Morris advertising columns, newspaper kiosks, Wallace drinking
    fountains, the bouquinistes' green book boxes along the Seine), French flags that wave, a carousel by the tower, the
@@ -1756,6 +1799,7 @@ function personShape(look){
   var HATS = [0x22336e, 0xc8382f, 0x1a1a1c, 0x6b4a32], COATS = [0x6b4a32, 0x2f4f6e, 0x7a2a3a, 0x3a5a3a, 0x8a7a6a], DOGS = [0xf4f1ea, 0x6b4a32, 0x1a1a1c];
   var paths = [];
   plotRows.forEach(function(r){
+    if(r.village && r.index % 4) return;
     var front = r.cz + r.side*6, zw = front + r.side*2.55;
     paths.push({ax:r.x0 + 1, az:zw, bx:r.x0 + r.n*10 - 1, bz:zw, tourist:false});
   });
@@ -3616,6 +3660,101 @@ function updateRowVisibility(){
     r.innMesh.visible = dx*dx + dz*dz < 55*55;
   });
 }
+/* the villages: a plaza with a fountain, trees round the edge, and a big welcome sign (and Madame's giant baguette) */
+var bigBaguette = null;
+(function buildVillages(){
+  var B = new MeshBatch(), lawn = new FlatBatch(FLAT.lawn);
+  VILLAGES.forEach(function(v){
+    if(v.main) return;
+    var L = new Lot(B, v.x, v.z, 0), PZ = v.z + 60;
+    PLAY_AREAS.push({x0:v.x - 104, x1:v.x + 104, z0:v.z - 48, z1:v.z + 82});
+    lawn.rect(v.x, PZ, 150, 34, GRAVEL);
+    if(v.elite) [-47, 47].forEach(function(dx){ lawn.rect(v.x + dx, v.z - 19, 80, 24, LAWN); });
+    [-58, 58].forEach(function(dx){ lawn.rect(v.x + dx, PZ, 30, 26, LAWN); });
+    // the fountain (Madame's village has her giant baguette instead)
+    if(!v.elite){
+      L.cyl(7, 7.4, 0.9, 0, 0.45, 60, 0xd8d2c4, 24);
+      var wtr = new THREE.Mesh(new THREE.CylinderGeometry(6.4, 6.4, 0.2, 24), waterMat); wtr.position.set(v.x, 0.85, PZ); root.add(wtr);
+      var jet = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.5, 2.4, 8), waterMat); jet.position.set(v.x, 5.3, PZ); root.add(jet); water.push({jet:jet, base:5.3});
+      L.cyl(0.9, 1.3, 3.2, 0, 2.2, 60, v.fn, 10); L.cyl(2.4, 1.6, 0.5, 0, 3.9, 60, v.fn, 16);
+      pushSegCollider(v.x, PZ, v.x, PZ, 7.3, -50, 1);
+    }
+    // trees and benches on the lawns
+    [-70, -58, -46, 46, 58, 70].forEach(function(dx){ [-8, 8].forEach(function(dz){
+      var tx0 = v.x + dx, tz0 = PZ + dz, T = new Lot(B, tx0, tz0, 0);
+      T.box(0.5, 2.9, 0.5, 0, 1.45, 0, 0x7a5a3e); T.part(new THREE.IcosahedronGeometry(1.9, 0), 0, 4, 0, LEAF_GREENS[(dx + dz) & 3], 0, dx);
+      pushSegCollider(tx0, tz0, tx0, tz0, 0.35, -50, 3.3);
+    }); });
+    [-20, 20].forEach(function(dx){ [[10, Math.PI], [-10, 0]].forEach(function(q){
+      var Bn = new Lot(B, v.x + dx, PZ + q[0], q[1]);
+      Bn.box(1.8, 0.1, 0.5, 0, 0.48, 0, 0x2f5a3a); Bn.box(1.8, 0.5, 0.08, 0, 0.8, -0.24, 0x2f5a3a);
+      [-0.8, 0.8].forEach(function(px){ Bn.box(0.08, 0.48, 0.45, px, 0.24, 0, 0x23322b); });
+    }); });
+    // the welcome sign: two stone pillars and a banner over the plaza, readable from both sides
+    [-11, 11].forEach(function(dx){ L.box(1.6, 12, 1.6, dx, 6, 76, 0xe8dcc0); L.box(2.2, 1, 2.2, dx, 12.4, 76, v.fn); pushSegCollider(v.x + dx, v.z + 76, v.x + dx, v.z + 76, 1.1, -50, 13); });
+    var c = document.createElement('canvas'); c.width = 1024; c.height = 300; var k = c.getContext('2d');
+    k.fillStyle = v.col; k.fillRect(0, 0, 1024, 300); k.strokeStyle = '#f6e7b0'; k.lineWidth = 10; k.strokeRect(12, 12, 1000, 276);
+    k.fillStyle = '#ffffff'; k.textAlign = 'center'; k.textBaseline = 'middle';
+    k.font = 'bold 84px Georgia, serif'; k.fillText((v.elite ? '🥖 ' : '') + v.q.toUpperCase() + (v.elite ? ' 🥖' : ''), 512, 92, 980);
+    k.font = 'bold 46px Arial, sans-serif'; k.fillText(v.elite ? 'MADAME · ÉLITE / ELITE ONLY' : 'CLASSE DE ' + v.t.fr.toUpperCase() + ' · ' + v.t.en.toUpperCase() + '\'S CLASS', 512, 190, 980);
+    k.font = '34px Arial, sans-serif'; k.fillText(v.elite ? 'Pour l\'excellence · For excellence' : 'Bienvenue ! · Welcome!', 512, 252, 980);
+    var sg = new THREE.Mesh(new THREE.PlaneGeometry(20, 5.9), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c), side:THREE.DoubleSide}));
+    sg.position.set(v.x, 9, v.z + 76); root.add(sg);
+    if(v.elite){ buildBaguette(v, PZ); buildMountain(v); }
+  });
+  lawn.build(); B.build();
+  /* MADAME'S GIANT BAGUETTE: 90 m tall, golden, slowly turning, over the elite village (you can see it from Paris) */
+  function buildBaguette(v, PZ){
+    var g = new THREE.Group(), crust = solidMat(0xd99a45), dark = solidMat(0xb7782f), light = solidMat(0xf0cf8a);
+    var bodyH = 80, R = 7;
+    var body = new THREE.Mesh(new THREE.CylinderGeometry(R, R, bodyH, 24), crust); g.add(body);
+    [1, -1].forEach(function(s){ var cap = new THREE.Mesh(new THREE.SphereGeometry(R, 24, 14), crust); cap.scale.set(1, 1.5, 1); cap.position.y = s*bodyH/2; g.add(cap); });
+    for(var i = 0; i < 7; i++){   // the slashes along the top
+      var cut = new THREE.Mesh(new THREE.BoxGeometry(5.5, 1.2, 1.6), light);
+      cut.position.set(0, -33 + i*11, R - 0.2); cut.rotation.z = 0.5; g.add(cut);
+      var cut2 = cut.clone(); cut2.position.z = -(R - 0.2); g.add(cut2);
+    }
+    var ring = new THREE.Mesh(new THREE.TorusGeometry(R + 0.4, 0.7, 8, 32), dark); ring.rotation.x = Math.PI/2; ring.position.y = -bodyH/2 + 4; g.add(ring);
+    g.position.set(v.x, bodyH/2 + 18, PZ); g.rotation.z = 0.18;
+    root.add(g); bigBaguette = g;
+    // its golden pedestal on the plaza
+    var ped = new THREE.Mesh(new THREE.CylinderGeometry(7, 9.5, 8, 24), solidMat(0xe3b52c)); ped.position.set(v.x, 4, PZ); root.add(ped);
+    pushSegCollider(v.x, PZ, v.x, PZ, 9.6, -50, 9);
+    // a golden glow at night-ish: a sprite halo
+    var hc = document.createElement('canvas'); hc.width = hc.height = 128; var hk = hc.getContext('2d'), gr = hk.createRadialGradient(64, 64, 4, 64, 64, 64);
+    gr.addColorStop(0, 'rgba(255,220,120,0.55)'); gr.addColorStop(1, 'rgba(255,220,120,0)'); hk.fillStyle = gr; hk.fillRect(0, 0, 128, 128);
+    var halo = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(hc), depthWrite:false, transparent:true}));
+    halo.scale.set(70, 120, 1); halo.position.set(v.x, bodyH/2 + 18, PZ); root.add(halo);
+  }
+  /* the mountain: the village sits on its flat top; the slopes fall 260 m to a green valley, with snowy peaks around.
+     It's far past the edge of Paris (and past the fog), so you fly there from MENU → VILLAGES. */
+  function buildMountain(v){
+    var cz = v.z + 17, H = 260, rock = solidMat(0x7d776b), top = solidMat(PAVEMENT);
+    var geo = new THREE.CylinderGeometry(150, 560, H, 18, 5), pa = geo.attributes.position;
+    for(var i = 0; i < pa.count; i++){
+      var y = pa.getY(i);
+      if(y > H/2 - 1 || y < -H/2 + 1) continue;
+      var a = Math.atan2(pa.getZ(i), pa.getX(i)), k = 1 + 0.12*Math.sin(a*5 + y*0.05) + 0.06*Math.sin(a*11);
+      pa.setX(i, pa.getX(i)*k); pa.setZ(i, pa.getZ(i)*k); pa.setY(i, y + 10*Math.sin(a*7));
+    }
+    geo.computeVertexNormals();
+    var mtn = new THREE.Mesh(geo, [rock, top, rock]); mtn.position.set(v.x, -H/2 - 0.02, cz); root.add(mtn);
+    var vg = new THREE.Mesh(new THREE.PlaneGeometry(2600, 2600), solidMat(0x5f8a4a)); vg.rotation.x = -Math.PI/2; vg.position.set(v.x, -H, cz); root.add(vg);
+    // a stone wall round the edge of the top, so nobody walks off the cliff
+    var MB = new MeshBatch(), W = new Lot(MB, v.x, cz, 0);
+    for(var a = 0; a < Math.PI*2; a += Math.PI/36) W.box(13.5, 1.1, 1, Math.cos(a)*146, 0.55, Math.sin(a)*146, 0xbfb29a, 0, -a + Math.PI/2);
+    // snowy peaks all around
+    for(var n = 0; n < 9; n++){
+      var ang = n*0.7 + 0.4, dist = 650 + (n % 3)*180, ph = 260 + (n*67 % 160), px = Math.cos(ang)*dist, pz = Math.sin(ang)*dist;
+      var P = new Lot(MB, v.x + px, cz + pz, 0, -H);
+      P.part(new THREE.ConeGeometry(200 + (n % 4)*40, ph, 7), 0, ph/2, 0, 0x6f6a60);
+      P.part(new THREE.ConeGeometry((200 + (n % 4)*40)*0.3, ph*0.3, 7), 0, ph*0.85, 0, 0xf4f6f8);
+    }
+    MB.build();
+  }
+})();
+function villageOf(p){ return V_BY_ID[(p && p.village) || 'kaiman']; }
+function villageName(v){ return v.q + ' (' + tx(v.t) + ')'; }
 /* ---------- Cars and people (the same models as Cell City) ---------- */
 function buildCarModel(){
   var g = new THREE.Group(), paint = solidMat(0xd3453c);
@@ -5296,6 +5435,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 25, 2026 · 4:00 PM</span><br>CLASS VILLAGES: every class has its own quartier to build in (MENU → VILLAGES). Madame\'s Baguette Village on the mountain is for elite players 🥖.</li>' +
   '<li><span class="when">Nov 25, 2026 · 3:30 PM</span><br>THE PUBLIC SHAME CHAMBER: inappropriate language in the chat sends you straight there. Only Madame can let you out.</li>' +
   '<li><span class="when">Nov 25, 2026 · 3:15 PM</span><br>Smarter Mika: she remembers what you tell her (your name, what you like, your favourites), answers follow-ups like "why?" or "tell me more" without saying Mika again, asks you questions, reads several keywords at once, and knows 42 new topics.</li>' +
   '<li><span class="when">Nov 25, 2026 · 2:45 PM</span><br>No account? Press REQUEST ONE on the sign-in screen: pick a name and password, and your account is made automatically.</li>' +
@@ -6099,6 +6239,7 @@ function randInt(n){ return Math.floor(Math.random()*n); }
 function openBuilder(p, isNew){
   if(!signedIn() || !net.canBuild) return;
   if(buildLocked()){ lockedToast(); return; }
+  if(isNew && typeof claimBlocked === 'function' && claimBlocked(p)){ showToast(claimBlocked(p)); return; }
   closeEditors();
   goOverview();
   var d;
@@ -7052,9 +7193,11 @@ net.claimPlot = function(p, d){
   if(buildLocked()) return Promise.reject(new Error('notAllowed'));
   if(p.data && p.data.o !== net.uid) return Promise.reject(new Error('taken'));
   if(myPlot(p.kind)) return Promise.reject(new Error('notAllowed'));
+  if(claimBlocked(p)) return Promise.reject(new Error('notAllowed'));
   var upd = {};
   upd['paris/plots/' + p.id] = plotRecord(p, d);
   upd['paris/owners/' + net.uid + '/' + p.kind] = p.id;
+  if(!net.isOwner && !myClass.cls && p.village !== 'baguette'){ myClass.cls = p.village || 'kaiman'; upd['paris/owners/' + net.uid + '/cls'] = myClass.cls; }
   return net.db.ref().update(upd).catch(function(){ throw new Error(p.data && p.data.o !== net.uid ? 'taken' : 'saveFail'); });
 };
 net.savePlot = function(p, d){
@@ -7292,6 +7435,22 @@ function renderMembers(){
         }).catch(function(){ addMsg(t('saveFail'), 'bad'); });
       });
       row.appendChild(nv);
+      var el = document.createElement('button');
+      el.className = 'btn navy-give' + (m.elite ? ' on' : '');
+      el.textContent = t('eliteGive') + (m.elite ? ' ✓' : '');
+      el.addEventListener('click', function(){
+        var give = !m.elite;
+        net.db.ref('paris/members/' + uid + '/elite').set(give ? true : null).then(function(){ addMsg(t(give ? 'eliteGiven' : 'eliteTaken', {name:m.name}), 'good'); }).catch(function(){ addMsg(t('saveFail'), 'bad'); });
+      });
+      row.appendChild(el);
+      var cs = document.createElement('select');
+      cs.className = 'rank-select'; cs.title = t('vgClassSel'); cs.setAttribute('aria-label', t('vgClassSel') + ' - ' + m.name);
+      var c0 = document.createElement('option'); c0.value = ''; c0.textContent = t('vgClassSel') + '?'; cs.appendChild(c0);
+      VILLAGES.forEach(function(v){ if(v.elite) return; var o = document.createElement('option'); o.value = v.id; o.textContent = tx(v.t); cs.appendChild(o); });
+      cs.value = (ownersAll[uid] && ownersAll[uid].cls) || '';
+      cs.addEventListener('keydown', function(e){ e.stopPropagation(); });
+      cs.addEventListener('change', function(){ net.db.ref('paris/owners/' + uid + '/cls').set(cs.value || null).catch(function(){ addMsg(t('saveFail'), 'bad'); }); });
+      row.appendChild(cs);
       var jailed = isJailedUid(uid), jb = document.createElement('button');
       jb.className = 'btn navy-give' + (jailed ? ' on' : '');
       jb.textContent = jailed ? '🚔 ' + t('jailRelease') : t('jailBtn');
@@ -7367,6 +7526,7 @@ function presenceState(){
   if(flying && driving && fly.on){ s.fly = [r2(fly.rear), r2(fly.down), r2(fly.pitch), r2(fly.bank)]; }
   s.ver = updateCheck.ver;
   if(typeof jail !== 'undefined' && jail.me) s.jail = 1;
+  if(typeof amElite === 'function' && !net.isOwner && amElite()) s.el = 1;
   if(updateCheck.outdated()) s.old = 1;
   if(net.isOwner){ s.role = 'owner'; if(myAnnounce) s.announce = myAnnounce; if(myNap && napPhase()) s.nap = myNap; if(myLeash) s.leash = myLeash; }
   return s;
@@ -7611,7 +7771,7 @@ function updateRemotes(dt){
       setFlames(a.model, fl ? fl[0] : 0, fl ? fl[1] : 0);
     }
     a.model.wheels.forEach(function(w){ w.rotation.x += speed*dt/a.model.wheelR; });
-    var text = (s.jail ? '🚔 ' : '') + playerName(p) + (s.jail ? ' (' + t('jailTag') + ')' : '') + (peerOutdated(p) ? ' - ' + t('outdated') : ''), role = peerRole(p), tagKey = text + '|' + role + '|' + LANG;
+    var text = (s.jail ? '🚔 ' : '') + (s.el ? '🥖 ' : '') + playerName(p) + (s.jail ? ' (' + t('jailTag') + ')' : '') + (peerOutdated(p) ? ' - ' + t('outdated') : ''), role = peerRole(p), tagKey = text + '|' + role + '|' + LANG;
     if(a.tagText !== tagKey){ if(a.tag){ root.remove(a.tag); disposeObject(a.tag); } a.tag = nameTag(text, role); a.tagText = tagKey; }
     if(role === 'owner'){ var now = performance.now()/1000, tg = a.tag.userData.tag; if(now - tg.lastShine > 0.08){ tg.lastShine = now; drawNameTag(tg, now); } }
     a.tag.visible = true;
@@ -8601,6 +8761,140 @@ function jailTick(){
 }
 langHooks.push(function(){ if(jail.banner) jail.banner.textContent = t('jailBanner'); });
 
+/* ---------- CLASS VILLAGES: your class, elite players, the VILLAGES menu and the flight there ---------- */
+STR.en.tabVillages = 'VILLAGES'; STR.fr.tabVillages = 'VILLAGES';
+STR.en.vgTitle = 'THE CLASS VILLAGES'; STR.fr.vgTitle = 'LES VILLAGES DES CLASSES';
+STR.en.vgNote = 'Every class has its own quartier of Paris. Build in your own class\'s village. The Baguette Village on the mountain is only for Madame\'s elite players 🥖.';
+STR.fr.vgNote = 'Chaque classe a son propre quartier de Paris. Construis dans le village de ta classe. Le Village de la Baguette sur la montagne est réservé aux joueurs d\'élite de Madame 🥖.';
+STR.en.vgClassOf = '{t}\'s class'; STR.fr.vgClassOf = 'Classe de {t}';
+STR.en.vgEliteOnly = '🥖 Only Madame\'s elite players can build in the Baguette Village.'; STR.fr.vgEliteOnly = '🥖 Seuls les joueurs d\'élite de Madame peuvent construire dans le Village de la Baguette.';
+STR.en.vgEliteTag = '🥖 ELITE ONLY'; STR.fr.vgEliteTag = '🥖 ÉLITE SEULEMENT';
+STR.en.vgGo = 'FLY THERE'; STR.fr.vgGo = 'Y ALLER';
+STR.en.vgMine = 'YOUR CLASS'; STR.fr.vgMine = 'TA CLASSE';
+STR.en.vgMyClass = 'MY CLASS'; STR.fr.vgMyClass = 'MA CLASSE';
+STR.en.vgPick = '- pick your class -'; STR.fr.vgPick = '- choisis ta classe -';
+STR.en.vgNotYours = 'This village is for another class. Your class builds in {v}.'; STR.fr.vgNotYours = 'Ce village est pour une autre classe. Ta classe construit à {v}.';
+STR.en.vgMoveFirst = 'You already have a plot in another village. Ask Madame to move you.'; STR.fr.vgMoveFirst = 'Tu as déjà un terrain dans un autre village. Demande à Madame de te déplacer.';
+STR.en.vgSaved = 'Your class: {v}'; STR.fr.vgSaved = 'Ta classe : {v}';
+STR.en.vgFlying = '✈ Flying to {v}...'; STR.fr.vgFlying = '✈ En route vers {v}...';
+STR.en.vgJail = 'You can\'t leave the Public Shame Chamber.'; STR.fr.vgJail = 'Tu ne peux pas quitter la chambre de la honte.';
+STR.en.eliteGive = '🥖 ELITE'; STR.fr.eliteGive = '🥖 ÉLITE';
+STR.en.eliteGiven = '{name} is now an elite player 🥖'; STR.fr.eliteGiven = '{name} est maintenant un joueur d\'élite 🥖';
+STR.en.eliteTaken = '{name} is no longer elite.'; STR.fr.eliteTaken = '{name} n\'est plus un joueur d\'élite.';
+STR.en.eliteYou = '🥖 Madame made you an ELITE player! You can build in the Baguette Village on the mountain (MENU → VILLAGES).';
+STR.fr.eliteYou = '🥖 Madame t\'a nommé(e) joueur d\'élite ! Tu peux construire dans le Village de la Baguette sur la montagne (MENU → VILLAGES).';
+STR.en.vgClassSel = 'Class'; STR.fr.vgClassSel = 'Classe';
+var myClass = {cls:null, listened:null}, ownersAll = {};
+function amElite(){ return !!(typeof net !== 'undefined' && net && (net.isOwner || (net.uid && net.members && net.members[net.uid] && net.members[net.uid].elite))); }
+/* your class: what you picked, or the village of a plot you own */
+function myVillageId(){
+  if(myClass.cls && V_BY_ID[myClass.cls]) return myClass.cls;
+  var a = myPlot('store'), b = myPlot('house');
+  var v = [a, b].filter(function(p){ return p && p.village !== 'baguette'; }).map(function(p){ return p.village || 'kaiman'; })[0];
+  return v || null;
+}
+/* why you can't claim this plot ('' = you can) */
+function claimBlocked(p){
+  if(!net || net.isOwner) return '';
+  var v = (p && p.village) || 'kaiman';
+  if(v === 'baguette') return amElite() ? '' : t('vgEliteOnly');
+  if(CLAUDE_MODE) return '';
+  var mine = myVillageId();
+  if(!mine || mine === v) return '';
+  return t('vgNotYours', {v:villageName(V_BY_ID[mine])});
+}
+function setMyClass(id){
+  if(!net.db || !net.uid || CLAUDE_MODE) return;
+  var other = [myPlot('store'), myPlot('house')].some(function(p){ return p && p.village !== 'baguette' && (p.village || 'kaiman') !== id; });
+  if(other){ showToast(t('vgMoveFirst')); renderVillages(); return; }
+  myClass.cls = id;
+  net.db.ref('paris/owners/' + net.uid + '/cls').set(id).then(function(){ showToast(t('vgSaved', {v:villageName(V_BY_ID[id])})); }).catch(function(){ showToast(t('saveFail')); });
+  renderVillages();
+}
+function villageListen(){
+  if(CLAUDE_MODE || !net.db || !net.uid || myClass.listened === net.uid) return;
+  myClass.listened = net.uid;
+  if(net.isOwner){
+    net.db.ref('paris/owners').on('value', function(s){ ownersAll = s.val() || {}; renderMembers(); }, function(){});
+  } else {
+    net.db.ref('paris/owners/' + net.uid + '/cls').on('value', function(s){ myClass.cls = s.val() || null; renderVillages(); }, function(){});
+    var wasElite = null;
+    net.db.ref('paris/members/' + net.uid + '/elite').on('value', function(s){ var e = !!s.val(); if(wasElite === false && e) systemLine(t('eliteYou')); wasElite = e; sendPresence(true); }, function(){});
+  }
+}
+/* ---- the flight: the camera rises, swoops over and comes down over the village's plaza ---- */
+var vFlight = null;
+function goVillage(v){
+  if(typeof amJailed === 'function' && amJailed()){ showToast(t('vgJail')); return; }
+  titleScreen.classList.add('hidden');
+  closeEditors();
+  goOverview();
+  var to = {x:v.x, z:v.z + 125}, tgt = {x:v.x, z:v.z + 15}, d = Math.hypot(to.x - camera.position.x, to.z - camera.position.z);
+  vFlight = {t0:performance.now(), dur:Math.min(6000, 2200 + d*2.2), from:camera.position.clone(), fromT:controls.target.clone(),
+             to:new THREE.Vector3(to.x, 70, to.z), toT:new THREE.Vector3(tgt.x, 0, tgt.z), peak:Math.max(90, Math.min(420, d*0.3))};
+  showToast(t('vgFlying', {v:villageName(v)}));
+}
+function villageTick(){
+  if(net.uid) villageListen();
+  if(bigBaguette) bigBaguette.rotation.y = performance.now()*0.00025;
+  if(!vFlight) return;
+  if(flying){ vFlight = null; return; }
+  var k = Math.min(1, (performance.now() - vFlight.t0)/vFlight.dur), e = k < 0.5 ? 2*k*k : 1 - Math.pow(-2*k + 2, 2)/2;
+  camera.position.lerpVectors(vFlight.from, vFlight.to, e);
+  camera.position.y += Math.sin(Math.PI*e)*vFlight.peak;
+  controls.target.lerpVectors(vFlight.fromT, vFlight.toT, Math.min(1, e*1.4));
+  camera.lookAt(controls.target);
+  if(k >= 1){ vFlight = null; controls.update(); }
+}
+/* ---- MENU → VILLAGES ---- */
+(function makeVillagesTab(){
+  var help = document.getElementById('tab-btn-help'), btn = document.createElement('button');
+  btn.className = 'tab-btn'; btn.id = 'tab-btn-villages'; btn.setAttribute('data-t', 'tabVillages'); btn.textContent = t('tabVillages');
+  help.parentNode.insertBefore(btn, help);
+  var panel = document.createElement('div'); panel.className = 'tab-panel hidden'; panel.id = 'tab-villages';
+  document.getElementById('tab-play').parentNode.insertBefore(panel, document.getElementById('tab-play').nextSibling);
+  var tb = {name:'villages', btn:btn, panel:panel};
+  titleTabs.push(tb);
+  btn.addEventListener('click', function(){ showTitleTab('villages'); renderVillages(); });
+  var st = document.createElement('style');
+  st.textContent = '#tab-villages .vg-row{display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px dashed var(--ink-soft);} #tab-villages .vg-row .grow{flex:1; font-size:15px; line-height:1.25;} #tab-villages .vg-dot{width:14px; height:14px; border:2px solid var(--panel-border); flex:none;} #tab-villages .vg-tag{font-size:8px; padding:3px 5px; background:var(--accent); color:#fff;} #tab-villages .vg-tag.elite{background:#b8822e;} #tab-villages select{font-family:inherit; font-size:15px; padding:4px; margin-top:6px; width:100%;}';
+  document.head.appendChild(st);
+})();
+function renderVillages(){
+  var panel = document.getElementById('tab-villages');
+  if(!panel) return;
+  panel.textContent = '';
+  var blk = document.createElement('div'); blk.className = 'settings-block'; panel.appendChild(blk);
+  var h = document.createElement('div'); h.className = 'settings-label'; h.textContent = t('vgTitle'); blk.appendChild(h);
+  var note = document.createElement('div'); note.className = 'msg'; note.textContent = t('vgNote'); blk.appendChild(note);
+  var mine = signedIn() && !net.isOwner ? myVillageId() : null;
+  VILLAGES.forEach(function(v){
+    var row = document.createElement('div'); row.className = 'vg-row';
+    var dot = document.createElement('span'); dot.className = 'vg-dot'; dot.style.background = v.col; row.appendChild(dot);
+    var nm = document.createElement('span'); nm.className = 'grow';
+    nm.textContent = (v.elite ? '🥖 ' : '') + v.q + ' - ' + (v.elite ? tx(v.t) : t('vgClassOf', {t:tx(v.t)}));
+    row.appendChild(nm);
+    if(v.elite){ var et = document.createElement('span'); et.className = 'vg-tag elite'; et.textContent = t('vgEliteTag'); row.appendChild(et); }
+    if(mine === v.id){ var mt = document.createElement('span'); mt.className = 'vg-tag'; mt.textContent = t('vgMine'); row.appendChild(mt); }
+    var go = document.createElement('button'); go.className = 'btn go'; go.textContent = t('vgGo');
+    go.addEventListener('click', function(){ goVillage(v); });
+    row.appendChild(go);
+    blk.appendChild(row);
+  });
+  if(signedIn() && !net.isOwner && !CLAUDE_MODE){
+    var lab = document.createElement('div'); lab.className = 'settings-label second'; lab.textContent = t('vgMyClass'); blk.appendChild(lab);
+    var sel = document.createElement('select');
+    var o0 = document.createElement('option'); o0.value = ''; o0.textContent = t('vgPick'); sel.appendChild(o0);
+    VILLAGES.forEach(function(v){ if(v.elite) return; var o = document.createElement('option'); o.value = v.id; o.textContent = t('vgClassOf', {t:tx(v.t)}) + ' - ' + v.q; sel.appendChild(o); });
+    sel.value = mine || '';
+    sel.addEventListener('keydown', function(e){ e.stopPropagation(); });
+    sel.addEventListener('change', function(){ if(sel.value) setMyClass(sel.value); });
+    blk.appendChild(sel);
+  }
+}
+langHooks.push(function(){ var b = document.getElementById('tab-btn-villages'); if(b) b.textContent = t('tabVillages'); renderVillages(); });
+renderVillages();
+
 function animate(){
   requestAnimationFrame(animate);
   var dt = Math.min(clock.getDelta(), 0.1);
@@ -8617,6 +8911,7 @@ function animate(){
   updatePrompt();
   updateSpeedo();
   jailTick();
+  villageTick();
   sendPresence(false);
   followSky();
   var wantNear = flying ? (insideView() ? 0.08 : 0.3) : 1.0;   // a closer near distance only when you're on foot, so depth stays precise
