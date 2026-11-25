@@ -2366,8 +2366,8 @@ function updatePet(dt){
    trots back to her walk. While she's awake she says "bark" or "ruff" in the chat now and then. */
 var MIKA_BED = {x:-8.6, z:47, y:0.32}, MIKA_VIA = [-10.5, 31];   // beside the fountain (west side); she goes round the carousel
 var MIKA_CYCLE = 300, MIKA_GO = 225, MIKA_SLEEP = 240, MIKA_WAKE = 290;
-(function buildMikaBed(){
-  var g = new THREE.Group(); g.position.set(MIKA_BED.x, 0, MIKA_BED.z);
+function makeDogBed(bx, bz, ry){
+  var g = new THREE.Group(); g.position.set(bx, 0, bz); g.rotation.y = ry || 0;
   var rim = new THREE.Mesh(new THREE.TorusGeometry(1.25, 0.32, 10, 28), solidMat(0x7a2a3a)); rim.rotation.x = Math.PI/2; rim.scale.set(1, 0.78, 1); rim.position.y = 0.3; g.add(rim);
   var base = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.4, 0.22, 28), solidMat(0x5e1f2c)); base.scale.set(1, 1, 0.78); base.position.y = 0.11; g.add(base);
   var cushion = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.16, 28), solidMat(0xe8d6b8)); cushion.scale.set(1, 1, 0.78); cushion.position.y = 0.26; g.add(cushion);
@@ -2383,7 +2383,9 @@ var MIKA_CYCLE = 300, MIKA_GO = 225, MIKA_SLEEP = 240, MIKA_WAKE = 290;
   sign.position.set(-1.25, 0.75, 0); sign.rotation.y = -Math.PI/2; g.add(sign);
   var post = box(0.06, 0.6, 0.06, solidMat(0x6b4a32)); post.position.set(-1.27, 0.3, 0); g.add(post);
   root.add(g);
-})();
+  return g;
+}
+makeDogBed(MIKA_BED.x, MIKA_BED.z, 0);
 /* when it rains while she naps, a striped umbrella stands over her bed */
 var mikaUmbrella = (function(){
   var g = new THREE.Group(); g.position.set(MIKA_BED.x + 0.35, 0, MIKA_BED.z); g.rotation.z = -0.12;
@@ -3515,14 +3517,83 @@ function rebuildPreview(){
   previewMeshes = [ext.build(), inn.build()];
   setSigns('preview', quads);
 }
+/* ---------- DANIEL'S HOUSE (residential plot 72) ----------
+   A two-storey Parisian house built from blocks: cream walls, white trim and French windows, a balcony over the door
+   with a railing, lanterns by the door, a grey mansard roof with a brick chimney, plants in the front garden - and
+   Mika's own bed in the front yard. Until Daniel saves his own design there, this is what plot 72 shows (it can't be
+   claimed by anyone else). It counts as Daniel's: he can open it in the block builder and change it. */
+var DANIEL_PLOT = 'h72';
+function danielHouseBlocks(){
+  var out = [], C = {white:0, cream:1, stone:2, grey:3, slate:4, dark:5, brick:9, green:13, blue:14};
+  function put(i, j, k, t, c, r){ out.push([i, j, k, t, c, r || 0]); }
+  var I0 = 1, I1 = 8, K0 = 2, K1 = 8;
+  for(var j=0;j<=5;j++){
+    for(var i=I0;i<=I1;i++) for(var k=K0;k<=K1;k++){
+      var edgeX = i === I0 || i === I1, edgeZ = k === K0 || k === K1;
+      if(!edgeX && !edgeZ) continue;
+      var corner = edgeX && edgeZ, col = j === 3 ? C.white : corner ? C.white : C.cream, t = BS.cube, r = 0;
+      if(k === K1 && !corner){                       // the front
+        if((i === 4 || i === 5) && j <= 1) continue;  // the doorway
+        if((i === 2 || i === 7) && j <= 1){ t = BS.window; col = C.white; }        // tall French windows
+        if((i === 2 || i === 4 || i === 5 || i === 7) && (j === 4 || j === 5)){ t = BS.window; col = C.white; }
+      } else if(k === K0 && !corner){                // the back
+        if((i === 3 || i === 6) && (j === 1 || j === 4)){ t = BS.window; col = C.white; }
+      } else if(edgeX && !corner){                   // the sides
+        if((k === 4 || k === 6) && (j === 1 || j === 4)){ t = BS.window; col = C.white; r = 1; }
+      }
+      if(j === 2 && k === K1 && (i === 4 || i === 5)) col = C.white;   // over the door
+      put(i, j, k, t, col, r);
+    }
+  }
+  // the mansard roof: slate slopes all round, flat on top, and a brick chimney
+  for(var i2=I0;i2<=I1;i2++) for(var k2=K0;k2<=K1;k2++){
+    var ex = i2 === I0 || i2 === I1, ez = k2 === K0 || k2 === K1;
+    if(ex && ez) put(i2, 6, k2, BS.half, C.slate);
+    else if(k2 === K1) put(i2, 6, k2, BS.ramp, C.slate, 0);
+    else if(k2 === K0) put(i2, 6, k2, BS.ramp, C.slate, 2);
+    else if(i2 === I0) put(i2, 6, k2, BS.ramp, C.slate, 3);
+    else if(i2 === I1) put(i2, 6, k2, BS.ramp, C.slate, 1);
+    else put(i2, 6, k2, BS.cube, C.slate);
+  }
+  for(var i3=I0+1;i3<=I1-1;i3++) for(var k3=K0+1;k3<=K1-1;k3++) put(i3, 7, k3, BS.half, C.grey);
+  put(6, 7, 4, BS.cube, C.brick); put(6, 8, 4, BS.cube, C.brick); put(6, 9, 4, BS.half, C.dark);
+  // dormer windows in the front slope
+  put(3, 7, 7, BS.window, C.white, 0); put(6, 7, 7, BS.window, C.white, 0);
+  // the balcony over the door: a white slab and a dark railing
+  for(var b=3;b<=6;b++){ put(b, 3, 9, BS.half, C.white); put(b, 4, 9, BS.post, C.dark); }
+  // lanterns by the door, and a step
+  put(3, 0, 9, BS.post, C.dark); put(3, 1, 9, BS.light, C.dark);
+  put(6, 0, 9, BS.post, C.dark); put(6, 1, 9, BS.light, C.dark);
+  put(4, 0, 9, BS.half, C.stone); put(5, 0, 9, BS.half, C.stone);
+  // the front garden
+  [[8, 11], [8, 10], [8, 9], [7, 11], [6, 11]].forEach(function(q){ put(q[0], 0, q[1], BS.plant, C.green); });
+  return out.map(function(v){ return v.map(function(n){ return n.toString(36); }).join(''); }).join('');
+}
+var DANIEL_HOUSE = null;
+function danielHouseData(){
+  if(!DANIEL_HOUSE) DANIEL_HOUSE = {k:'house', nm:'Daniel\'s House', ty:'', st:0, fl:2, cw:0, cr:0, ct:0, ca:0, dp:1, iw:0, 'if':0, it:'', at:0, md:'b', bk:danielHouseBlocks(), ib:''};
+  var d = JSON.parse(JSON.stringify(DANIEL_HOUSE));
+  d.o = (typeof net !== 'undefined' && net && net.isOwner && net.uid) ? net.uid : '__daniel';
+  d.builtIn = true;
+  return d;
+}
+/* Mika's bed in the front yard */
+(function(){
+  var p = PLOT_BY_ID[DANIEL_PLOT]; if(!p) return;
+  var w = plotToWorld(p, -3.3, 4.9);
+  makeDogBed(w.x, w.z, p.rot);
+})();
+
 /* a plot's data changed (from the network, or you): redraw its sign, its walls and its row */
 function plotChanged(p, d){
+  if(p.id === DANIEL_PLOT && !d) d = danielHouseData();   // Daniel's house, until he saves his own
   p.data = d;
   drawPlotSigns(p, d);
   refreshPlotSolids(p, d);
   p.row.dirty = true;
 }
 PLOTS.forEach(function(p){ drawPlotSigns(p, null); });
+plotChanged(PLOT_BY_ID[DANIEL_PLOT], null);
 plotRows.forEach(rebuildRow);
 langHooks.push(function(){ PLOTS.forEach(function(p){ drawPlotSigns(p, editing && editing.p === p ? editing.d : p.data); }); });
 /* only the rows near the camera draw their insides */
@@ -5212,6 +5283,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 25, 2026 · 12:30 PM</span><br>Daniel\'s House on residential plot 72: a two-storey Parisian house with a balcony and a mansard roof - and Mika has a bed in the front yard.</li>' +
   '<li><span class="when">Nov 25, 2026 · 11:50 AM</span><br>Daniel can now open or close building for everyone with one switch (PLAYERS tab).</li>' +
   '<li><span class="when">Nov 25, 2026 · 11:30 AM</span><br>HAPPY HOLIDAYS! A giant Christmas tree and a Hanukkah menorah (it lights one more candle each night of Hanukkah) on the Champ de Mars, wreaths on the street lamps, snow, and a Santa hat for Mika. And Mika can now go for walks on a leash with Daniel.</li>' +
   '<li><span class="when">Nov 25, 2026 · 10:55 AM</span><br>ROADSTER MANUAL flight: SPACE is a burst of thrust - let go and you fall. M switches to HOVER.</li>' +
@@ -6628,7 +6700,7 @@ langHooks.push(function(){ loginMsgEl.textContent = t(loginMsgKey); if(net.membe
 function nameKey(name){ return String(name || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 60); }
 function cleanNick(n){ return String(n || '').replace(/[^A-Za-z0-9 _.\-À-ÖØ-öø-ÿ]/g, '').replace(/\s+/g, ' ').trim().slice(0, 100); }
 function signedIn(){ return !!net.ready; }   // in (website: on the list; claude.ai: the page has met you)
-function memberName(uid){ var m = uid && net.members[uid]; return m && m.name ? m.name : t('someone'); }
+function memberName(uid){ if(uid === '__daniel') return 'Daniel'; var m = uid && net.members[uid]; return m && m.name ? m.name : t('someone'); }
 /* ---------- Ranks: Daniel can give players a rank (PLAYERS tab). It shows as a coloured badge next to their name
    in the player list, over their head and in the chat. Saved in paris/members/<player>/rank. ---------- */
 var RANKS = {
@@ -6777,6 +6849,7 @@ function startListening(){
     var st = all._settings; delete all._settings;   // not a player: the owner's settings for everyone
     net.members = all;
     setBuildOpen(st && st.buildOpen, true);
+    var dp = PLOT_BY_ID[DANIEL_PLOT]; if(dp && dp.data && dp.data.builtIn && dp.data.o !== danielHouseData().o) plotChanged(dp, null);
     applyDark();
     renderMembers();
     mp.listKey = ''; renderPlayers();
