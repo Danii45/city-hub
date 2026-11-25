@@ -4225,8 +4225,28 @@ function buildWalker(){
   var cap = new THREE.Group(); cap.position.y = 1.93; cap.visible = false; g.add(cap);
   var capTop = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 6, 0, Math.PI*2, 0, Math.PI*0.5), paint); cap.add(capTop);
   var visor = box(0.3, 0.03, 0.18, paint); visor.position.set(0, 0.0, -0.24); cap.add(visor);
+  // OUTFITS (LIFE IN PARIS, bought with jetons): a shirt over the body and arms, and the bits that make each outfit
+  var O = {g:new THREE.Group()}; g.add(O.g); O.g.visible = false;
+  function op(geo, x, y, z){ var m = new THREE.Mesh(geo, solidMat(0xffffff)); m.position.set(x, y, z); O.g.add(m); return m; }
+  O.shell = op(new THREE.BoxGeometry(0.67, 0.74, 0.41), 0, 1.2, 0);
+  O.armL = op(new THREE.BoxGeometry(0.18, 0.64, 0.18), -0.42, 1.18, 0); O.armR = op(new THREE.BoxGeometry(0.18, 0.64, 0.18), 0.42, 1.18, 0);
+  O.stripes = [0.98, 1.14, 1.3, 1.46].map(function(y){ return op(new THREE.BoxGeometry(0.69, 0.06, 0.43), 0, y, 0); });
+  O.armStripes = [];
+  [-0.42, 0.42].forEach(function(x){ [1.0, 1.18, 1.36].forEach(function(y){ O.armStripes.push(op(new THREE.BoxGeometry(0.2, 0.05, 0.2), x, y, 0)); }); });
+  O.scarf = op(new THREE.BoxGeometry(0.42, 0.12, 0.44), 0, 1.58, 0);
+  O.apron = op(new THREE.BoxGeometry(0.5, 0.9, 0.04), 0, 1.0, -0.22);
+  O.front = op(new THREE.BoxGeometry(0.22, 0.6, 0.03), 0, 1.24, -0.215);
+  O.tie = op(new THREE.BoxGeometry(0.16, 0.08, 0.04), 0, 1.5, -0.235);
+  O.cape = op(new THREE.BoxGeometry(0.72, 1.3, 0.05), 0, 0.95, 0.23);
+  O.chef = op(new THREE.CylinderGeometry(0.2, 0.17, 0.34, 12), 0, 2.08, 0);
+  O.top = op(new THREE.CylinderGeometry(0.17, 0.17, 0.36, 12), 0, 2.08, 0); O.brim = op(new THREE.CylinderGeometry(0.28, 0.28, 0.03, 14), 0, 1.92, 0);
+  O.helmet = op(new THREE.BoxGeometry(0.5, 0.5, 0.5), 0, 1.8, 0);
+  O.visor = op(new THREE.BoxGeometry(0.36, 0.08, 0.04), 0, 1.8, -0.26);
+  O.space = new THREE.Mesh(new THREE.SphereGeometry(0.33, 14, 10), new THREE.MeshLambertMaterial({color:0xcfe6ff, transparent:true, opacity:0.45})); O.space.position.y = 1.8; O.g.add(O.space);
+  O.crown = op(new THREE.CylinderGeometry(0.2, 0.17, 0.16, 8), 0, 2.03, 0);
+  O.number = op(new THREE.BoxGeometry(0.2, 0.26, 0.03), 0, 1.24, -0.215);
   g.visible = false; root.add(g);
-  return {group:g, wheels:[], wheelR:1, paint:paint, parts:{head:head, legs:legs, beret:beret, cap:cap, hairCap:hairCap}};
+  return {group:g, wheels:[], wheelR:1, paint:paint, parts:{head:head, legs:legs, beret:beret, cap:cap, hairCap:hairCap, out:O}};
 }
 
 /* ---------- Car colors: everyday paints, one per player; shiny GOLD / DIAMOND / AURORA for the owner ---------- */
@@ -5495,6 +5515,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 25, 2026 · 5:30 PM</span><br>(Preview) Create your character when you log in, earn 🪙 jetons at work for outfits, every job starts at a real place in the city, and the new SHOP ASSISTANT job at classmates\' shops.</li>' +
   '<li><span class="when">Nov 25, 2026 · 5:15 PM</span><br>Madame herself now stands in the Baguette Village, beside the giant baguette.</li>' +
   '<li><span class="when">Nov 25, 2026 · 5:00 PM</span><br>TEACHERS: Daniel can make an account a teacher. Teachers get the 🥖 ÉLITE tab to make players elite and send them to (or let them out of) the Public Shame Chamber.</li>' +
   '<li><span class="when">Nov 25, 2026 · 4:45 PM</span><br>THE AIRPORT: take the taxi from the Champ de Mars to Paris-CDG and fly to the test cities.</li>' +
@@ -7691,7 +7712,7 @@ function presenceState(){
   if(flying && driving && wreck.on){ s.wy = r2(wreck.y); s.wf = r2(wreck.flip); }
   if(flying && driving && fly.on){ s.fly = [r2(fly.rear), r2(fly.down), r2(fly.pitch), r2(fly.bank)]; }
   s.ver = updateCheck.ver;
-  if(typeof lifeOn === 'function' && lifeOn() && life.eco.ch) s.look = lookCode(life.eco.ch);
+  if(typeof life !== 'undefined' && life.eco && life.eco.ch) s.look = lookCode(life.eco.ch);
   if(typeof mikaAIActive === 'function' && mikaAIActive()){ s.mkai = 1; if(mikaAI.say) s.mk = mikaAI.say; }
   if(typeof jail !== 'undefined' && jail.me) s.jail = 1;
   if(typeof amElite === 'function' && !net.isOwner && !amTeacher() && amElite()) s.el = 1;
@@ -7915,7 +7936,7 @@ function updateRemotes(dt){
     if(!a.model){ if(a.tag) a.tag.visible = false; return; }
     var colorId = peerColor(p);
     if(a.color !== colorId){ paintModel(a.model, colorId); a.color = colorId; }
-    if(want === 'walker' && a.model.parts){ var lk = typeof s.look === 'string' && /^[0-9]{4}$/.test(s.look) ? s.look : '1000'; if(a.look !== lk){ a.look = lk; applyLook(a.model, lk); } }
+    if(want === 'walker' && a.model.parts){ var lk = typeof s.look === 'string' && /^[0-9]{4,5}$/.test(s.look) ? s.look : '1000'; if(a.look !== lk){ a.look = lk; applyLook(a.model, lk); } }
     var ahead = Math.min(0.15, Math.max(0, (Date.now() - p.updatedAt)/1000)), speed = finite(s.speed) ? s.speed : 0;
     _fwd.set(-Math.sin(s.yaw), 0, -Math.cos(s.yaw)).multiplyScalar(want === 'walker' ? 0 : speed*ahead);
     var tx2 = s.x + _fwd.x, ty = s.y, tz = s.z + _fwd.z;
@@ -8965,7 +8986,34 @@ var LOOK = {
   pants:[0x2b2a2e, 0x2a3f6e, 0x6b5a42, 0x7a7d84, 0x3f5a35, 0x5c2a2a],
   hats:['beret', 'cap', 'none']
 };
-function lookCode(ch){ ch = ch || {}; return [ch.skin|0, ch.hair|0, ch.pants|0, ch.hat|0].join(''); }
+function lookCode(ch){ ch = ch || {}; return [ch.skin|0, ch.hair|0, ch.pants|0, ch.hat|0].join('') + ((life.eco && life.eco.out|0) || ''); }
+/* OUTFITS: bought with jetons (earned at work), worn by your character - everyone in Paris sees them */
+var OUTFITS = [
+  {en:'Your player colour', fr:'Ta couleur de joueur', icon:'👕', cost:0},
+  {en:'Marinière (striped top)', fr:'Marinière', icon:'⛵', cost:4, shell:0xf4f4f0, stripes:0x1f3f8f, scarf:0xc8382f},
+  {en:'Chef', fr:'Chef cuisinier', icon:'🍳', cost:6, shell:0xfafafa, front:0xe8e8e8, chef:0xffffff, hideHat:true},
+  {en:'Baker, like Madame', fr:'Boulangère, comme Madame', icon:'🥖', cost:8, shell:0xf4f4f0, stripes:0x1f3f8f, scarf:0xc8382f, apron:0x7a4a2a},
+  {en:'Painter', fr:'Peintre', icon:'🎨', cost:8, shell:0x6f93c8, apron:0xe8dcc0, scarf:0xe3b52c},
+  {en:'Les Bleus football kit', fr:'Maillot des Bleus', icon:'⚽', cost:10, shell:0x1f3f8f, number:0xffffff, legs:0xf4f4f4},
+  {en:'Tuxedo', fr:'Smoking', icon:'🎩', cost:12, shell:0x1b1b1d, front:0xf4f4f4, tie:0xc8382f, top:0x1b1b1d, hideHat:true},
+  {en:'Knight', fr:'Chevalier', icon:'🛡', cost:16, shell:0x9aa0a8, helmet:0x8a9098, cape:0x1f3f8f, legs:0x7a7d84, hideHat:true},
+  {en:'Astronaut', fr:'Astronaute', icon:'🚀', cost:20, shell:0xf2f2f2, front:0x2b4c9b, space:true, legs:0xf2f2f2, hideHat:true},
+  {en:'Le Roi Soleil (Louis XIV)', fr:'Le Roi Soleil (Louis XIV)', icon:'👑', cost:30, shell:0x3a2a8a, cape:0x8a1c1c, crown:0xe3b52c, scarf:0xf4f4f0, hideHat:true}
+];
+function applyOutfit(model, n){
+  var O = model && model.parts && model.parts.out; if(!O) return;
+  var o = OUTFITS[n] || OUTFITS[0], on = n > 0 && !!OUTFITS[n];
+  O.g.visible = on;
+  if(!on) return;
+  function show(m, hex){ m.visible = hex != null && hex !== false; if(m.visible && m.material.color) m.material.color.setHex(hex === true ? 0xffffff : hex); }
+  show(O.shell, o.shell); show(O.armL, o.shell); show(O.armR, o.shell);
+  O.stripes.concat(O.armStripes).forEach(function(m){ show(m, o.stripes); });
+  show(O.scarf, o.scarf); show(O.apron, o.apron); show(O.front, o.front); show(O.tie, o.tie); show(O.cape, o.cape);
+  show(O.chef, o.chef); show(O.top, o.top); show(O.brim, o.top); show(O.helmet, o.helmet); show(O.visor, o.helmet ? 0x1b1b1d : null);
+  O.space.visible = !!o.space; show(O.crown, o.crown); show(O.number, o.number);
+  if(o.legs) model.parts.legs.material.color.setHex(o.legs);
+  if(o.hideHat){ model.parts.beret.visible = false; model.parts.cap.visible = false; model.parts.hairCap.visible = true; }
+}
 function applyLook(model, code){
   if(!model || !model.parts) return;
   var v = String(code || '').split('').map(Number), P = model.parts;
@@ -8975,6 +9023,7 @@ function applyLook(model, code){
   var hat = LOOK.hats[v[3]] || 'beret';
   P.beret.visible = hat === 'beret'; P.cap.visible = hat === 'cap'; P.hairCap.visible = hat !== 'beret';
   P.hairCap.material.color.setHex(LOOK.hair[v[1]] || LOOK.hair[0]);
+  applyOutfit(model, v[4] || 0);
 }
 var FIRST_NAMES = ['Camille', 'Léa', 'Chloé', 'Manon', 'Inès', 'Jade', 'Louise', 'Emma', 'Hugo', 'Lucas', 'Louis', 'Gabriel', 'Arthur', 'Jules', 'Nathan', 'Théo'];
 var LAST_NAMES = ['Martin', 'Bernard', 'Dubois', 'Thomas', 'Robert', 'Richard', 'Petit', 'Durand', 'Leroy', 'Moreau', 'Simon', 'Laurent', 'Lefebvre', 'Michel'];
@@ -8994,6 +9043,8 @@ var JOBS = [
    about:['Deliver parcels to real addresses around Paris - walk or drive there before time runs out.', 'Livre des colis à de vraies adresses dans Paris - à pied ou en voiture, avant la fin du temps.']},
   {id:'guide', en:'Tour guide', fr:'Guide touristique', gross:2150, icon:'🗼',
    about:['Answer tourists\' questions about Paris and its monuments.', 'Réponds aux questions des touristes sur Paris et ses monuments.']},
+  {id:'vendeur', en:'Shop assistant at a classmate\'s shop', fr:'Vendeur / Vendeuse dans la boutique d\'un camarade', gross:1880, icon:'🛍',
+   about:['Pick a shop your classmates built, go there and serve its customers in French: understand what they want, add up and give change.', 'Choisis une boutique construite par tes camarades, vas-y et sers ses clients en français : comprends ce qu\'ils veulent, calcule et rends la monnaie.']},
   {id:'banquier', en:'Bank adviser', fr:'Conseiller / Conseillère bancaire', gross:2500, icon:'🏦',
    about:['Help customers with interest, budgets, savings and credit. The best-paid job - and the hardest questions.', 'Aide les clients : intérêts, budget, épargne et crédit. Le métier le mieux payé - et les questions les plus dures.']}
 ];
@@ -9135,7 +9186,50 @@ function numOpts(r, right, step, fmt){
   return {opts:out.map(fmt), ans:out.indexOf(right)};
 }
 function mc(r, right, wrongs){ var all = shuffleR(r, [right].concat(shuffleR(r, wrongs).slice(0, 3))); return {opts:all, ans:all.indexOf(right)}; }
+/* what each kind of shop sells (shop assistant job) */
+var SHOP_ITEMS = {
+  cafe:[['un café', 'a coffee', '☕', 2.5], ['un chocolat chaud', 'a hot chocolate', '🍫', 4], ['un croissant', 'a croissant', '🥐', 1.6], ['un jus d\'orange', 'an orange juice', '🍊', 4.5]],
+  bakery:[['une baguette', 'a baguette', '🥖', 1.3], ['deux croissants', 'two croissants', '🥐', 2.6], ['un pain au chocolat', 'a pain au chocolat', '🍫', 1.5], ['une tarte aux pommes', 'an apple tart', '🥧', 3.8]],
+  pastry:[['un éclair au chocolat', 'a chocolate éclair', '🍫', 4.2], ['six macarons', 'six macarons', '🍬', 9], ['une religieuse', 'a religieuse', '🧁', 4.8], ['une tarte au citron', 'a lemon tart', '🍋', 4.5]],
+  books:[['un roman', 'a novel', '📕', 18], ['une bande dessinée', 'a comic book', '📗', 13.5], ['un dictionnaire', 'a dictionary', '📘', 24], ['un guide de Paris', 'a Paris guidebook', '🗺', 15]],
+  fashion:[['une écharpe', 'a scarf', '🧣', 25], ['un pull', 'a jumper', '🧶', 45], ['une robe', 'a dress', '👗', 60], ['une casquette', 'a cap', '🧢', 20]],
+  flowers:[['un bouquet de roses', 'a bunch of roses', '🌹', 22], ['des tulipes', 'some tulips', '🌷', 14], ['une plante verte', 'a houseplant', '🪴', 18], ['un tournesol', 'a sunflower', '🌻', 4]],
+  cheese:[['du camembert', 'some camembert', '🧀', 5.5], ['du comté', 'some comté', '🧀', 8], ['du brie', 'some brie', '🧀', 6.2], ['du roquefort', 'some roquefort', '🧀', 7.4]],
+  restaurant:[['une salade niçoise', 'a salade niçoise', '🥗', 14], ['un steak-frites', 'steak and chips', '🥩', 19], ['une soupe à l\'oignon', 'an onion soup', '🍲', 9], ['une crème brûlée', 'a crème brûlée', '🍮', 7.5]],
+  toys:[['un ballon', 'a ball', '⚽', 12], ['un puzzle', 'a jigsaw puzzle', '🧩', 16], ['une peluche', 'a soft toy', '🧸', 22], ['un jeu de cartes', 'a pack of cards', '🃏', 6]],
+  art:[['une carte postale', 'a postcard', '🖼', 2], ['une affiche', 'a poster', '🎨', 15], ['un petit tableau', 'a small painting', '🖌', 80], ['un carnet de croquis', 'a sketchbook', '📓', 12]],
+  icecream:[['une glace à la vanille', 'a vanilla ice cream', '🍦', 3.5], ['un sorbet à la fraise', 'a strawberry sorbet', '🍓', 3.8], ['deux boules au chocolat', 'two scoops of chocolate', '🍫', 5.5], ['un milk-shake', 'a milkshake', '🥤', 5]],
+  chocolate:[['une tablette de chocolat noir', 'a bar of dark chocolate', '🍫', 4.5], ['une boîte de truffes', 'a box of truffles', '🎁', 16], ['des chocolats au lait', 'some milk chocolates', '🍬', 7], ['un chocolat chaud', 'a hot chocolate', '☕', 4]],
+  grocery:[['un litre de lait', 'a litre of milk', '🥛', 1.2], ['six œufs', 'six eggs', '🥚', 2.4], ['un kilo de pommes', 'a kilo of apples', '🍎', 2.9], ['une bouteille d\'eau', 'a bottle of water', '💧', 0.8]],
+  music:[['un CD', 'a CD', '💿', 15], ['une guitare', 'a guitar', '🎸', 120], ['des écouteurs', 'some earphones', '🎧', 30], ['une partition', 'some sheet music', '🎼', 9]],
+  candy:[['des bonbons', 'some sweets', '🍬', 3], ['une sucette', 'a lollipop', '🍭', 1.5], ['des berlingots', 'some berlingots', '🍬', 4.5], ['un sachet de guimauves', 'a bag of marshmallows', '☁', 3.2]]
+};
+function shopOf(p){ return p && p.data ? shopType(p.data.ty) : shopType('grocery'); }
+function shopTitle(p){ var tp = shopOf(p); return (p && p.data && p.data.nm ? '« ' + p.data.nm + ' » · ' : '') + L2(tp.en, tp.fr) + (p ? ' · ' + plotLabel(p) : ''); }
 var TASKS = {
+  vendeur:function(r, k){
+    var p = life.shift && life.shift.shop, tp = shopOf(p).id, items = SHOP_ITEMS[tp] || SHOP_ITEMS.grocery, kind = k % 3;
+    if(kind === 0){
+      var it = pickR(r, items), say = pickR(r, ['Bonjour ! Je voudrais ', 'Bonjour, je cherche ', 'Excusez-moi, vous avez ']) + it[0] + ' ?';
+      var m = mc(r, it[2] + ' ' + L2(it[1], it[0]), items.filter(function(x){ return x !== it; }).map(function(x){ return x[2] + ' ' + L2(x[1], x[0]); }).concat(SHOP_ITEMS.grocery.map(function(x){ return x[2] + ' ' + L2(x[1], x[0]); })));
+      return {q:L2('A customer comes in and says: « ' + say + ' » What do they want?', 'Un client entre et dit : « ' + say + ' » Que veut-il ?'), opts:m.opts, ans:m.ans};
+    }
+    if(kind === 1){
+      var a = pickR(r, items), b; do { b = pickR(r, items); } while(b === a);
+      var tot = Math.round((a[3] + b[3])*100)/100, note = [5, 10, 20, 50, 100, 200].filter(function(n){ return n > tot; })[0] || 200, ch = Math.round((note - tot)*100)/100;
+      var n = numOpts(r, ch, 0.5, function(v){ return money2(v) + ' €'; });
+      return {q:L2('The customer buys ', 'Le client achète ') + a[0] + ' (' + money2(a[3]) + ' €) + ' + b[0] + ' (' + money2(b[3]) + ' €) ' + L2('and pays with a ', 'et paie avec un billet de ') + note + ' €' + L2(' note. How much change?', '. Combien rends-tu ?'), opts:n.opts, ans:n.ans};
+    }
+    var ph = pickR(r, [
+      ['How do you greet a customer who walks into the shop?', 'Comment accueilles-tu un client qui entre ?', 'Bonjour, madame ! Je peux vous aider ?', ['Quoi ?', 'Au revoir, monsieur !', 'Tu veux quoi, toi ?']],
+      ['The customer asks « Ça fait combien ? » What do they want to know?', 'Le client demande « Ça fait combien ? » Que veut-il savoir ?', L2('How much it costs', 'Le prix'), [L2('What time it is', 'L\'heure'), L2('Where the toilets are', 'Où sont les toilettes'), L2('Your name', 'Ton nom')]],
+      ['How do you ask if they want anything else?', 'Comment demandes-tu s\'il veut autre chose ?', 'Avec ceci ?', ['C\'est tout, au revoir.', 'Pourquoi ?', 'Vous êtes en retard.']],
+      ['The customer wants a gift. What do you ask?', 'Le client veut faire un cadeau. Que demandes-tu ?', 'Je vous fais un paquet cadeau ?', ['Vous avez faim ?', 'Il pleut dehors ?', 'Vous habitez où ?']],
+      ['How do you say goodbye politely?', 'Comment dis-tu au revoir poliment ?', 'Merci, bonne journée !', ['Salut, à plus !', 'Allez, ouste !', 'Bonne nuit, bébé !']]
+    ]);
+    var mm = mc(r, ph[2], ph[3]);
+    return {q:L2(ph[0], ph[1]), opts:mm.opts, ans:mm.ans};
+  },
   serveur:function(r, k){
     var kind = k % 3;
     if(kind === 0){   // understand the order
@@ -9345,8 +9439,8 @@ function closeLife(){ life.open = false; document.getElementById('life').classLi
 /* the tabs you can see right now */
 function lifeTabs(){
   var t = [];
-  if(lifeOn()) t = [['home', 'HOME', 'ACCUEIL'], ['work', 'WORK', 'TRAVAIL'], ['bank', 'BANK', 'BANQUE'], ['budget', 'BUDGET', 'BUDGET'], ['shop', 'SHOP', 'ACHATS'], ['labels', 'LABELS', 'ÉTIQUETTES'], ['me', 'ME', 'MOI']];
-  else t = [['setup', 'START', 'DÉBUT'], ['labels', 'LABELS', 'ÉTIQUETTES']];
+  if(lifeOn()) t = [['home', 'HOME', 'ACCUEIL'], ['work', 'WORK', 'TRAVAIL'], ['bank', 'BANK', 'BANQUE'], ['budget', 'BUDGET', 'BUDGET'], ['shop', 'SHOP', 'ACHATS'], ['labels', 'LABELS', 'ÉTIQUETTES'], ['style', '👕 ME & STYLE', '👕 MOI & STYLE']];
+  else t = [['style', '👕 MY CHARACTER', '👕 MON PERSONNAGE'], ['setup', 'START', 'DÉBUT'], ['labels', 'LABELS', 'ÉTIQUETTES']];
   if(life.eco && life.eco.stmt) t.splice(1, 0, ['stmt', 'STATEMENT', 'RELEVÉ']);
   if(net.isOwner) t.push(['class', 'CLASS', 'CLASSE']);
   return t;
@@ -9364,7 +9458,7 @@ function renderLife(){
   document.getElementById('life-tabs').innerHTML = tabs.map(function(x){ return '<button data-a="tab" data-v="' + x[0] + '" class="' + (x[0] === life.tab ? 'on' : '') + '">' + esc(L2(x[1], x[2])) + '</button>'; }).join('');
   var body = document.getElementById('life-body');
   if(!life.loaded){ body.innerHTML = '<p class="lf-soft">' + L2('Loading...', 'Chargement...') + '</p>'; return; }
-  var f = {setup:viewSetup, home:viewHome, work:viewWork, bank:viewBank, budget:viewBudget, shop:viewShop, labels:viewLabels, me:viewMe, stmt:viewStmt, 'class':viewClass}[life.tab];
+  var f = {setup:viewSetup, home:viewHome, work:viewWork, bank:viewBank, budget:viewBudget, shop:viewShop, labels:viewLabels, me:viewMe, style:viewStyle, stmt:viewStmt, 'class':viewClass}[life.tab];
   body.innerHTML = f ? f() : '';
 }
 function row(a, b, cls){ return '<div class="lf-row' + (cls ? ' ' + cls : '') + '"><span>' + a + '</span><b>' + b + '</b></div>'; }
@@ -9381,7 +9475,7 @@ function viewSetup(){
   h += '<div class="lf-card">' + row(L2('Things labelled', 'Objets étiquetés'), ld.s.labelled + ' / ' + ld.s.n) + row(L2('Correct', 'Corrects'), '<span class="lf-good">' + ld.s.ok + '</span>') + '</div>';
   if(!ld.ok){ h += B('tab', 'LABEL MY THINGS', 'ÉTIQUETER MES OBJETS', 'labels', 'go'); return h; }
   h += '<p class="lf-good">✓ ' + L2('Everything is labelled!', 'Tout est étiqueté !') + '</p>';
-  var d = life.draft || (life.draft = {mode:e && e.mode || '', ch:(e && e.ch) || {fn:pickR(Math.random, FIRST_NAMES), ln:pickR(Math.random, LAST_NAMES), age:22, skin:1, hair:0, pants:0, hat:0}, job:e && e.job || ''});
+  var d = life.draft || (life.draft = {mode:e && e.mode || '', ch:(e && e.ch && JSON.parse(JSON.stringify(e.ch))) || {fn:pickR(Math.random, FIRST_NAMES), ln:pickR(Math.random, LAST_NAMES), age:22, skin:1, hair:0, pants:0, hat:0}, job:e && e.job || ''});
   h += H('Step 2 - Choose your player mode', 'Étape 2 - Choisis ton mode de jeu');
   h += '<button class="lf-opt' + (d.mode === 'explore' ? ' on' : '') + '" data-a="dmode" data-v="explore">🗺 <b>' + L2('EXPLORER', 'EXPLORATEUR') + '</b> - ' + L2('walk, drive and visit Paris like before.', 'balade-toi, conduis et visite Paris comme avant.') + '</button>';
   h += '<button class="lf-opt' + (d.mode === 'life' ? ' on' : '') + '" data-a="dmode" data-v="life">🏠 <b>' + L2('LIFE IN PARIS', 'VIE À PARIS') + '</b> - ' + L2('have a job, earn money, pay rent and bills, save and manage credit.', 'aie un métier, gagne de l\'argent, paie le loyer et les factures, épargne et gère le crédit.') + '</button>';
@@ -9437,6 +9531,15 @@ function scoreText(s){ var c = s >= 700 ? 'lf-good' : s < 580 ? 'lf-bad' : ''; r
 function viewWork(){
   var e = life.eco, j = JOB_BY_ID[e.job], h = '', sh = life.shift;
   if(sh) return viewShift(sh, j);
+  if(life.go) return '<div class="lf-card">' + j.icon + ' <b>' + esc(L2('On your way to work: ', 'En route pour le travail : ') + life.go.label) + '</b><br><span class="lf-soft">' + L2('Follow the yellow light.', 'Suis la lumière jaune.') + '</span></div>' + B('cancelgo', 'CANCEL THIS SHIFT', 'ANNULER CE SERVICE');
+  if(life.pickShop){
+    var shops = builtShops(), me = myPos();
+    shops.sort(function(a, b){ return Math.hypot(a.cx - me.x, a.cz - me.z) - Math.hypot(b.cx - me.x, b.cz - me.z); });
+    h = H('Where do you want to work today?', 'Où veux-tu travailler aujourd\'hui ?');
+    if(!shops.length) h += P('Nobody has built a shop yet - you\'ll work at a little shop in the city.', 'Personne n\'a encore construit de boutique - tu travailleras dans une petite boutique de la ville.') + B('pickshop', 'GO TO WORK', 'ALLER AU TRAVAIL', PLOTS.filter(function(p){ return p.kind === 'store' && !p.village; })[0].id, 'go');
+    shops.slice(0, 12).forEach(function(p){ h += '<button class="lf-opt" data-a="pickshop" data-v="' + p.id + '">🛍 <b>' + esc(p.data.nm || L2(shopOf(p).en, shopOf(p).fr)) + '</b><br><span class="lf-soft">' + esc(L2(shopOf(p).en, shopOf(p).fr) + ' · ' + plotLabel(p) + ' · ' + L2('owner: ', 'propriétaire : ') + memberName(p.data.o) + ' · ' + Math.round(Math.hypot(p.cx - me.x, p.cz - me.z)) + ' m') + '</span></button>'; });
+    return h + B('cancelgo', 'NOT NOW', 'PAS MAINTENANT');
+  }
   h += '<div class="lf-card"><b>' + j.icon + ' ' + esc(jobName(j)) + '</b><br><span class="lf-soft">' + esc(L2(j.about[0], j.about[1])) + '</span>' +
        row(L2('Gross pay (full time)', 'Salaire brut (temps plein)'), eur0(j.gross)) + row(L2('Social contributions (~21 %)', 'Cotisations sociales (~21 %)'), '-' + eur0(j.gross*(1 - NET_RATE))) +
        row(L2('Net pay (full time)', 'Salaire net (temps plein)'), eur0(j.gross*NET_RATE)) + '</div>';
@@ -9449,18 +9552,55 @@ function viewWork(){
   h += e.jobMonth === e.month ? P('Already changed this month.', 'Déjà changé ce mois-ci.') : jobList(e.job).replace(/data-a="djob"/g, 'data-a="setjob"');
   return h;
 }
-function startShift(){
+function startShift(shopId){
   var e = life.eco, j = JOB_BY_ID[e.job];
   if(e.shifts >= SHIFTS_PER_MONTH) return;
   if(j.id === 'livreur'){ startDeliveries(); return; }
-  var seed = net.uid + ':' + e.month + ':' + e.shifts + ':' + Date.now();
-  life.shift = {n:0, of:6, right:0, tips:0, q:null, picked:-1, r:lifeRand(seed)};
-  nextTask(); renderLife();
+  if(j.id === 'vendeur' && !shopId){ life.pickShop = true; renderLife(); return; }
+  life.pickShop = false;
+  var place = shopId ? {p:PLOT_BY_ID[shopId]} : workplaceFor(j);
+  goToWork(j, place);
+}
+/* WORK IN THE CITY: every shift starts at a real place in Paris - a yellow light shows the way (walk or drive) */
+var WORK_SHOPS = {serveur:['cafe', 'restaurant'], caissier:['grocery'], boulanger:['bakery', 'pastry'], banquier:[]};
+function builtShops(){ return PLOTS.filter(function(p){ return p.kind === 'store' && p.data && p.data.o && p.data.o !== net.uid; }); }
+function workplaceFor(j){
+  if(j.id === 'guide'){ var l = pickR(Math.random, LANDMARK_INFO.filter(function(l){ return l.go && !l.view; })); return {x:l.go.x, z:l.go.z, label:L2(l.en, l.fr)}; }
+  var me = myPos(), types = WORK_SHOPS[j.id] || [], near = function(p){ return Math.hypot(p.cx - me.x, p.cz - me.z); };
+  var cand = builtShops().filter(function(p){ return types.indexOf(p.data.ty) >= 0 && near(p) < 400; });
+  if(!cand.length) cand = PLOTS.filter(function(p){ return p.kind === 'store' && !p.village && near(p) > 30 && near(p) < 220; });
+  var p = pickR(Math.random, cand.length ? cand : PLOTS.filter(function(q){ return q.kind === 'store'; }));
+  var label = j.id === 'banquier' ? L2('The bank (', 'La banque (') + plotLabel(p) + ')' : p.data ? shopTitle(p) : L2(j.en, j.fr) + ' · ' + plotLabel(p);
+  return {p:p, label:label};
+}
+function goToWork(j, place){
+  var x = place.x, z = place.z;
+  if(place.p){ var w = plotToWorld(place.p, 0, 7.8); x = w.x; z = w.z; }
+  life.go = {j:j.id, x:x, z:z, p:place.p || null, label:place.label || shopTitle(place.p)};
+  beacon.g.position.set(x, surfaceAt(x, z, 0), z); beacon.g.visible = true;
+  closeLife();
+  showToast(L2('Go to work! Walk or drive to the yellow light.', 'Au travail ! Va à pied ou en voiture jusqu\'à la lumière jaune.'));
+  if(!flying) requestFirstPerson('walk');
+}
+function tickGoWork(dt){
+  var g = life.go, hud = document.getElementById('life-beacon-hud');
+  beacon.box.rotation.y += dt*1.5;
+  var me = myPos(), dist = Math.hypot(g.x - me.x, g.z - me.z);
+  hud.classList.remove('hidden');
+  hud.innerHTML = JOB_BY_ID[g.j].icon + ' ' + esc(L2('Go to work: ', 'Au travail : ') + g.label) + '<br>' + Math.round(dist) + ' m';
+  if(dist < 7){
+    var e = life.eco, seed = net.uid + ':' + e.month + ':' + e.shifts + ':' + Date.now();
+    life.go = null; beacon.g.visible = false; hud.classList.add('hidden');
+    life.shift = {n:0, of:6, right:0, tips:0, q:null, picked:-1, r:lifeRand(seed), shop:g.p, place:g.label};
+    nextTask();
+    showToast(L2('You\'re at work - bonne chance !', 'Tu es au travail - bonne chance !'));
+    life.tab = 'work'; openLife();
+  }
 }
 function nextTask(){ var s = life.shift, j = JOB_BY_ID[life.eco.job]; s.q = TASKS[j.id](s.r, s.n); s.picked = -1; }
 function viewShift(s, j){
   if(s.done) return viewShiftDone(s, j);
-  var q = s.q, h = '<div class="lf-soft">' + j.icon + ' ' + esc(jobName(j)) + ' · ' + L2('Task ', 'Tâche ') + (s.n + 1) + ' / ' + s.of + '</div>';
+  var q = s.q, h = '<div class="lf-soft">' + j.icon + ' ' + esc(jobName(j)) + (s.place ? ' · ' + esc(s.place) : '') + ' · ' + L2('Task ', 'Tâche ') + (s.n + 1) + ' / ' + s.of + '</div>';
   h += '<div class="lf-card" style="font-size:21px">' + esc(q.q) + '</div>';
   q.opts.forEach(function(o, i){
     var cls = s.picked < 0 ? '' : i === q.ans ? ' right' : i === s.picked ? ' wrongpick' : '';
@@ -9475,15 +9615,16 @@ function viewShift(s, j){
 function finishShift(right, of, tips){
   var e = life.eco, j = JOB_BY_ID[e.job], perf = right/of, gross = Math.round(shiftGross(j)*(0.5 + 0.5*perf)*100)/100, net = Math.round(gross*NET_RATE*100)/100;
   e.cash += net + tips; e.earned += net + tips; e.shifts += 1;
+  var tok = right + (perf === 1 ? 3 : 0); e.tok = (e.tok|0) + tok;
   ecoLog(e, net, 'Pay: ' + j.en + ' shift', 'Salaire : service ' + j.fr);
   if(tips > 0) ecoLog(e, tips, 'Tips', 'Pourboires');
   lifeSave(true);
-  return {gross:gross, net:net, tips:tips, perf:perf};
+  return {gross:gross, net:net, tips:tips, perf:perf, tok:tok};
 }
 function viewShiftDone(s, j){
   var r = s.result, h = '<div class="lf-card"><b>' + L2('Shift finished!', 'Service terminé !') + '</b>' + row(L2('Score', 'Résultat'), s.right + ' / ' + s.of) +
     row(L2('Gross pay', 'Salaire brut'), eur(r.gross)) + row(L2('Social contributions', 'Cotisations sociales'), '-' + eur(r.gross - r.net)) + row(L2('Net pay', 'Salaire net'), '<span class="lf-good">' + eur(r.net) + '</span>') +
-    (r.tips ? row(L2('Tips', 'Pourboires'), '<span class="lf-good">+' + eur(r.tips) + '</span>') : '') + '</div>';
+    (r.tips ? row(L2('Tips', 'Pourboires'), '<span class="lf-good">+' + eur(r.tips) + '</span>') : '') + row('🪙 ' + L2('Jetons earned', 'Jetons gagnés'), '<span class="lf-good">+' + (r.tok|0) + '</span>') + '</div>';
   h += P(r.perf === 1 ? 'Perfect shift - full pay!' : 'Every mistake cost you part of your pay. Practise to earn the full amount!', r.perf === 1 ? 'Service parfait - salaire complet !' : 'Chaque erreur t\'a coûté une partie du salaire. Entraîne-toi pour tout gagner !');
   h += B('closeshift', 'OK', 'OK', null, 'go');
   return h;
@@ -9649,6 +9790,63 @@ function viewLabels(){
 }
 
 /* ---------- ME ---------- */
+/* ---------- ME & STYLE: create and design your character (from your very first log-in), spend jetons on outfits ---------- */
+var EXTRAS = [
+  {id:'fireworks', en:'Fireworks where you stand (everyone sees them)', fr:'Feu d\'artifice là où tu es (tout le monde le voit)', icon:'🎆', cost:3},
+  {id:'treat', en:'A treat for Mika', fr:'Une friandise pour Mika', icon:'🦴', cost:1}
+];
+function viewStyle(){
+  var e = life.eco, h = '';
+  if(!e || !e.ch){
+    var d = life.sdraft || (life.sdraft = {fn:pickR(Math.random, FIRST_NAMES), ln:pickR(Math.random, LAST_NAMES), age:22, skin:1, hair:0, pants:0, hat:0});
+    h += '<div class="lf-card"><b>' + L2('Welcome to Paris! 🇫🇷', 'Bienvenue à Paris ! 🇫🇷') + '</b><br>' + L2('First, create your character - this is how everyone in Paris will see you.', 'D\'abord, crée ton personnage - c\'est comme ça que tout le monde te verra à Paris.') + '</div>';
+    h += '<div class="lf-lab"><span>' + L2('First name', 'Prénom') + '</span><input class="lf-in" maxlength="20" data-sd="fn" value="' + esc(d.fn) + '"></div>';
+    h += '<div class="lf-lab"><span>' + L2('Last name', 'Nom') + '</span><input class="lf-in" maxlength="20" data-sd="ln" value="' + esc(d.ln) + '"></div>';
+    h += '<div class="lf-lab"><span>' + L2('Age', 'Âge') + '</span><input class="lf-in" type="number" min="18" max="35" data-sd="age" value="' + (d.age|0) + '"></div>';
+    h += B('sdrandom', 'RANDOM FRENCH NAME', 'NOM FRANÇAIS AU HASARD');
+    h += lookPicker(d).replace(/data-a="look"/g, 'data-a="sdlook"');
+    h += '<div class="btn-row" style="margin-top:10px">' + B('sdsave', 'CREATE MY CHARACTER', 'CRÉER MON PERSONNAGE', null, 'go') + '</div>';
+    return h;
+  }
+  var tok = e.tok|0, own = String(e.outs || '0');
+  h += '<div class="lf-card"><div class="lf-big">🪙 ' + tok + ' ' + L2('jetons', 'jetons') + '</div><div class="lf-soft">' +
+       L2('Earn jetons at work: 1 for every right answer or delivery, +3 for a perfect shift. Spend them on outfits and fun extras.', 'Gagne des jetons au travail : 1 par bonne réponse ou livraison, +3 pour un service parfait. Dépense-les en tenues et en extras.') + '</div></div>';
+  h += H('My character', 'Mon personnage');
+  h += '<div class="lf-lab"><span>' + L2('First name', 'Prénom') + '</span><input class="lf-in" maxlength="20" data-me="fn" value="' + esc(e.ch.fn) + '"></div>';
+  h += '<div class="lf-lab"><span>' + L2('Last name', 'Nom') + '</span><input class="lf-in" maxlength="20" data-me="ln" value="' + esc(e.ch.ln) + '"></div>';
+  h += '<div class="lf-lab"><span>' + L2('Age', 'Âge') + '</span><input class="lf-in" type="number" min="18" max="35" data-me="age" value="' + (e.ch.age|0) + '"></div>';
+  h += lookPicker(e.ch).replace(/data-a="look"/g, 'data-a="melook"');
+  h += H('Outfits (la boutique de mode)', 'Tenues (la boutique de mode)');
+  OUTFITS.forEach(function(o, i){
+    var have = i === 0 || own.indexOf(String(i)) >= 0, wearing = (e.out|0) === i;
+    h += '<div class="lf-card lf-outfit"><b>' + o.icon + ' ' + esc(L2(o.en, o.fr)) + '</b> ' + (o.cost ? '<span class="lf-soft">· ' + o.cost + ' 🪙</span>' : '') + '<br>' +
+      (wearing ? '<span class="lf-chip ok">' + L2('wearing it', 'tu la portes') + '</span>' :
+       have ? B('wear', 'WEAR IT', 'LA PORTER', i, 'go') :
+       '<button class="btn' + (tok >= o.cost ? ' go' : '') + '" data-a="buyout" data-v="' + i + '"' + (tok >= o.cost ? '' : ' disabled') + '>' + esc(L2('BUY', 'ACHETER')) + ' · ' + o.cost + ' 🪙</button>' + (tok < o.cost ? ' <span class="lf-soft">' + L2('need ', 'il manque ') + (o.cost - tok) + ' 🪙</span>' : '')) + '</div>';
+  });
+  h += H('Spend jetons', 'Dépenser des jetons');
+  EXTRAS.forEach(function(x){
+    h += '<div class="lf-card"><b>' + x.icon + ' ' + esc(L2(x.en, x.fr)) + '</b> <span class="lf-soft">· ' + x.cost + ' 🪙</span><br><button class="btn' + (tok >= x.cost ? ' go' : '') + '" data-a="extra" data-v="' + x.id + '"' + (tok >= x.cost ? '' : ' disabled') + '>' + esc(L2('USE', 'UTILISER')) + '</button></div>';
+  });
+  if(lifeOn()){ h += H('Player mode', 'Mode de jeu'); h += B('toexplore', 'SWITCH TO EXPLORER (keeps your money)', 'PASSER EN EXPLORATEUR (garde ton argent)'); }
+  return h;
+}
+function useExtra(id){
+  var e = life.eco, x = EXTRAS.filter(function(q){ return q.id === id; })[0];
+  if(!x || (e.tok|0) < x.cost) return;
+  e.tok -= x.cost; lifeSave(true);
+  if(id === 'fireworks'){
+    var me = myPos(); closeLife();
+    [0, 500, 1000, 1500, 2100].forEach(function(ms, i){ setTimeout(function(){ var x0 = me.x + Math.sin(i*2.1)*6, z0 = me.z + Math.cos(i*2.1)*6, y0 = 18 + i*3; explode(x0, y0, z0, 1.2); shareBoom(x0, y0, z0, 1.2); }, ms); });
+    showToast('🎆 ' + L2('Ooh la la!', 'Oh là là !'));
+  }
+  if(id === 'treat'){
+    var nm = (e.ch && e.ch.fn) || net.name || 'friend';
+    addChatLine('Mika', L2('*crunch crunch* Merci beaucoup, ', '*crunch crunch* Merci beaucoup, ') + nm + L2('! That was a most excellent treat. 🦴', ' ! C\'était une friandise excellente. 🦴'), 'orange', false, null);
+    if(typeof pet !== 'undefined' && pet.state === 'walk') pet.petT = Math.max(pet.petT || 0, 2.5);
+    showToast('🦴 ' + L2('Mika loved it!', 'Mika a adoré !'));
+  }
+}
 function viewMe(){
   var e = life.eco, ch = e.ch, h = '';
   h += '<div class="lf-lab"><span>' + L2('First name', 'Prénom') + '</span><input class="lf-in" maxlength="20" data-me="fn" value="' + esc(ch.fn) + '"></div>';
@@ -9717,6 +9915,8 @@ function lifeClick(ev){
       showToast(L2('Welcome to Paris, ', 'Bienvenue à Paris, ') + e.ch.fn + ' !');
       break;
     case 'startshift': startShift(); return;
+    case 'pickshop': startShift(v); return;
+    case 'cancelgo': life.go = null; life.pickShop = false; beacon.g.visible = false; document.getElementById('life-beacon-hud').classList.add('hidden'); break;
     case 'answer':
       var s = life.shift; if(!s || s.picked >= 0) return;
       s.picked = v|0;
@@ -9755,6 +9955,23 @@ function lifeClick(ev){
       lifeSave(); break;
     case 'toexplore': e.mode = 'explore'; lifeSave(true); life.draft = null; life.tab = 'setup'; sendPresence(true); break;
     case 'melook': e.ch[k] = v|0; lifeSave(); sendPresence(true); break;
+    case 'sdlook': life.sdraft[k] = v|0; break;
+    case 'sdrandom': life.sdraft.fn = pickR(Math.random, FIRST_NAMES); life.sdraft.ln = pickR(Math.random, LAST_NAMES); break;
+    case 'sdsave':
+      var sd = life.sdraft;
+      if(!cleanName(sd.fn) || !cleanName(sd.ln)){ showToast(L2('Give your character a first and last name.', 'Donne un prénom et un nom à ton personnage.')); return; }
+      life.eco = e || newEco(); e = life.eco;
+      e.ch = {fn:cleanName(sd.fn).slice(0, 20), ln:cleanName(sd.ln).slice(0, 20), age:Math.max(18, Math.min(35, sd.age|0)), skin:sd.skin|0, hair:sd.hair|0, pants:sd.pants|0, hat:sd.hat|0};
+      e.tok = (e.tok|0) + 2; lifeSave(true); sendPresence(true); life.draft = null;
+      showToast(L2('Bienvenue, ', 'Bienvenue, ') + e.ch.fn + ' ! +2 🪙');
+      break;
+    case 'buyout':
+      var o = OUTFITS[v|0]; if(!o || (e.tok|0) < o.cost) return;
+      e.tok -= o.cost; e.outs = String(e.outs || '0') + (v|0); e.out = v|0; lifeSave(true); sendPresence(true);
+      showToast(o.icon + ' ' + L2('New outfit: ', 'Nouvelle tenue : ') + L2(o.en, o.fr));
+      break;
+    case 'wear': e.out = v|0; lifeSave(true); sendPresence(true); break;
+    case 'extra': useExtra(v); return;
     case 'viewstu': life.view = v; break;
     case 'classback': life.view = null; break;
     default: return;
@@ -9763,6 +9980,8 @@ function lifeClick(ev){
 }
 function lifeChange(ev){
   var t = ev.target, c = t.getAttribute('data-c'), me = t.getAttribute('data-me'), lbl = t.getAttribute('data-lbl');
+  var sdk = t.getAttribute('data-sd');
+  if(sdk && life.sdraft){ life.sdraft[sdk] = sdk === 'age' ? Math.max(18, Math.min(35, t.value|0)) : t.value; return; }
   if(c && life.draft){ life.draft.ch[c] = c === 'age' ? Math.max(18, Math.min(35, t.value|0)) : t.value; return; }
   if(me && life.eco && life.eco.ch){ life.eco.ch[me] = me === 'age' ? Math.max(18, Math.min(35, t.value|0)) : cleanName(t.value).slice(0, 20); lifeSave(); return; }
   if(lbl){
@@ -9778,10 +9997,14 @@ function lifeChange(ev){
 /* ---------- every frame ---------- */
 var lifeSigned = null;
 function lifeTick(dt){
+  if(life.loaded && !life.askedChar && signedIn() && titleScreen.classList.contains('hidden') && !(life.eco && life.eco.ch) && life.uid === net.uid){
+    life.askedChar = true; life.tab = 'style'; openLife();
+  }
   var s = signedIn();
   if(s !== lifeSigned){ lifeSigned = s; renderLifeBtn(); if(!s){ life.uid = null; life.eco = null; life.loaded = false; closeLife(); } }
   if(s && net.uid && life.uid !== net.uid) lifeLoad();
   if(life.del) tickDelivery(dt);
+  else if(life.go) tickGoWork(dt);
   updateLabelSprites(dt);
 }
 
