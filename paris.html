@@ -9546,7 +9546,7 @@ function mikaAIHeard(text, who, fromOwner){
   m.at = Date.now();
   var key = String(who).toLowerCase(), hist = mikaAI.history[key] || (mikaAI.history[key] = []);
   var input = [{role:'user', content:MIKA_AI_RULES + '\n\nRight now: ' + mikaAIContext() + '\n\nReply only with what Mika says. Ready?'}, {role:'assistant', content:'Indeed. I am Mika, at your service.'}]
-    .concat(hist.slice(-12), [{role:'user', content:who + ' says: ' + String(text).slice(0, 300) + (mentioned ? '' : '\n(They did not say "Mika". If this message is clearly meant for other players and not a follow-up to you, reply with exactly: (silent))')}]);
+    .concat(hist.slice(-12), [{role:'user', content:who + (fromOwner ? ' (this is Daniel, your owner!)' : ' (a student, not your owner)') + ' says: ' + String(text).slice(0, 300) + (mentioned ? '' : '\n(They did not say "Mika". If this message is clearly meant for other players and not a follow-up to you, reply with exactly: (silent))')}]);
   mikaAI.busy++;
   mikaAI.sample(input, {modelTier:'quick', cache:false}).then(function(res){
     var line = String(res && res.text || '').replace(/^\s*(Mika\s*:\s*)/i, '').replace(/[*_#`]+/g, function(x){ return x === '*' ? '*' : ''; }).trim().slice(0, 300);
@@ -9580,16 +9580,23 @@ function receiveMikaSay(p){
   if(pet.state === 'walk') pet.petT = Math.max(pet.petT, 0.8);
 }
 
-/* ---------- THE AIRPORT (test): fly to test destinations ----------
-   A check-in desk with a little plane in the north-west corner of the park. Walk up to it and pick where to fly: a
-   short animation (taxi, take off, fly, land) takes you to a TEST destination far away - a small walkable town with
-   its own desk to fly home. Just for testing; the destinations are placeholders. */
+/* ---------- THE AIRPORT: Paris-CDG (south of the city) and two TEST destinations ----------
+   Take a taxi from the stand in the park (north-west corner) to the airport: a glass terminal you can walk into, with
+   check-in counters, a departures board and the flight desk; a gate with a jet bridge and the plane; a taxiway; a long
+   runway with markings and lights; a control tower, a hangar and a windsock. At the desk, pick a test destination:
+   the plane taxis to the runway, takes off and flies there; flying home, it lands back on the runway. The city's
+   background buildings are hidden while you're out at the airport. */
+var CDG = {x:0, z:900};
 var AIRPORTS = [
-  {id:'paris', x:-66, z:-46, en:'Paris', fr:'Paris'},
+  {id:'paris', x:CDG.x, z:CDG.z - 37, en:'Paris-CDG', fr:'Paris-CDG', gate:{x:CDG.x, z:CDG.z + 8}},
   {id:'testa', x:2600, z:0, en:'Test City A (New York style)', fr:'Ville test A (style New York)', ground:0x8d8f94, cols:[0x6b7380, 0x9aa3ad, 0xb9a27a, 0x4f5966]},
   {id:'testb', x:-2600, z:0, en:'Test City B (Tokyo style)', fr:'Ville test B (style Tokyo)', ground:0x9a9c8a, cols:[0xe8e4dc, 0xc9c3b8, 0x7a8aa0, 0xd9d0c0]}
 ];
-function makePlane(){
+var TAXIS = [
+  {x:-66, z:-46, to:{x:CDG.x - 6, z:CDG.z - 62, yaw:Math.PI}, en:'TAXI TO THE AIRPORT', fr:'TAXI POUR L\'AÉROPORT'},
+  {x:CDG.x - 14, z:CDG.z - 64, to:{x:-62, z:-42, yaw:0}, en:'TAXI TO PARIS', fr:'TAXI POUR PARIS'}
+];
+function makePlane(s){
   var g = new THREE.Group(), white = solidMat(0xf2f2f0), blue = solidMat(0x2b4c9b), dark = solidMat(0x2a2d36);
   var body = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 10, 14), white); body.rotation.z = Math.PI/2; g.add(body);
   var nose = new THREE.Mesh(new THREE.SphereGeometry(0.9, 14, 10), white); nose.scale.set(1.6, 1, 1); nose.position.x = 5; g.add(nose);
@@ -9599,52 +9606,116 @@ function makePlane(){
   var stab = box(1.2, 0.14, 4, white); stab.position.set(-6.3, 0.3, 0); g.add(stab);
   var stripe = box(9, 0.25, 1.86, blue); stripe.position.y = -0.1; g.add(stripe);
   var win = box(7.5, 0.28, 1.84, dark); win.position.set(0.3, 0.38, 0); g.add(win);
-  [-1, 1].forEach(function(s){ var e = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 1.6, 10), dark); e.rotation.z = Math.PI/2; e.position.set(1.2, -0.75, s*2.6); g.add(e); });
+  [-1, 1].forEach(function(sd){ var e = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 1.6, 10), dark); e.rotation.z = Math.PI/2; e.position.set(1.2, -0.75, sd*2.6); g.add(e); });
+  [[3.6, 0], [-0.6, 1.2], [-0.6, -1.2]].forEach(function(w){ var wh = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.25, 10), dark); wh.rotation.x = Math.PI/2; wh.position.set(w[0], -1.35, w[1]); g.add(wh); var st = box(0.1, 0.5, 0.1, dark); st.position.set(w[0], -1.05, w[1]); g.add(st); });
+  g.scale.setScalar(s || 1);
   g.traverse(function(o){ if(o.isMesh) o.castShadow = false; });
   root.add(g); return g;
 }
-function airportSign(text, x, z, ry){
-  var c = document.createElement('canvas'); c.width = 512; c.height = 128; var k = c.getContext('2d');
-  k.fillStyle = '#2b4c9b'; k.fillRect(0, 0, 512, 128); k.fillStyle = '#fff'; k.font = 'bold 54px sans-serif'; k.textAlign = 'center'; k.textBaseline = 'middle'; k.fillText(text, 256, 66);
-  var m = new THREE.Mesh(new THREE.PlaneGeometry(4, 1), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c), side:THREE.DoubleSide}));
-  m.position.set(x, 3.4, z); m.rotation.y = ry || 0; root.add(m);
+function airSign(text, x, y, z, ry, w, bg){
+  var c = document.createElement('canvas'); c.width = 1024; c.height = 160; var k = c.getContext('2d');
+  k.fillStyle = bg || '#2b4c9b'; k.fillRect(0, 0, 1024, 160); k.fillStyle = '#fff'; k.font = 'bold 84px sans-serif'; k.textAlign = 'center'; k.textBaseline = 'middle'; k.fillText(text, 512, 84, 980);
+  var m = new THREE.Mesh(new THREE.PlaneGeometry(w || 6, (w || 6)*160/1024), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c), side:THREE.DoubleSide}));
+  m.position.set(x, y, z); m.rotation.y = ry || 0; root.add(m); return m;
 }
-(function buildAirports(){
-  AIRPORTS.forEach(function(a, i){
-    // the desk
-    var desk = box(3, 1.1, 1.2, solidMat(0xdfe3ea)); desk.position.set(a.x, 0.55, a.z); root.add(desk);
-    var post = box(0.15, 3, 0.15, solidMat(0x2a2d36)); post.position.set(a.x, 1.5, a.z - 0.4); root.add(post);
-    airportSign('✈ ' + (a.id === 'paris' ? 'AÉROPORT' : 'AIRPORT'), a.x, a.z - 0.45, 0);
-    pushSegCollider(a.x - 1.3, a.z, a.x + 1.3, a.z, 0.6, -50, 1.2);
-    // a little runway and a parked plane
-    var rw = new THREE.Mesh(new THREE.PlaneGeometry(26, 6), solidMat(0x3a3c42)); rw.rotation.x = -Math.PI/2; rw.position.set(a.x + 6, 0.03, a.z - 7); root.add(rw);
-    var pl = makePlane(); pl.position.set(a.x + 2, 1.6, a.z - 7); a.plane = pl;
-    if(a.id === 'paris') return;
-    // a test town: its own ground, blocks of buildings, a landmark, and a wall round it
-    var S = 140, gnd = new THREE.Mesh(new THREE.PlaneGeometry(S, S), solidMat(a.ground)); gnd.rotation.x = -Math.PI/2; gnd.position.set(a.x, 0.01, a.z); root.add(gnd);
+function flat(w, d, x, z, col, y){ var m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), solidMat(col)); m.rotation.x = -Math.PI/2; m.position.set(x, y || 0.02, z); root.add(m); return m; }
+function bx(w, h, d, x, y, z, col, solid){ var m = box(w, h, d, solidMat(col)); m.position.set(x, y, z); root.add(m); if(solid) addSolid(x - w/2, x + w/2, z - d/2, z + d/2, 'airport', y - h/2 - 0.5, y + h/2); return m; }
+(function buildCDG(){
+  var X = CDG.x, Z = CDG.z;
+  PLAY_AREAS.push({x0:X - 320, x1:X + 320, z0:Z - 80, z1:Z + 140});
+  flat(640, 220, X, Z + 30, 0x6f8a55, 0.01);                       // grass all round
+  // the landside: a road and a car park in front of the terminal
+  flat(200, 12, X, Z - 66, 0x3a3c42); flat(120, 22, X, Z - 48, 0x55585f);
+  for(var px = -55; px <= 55; px += 5) flat(0.15, 5, X + px, Z - 48, 0xeeeeee, 0.03);
+  // the terminal: glass front and back, a big roof, and you can walk in through the doors
+  var T = {x0:X - 40, x1:X + 40, z0:Z - 37, z1:Z - 13, h:12};
+  flat(80, 24, X, Z - 25, 0xd9d6cf, 0.04);                          // the floor inside
+  bx(84, 1.2, 28, X, T.h + 0.6, Z - 25, 0xe4e6ea);                  // roof
+  bx(1, T.h, 24, T.x0, T.h/2, Z - 25, 0xc9ccd2, true); bx(1, T.h, 24, T.x1, T.h/2, Z - 25, 0xc9ccd2, true);   // ends
+  var glass = new THREE.MeshLambertMaterial({color:0x9fc8e0, transparent:true, opacity:0.45});
+  [T.z0, T.z1].forEach(function(z, side){
+    [[X - 40, X - 4], [X + 4, X + 40]].forEach(function(seg){
+      var w = seg[1] - seg[0], g = new THREE.Mesh(new THREE.BoxGeometry(w, T.h, 0.3), glass); g.position.set((seg[0] + seg[1])/2, T.h/2, z); root.add(g);
+      addSolid(seg[0], seg[1], z - 0.2, z + 0.2, 'airport', -1, T.h);
+      for(var mx = seg[0]; mx <= seg[1]; mx += 4) bx(0.25, T.h, 0.35, mx, T.h/2, z, 0x8a8f98);
+    });
+    bx(8, T.h - 3.5, 0.35, X, (T.h + 3.5)/2, z, 0x8a8f98);           // over the doors
+  });
+  airSign('AÉROPORT PARIS-CDG', X, T.h + 3, T.z0 - 0.3, Math.PI, 30);
+  // inside: check-in counters, a departures board, and the flight desk
+  [-1, 1].forEach(function(sd){
+    for(var c = 0; c < 4; c++){ var cx = X + sd*(14 + c*5); bx(4, 1.1, 1.4, cx, 0.55, Z - 30, 0x2b4c9b, true); bx(4, 0.1, 1.5, cx, 1.15, Z - 30, 0xf2f2f2); }
+    airSign('ENREGISTREMENT · CHECK-IN', X + sd*21, 4.2, Z - 31.2, Math.PI, 16);
+  });
+  var board = document.createElement('canvas'); board.width = 1024; board.height = 512; var bk = board.getContext('2d');
+  bk.fillStyle = '#141820'; bk.fillRect(0, 0, 1024, 512); bk.fillStyle = '#ffd23f'; bk.font = 'bold 54px monospace'; bk.fillText('DÉPARTS · DEPARTURES', 40, 76);
+  bk.font = '44px monospace'; bk.fillStyle = '#e8ecf2';
+  [['AF 001', 'VILLE TEST A', '14:30', 'À L\'HEURE'], ['AF 002', 'VILLE TEST B', '15:05', 'À L\'HEURE'], ['AF 003', 'VILLE TEST A', '17:40', 'EMBARQUEMENT']].forEach(function(r, i){ bk.fillText(r[0] + '  ' + r[1], 40, 170 + i*100); bk.fillText(r[2], 690, 170 + i*100); bk.fillStyle = i === 2 ? '#7fdc7f' : '#e8ecf2'; bk.font = '30px monospace'; bk.fillText(r[3], 690, 205 + i*100); bk.font = '44px monospace'; bk.fillStyle = '#e8ecf2'; });
+  var bm = new THREE.Mesh(new THREE.PlaneGeometry(12, 6), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(board)})); bm.position.set(X, 7.5, Z - 13.6); bm.rotation.y = Math.PI; root.add(bm);
+  bx(3.4, 1.1, 1.2, X, 0.55, Z - 37 + 3, 0xdfe3ea, true); bx(0.15, 3, 0.15, X, 1.5, Z - 37 + 2.4, 0x2a2d36);
+  airSign('✈ VOLS · FLIGHTS', X, 3.4, Z - 37 + 2.35, Math.PI, 4.4);
+  // the gate: a jet bridge out to the plane on the apron
+  flat(320, 70, X, Z + 22, 0xa7a9ad, 0.03);                         // apron (concrete)
+  bx(3, 3, 14, X - 7, 4.5, Z - 4, 0xc9ccd2);                        // jet bridge
+  bx(1.6, 4.5, 1.6, X - 7, 2.25, Z + 3, 0x6b6f78);
+  for(var lz = -10; lz <= 60; lz += 5) flat(0.25, 2.5, X, Z + lz, 0xf2c230, 0.05);   // yellow guide line
+  // taxiway and runway
+  flat(560, 14, X, Z + 60, 0x3a3c42, 0.04);
+  for(var tx = -270; tx <= 270; tx += 6) flat(3, 0.3, X + tx, Z + 60, 0xf2c230, 0.05);
+  flat(12, 40, X - 200, Z + 80, 0x3a3c42, 0.04);                   // the link to the runway
+  flat(620, 46, X, Z + 100, 0x2c2e33, 0.045);                       // runway
+  for(var rx = -280; rx <= 280; rx += 20) flat(10, 0.9, X + rx, Z + 100, 0xffffff, 0.06);   // centre line
+  [-1, 1].forEach(function(sd){
+    flat(620, 0.8, X, Z + 100 + sd*21.5, 0xffffff, 0.06);           // edge lines
+    for(var k = -7; k <= 7; k++) if(k) flat(14, 1.6, X + sd*300, Z + 100 + k*2.6, 0xffffff, 0.06);   // threshold stripes
+    for(var lx = -300; lx <= 300; lx += 20) bx(0.4, 0.4, 0.4, X + lx, 0.2, Z + 100 + sd*24, 0xfff2b0);   // edge lights
+  });
+  airSign('09', X - 270, 0.07, Z + 100, 0, 12, '#2c2e33').rotation.x = -Math.PI/2;
+  // control tower, hangar, windsock
+  bx(6, 34, 6, X + 110, 17, Z - 20, 0xd9d6cf, true);
+  var cab = new THREE.Mesh(new THREE.CylinderGeometry(7, 5, 6, 8), new THREE.MeshLambertMaterial({color:0x3f6f8f})); cab.position.set(X + 110, 37, Z - 20); root.add(cab);
+  bx(15, 1, 15, X + 110, 40.5, Z - 20, 0x8a8f98);
+  var hg = new THREE.Mesh(new THREE.CylinderGeometry(16, 16, 40, 20, 1, false, 0, Math.PI), solidMat(0xb9bec6)); hg.rotation.z = Math.PI/2; hg.rotation.y = Math.PI/2; hg.position.set(X - 120, 0, Z + 10); root.add(hg);
+  addSolid(X - 136, X - 104, Z - 10, Z + 30, 'airport', -1, 16);
+  var pole = bx(0.2, 7, 0.2, X + 150, 3.5, Z + 70, 0xdddddd);
+  var sock = new THREE.Mesh(new THREE.ConeGeometry(0.6, 3, 10, 1, true), solidMat(0xe07b2c)); sock.rotation.z = -Math.PI/2; sock.position.set(X + 151.5, 6.6, Z + 70); root.add(sock);
+  // the plane at the gate
+  AIRPORTS[0].plane = makePlane(1.6); AIRPORTS[0].plane.position.set(X, 2.6, Z + 8); AIRPORTS[0].plane.rotation.y = Math.PI/2;
+  AIRPORTS[0].rest = {x:X, y:2.6, z:Z + 8, ry:Math.PI/2};
+})();
+(function buildTestCities(){
+  AIRPORTS.slice(1).forEach(function(a){
+    var S = 140; flat(S, S, a.x, a.z, a.ground, 0.01);
+    bx(3, 1.1, 1.2, a.x, 0.55, a.z, 0xdfe3ea, true); bx(0.15, 3, 0.15, a.x, 1.5, a.z - 0.4, 0x2a2d36);
+    airSign('✈ AIRPORT', a.x, 3.4, a.z - 0.45, 0, 4);
+    flat(60, 8, a.x + 10, a.z - 8, 0x3a3c42, 0.03);
+    a.plane = makePlane(1); a.plane.position.set(a.x + 2, 1.6, a.z - 8); a.rest = {x:a.x + 2, y:1.6, z:a.z - 8, ry:0};
     var r = lifeRand(a.id);
-    for(var bx = -50; bx <= 50; bx += 20) for(var bz = -50; bz <= 50; bz += 20){
-      if(Math.abs(bx) < 20 && Math.abs(bz) < 20) continue;
-      var h = a.id === 'testa' ? 10 + r()*45 : 6 + r()*18, b = box(12, h, 12, solidMat(a.cols[(r()*a.cols.length)|0]));
-      b.position.set(a.x + bx, h/2, a.z + bz); root.add(b);
-      addSolid(a.x + bx - 6, a.x + bx + 6, a.z + bz - 6, a.z + bz + 6, 'air-' + a.id, -50, h);
+    for(var bxx = -50; bxx <= 50; bxx += 20) for(var bz = -50; bz <= 50; bz += 20){
+      if(Math.abs(bxx) < 20 && Math.abs(bz) < 20) continue;
+      var h = a.id === 'testa' ? 10 + r()*45 : 6 + r()*18;
+      bx(12, h, 12, a.x + bxx, h/2, a.z + bz, a.cols[(r()*a.cols.length)|0], true);
     }
-    if(a.id === 'testa'){   // a tall tower with a spire
-      var t = box(9, 70, 9, solidMat(0xb7bcc4)); t.position.set(a.x + 30, 35, a.z - 30); root.add(t);
-      var sp = new THREE.Mesh(new THREE.ConeGeometry(1.4, 20, 8), solidMat(0xd9dde3)); sp.position.set(a.x + 30, 80, a.z - 30); root.add(sp);
-    } else {                // a red gate and a red-and-white tower
-      var red = solidMat(0xc8231a);
-      [-4, 4].forEach(function(dx){ var c2 = box(0.9, 8, 0.9, red); c2.position.set(a.x + dx, 4, a.z + 14); root.add(c2); });
-      var tb = box(12, 0.9, 1.2, red); tb.position.set(a.x, 8.2, a.z + 14); root.add(tb);
-      var tb2 = box(10, 0.6, 0.9, red); tb2.position.set(a.x, 6.8, a.z + 14); root.add(tb2);
-      var tw = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 6, 60, 4), solidMat(0xd8452f)); tw.position.set(a.x - 30, 30, a.z - 30); root.add(tw);
-    }
-    airportSign(a.id === 'testa' ? 'TEST CITY A' : 'TEST CITY B', a.x, a.z + 6, Math.PI);
+    if(a.id === 'testa'){ bx(9, 70, 9, a.x + 30, 35, a.z - 30, 0xb7bcc4); var sp = new THREE.Mesh(new THREE.ConeGeometry(1.4, 20, 8), solidMat(0xd9dde3)); sp.position.set(a.x + 30, 80, a.z - 30); root.add(sp); }
+    else { [-4, 4].forEach(function(dx){ bx(0.9, 8, 0.9, a.x + dx, 4, a.z + 14, 0xc8231a); }); bx(12, 0.9, 1.2, a.x, 8.2, a.z + 14, 0xc8231a); bx(10, 0.6, 0.9, a.x, 6.8, a.z + 14, 0xc8231a);
+      var tw = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 6, 60, 4), solidMat(0xd8452f)); tw.position.set(a.x - 30, 30, a.z - 30); root.add(tw); }
+    airSign(a.id === 'testa' ? 'TEST CITY A' : 'TEST CITY B', a.x, 3.4, a.z + 6, Math.PI, 4);
     PLAY_AREAS.push({x0:a.x - S/2 + 2, x1:a.x + S/2 - 2, z0:a.z - S/2 + 2, z1:a.z + S/2 - 2});
   });
 })();
-/* the destination picker: walk up to a desk */
-var flight = {active:false, t:0, plane:null, from:null, to:null, near:null, arrived:null};
+TAXIS.forEach(function(tx){
+  bx(0.15, 3, 0.15, tx.x, 1.5, tx.z, 0x2a2d36);
+  airSign('🚕 TAXI', tx.x, 3.2, tx.z, 0, 2.6, '#e3b52c');
+  var car = makeTaxi(); car.position.set(tx.x + 3, 0, tx.z + 2.5);
+});
+function makeTaxi(){
+  var g = new THREE.Group(), y = solidMat(0xe3b52c), d = solidMat(0x2a2d36);
+  var b1 = box(4, 0.8, 1.8, y); b1.position.y = 0.7; g.add(b1); var b2 = box(2.2, 0.6, 1.6, d); b2.position.set(-0.2, 1.4, 0); g.add(b2);
+  [[1.3, 0.8], [1.3, -0.8], [-1.3, 0.8], [-1.3, -0.8]].forEach(function(w){ var wh = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.3, 12), d); wh.rotation.x = Math.PI/2; wh.position.set(w[0], 0.38, w[1]); g.add(wh); });
+  root.add(g); return g;
+}
+/* the picker (flights) and the taxi offer: walk up to a desk or a stand */
+var flight = {active:false, t:0, near:null, arrived:null};
 var flyCard = (function(){
   var el = document.createElement('div'); el.id = 'fly-card'; el.className = 'card hidden';
   var st = document.createElement('style');
@@ -9656,65 +9727,96 @@ var flyCard = (function(){
   el.addEventListener('click', function(e){
     var b = e.target.closest('[data-fly]'); if(!b) return;
     var v = b.getAttribute('data-fly');
-    if(v === 'close'){ el.classList.add('hidden'); return; }
-    if(v === 'walk'){ el.classList.add('hidden'); var a = flight.arrived; if(a){ pendingLandmark = {go:{x:a.x + 4, z:a.z + 4, yaw:Math.PI}}; placeAtLandmark(pendingLandmark); requestFirstPerson('walk'); } return; }
-    el.classList.add('hidden'); startFlight(v);
+    el.classList.add('hidden');
+    if(v === 'close') return;
+    if(v === 'walk'){ var sp = flight.arrived; if(sp) goTo(sp); return; }
+    if(v.indexOf('taxi:') === 0){ var tx = TAXIS[v.slice(5)|0]; fade.style.opacity = 1; setTimeout(function(){ goTo(tx.to); setTimeout(function(){ fade.style.opacity = 0; }, 300); }, 800); return; }
+    startFlight(v);
   });
   return {el:el, fade:fade};
 })();
-function nearAirport(){
-  if(!flying || flight.active) return null;
-  var x = camera.position.x, z = camera.position.z;
-  return AIRPORTS.filter(function(a){ return Math.hypot(a.x - x, a.z + 1.2 - z) < 3.5; })[0] || null;
+function goTo(spot){
+  pendingLandmark = {go:spot}; placeAtLandmark(pendingLandmark);
+  if(!flying) requestFirstPerson('walk'); else pendingLandmark = null;
+}
+function nearThing(){
+  if(!flying || flight.active || driving) return null;
+  var x = camera.position.x, z = camera.position.z, hit = null;
+  AIRPORTS.forEach(function(a){ if(Math.hypot(a.x - x, a.z + 1.2 - z) < 3.2) hit = {kind:'desk', a:a}; });
+  TAXIS.forEach(function(t, i){ if(Math.hypot(t.x - x, t.z - z) < 3) hit = {kind:'taxi', i:i, t:t}; });
+  return hit;
 }
 function showFlyPicker(here){
   var h = '<h4>✈ ' + esc(L2('WHERE TO?', 'OÙ ALLEZ-VOUS ?')) + '</h4><div class="lf-soft" style="margin-bottom:6px">' + esc(L2('Test flights - the destinations are just for testing.', 'Vols test - les destinations sont juste pour tester.')) + '</div>';
   AIRPORTS.forEach(function(a){ if(a !== here) h += '<button class="btn go" data-fly="' + a.id + '">' + esc(L2('FLY TO ', 'VOLER VERS ') + L2(a.en, a.fr)) + '</button>'; });
   h += '<button class="btn" data-fly="close">' + esc(L2('NOT NOW', 'PAS MAINTENANT')) + '</button>';
   flyCard.el.innerHTML = h; flyCard.el.classList.remove('hidden');
-  if(flying) exitFirstPerson();
+  exitFirstPerson();
+}
+function showTaxiOffer(i){
+  var t = TAXIS[i];
+  flyCard.el.innerHTML = '<h4>🚕 ' + esc(L2(t.en, t.fr)) + '</h4><button class="btn go" data-fly="taxi:' + i + '">' + esc(L2('GET IN', 'MONTER')) + '</button><button class="btn" data-fly="close">' + esc(L2('NOT NOW', 'PAS MAINTENANT')) + '</button>';
+  flyCard.el.classList.remove('hidden');
+  exitFirstPerson();
+}
+/* the flight: a path of points the plane follows (taxi, take-off, climb), then the landing at the other end */
+function departurePath(a){
+  var r = a.rest;
+  if(a.id === 'paris') return [[r.x, r.y, r.z, 0], [r.x, r.y, CDG.z + 60, 3.5], [CDG.x - 200, r.y, CDG.z + 60, 5.5], [CDG.x - 200, r.y, CDG.z + 100, 2], [CDG.x - 40, r.y, CDG.z + 100, 3.5], [CDG.x + 80, r.y + 14, CDG.z + 100, 2], [CDG.x + 260, r.y + 70, CDG.z + 100, 3]];
+  return [[r.x, r.y, r.z, 0], [r.x + 30, r.y, r.z, 2.5], [r.x + 70, r.y + 18, r.z, 2], [r.x + 200, r.y + 80, r.z, 3]];
+}
+function arrivalPath(a){
+  var r = a.rest;
+  if(a.id === 'paris') return [[CDG.x - 420, 90, CDG.z + 100, 0], [CDG.x - 200, r.y + 0.2, CDG.z + 100, 4.5], [CDG.x + 20, r.y, CDG.z + 100, 3.5], [CDG.x + 40, r.y, CDG.z + 60, 2], [r.x, r.y, CDG.z + 60, 2], [r.x, r.y, r.z, 3]];
+  return [[r.x - 220, 80, r.z, 0], [r.x - 40, r.y + 0.2, r.z, 4], [r.x, r.y, r.z, 2.5]];
 }
 function startFlight(id){
   var to = AIRPORTS.filter(function(a){ return a.id === id; })[0], from = flight.near || AIRPORTS[0];
   if(!to) return;
-  if(flying) exitFirstPerson();
-  closeEditors(); hideLmTip(); flyCard.el.classList.add('hidden');
-  flight = {active:true, t:0, from:from, to:to, plane:from.plane, near:null, arrived:null, start:from.plane.position.clone()};
+  exitFirstPerson(); closeEditors(); hideLmTip(); flyCard.el.classList.add('hidden');
+  flight = {active:true, t:0, from:from, to:to, leg:'out', path:departurePath(from), seg:0, segT:0, plane:from.plane, near:null, arrived:null};
   controls.enabled = false;
   showToast(L2('Fasten your seatbelt! ✈', 'Attachez votre ceinture ! ✈'));
 }
 function updateFlight(dt){
-  var f = flight; f.t += dt;
-  var T = f.t, pl = f.plane, a = f.from, b = f.to, p = new THREE.Vector3();
-  if(T < 5.5){   // taxi, speed up, take off and climb
-    var u = T < 2.5 ? (T/2.5)*(T/2.5)*25 : 25 + (T - 2.5)*30;
-    p.set(f.start.x + u, f.start.y + Math.max(0, T - 2.5)*Math.max(0, T - 2.5)*5, f.start.z);
-    pl.rotation.set(0, 0, T > 2.5 ? Math.min(0.25, (T - 2.5)*0.2) : 0);
-  } else if(T < 7){   // high up, the screen goes white
-    p.set(f.start.x + 115 + (T - 5.5)*40, f.start.y + 45 + (T - 5.5)*6, f.start.z);
-    flyCard.fade.style.opacity = T > 5.8 ? 1 : 0;
-  } else {           // over the destination: descend and land
-    if(pl !== b.plane){ pl.position.copy(f.start); f.plane = pl = b.plane; f.land = b.plane.position.clone(); flyCard.fade.style.opacity = 0; }
-    var k = Math.min(1, (T - 7)/4), e = 1 - (1 - k)*(1 - k);
-    p.set(f.land.x - 140*(1 - e), f.land.y + 50*(1 - e)*(1 - e), f.land.z);
-    pl.rotation.set(0, 0, -0.12*(1 - k));
-    if(T > 11.5){
-      f.active = false; controls.enabled = true; pl.rotation.set(0, 0, 0); pl.position.copy(f.land);
-      flight = {active:false, t:0, plane:null, from:null, to:null, near:null, arrived:b};
-      camera.position.set(b.x + 14, 9, b.z + 14); controls.target.set(b.x, 1, b.z); controls.update();
-      flyCard.el.innerHTML = '<h4>' + esc(L2('WELCOME TO ', 'BIENVENUE À ') + L2(b.en, b.fr).toUpperCase()) + '</h4><button class="btn go" data-fly="walk">' + esc(L2('WALK AROUND', 'SE PROMENER')) + '</button>';
-      flyCard.el.classList.remove('hidden');
-      return;
-    }
+  var f = flight; f.t += dt; f.segT += dt;
+  var P = f.path;
+  while(f.seg < P.length - 1 && f.segT >= P[f.seg + 1][3]){ f.segT -= P[f.seg + 1][3]; f.seg++; }
+  var pl = f.plane, a = P[f.seg], b = P[Math.min(f.seg + 1, P.length - 1)], u = f.seg >= P.length - 1 ? 1 : f.segT/b[3];
+  var e = u*u*(3 - 2*u), x = a[0] + (b[0] - a[0])*e, y = a[1] + (b[1] - a[1])*e, z = a[2] + (b[2] - a[2])*e;
+  var dx = b[0] - a[0], dz = b[2] - a[2];
+  if(Math.abs(dx) + Math.abs(dz) > 0.5){ var want = Math.atan2(-dz, dx); var d = Math.atan2(Math.sin(want - pl.rotation.y), Math.cos(want - pl.rotation.y)); pl.rotation.y += d*Math.min(1, dt*4); }
+  pl.rotation.z = (b[1] - a[1])/(Math.hypot(dx, dz) + 1)*0.8;
+  pl.position.set(x, y, z);
+  var done = f.seg >= P.length - 1;
+  if(f.leg === 'out' && (done || (f.seg === P.length - 2 && u > 0.6))){ flyCard.fade.style.opacity = 1; }
+  if(f.leg === 'out' && done){
+    var r = f.from.rest; pl.position.set(r.x, r.y, r.z); pl.rotation.set(0, r.ry, 0);
+    f.leg = 'in'; f.path = arrivalPath(f.to); f.seg = 0; f.segT = 0; f.plane = pl = f.to.plane; setTimeout(function(){ flyCard.fade.style.opacity = 0; }, 300);
+    return;
   }
-  pl.position.copy(p);
-  camera.position.set(p.x - 16, p.y + 6, p.z + 12); camera.lookAt(p.x + 2, p.y, p.z);
+  if(f.leg === 'in' && done){
+    var r2 = f.to.rest; pl.position.set(r2.x, r2.y, r2.z); pl.rotation.set(0, r2.ry, 0);
+    controls.enabled = true;
+    var spot = f.to.id === 'paris' ? {x:CDG.x + 6, z:CDG.z - 32, yaw:0} : {x:f.to.x + 4, z:f.to.z + 4, yaw:Math.PI};
+    flight = {active:false, t:0, near:null, arrived:spot};
+    camera.position.set(r2.x + 25, 14, r2.z - 25); controls.target.set(r2.x, 2, r2.z); controls.update();
+    flyCard.el.innerHTML = '<h4>' + esc(L2('WELCOME TO ', 'BIENVENUE À ') + L2(f.to.en, f.to.fr).toUpperCase()) + '</h4><button class="btn go" data-fly="walk">' + esc(L2('WALK AROUND', 'SE PROMENER')) + '</button>';
+    flyCard.el.classList.remove('hidden');
+    return;
+  }
+  // the camera follows behind and to the side
+  var hd = pl.rotation.y, cx = x - Math.cos(hd)*22 + Math.sin(hd)*10, cz = z + Math.sin(hd)*22 + Math.cos(hd)*10;
+  camera.position.lerp(new THREE.Vector3(cx, y + 8, cz), Math.min(1, dt*3)); camera.lookAt(x, y + 1, z);
 }
-var lastNearAirport = null;
+var lastNear = null, skylineMesh = null;
 function airportTick(){
-  var a = nearAirport();
-  if(a && a !== lastNearAirport){ flight.near = a; showFlyPicker(a); }
-  lastNearAirport = a;
+  var n = nearThing(), key = n ? n.kind + (n.a ? n.a.id : n.i) : '';
+  if(key && key !== lastNear){ if(n.kind === 'desk'){ flight.near = n.a; showFlyPicker(n.a); } else showTaxiOffer(n.i); }
+  lastNear = key;
+  // out at the airport or a test city, the city's background buildings are hidden
+  if(!skylineMesh) root.children.forEach(function(c){ if(c.userData && c.userData.skyline) skylineMesh = c; });
+  if(skylineMesh){ var far = camera.position.z > 500 || Math.abs(camera.position.x) > 1000; if(skylineMesh.visible === far) skylineMesh.visible = !far; }
 }
 
 function animate(){
