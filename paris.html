@@ -3672,7 +3672,7 @@ function updateRowVisibility(){
   });
 }
 /* the villages: a plaza with a fountain, trees round the edge, and a big welcome sign (and Madame's giant baguette) */
-var bigBaguette = null, farLand = null;
+var bigBaguette = null, farLand = null, madameCut = null;
 (function buildVillages(){
   var B = new MeshBatch(), lawn = new FlatBatch(FLAT.lawn);
   VILLAGES.forEach(function(v){
@@ -3711,7 +3711,7 @@ var bigBaguette = null, farLand = null;
     k.font = '34px Arial, sans-serif'; k.fillText(v.elite ? 'Pour l\'excellence · For excellence' : 'Bienvenue ! · Welcome!', 512, 252, 980);
     var sg = new THREE.Mesh(new THREE.PlaneGeometry(20, 5.9), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c), side:THREE.DoubleSide}));
     sg.position.set(v.x, 9, v.z + 76); root.add(sg);
-    if(v.elite){ buildBaguette(v, PZ); buildMountain(v); }
+    if(v.elite){ buildBaguette(v, PZ); buildMountain(v); buildMadame(v, PZ); }
   });
   lawn.build(); B.build();
   /* MADAME'S GIANT BAGUETTE: 90 m tall, golden, slowly turning, over the elite village (you can see it from Paris) */
@@ -3736,6 +3736,22 @@ var bigBaguette = null, farLand = null;
     gr.addColorStop(0, 'rgba(255,220,120,0.55)'); gr.addColorStop(1, 'rgba(255,220,120,0)'); hk.fillStyle = gr; hk.fillRect(0, 0, 128, 128);
     var halo = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(hc), depthWrite:false, transparent:true}));
     halo.scale.set(70, 120, 1); halo.position.set(v.x, bodyH/2 + 18, PZ); root.add(halo);
+  }
+  /* MADAME herself: a big cut-out of her (holding a baguette, of course) on a golden stand beside the giant baguette,
+     always turning to face you, with her name plate */
+  function buildMadame(v, PZ){
+    var mx = v.x + 31, mz = PZ, H2 = 10, W2 = H2*574/900;
+    var tex = new THREE.TextureLoader().load('pets/madame.webp');
+    var cut = new THREE.Mesh(new THREE.PlaneGeometry(W2, H2), new THREE.MeshBasicMaterial({map:tex, transparent:true, alphaTest:0.4, side:THREE.DoubleSide}));
+    cut.position.set(mx, 1.6 + H2/2, mz); root.add(cut);
+    var stand = new THREE.Mesh(new THREE.CylinderGeometry(3, 3.4, 1.6, 20), solidMat(0xe3b52c)); stand.position.set(mx, 0.8, mz); root.add(stand);
+    pushSegCollider(mx, mz, mx, mz, 3.4, -50, 2);
+    var c = document.createElement('canvas'); c.width = 512; c.height = 128; var k = c.getContext('2d');
+    k.fillStyle = '#1f3f8f'; k.fillRect(0, 0, 512, 128); k.strokeStyle = '#e3b52c'; k.lineWidth = 8; k.strokeRect(6, 6, 500, 116);
+    k.fillStyle = '#fff'; k.textAlign = 'center'; k.textBaseline = 'middle'; k.font = 'bold 64px Georgia, serif'; k.fillText('🥖 MADAME 🥖', 256, 66, 480);
+    var plate = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 1.1), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c), side:THREE.DoubleSide}));
+    plate.position.set(mx, 0.85, mz + 3.45); root.add(plate);
+    madameCut = cut;
   }
   /* the mountain: the village sits on its flat top; the slopes fall 260 m to a green valley, with snowy peaks around.
      It's far past the edge of Paris (and past the fog), so you fly there from MENU → VILLAGES. */
@@ -5479,6 +5495,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 25, 2026 · 5:15 PM</span><br>Madame herself now stands in the Baguette Village, beside the giant baguette.</li>' +
   '<li><span class="when">Nov 25, 2026 · 5:00 PM</span><br>TEACHERS: Daniel can make an account a teacher. Teachers get the 🥖 ÉLITE tab to make players elite and send them to (or let them out of) the Public Shame Chamber.</li>' +
   '<li><span class="when">Nov 25, 2026 · 4:45 PM</span><br>THE AIRPORT: take the taxi from the Champ de Mars to Paris-CDG and fly to the test cities.</li>' +
   '<li><span class="when">Nov 25, 2026 · 4:30 PM</span><br>Hit Mika 3 times and you go straight to the Public Shame Chamber.</li>' +
@@ -10469,6 +10486,7 @@ function villageTick(){
   if(net.uid) villageListen();
   if(net.uid && signedIn() && net.members && net.members[net.uid] && !net.isOwner){ var e = amElite(); if(wasElite === false && e){ systemLine(t('eliteYou')); sendPresence(true); } if(wasElite !== e && wasElite !== null) sendPresence(true); wasElite = e; }
   if(bigBaguette) bigBaguette.rotation.y = performance.now()*0.00025;
+  if(madameCut && Math.abs(camera.position.z - madameCut.position.z) < 400) madameCut.rotation.y = Math.atan2(camera.position.x - madameCut.position.x, camera.position.z - madameCut.position.z);
   farLandTick();
   if(!vFlight) return;
   if(flying){ vFlight = null; return; }
