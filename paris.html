@@ -5296,6 +5296,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 25, 2026 · 3:15 PM</span><br>Smarter Mika: she remembers what you tell her (your name, what you like, your favourites), answers follow-ups like "why?" or "tell me more" without saying Mika again, asks you questions, reads several keywords at once, and knows 42 new topics.</li>' +
   '<li><span class="when">Nov 25, 2026 · 2:45 PM</span><br>No account? Press REQUEST ONE on the sign-in screen: pick a name and password, and your account is made automatically.</li>' +
   '<li><span class="when">Nov 25, 2026 · 12:30 PM</span><br>Daniel\'s House on residential plot 72: a two-storey Parisian house with a balcony and a mansard roof - and Mika has a bed in the front yard.</li>' +
   '<li><span class="when">Nov 25, 2026 · 11:50 AM</span><br>Daniel can now open or close building for everyone with one switch (PLAYERS tab).</li>' +
@@ -5629,6 +5630,51 @@ var MIKA_BIG = [
   {w:'god heaven pray church', say:['I have been to heaven and back, {name}. The choir was lovely, but I prefer it down here.']},
   {w:'tired busy sleepy', say:['Do rest, {name}. Even the busiest Parisian needs a nap now and then.']}
 ];
+MIKA_BIG.push(
+  {cap:true, w:'tech technology company companies apple iphone ipad mac macbook samsung google microsoft windows android computer computers laptop laptops phone phones smartphone tablet app apps tesla elon amazon youtube tiktok instagram snapchat discord ai robot robots', p:['tech company','apple company','the company apple'], say:['{word}? Technology is fascinating, {name}, though I have never managed to use a touchscreen with my paws.', 'Ah, {word}! The humans in Paris are always looking at their phones, {name}. I prefer looking at pigeons.', 'I am told {word} makes very clever machines, {name}. None of them can fetch, however.']},
+  {w:'school class classes classroom lesson lessons homework teacher teachers madame monsieur prof professeur test tests quiz exam exams grade grades report assignment project ecole classe devoirs examen', say:['I do hope your {word} goes splendidly, {name}. I am told dogs are excellent study companions.', 'Ah, the {word}. Do work diligently, {name} - and perhaps take a short break to pet me.', 'Madame would be very proud of your hard work, {name}.']},
+  {cap:true, w:'french francais english anglais spanish espanol language languages vocabulary grammar verb verbs conjugate conjugation translate translation accent accents', say:['{word}, {name}? A most noble pursuit. Je parle un peu français, bien sûr.', 'Learning {word} is a wonderful thing, {name}. Every word is a little treasure.', 'I adore languages, {name}. Woof is my first, but French is a close second.']},
+  {w:'label labels labelling labeling article articles le la les un une des etiquette etiquettes', p:['how do i label','what is the article'], say:['Every thing in your home deserves a proper French label, {name}: le lit, la lampe, l\'armoire. Do remember the article!', 'A small tip, {name}: le for masculine words, la for feminine, l\' before a vowel, and les for more than one.']},
+  {w:'job jobs work working career careers shift shifts boss employee salary salaire travail metier emploi', say:['An honest day\'s work, {name}! Do your tasks carefully and you shall earn your full pay.', 'Every career in Paris has its charms, {name}. Mine is professional napping.', 'A good worker is a happy worker, {name}. And a well-paid one, if all the tasks are correct.']},
+  {w:'waiter waitress server serveur serveuse cafe bistro order orders tips tip pourboire addition bill', say:['Do bring me a croissant while you are serving, {name}. I tip generously in tail wags.', 'Say « Bonjour, qu\'est-ce que je vous sers ? » and the customers shall adore you, {name}.']},
+  {w:'cashier caissier caissiere change coins euro euros cents centimes note notes cash', say:['Always count the change twice, {name}. A euro saved is a euro earned.', 'The euro has 100 centimes, {name}. I have never held one myself - no pockets, you see.']},
+  {w:'baker boulanger boulangere bakery boulangerie bread baguette baguettes flour farine dough oven four recipe recette', say:['Fresh bread from the boulangerie, {name}! The smell alone could make a dog weep with joy.', 'A good baguette must be crisp outside and soft inside, {name}. I have tasted precisely none, but I am certain.']},
+  {w:'delivery deliver delivering parcel parcels package packages livreur livreuse livraison colis courier', say:['I once chased a delivery rider, {name}. Purely professional curiosity, I assure you.']},
+  {w:'guide tour tourist tourists touriste monument monuments museum musee visit visiting sightseeing', say:['Paris has more monuments than I have toys, {name} - and I have a great many toys.', 'The Eiffel Tower, the Louvre, Notre-Dame... Paris is a museum all by itself, {name}.']},
+  {w:'bank banque banker banquier account accounts compte savings epargne save saving interest interets livret', p:['livret a','savings account'], say:['The Livret A pays 1,7 % a year, {name}. Slow and steady, like a well-behaved dog on a walk.', 'Saving a little each month is very wise, {name}. I myself save bones for a rainy day.', 'Interest is money that grows while you sleep, {name}. Much like my love of naps.']},
+  {w:'money cash rich poor broke expensive cheap price prices cost costs afford budget budgets argent cher pascher prix', say:['A budget is simply a plan for your money, {name}. Needs first, then wants, then savings.', 'Paris is rather expensive, {name}. Do check your budget before buying anything shiny.', 'Spend less than you earn, {name}, and you shall always sleep soundly. Like me.']},
+  {w:'rent loyer landlord proprietaire apartment appartement studio roommate roommates colocataire colocation lease bail', say:['Rent in Paris is rather steep, {name}. A roommate or two can be a great help.', 'Landlords often ask for an income of three times the rent, {name}. The rule of three!', 'My own bed by the fountain is rent-free, {name}. I highly recommend it.']},
+  {w:'credit card cards debt debts loan loans borrow overdraft decouvert agios fee fees score', p:['credit card','credit score'], say:['A credit card is borrowed money, {name}, at about 21 % a year. Pay it back in full if you can!', 'Debt grows quietly, {name}, like weeds in a garden. Best to pull it out early.', 'Paying every bill on time is the secret to a fine credit score, {name}.']},
+  {w:'bills bill electricity electricite internet phone forfait groceries courses insurance assurance navigo metro transport', say:['Bills, bills, bills, {name}. Mine are paid entirely in cuddles.', 'Do not forget your Navigo pass, {name}. Your employer pays half, you know.']},
+  {w:'shopping buy buying bought shop store stores mall sale sales discount soldes acheter magasin', say:['Before you buy, ask yourself: is it a need or a want, {name}?', 'Les soldes! The sales in Paris are legendary, {name}. Do mind your budget.']},
+  {w:'character avatar outfit clothes clothing shirt hat beret cap trousers pants look style', say:['You look très chic today, {name}. A beret suits everyone, I find.', 'Fashion is very important in Paris, {name}. I myself wear only my natural fur coat.']},
+  {w:'house home maison build building built decorate decoration furniture meubles room rooms chambre', say:['Your home sounds lovely, {name}. Is there room for a small dog bed?', 'Do label all your furniture in French, {name}. Le canapé, la table, le lit...']},
+  {w:'bed lit sofa canape couch chair chaise table lamp lampe fridge frigo wardrobe armoire bath baignoire desk bureau', say:['Ah, the {word}! A fine piece of furniture, {name}. Do you know its French name?', 'I would very much like to nap on that {word}, {name}. Purely for testing purposes.']},
+  {cap:true, w:'eiffel louvre notredame arc triomphe luxembourg montmartre sacrecoeur seine champs elysees versailles', say:['{word}! One of the treasures of Paris, {name}. Do go and visit it, {name}!', 'I have visited the {word} many times, {name}. Mostly to look for dropped croissants.']},
+  {w:'history historic histoire revolution napoleon king kings queen queens roi reine medieval war', say:['Paris has over two thousand years of history, {name}. It began as a little village called Lutetia.', 'The French Revolution began in 1789, {name}. Exactly one hundred years before the Eiffel Tower was finished.']},
+  {w:'happy glad excited great awesome amazing wonderful fantastic yay heureux heureuse content contente super genial', say:['How wonderful, {name}! Your happiness makes my tail wag.', 'I am delighted to hear it, {name}! Shall we celebrate with a walk?']},
+  {w:'sad upset unhappy cry crying lonely triste depressed down bad', say:['Oh, {name}, I am sorry to hear that. Would a little pet on the head help? It usually helps me.', 'Everyone has hard days, {name}. Do talk to a friend or a grown-up you trust - and I am always here for a cuddle.']},
+  {w:'tired sleepy exhausted fatigue fatigued bored boring ennui ennuye', say:['Then you must rest, {name}. I am an expert in this field.', 'Bored, {name}? Why not explore Paris - or pet a certain distinguished dog.']},
+  {w:'angry mad annoyed furious frustrated colere fache', say:['Deep breaths, {name}. Count to ten in French: un, deux, trois...', 'I understand, {name}. Perhaps a stroll by the Seine would calm the nerves.']},
+  {w:'hungry starving food snack snacks faim manger lunch dinner breakfast dejeuner diner gouter', say:['I too am always hungry, {name}. It is a lifelong condition.', 'Perhaps a croissant from the café, {name}? With a small piece for me, naturally.']},
+  {w:'game games play playing gaming minecraft fortnite roblox video console controller', say:['Games are great fun, {name}! My favourite is fetch. I am undefeated.', 'Do finish your work first, {name}, then play. That is what Madame would say.']},
+  {w:'music song songs sing singing accordion piano guitar dance dancing musique chanson danser', say:['The accordion music of Paris is rather charming, {name}. I howl along, occasionally.', 'I do enjoy a good song, {name}. My singing voice is, regrettably, a howl.']},
+  {w:'sport sports football soccer basketball hockey tennis run running swim swimming olympics', say:['Paris hosted the Olympic Games in 2024, {name}! I trained very hard for the 100-metre fetch.', 'Exercise is excellent for the body, {name}. I take three walks a day, minimum.']},
+  {w:'birthday anniversaire cake gateau candles party fete gift gifts cadeau cadeaux', say:['Joyeux anniversaire, {name}! I shall wear my party collar.', 'A cake, {name}? Do save me the crumbs.']},
+  {w:'snow snowing snowman winter cold froid neige hiver christmas noel hanukkah menorah', say:['The snow in Paris is magical, {name}. My paws, however, disagree.', 'Have you seen the great Christmas tree and the menorah on the Champ de Mars, {name}? Splendid!']},
+  {w:'vacation holiday holidays vacances trip travel travelling airplane plane beach', say:['Bon voyage, {name}! Do send me a postcard. I shall chew it lovingly.', 'Holidays are for resting, {name}. I take mine every five minutes in my bed.']},
+  {w:'daniel owner creator maker made', p:['who made you','who made this game','who is your owner'], say:['Daniel is my owner, {name}, and he built all of Paris for this game. Rather impressive, I must say.', 'My owner is Daniel, {name}. He is very kind and gives excellent pets.']},
+  {w:'leash walk walkies promenade balade follow', say:['A walk? Oh, how I adore a good walk, {name}! Only Daniel holds my leash, however.', 'Walks are my favourite activity, {name}, after naps and snacks.']},
+  {w:'smart clever intelligent genius brilliant dumb stupid', say:['I am told I am remarkably clever for a dog, {name}. I can even open the treat cupboard.', 'Everyone is clever in their own way, {name}. Do be kind to yourself.']},
+  {w:'joke jokes funny laugh lol haha mdr blague drole', say:['Why did the dog sit in the shade, {name}? Because it did not want to be a hot dog!', 'What do you call a French dog? A poodle, of course, {name}. Oui oui!', 'I am famously hilarious, {name}. Ask anyone at the fountain.']},
+  {w:'secret secrets password passwords hack hacking cheat cheats', say:['I am very good at keeping secrets, {name}. But never share your password with anyone!', 'Cheating is not very sporting, {name}. Do play fair.']},
+  {w:'weather sunny sun rain raining cloudy wind windy storm meteo soleil pluie', say:['The weather in Paris changes every few minutes, {name}. Rather like my mood near a sausage.']},
+  {w:'night day morning evening afternoon time clock hour heure soir matin nuit', say:['Day turns to night quite quickly in this Paris, {name}. Do watch the tower sparkle after dark!']},
+  {w:'animal animals cat cats chat chats bird birds pigeon pigeons squirrel squirrels horse horses', say:['Pigeons, {name}! Paris is full of them. I have chased approximately four thousand.', 'Cats are... acceptable, {name}. From a distance.']},
+  {w:'love like adore aime aimer favorite favourite best', say:['I love you too, {name}! In a strictly dog-and-friend sort of way.', 'You are one of my favourite people, {name}. Do not tell the others.']},
+  {w:'sorry pardon desole desolee oops apologize apologise excuse', say:['All is forgiven, {name}. Dogs do not hold grudges. Except against the vacuum cleaner.']},
+  {w:'please merci thanks thank grateful svp', say:['You are most welcome, {name}! Your manners are impeccable.', 'De rien, {name}! It is always a pleasure.']}
+);
 MIKA_BIG.forEach(function(tp){ tp.p = tp.p || []; tp.big = true; MIKA_TOPICS.push(tp); });   // after the special topics: those win ties
 (function(){ MIKA_TOPICS.forEach(function(tp){ tp.words = tp.w.split(' ').filter(Boolean); }); })();
 /* now and then (1 time in 12) she answers in another language instead */
@@ -5645,24 +5691,41 @@ var MIKA_LANGS = [
   ['Arabic', 'مساء الخير يا {name}. إنه لشرف عظيم أن أتحدث إليك.'],
   ['Latin', 'Salve, {name}. Magno mihi honori est tecum loqui.']
 ];
+var mikaLastTopic = {topic:null, word:'', raw:''};
 function mikaReply(text, who){
+  mikaLastTopic = {topic:null, word:'', raw:''};
   var low = String(text).toLowerCase(), h = mikaHash(who + '|' + low), name = who || 'friend', line;
+  if(/\*{3,}/.test(low)){ var rude = ['I beg your pardon, {name}! Such language. A dog has delicate ears.', 'Goodness, {name}! We do not use words like that in Paris. Let us try again, politely.', 'Language, {name}! Madame would not approve.']; return rude[mikaHash(who + low) % rude.length].split('{name}').join(name); }
   var clean = ' ' + low.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9?]+/g, ' ') + ' ';
   var tokens = {}; clean.split(' ').forEach(function(w){ if(w) tokens[w.replace(/\?/g, '')] = true; });
   if(h % 12 === 0){
     var lang = MIKA_LANGS[Math.floor(h/12) % MIKA_LANGS.length];
     line = lang[1] + ' (' + lang[0] + ')';
   } else {
-    var best = null, bestScore = 0, bestWord = '';
+    // every topic scores all the words it finds (so "the tech company apple" is about tech, not fruit); the best two
+    // both get an answer when a message is about two different things
+    var best = null, bestScore = 0, bestWord = '', second = null, secondScore = 0, secondWord = '', bestSet = {}, secondSet = {};
     MIKA_TOPICS.forEach(function(tp){
-      var sc = 0, word = '';
-      tp.words.forEach(function(w){ if(tokens[w]){ sc += 1 + w.length/20; if(w.length > word.length) word = w; } });   // longer words are more specific: they count a bit more
+      var sc = 0, word = '', hits = 0, set = {};
+      var wordAt = -1;
+      tp.words.forEach(function(w){ if(tokens[w]){ hits++; set[w] = 1; sc += 1 + w.length/20; var at = clean.lastIndexOf(' ' + w + ' '); if(at > wordAt){ wordAt = at; word = w; } } });   // longer words are more specific: they count a bit more
+      if(hits > 1) sc += hits*0.75;   // several words from the same topic: it really is about that
       tp.p.forEach(function(ph){ var q = ' ' + ph.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim() + ' '; if(clean.indexOf(q) >= 0) sc += 3; });
-      if(sc > bestScore){ best = tp; bestScore = sc; bestWord = word; }
+      if(sc > bestScore){ second = best; secondScore = bestScore; secondWord = bestWord; secondSet = bestSet; best = tp; bestScore = sc; bestWord = word; bestSet = set; }
+      else if(sc > secondScore){ second = tp; secondScore = sc; secondWord = word; secondSet = set; }
     });
+    // the second answer only if it's about OTHER words (not "apple" again, already read as the tech company)
+    if(second && (!secondWord || Object.keys(secondSet).some(function(w){ return bestSet[w]; }))) second = null;
     var list = best ? best.say : (/\?/.test(low) ? MIKA_QUESTION : MIKA_DEFAULT);
     if(typeof list === 'function') list = list(name);
     line = list[Math.floor(h/12) % list.length];
+    mikaLastTopic = {topic:best, word:bestWord, raw:line};
+    if(best && second && secondScore >= 1){   // ...and the other thing they mentioned
+      var l2 = typeof second.say === 'function' ? second.say(name) : second.say, s2 = l2[Math.floor(h/7) % l2.length];
+      if(s2.indexOf('{word}') >= 0){ var w2 = second.cap ? secondWord.charAt(0).toUpperCase() + secondWord.slice(1) : secondWord; s2 = s2.replace(/(^|[.!?]\s+)\{word\}/g, function(m, pre){ return pre + secondWord.charAt(0).toUpperCase() + secondWord.slice(1); }).split('{word}').join(w2); }
+      s2 = s2.split('{name}').join(name);
+      if(line.length + s2.length < 260) line = line + ' ' + (LANG === 'fr' ? 'Et pour ce qui est de ' : 'And as for ') + secondWord + ': ' + s2.charAt(0).toLowerCase() + s2.slice(1);
+    }
   }
   line = line.split('{name}').join(name);
   if(line.indexOf('{word}') >= 0){
@@ -5673,14 +5736,98 @@ function mikaReply(text, who){
   if(pet.sleeping) line = '*awakens with a gentle yawn* ' + line;
   return line;
 }
+/* ---------- Mika remembers: a conversation with each person ----------
+   She keeps a little memory for everyone who talks to her (for this visit): their name if they tell her, what they
+   like and dislike, their favourite things, how they feel, what they last said and what she last said. So you can
+   follow up - "why?", "really?", "tell me more", "and you?", "yes" / "no" to her questions - without saying "Mika"
+   again, for about a minute after she answers you. She asks questions back now and then, and remembers the answers.
+   Everyone sees the same thing: it all comes from the chat everyone shares. */
+var MIKA_MEM = {}, MIKA_TALK_WINDOW = 60000;
+function mikaMem(who){ var k = String(who || 'friend').toLowerCase(); return MIKA_MEM[k] || (MIKA_MEM[k] = {facts:{likes:[], dislikes:[], fav:{}}, last:null, asked:null, n:0, at:0}); }
+function mikaNorm(s){ return ' ' + String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/['’]/g, ' ').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim() + ' '; }
+function mikaPick(list, seed){ return list[mikaHash(seed) % list.length]; }
+function tidyThing(s){ return String(s).replace(/\b(very much|a lot|so much|too|beaucoup|vraiment)\b/g, '').replace(/\s+/g, ' ').trim().split(' ').slice(0, 4).join(' '); }
+var MIKA_ASK = [
+  {k:'food', q:'By the way, {name}, what is your favourite food?', a:['{x}! Excellent choice, {name}. I shall remember that you love {x}.', '{x}, {name}? Now I am hungry. I shall remember that.']},
+  {k:'color', q:'Tell me, {name}, what is your favourite colour?', a:['{x}! A very elegant colour, {name}. I shall remember it.', 'Ah, {x}. Très chic, {name}.']},
+  {k:'animal', q:'Do you have a favourite animal, {name}? Apart from me, naturally.', a:['{x}! A noble creature, {name} - though not quite as noble as a dog.', '{x}? I shall try not to be jealous, {name}.']},
+  {k:'subject', q:'What is your favourite subject at school, {name}?', a:['{x}! Madame would be pleased - unless it isn\'t French, {name}.', '{x}, {name}? How clever of you.']},
+  {k:'monument', q:'Which monument in Paris do you like best, {name}?', a:['{x}! A magnificent choice, {name}. Have you hovered over it to read its story?', 'Ah, {x}, {name}. Simply magnifique.']},
+  {k:'hobby', q:'What do you like to do for fun, {name}?', a:['{x}? How delightful, {name}. My own hobby is napping, professionally.', '{x}! I shall remember that, {name}.']}
+];
+var MIKA_LIKES = ['naps by the fountain', 'croissants', 'long walks with Daniel', 'being petted', 'chasing pigeons'];
+/* returns a reply, or null to let her usual topics answer */
+function mikaBrain(text, who, mentioned){
+  var m = mikaMem(who), x = mikaNorm(String(text).replace(/\bmika\b/ig, ' ')), name = m.facts.name || who || 'friend', seed = who + '|' + x + '|' + m.n, r;
+  function say(line){ return line.split('{name}').join(name); }
+  function rem(line){ m.last = {kind:'mem', line:line}; return say(line); }
+  // she asked something: this is the answer
+  if(m.asked && x.trim() && x.trim().split(' ').length <= 6 && !/\?|\b(why|what|who|pourquoi|quoi|qui)\b/.test(String(text).toLowerCase())){
+    var q = MIKA_ASK.filter(function(a){ return a.k === m.asked; })[0], ans = tidyThing(x.replace(/\b(my favou?rite \w+ is|i like|i love|j aime|j adore|c est|it s|its|it is|probably|maybe|le|la|les|l|the)\b/g, ' '));
+    m.asked = null;
+    if(q && ans){ m.facts.fav[q.k] = ans; return rem(mikaPick(q.a, seed).split('{x}').join(ans.charAt(0).toUpperCase() + ans.slice(1))); }
+  }
+  // telling her things
+  if((r = x.match(/ (?:my name is|i am called|call me|je m appelle|mon nom est|appelle moi) ([a-z]+)/))){ m.facts.name = r[1].charAt(0).toUpperCase() + r[1].slice(1); name = m.facts.name; return rem('Enchantée, {name}! What a lovely name. I shall remember it.'); }
+  if((r = x.match(/ my (?:favou?rite|fav) (\w+) is (.+) /)) || (r = x.match(/ (?:mon|ma) (\w+) prefere?e? (?:est|c est) (.+) /))){ var key = r[1] === 'couleur' ? 'color' : r[1] === 'colour' ? 'color' : r[1]; m.facts.fav[key] = tidyThing(r[2]); return rem('Your favourite ' + r[1] + ' is ' + m.facts.fav[key] + '? Noted, {name}. I never forget a favourite.'); }
+  if((r = x.match(/ (?:i don t like|i dont like|i do not like|i hate|je deteste|je n aime pas|j aime pas) (.+) /))){ var d = tidyThing(r[1]); if(m.facts.dislikes.indexOf(d) < 0) m.facts.dislikes.push(d); return rem(mikaPick(['No ' + d + ' for you, then, {name}. I shall remember.', 'Not a fan of ' + d + ', {name}? Understood. Your secret is safe with me.'], seed)); }
+  if((r = x.match(/ (?:i like|i love|i really like|i adore|j aime|j adore) (.+) /)) && !/\byou\b|\btoi\b|\bte\b/.test(r[1])){ var l = tidyThing(r[1]); if(m.facts.likes.indexOf(l) < 0) m.facts.likes.push(l); if(m.facts.likes.length > 8) m.facts.likes.shift(); return rem(mikaPick(['You like ' + l + '? Splendid taste, {name}. I shall remember that.', l.charAt(0).toUpperCase() + l.slice(1) + '! How wonderful, {name}. I shall keep that in my memory, next to the location of every treat.'], seed)); }
+  if((r = x.match(/ (?:i am|i m|im|je suis) (happy|sad|tired|bored|angry|excited|hungry|sick|scared|nervous|great|good|fine|okay|ok|triste|content|contente|fatigue|fatiguee|malade) /))){ m.facts.feel = r[1]; m.feelAt = m.n; }
+  // asking what she remembers
+  if(/ (what is my name|whats my name|what s my name|who am i|comment je m appelle|c est quoi mon nom|do you know my name) /.test(x)) return rem(m.facts.name ? 'Your name is ' + m.facts.name + ', of course! I never forget a friend.' : 'You haven\'t told me your name yet, ' + (who || 'friend') + '! Say "my name is..." and I shall remember.');
+  if(/ (what do i like|what things do i like|qu est ce que j aime|j aime quoi) /.test(x)) return rem(m.facts.likes.length ? 'You told me you like ' + m.facts.likes.join(', ') + ', {name}.' : 'You haven\'t told me what you like yet, {name}. Try "I like..."');
+  if((r = x.match(/ what is my (?:favou?rite|fav) (\w+) /)) || (r = x.match(/ c est quoi mon (\w+) prefere /))){ var fk = r[1] === 'colour' || r[1] === 'couleur' ? 'color' : r[1]; return rem(m.facts.fav[fk] ? 'Your favourite ' + r[1] + ' is ' + m.facts.fav[fk] + ', {name}!' : 'You haven\'t told me your favourite ' + r[1] + ' yet, {name}.'); }
+  if(/ (do you remember me|remember me|tu te souviens de moi|what do you know about me|what do you remember) /.test(x)){
+    var bits = [];
+    if(m.facts.name) bits.push('your name is ' + m.facts.name);
+    if(m.facts.likes.length) bits.push('you like ' + m.facts.likes.slice(-3).join(', '));
+    if(m.facts.dislikes.length) bits.push('you don\'t like ' + m.facts.dislikes.slice(-2).join(' or '));
+    Object.keys(m.facts.fav).forEach(function(k){ bits.push('your favourite ' + (k === 'color' ? 'colour' : k) + ' is ' + m.facts.fav[k]); });
+    if(m.facts.feel) bits.push('you said you were ' + m.facts.feel);
+    return rem(bits.length ? 'Of course I remember you, {name}! I know that ' + bits.slice(0, 5).join(', ') + '.' : 'I remember your face, {name}, but you haven\'t told me much about yourself yet. Tell me what you like!');
+  }
+  if(/ (what did i say|what did i just say|qu est ce que j ai dit) /.test(x)) return rem(m.lastText ? 'You said: « ' + m.lastText + ' », {name}.' : 'We have only just begun talking, {name}!');
+  if(/ (what did you say|repeat|say that again|pardon|quoi) $/.test(x) || / (what did you say|repeat that|say that again|tu as dit quoi) /.test(x)) return m.last ? say(m.last.line) : null;
+  // follow-ups to what she just said
+  if(m.last && Date.now() - m.at < MIKA_TALK_WINDOW*2){
+    var lw = m.last.word || 'that';
+    if(/^ (why|why not|how come|pourquoi|pourquoi pas|but why) $/.test(x)) return say(mikaPick(['Why? Because, {name}, when it comes to ' + lw + ', a dog simply knows these things.', 'A fine question, {name}! I suppose ' + lw + ' is just one of those things I feel very strongly about.', 'Why, {name}? Instinct, mostly. And a great deal of experience.'], seed));
+    if(/^ (really|seriously|vraiment|serieux|for real|are you sure|c est vrai) $/.test(x)) return say(mikaPick(['Absolutely, {name}! I never joke about ' + lw + '. Well, almost never.', 'Truly, {name}. On my honour as a dog.', 'Vraiment, {name}! Cross my paws.'], seed));
+    if(/ (tell me more|more|go on|and then|continue|dis m en plus|encore|et apres) $/.test(x) && m.last.topic){ var tp = m.last.topic, list = typeof tp.say === 'function' ? tp.say(name) : tp.say, i = (list.indexOf(m.last.raw) + 1) % list.length; if(list.length < 2) return say('That is everything I know about ' + lw + ', {name}! Ask me about something else.'); var ln = list[i].split('{word}').join(lw); m.last.raw = list[i]; m.last.line = ln.split('{name}').join(name); return say(ln); }
+    if(/^ (and you|what about you|you|et toi|et vous|toi) $/.test(x)) return say(mikaPick(['Me, {name}? I adore ' + MIKA_LIKES.slice(0, 3).join(', ') + '. Simple pleasures.', 'As for me, {name}, I am perfectly content with ' + MIKA_LIKES[mikaHash(seed + 'b') % MIKA_LIKES.length] + '.', 'Moi? I am a dog of refined tastes, {name}: ' + MIKA_LIKES[mikaHash(seed) % MIKA_LIKES.length] + ', mostly.'], seed));
+    if(/^ (yes|yeah|yep|yup|sure|of course|oui|ouais|bien sur|absolutely) $/.test(x)) return say(mikaPick(['Splendid, {name}!', 'I knew you would agree, {name}.', 'Excellent! We are of one mind, {name}.'], seed));
+    if(/^ (no|nope|nah|non|not really|pas vraiment) $/.test(x)) return say(mikaPick(['Very well, {name}. To each their own.', 'No? How curious, {name}. I shall think about that during my next nap.', 'Ah. Well, I respect your opinion, {name}.'], seed));
+    if(/^ (ok|okay|k|cool|nice|great|good|d accord|daccord|super|top|bien|ah|oh|lol|haha|mdr) $/.test(x)) return say(mikaPick(['Indeed, {name}.', 'Quite so, {name}!', '*wags tail contentedly*', 'Splendid, {name}.'], seed));
+  }
+  if(!mentioned) return '';   // not to Mika, and not a follow-up she understands: she stays quiet
+  return null;
+}
 function mikaHeard(text, who, fromOwner){
-  if(!/\bmika\b/i.test(String(text))) return;
+  var mentioned = /\bmika\b/i.test(String(text)), m = mikaMem(who);
+  if(!mentioned && !(m.at && Date.now() - m.at < MIKA_TALK_WINDOW)) return;   // talking to her, or still in a chat with her
   if((MIKA_NAP_RE.test(String(text)) || MIKA_LEASH_RE.test(String(text))) && fromOwner) return;   // she just yawns and goes to bed
-  var line = mikaReply(text, who);
+  var line = mikaComputeLine(text, who, mentioned);
+  if(!line) return;
   setTimeout(function(){
     addChatLine('Mika', line, 'orange', false, null);
     if(pet.state === 'walk') pet.petT = Math.max(pet.petT, 0.8);   // a happy little wiggle
   }, 1100);
+}
+/* what she says (and what she remembers), without saying it yet */
+function mikaComputeLine(text, who, mentioned){
+  var m = mikaMem(who);
+  var line = mikaBrain(text, who, mentioned);
+  if(line === '') return '';
+  if(line === null){
+    line = mikaReply(text, m.facts.name || who);
+    var tp = mikaLastTopic;
+    m.last = {kind:'topic', topic:tp.topic, word:tp.word, raw:tp.raw, line:line};
+    // now and then she asks something back (and listens for the answer)
+    var open = MIKA_ASK.filter(function(a){ return !m.facts.fav[a.k]; });
+    if(open.length && mikaHash(who + '|ask|' + m.n) % 4 === 0 && !/\?$/.test(line)){ var qa = open[mikaHash(who + m.n) % open.length]; m.asked = qa.k; line += ' ' + qa.q.split('{name}').join(m.facts.name || who || 'friend'); }
+  }
+  m.n++; m.at = Date.now(); m.lastText = String(text).replace(/\bmika\b[,!]?\s*/ig, '').slice(0, 80);
+  return line;
 }
 if(PILOT) window.addEventListener('keydown', function(e){ if(e.code === 'Escape' && flying && !chatOpen) exitFirstPerson(); });
 if(PILOT) window.parisPilot = {
