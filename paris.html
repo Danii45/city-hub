@@ -5466,6 +5466,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 25, 2026 · 5:00 PM</span><br>TEACHERS: Daniel can make an account a teacher. Teachers get the 🥖 ÉLITE tab to make players elite and send them to (or let them out of) the Public Shame Chamber.</li>' +
   '<li><span class="when">Nov 25, 2026 · 4:45 PM</span><br>THE AIRPORT: take the taxi from the Champ de Mars to Paris-CDG and fly to the test cities.</li>' +
   '<li><span class="when">Nov 25, 2026 · 4:30 PM</span><br>Hit Mika 3 times and you go straight to the Public Shame Chamber.</li>' +
   '<li><span class="when">Nov 25, 2026 · 4:00 PM</span><br>CLASS VILLAGES: every class has its own quartier to build in (MENU → VILLAGES). Madame\'s Baguette Village on the mountain is for elite players 🥖.</li>' +
@@ -6016,7 +6017,7 @@ if(PILOT) window.parisPilot = {
 };
 function sendChat(text){
   if(typeof amJailed === 'function' && amJailed()){ showToast(t('jailNoChat')); return; }
-  if(!net.isOwner && filterChat(text) !== text){ jail.reason = ''; try { localStorage.removeItem('paris.jailWhy'); } catch(e){} jailUid(net.uid, text); systemLine(t('jailBanner')); return; }
+  if(!isStaff() && filterChat(text) !== text){ jail.reason = ''; try { localStorage.removeItem('paris.jailWhy'); } catch(e){} jailUid(net.uid, text); systemLine(t('jailBanner')); return; }
   text = filterChat(text);
   addChatLine(t('you'), text, myColor, false, myRole());
   mikaHeard(text, net.name || 'friend', net.isOwner);
@@ -6061,7 +6062,7 @@ function receiveChat(p){
   mp.chatSeen[p.peer] = c.n;
   if(firstLook && finite(c.at) && Date.now() - c.at > 120000) return;
   var text = cleanChat(c.t);
-  if(net.isOwner && text && filterChat(text) !== text && p.by && peerRole(p) !== 'owner'){ jailUid(p.by, text); systemLine(t('jailSent', {name:playerName(p)})); return; }
+  if(isStaff() && text && filterChat(text) !== text && p.by && peerRole(p) !== 'owner' && !isTeacherUid(p.by)){ jailUid(p.by, text); systemLine(t('jailSent', {name:playerName(p)})); return; }
   if(text){ addChatLine(playerName(p), filterChat(text), peerColor(p), false, peerRole(p)); var m = net.members[p.by]; mikaHeard(filterChat(text), (m && m.name && cleanNick(m.name)) || playerName(p), peerRole(p) === 'owner'); }
 }
 
@@ -7453,6 +7454,7 @@ STR.en.whyExists = 'has an account already'; STR.fr.whyExists = 'a déjà un com
 })();
 var memberConfirm = null;
 function renderMembers(){
+  if(typeof renderEliteTab === 'function') renderEliteTab();
   if(CLAUDE_MODE){ renderMembersClaude(); return; }
   var list = document.getElementById('member-list');
   if(!net.isOwner){ list.textContent = ''; return; }
@@ -7467,7 +7469,7 @@ function renderMembers(){
     nm.textContent = m.name + (owned ? ' - ' + t('owns', {n:owned}) : '');
     row.appendChild(nm);
     if(!m.owner){
-      var tags = (isJailedUid(uid) ? '🚔 ' : '') + (m.elite ? '🥖 ' : '');
+      var tags = (isJailedUid(uid) ? '🚔 ' : '') + (eliteOf(uid) ? '🥖 ' : '') + (m.teacher ? '👩‍🏫 ' : '');
       nm.textContent = tags + m.name + (RANKS[m.rank] ? ' · ' + tx(RANKS[m.rank]) : '') + (owned ? ' - ' + t('owns', {n:owned}) : '');
       var build = function(box){
       var sel = document.createElement('select');
@@ -7494,13 +7496,22 @@ function renderMembers(){
       });
       box.appendChild(nv);
       var el = document.createElement('button');
-      el.className = 'btn navy-give' + (m.elite ? ' on' : '');
-      el.textContent = t('eliteGive') + (m.elite ? ' ✓' : '');
+      var isEl = eliteOf(uid);
+      el.className = 'btn navy-give' + (isEl ? ' on' : '');
+      el.textContent = t('eliteGive') + (isEl ? ' ✓' : '');
       el.addEventListener('click', function(){
-        var give = !m.elite;
-        net.db.ref('paris/members/' + uid + '/elite').set(give ? true : null).then(function(){ addMsg(t(give ? 'eliteGiven' : 'eliteTaken', {name:m.name}), 'good'); }).catch(function(){ addMsg(t('saveFail'), 'bad'); });
+        var give = !eliteOf(uid);
+        setElite(uid, give).then(function(){ addMsg(t(give ? 'eliteGiven' : 'eliteTaken', {name:m.name}), 'good'); renderMembers(); }).catch(function(){ addMsg(t('saveFail'), 'bad'); });
       });
       box.appendChild(el);
+      var tch = document.createElement('button');
+      tch.className = 'btn navy-give' + (m.teacher ? ' on' : '');
+      tch.textContent = t('teacherGive') + (m.teacher ? ' ✓' : '');
+      tch.addEventListener('click', function(){
+        var give = !m.teacher;
+        net.db.ref('paris/members/' + uid + '/teacher').set(give ? true : null).then(function(){ addMsg(t(give ? 'teacherGiven' : 'teacherTaken', {name:m.name}), 'good'); }).catch(function(){ addMsg(t('saveFail'), 'bad'); });
+      });
+      box.appendChild(tch);
       var cs = document.createElement('select');
       cs.className = 'rank-select'; cs.title = t('vgClassSel'); cs.setAttribute('aria-label', t('vgClassSel') + ' - ' + m.name);
       var c0 = document.createElement('option'); c0.value = ''; c0.textContent = t('vgClassSel') + '?'; cs.appendChild(c0);
@@ -7571,7 +7582,7 @@ function renderPlayerMenu(){
   if(!uid || !m || !pmBuilders[uid]){ closePlayerMenu(); return; }
   var plots = PLOTS.filter(function(p){ return p.data && p.data.o === uid; }).map(plotLabel);
   var cls = ownersAll[uid] && ownersAll[uid].cls && V_BY_ID[ownersAll[uid].cls];
-  pm.el.querySelector('h3').textContent = (isJailedUid(uid) ? '🚔 ' : '') + (m.elite ? '🥖 ' : '') + m.name;
+  pm.el.querySelector('h3').textContent = (isJailedUid(uid) ? '🚔 ' : '') + (eliteOf(uid) ? '🥖 ' : '') + (m.teacher ? '👩‍🏫 ' : '') + m.name;
   pm.el.querySelector('.pm-sub').textContent = (cls ? villageName(cls) + ' · ' : '') + t('pmPlots') + ': ' + (plots.length ? plots.join(', ') : t('pmNone'));
   var grid = pm.el.querySelector('.pm-grid'); grid.textContent = '';
   pmBuilders[uid](grid);
@@ -7629,7 +7640,7 @@ function presenceState(){
   if(flying && driving && fly.on){ s.fly = [r2(fly.rear), r2(fly.down), r2(fly.pitch), r2(fly.bank)]; }
   s.ver = updateCheck.ver;
   if(typeof jail !== 'undefined' && jail.me) s.jail = 1;
-  if(typeof amElite === 'function' && !net.isOwner && amElite()) s.el = 1;
+  if(typeof amElite === 'function' && !net.isOwner && !amTeacher() && amElite()) s.el = 1;
   if(updateCheck.outdated()) s.old = 1;
   if(net.isOwner){ s.role = 'owner'; if(myAnnounce) s.announce = myAnnounce; if(myNap && napPhase()) s.nap = myNap; if(myLeash) s.leash = myLeash; }
   return s;
@@ -9080,8 +9091,26 @@ try { jail.local = localStorage.getItem('paris.jail') === '1'; } catch(e){}
   var st = document.createElement('style'); st.textContent = '#jail-banner{position:fixed; left:50%; top:calc(70px + env(safe-area-inset-top,0px)); transform:translateX(-50%); z-index:50; padding:10px 14px; font-family:"VT323", monospace; font-size:21px; background:#8a1c1c; color:#fff; border-color:#3a0a0a; max-width:90vw; text-align:center;} #jail-banner.hidden{display:none;}';
   document.head.appendChild(st); document.body.appendChild(el); jail.banner = el;
 })();
-function isJailedUid(uid){ var m = net.members[uid]; return !!((m && m.jail) || jail.all[uid]); }
-function amJailed(){ return !net.isOwner && signedIn() && (jail.local || isJailedUid(net.uid)); }
+/* TEACHERS: Daniel can make any account a teacher (MENU → PLAYERS → the player's menu → TEACHER). Teachers can't be
+   jailed, and get the ÉLITE tab: make players elite 🥖, and send them to / let them out of the Public Shame Chamber.
+   Their changes go in paris/mod (jail, elite), which Daniel's account and teachers can write. */
+var mod = {jail:{}, elite:{}, on:false, ok:true};
+function isTeacherUid(uid){ var m = net.members && net.members[uid]; return !!(m && m.teacher); }
+function amTeacher(){ return !!(net && net.uid && isTeacherUid(net.uid)); }
+function isStaff(){ return !!(net && (net.isOwner || amTeacher())); }
+function eliteOf(uid){ var m = net.members && net.members[uid]; return !!((m && m.elite) || mod.elite[uid]); }
+function isJailedUid(uid){ var m = net.members[uid]; return !!((m && m.jail) || jail.all[uid] || mod.jail[uid]); }
+function amJailed(){ return !isStaff() && signedIn() && (jail.local || isJailedUid(net.uid)); }
+function modListen(){
+  if(mod.on || CLAUDE_MODE || !net.db || !net.uid) return;
+  mod.on = true;
+  net.db.ref('paris/mod').on('value', function(s){
+    var v = s.val() || {}; mod.jail = v.jail || {}; mod.elite = v.elite || {}; mod.ok = true;
+    renderMembers(); if(typeof renderEliteTab === 'function') renderEliteTab();
+  }, function(){ mod.ok = false; });
+}
+/* write to every place a record could be, and succeed if any of them worked */
+function anyOk(list){ return Promise.all(list.map(function(p){ return p.then(function(){ return 1; }, function(){ return 0; }); })).then(function(r){ if(!r.some(Boolean)) throw new Error('denied'); }); }
 /* send someone (or yourself) to jail */
 function jailUid(uid, why){
   if(!net.db || !uid) return;
@@ -9090,27 +9119,43 @@ function jailUid(uid, why){
     jail.local = true; try { localStorage.setItem('paris.jail', '1'); } catch(e){}
     net.db.ref('paris/owners/' + uid + '/jail').set(rec).catch(function(){});
   }
-  if(net.isOwner){ net.db.ref('paris/members/' + uid + '/jail').set(rec).catch(function(){}); }
+  if(isStaff()){
+    mod.jail[uid] = rec;
+    var w = [net.db.ref('paris/mod/jail/' + uid).set(rec)];
+    if(net.isOwner) w.push(net.db.ref('paris/members/' + uid + '/jail').set(rec));
+    return anyOk(w);
+  }
+  return Promise.resolve();
 }
 function releaseUid(uid){
-  if(!net.isOwner || !net.db) return Promise.resolve();
-  delete jail.all[uid];
-  return Promise.all([net.db.ref('paris/members/' + uid + '/jail').remove(), net.db.ref('paris/owners/' + uid + '/jail').remove()]);
+  if(!isStaff() || !net.db) return Promise.resolve();
+  delete jail.all[uid]; delete mod.jail[uid];
+  var w = [net.db.ref('paris/mod/jail/' + uid).remove(), net.db.ref('paris/owners/' + uid + '/jail').remove()];
+  if(net.isOwner) w.push(net.db.ref('paris/members/' + uid + '/jail').remove());
+  return anyOk(w);
+}
+function setElite(uid, give){
+  if(!isStaff() || !net.db) return Promise.reject(new Error('denied'));
+  if(give) mod.elite[uid] = true; else delete mod.elite[uid];
+  var w = [give ? net.db.ref('paris/mod/elite/' + uid).set(true) : net.db.ref('paris/mod/elite/' + uid).remove()];
+  if(net.isOwner) w.push(net.db.ref('paris/members/' + uid + '/elite').set(give ? true : null));
+  else if(!give && net.members[uid] && net.members[uid].elite){ delete mod.elite[uid]; return Promise.reject(new Error('owner')); }   // only Daniel can undo elite he gave from his list
+  return anyOk(w);
 }
 /* who is in jail: the owner sees everyone's own records; a player watches their own */
 function jailListen(){
   if(!net.db || !net.uid || jail.listened === net.uid) return;
   jail.listened = net.uid;
-  if(net.isOwner){
+  if(isStaff()){
     net.db.ref('paris/owners').on('value', function(s){
       var v = s.val() || {}, all = {};
-      Object.keys(v).forEach(function(u){ if(v[u] && v[u].jail){ all[u] = v[u].jail; if(!(net.members[u] && net.members[u].jail)) net.db.ref('paris/members/' + u + '/jail').set(v[u].jail).catch(function(){}); } });
-      jail.all = all; renderMembers();
+      Object.keys(v).forEach(function(u){ if(v[u] && v[u].jail){ all[u] = v[u].jail; if(!mod.jail[u]) net.db.ref('paris/mod/jail/' + u).set(v[u].jail).catch(function(){ if(net.isOwner && !(net.members[u] && net.members[u].jail)) net.db.ref('paris/members/' + u + '/jail').set(v[u].jail).catch(function(){}); }); } });
+      jail.all = all; renderMembers(); if(typeof renderEliteTab === 'function') renderEliteTab();
     }, function(){});
   } else {
     var first = true;
     net.db.ref('paris/owners/' + net.uid + '/jail').on('value', function(s){
-      var on = !!s.val(), inList = !!(net.members[net.uid] && net.members[net.uid].jail);
+      var on = !!s.val(), inList = !!((net.members[net.uid] && net.members[net.uid].jail) || mod.jail[net.uid]);
       if(on || inList){ jail.all[net.uid] = true; }
       else {
         if(jail.local || jail.all[net.uid]){ if(!first) showToast(t('jailedYou')); }
@@ -9127,7 +9172,7 @@ STR.fr.jailBannerMika = '🚔 TU ES DANS LA CHAMBRE DE LA HONTE PUBLIQUE pour av
 STR.en.mikaStrike = 'STRIKE {n}/3 for hitting Mika! At 3 you go to the Public Shame Chamber.'; STR.fr.mikaStrike = 'AVERTISSEMENT {n}/3 pour avoir frappé Mika ! À 3, c\'est la chambre de la honte publique.';
 STR.en.mikaJailed = '{name} hit Mika 3 times and was sent to the Public Shame Chamber.'; STR.fr.mikaJailed = '{name} a frappé Mika 3 fois et a été envoyé(e) dans la chambre de la honte publique.';
 function mikaStrike(){
-  if(!net.uid || net.isOwner || !signedIn()) return;
+  if(!net.uid || isStaff() || !signedIn()) return;
   var key = 'paris.mikaHits.' + net.uid, n = 0;
   try { n = (parseInt(localStorage.getItem(key), 10) || 0) + 1; localStorage.setItem(key, n >= 3 ? '0' : String(n)); } catch(e){ n = 1; }
   if(n < 3){ setTimeout(function(){ showToast(t('mikaStrike', {n:n})); }, 2600); return; }
@@ -9139,7 +9184,7 @@ function mikaStrike(){
 }
 try { jail.reason = localStorage.getItem('paris.jailWhy') || ''; } catch(e){}
 function jailTick(){
-  if(net.uid && signedIn()) jailListen();
+  if(net.uid && signedIn() && net.members && net.members[net.uid]){ modListen(); jailListen(); }
   var on = amJailed();
   if(on !== jail.me){ jail.me = on; jail.banner.textContent = t(jail.reason === 'mika' ? 'jailBannerMika' : 'jailBanner'); jail.banner.classList.toggle('hidden', !on); sendPresence(true); if(on) closeEditors(); }
   if(!on) return;
@@ -9178,7 +9223,7 @@ STR.en.eliteYou = '🥖 Madame made you an ELITE player! You can build in the Ba
 STR.fr.eliteYou = '🥖 Madame t\'a nommé(e) joueur d\'élite ! Tu peux construire dans le Village de la Baguette sur la montagne (MENU → VILLAGES).';
 STR.en.vgClassSel = 'Class'; STR.fr.vgClassSel = 'Classe';
 var myClass = {cls:null, listened:null}, ownersAll = {};
-function amElite(){ return !!(typeof net !== 'undefined' && net && (net.isOwner || (net.uid && net.members && net.members[net.uid] && net.members[net.uid].elite))); }
+function amElite(){ return !!(typeof net !== 'undefined' && net && (net.isOwner || (net.uid && (amTeacher() || eliteOf(net.uid))))); }
 /* your class: what you picked, or the village of a plot you own */
 function myVillageId(){
   if(myClass.cls && V_BY_ID[myClass.cls]) return myClass.cls;
@@ -9205,14 +9250,13 @@ function setMyClass(id){
   renderVillages();
 }
 function villageListen(){
-  if(CLAUDE_MODE || !net.db || !net.uid || myClass.listened === net.uid) return;
+  if(CLAUDE_MODE || !net.db || !net.uid || !net.members || !net.members[net.uid] || myClass.listened === net.uid) return;
   myClass.listened = net.uid;
-  if(net.isOwner){
+  if(isStaff()){
     net.db.ref('paris/owners').on('value', function(s){ ownersAll = s.val() || {}; renderMembers(); }, function(){});
   } else {
     net.db.ref('paris/owners/' + net.uid + '/cls').on('value', function(s){ myClass.cls = s.val() || null; renderVillages(); }, function(){});
-    var wasElite = null;
-    net.db.ref('paris/members/' + net.uid + '/elite').on('value', function(s){ var e = !!s.val(); if(wasElite === false && e) systemLine(t('eliteYou')); wasElite = e; sendPresence(true); }, function(){});
+
   }
 }
 /* ---- the flight: the camera rises, swoops over and comes down over the village's plaza ---- */
@@ -9244,8 +9288,10 @@ function farLandTick(){
   g.position.copy(camera.position).add(farLand.c.clone().sub(camera.position).multiplyScalar(k));
   if(farLand.bag) farLand.bag.rotation.y = bigBaguette.rotation.y;
 }
+var wasElite = null;
 function villageTick(){
   if(net.uid) villageListen();
+  if(net.uid && signedIn() && net.members && net.members[net.uid] && !net.isOwner){ var e = amElite(); if(wasElite === false && e){ systemLine(t('eliteYou')); sendPresence(true); } if(wasElite !== e && wasElite !== null) sendPresence(true); wasElite = e; }
   if(bigBaguette) bigBaguette.rotation.y = performance.now()*0.00025;
   farLandTick();
   if(!vFlight) return;
@@ -9306,6 +9352,99 @@ function renderVillages(){
 langHooks.push(function(){ var b = document.getElementById('tab-btn-villages'); if(b) b.textContent = t('tabVillages'); renderVillages(); });
 renderVillages();
 if(!CLAUDE_MODE) fillClassPickers();
+/* ---------- the ÉLITE tab (Daniel and teachers): every player, with 🥖 ELITE and SHAME CHAMBER / RELEASE ---------- */
+STR.en.tabElite = '🥖 ÉLITE'; STR.fr.tabElite = '🥖 ÉLITE';
+STR.en.etTitle = 'ELITE PLAYERS AND THE SHAME CHAMBER'; STR.fr.etTitle = 'JOUEURS D\'ÉLITE ET CHAMBRE DE LA HONTE';
+STR.en.etNote = '🥖 ELITE players can build in the Baguette Village on the mountain. 🚔 sends a player to the Public Shame Chamber; RELEASE lets them out.';
+STR.fr.etNote = 'Les joueurs d\'élite 🥖 peuvent construire dans le Village de la Baguette sur la montagne. 🚔 envoie un joueur dans la chambre de la honte publique ; LIBÉRER le fait sortir.';
+STR.en.etSearch = 'Find a player...'; STR.fr.etSearch = 'Chercher un joueur...';
+STR.en.etAll = 'All classes'; STR.fr.etAll = 'Toutes les classes';
+STR.en.etInJail = 'In the Shame Chamber: {n}'; STR.fr.etInJail = 'Dans la chambre de la honte : {n}';
+STR.en.etEliteN = 'Elite: {n}'; STR.fr.etEliteN = 'Élite : {n}';
+STR.en.etNeedRules = 'That didn\'t save - Daniel needs to add the teacher rules to the database (see the instructions he got).';
+STR.fr.etNeedRules = 'Ça n\'a pas été enregistré - Daniel doit ajouter les règles des enseignants à la base de données.';
+STR.en.etOwnerOnly = 'Daniel gave this player elite from his own list - only Daniel\'s account can take it away.'; STR.fr.etOwnerOnly = 'Daniel a donné l\'élite à ce joueur depuis sa liste - seul le compte de Daniel peut l\'enlever.';
+STR.en.teacherGive = '👩‍🏫 TEACHER'; STR.fr.teacherGive = '👩‍🏫 ENSEIGNANT(E)';
+STR.en.teacherGiven = '{name} is now a teacher: they have the ÉLITE tab.'; STR.fr.teacherGiven = '{name} est maintenant enseignant(e) : l\'onglet ÉLITE est disponible.';
+STR.en.teacherTaken = '{name} is no longer a teacher.'; STR.fr.teacherTaken = '{name} n\'est plus enseignant(e).';
+var et = {q:'', cls:'', busy:{}};
+(function makeEliteTab(){
+  var help = document.getElementById('tab-btn-help'), btn = document.createElement('button');
+  btn.className = 'tab-btn hidden'; btn.id = 'tab-btn-elite'; btn.textContent = t('tabElite');
+  help.parentNode.insertBefore(btn, help);
+  var panel = document.createElement('div'); panel.className = 'tab-panel hidden'; panel.id = 'tab-elite';
+  document.getElementById('tab-play').parentNode.insertBefore(panel, document.getElementById('tab-play').nextSibling);
+  titleTabs.push({name:'elite', btn:btn, panel:panel});
+  btn.addEventListener('click', function(){ showTitleTab('elite'); renderEliteTab(); });
+  panel.innerHTML = '<div class="settings-block"><div class="settings-label" id="et-title"></div><div class="msg" id="et-note"></div>' +
+    '<div class="et-tools"><input id="et-q" class="text-input menu-input" autocomplete="off" spellcheck="false"><select id="et-cls" class="rank-select"></select></div>' +
+    '<div class="msg" id="et-count"></div><div id="et-list"></div><div class="msg" id="et-msg"></div></div>';
+  var st = document.createElement('style');
+  st.textContent = '#tab-elite .et-tools{display:flex; gap:8px; margin:8px 0;} #tab-elite .et-tools input{flex:1; min-width:0;} #tab-elite .et-tools select{margin:0;}' +
+    '#et-list .et-row{display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:6px; align-items:center; padding:5px 0; border-bottom:1px dashed var(--ink-soft); font-size:17px;}' +
+    '#et-list .et-name{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;} #et-list .et-name small{color:var(--ink-soft); font-size:14px;} #et-list .btn{font-size:8px; padding:8px 7px; white-space:nowrap;}' +
+    '#et-list .btn.on{background:#b8822e; color:#fff;} #et-list .btn.jail-on{background:#8a1c1c; color:#fff;}';
+  document.head.appendChild(st);
+  var q = panel.querySelector('#et-q'), cs = panel.querySelector('#et-cls');
+  [q, cs].forEach(function(el){ el.addEventListener('keydown', function(e){ e.stopPropagation(); }); el.addEventListener('keyup', function(e){ e.stopPropagation(); }); });
+  q.addEventListener('input', function(){ et.q = q.value; renderEliteTab(); });
+  cs.addEventListener('change', function(){ et.cls = cs.value; renderEliteTab(); });
+})();
+function renderEliteTab(){
+  var btn = document.getElementById('tab-btn-elite'), panel = document.getElementById('tab-elite');
+  if(!btn) return;
+  var staff = !CLAUDE_MODE && signedIn() && isStaff();
+  btn.classList.toggle('hidden', !staff);
+  btn.textContent = t('tabElite');
+  if(!staff){ if(!panel.classList.contains('hidden')) showTitleTab('play'); return; }
+  panel.querySelector('#et-title').textContent = t('etTitle');
+  panel.querySelector('#et-note').textContent = t('etNote');
+  var q = panel.querySelector('#et-q'); q.placeholder = t('etSearch');
+  var cs = panel.querySelector('#et-cls');
+  if(!cs.options.length || cs.getAttribute('data-lang') !== LANG){
+    cs.textContent = ''; cs.setAttribute('data-lang', LANG);
+    var o0 = document.createElement('option'); o0.value = ''; o0.textContent = t('etAll'); cs.appendChild(o0);
+    VILLAGES.forEach(function(v){ if(v.elite) return; var o = document.createElement('option'); o.value = v.id; o.textContent = tx(v.t); cs.appendChild(o); });
+    cs.value = et.cls;
+  }
+  function clsOf(uid){
+    var c = ownersAll[uid] && ownersAll[uid].cls;
+    if(c) return c;
+    var pl = PLOTS.filter(function(p){ return p.data && p.data.o === uid && p.village !== 'baguette'; })[0];
+    return pl ? (pl.village || 'kaiman') : '';
+  }
+  var ids = Object.keys(net.members || {}).filter(function(u){ var m = net.members[u]; return m && typeof m.name === 'string' && !m.owner && !m.teacher; });
+  var nJail = ids.filter(isJailedUid).length, nElite = ids.filter(eliteOf).length;
+  panel.querySelector('#et-count').textContent = t('etInJail', {n:nJail}) + ' · ' + t('etEliteN', {n:nElite});
+  var needle = nameKey(et.q || '');
+  ids = ids.filter(function(u){ return (!needle || nameKey(net.members[u].name).indexOf(needle) >= 0) && (!et.cls || clsOf(u) === et.cls); });
+  // jailed players first, then elite, then by name
+  ids.sort(function(a, b){ return (isJailedUid(b) - isJailedUid(a)) || (eliteOf(b) - eliteOf(a)) || net.members[a].name.localeCompare(net.members[b].name); });
+  var list = panel.querySelector('#et-list'); list.textContent = '';
+  var msg = panel.querySelector('#et-msg');
+  function fail(err){ msg.textContent = t(err && err.message === 'owner' ? 'etOwnerOnly' : 'etNeedRules'); msg.className = 'msg bad'; }
+  ids.forEach(function(uid){
+    var m = net.members[uid], row = document.createElement('div'); row.className = 'et-row';
+    var nm = document.createElement('span'); nm.className = 'et-name';
+    var c = clsOf(uid);
+    nm.textContent = (isJailedUid(uid) ? '🚔 ' : '') + (eliteOf(uid) ? '🥖 ' : '') + m.name + ' ';
+    if(c && V_BY_ID[c]){ var sm = document.createElement('small'); sm.textContent = tx(V_BY_ID[c].t); nm.appendChild(sm); }
+    row.appendChild(nm);
+    var eb = document.createElement('button'), isEl = eliteOf(uid);
+    eb.className = 'btn' + (isEl ? ' on' : ''); eb.textContent = '🥖 ' + (isEl ? 'ÉLITE ✓' : 'ÉLITE');
+    eb.addEventListener('click', function(){ setElite(uid, !eliteOf(uid)).then(function(){ msg.textContent = ''; renderEliteTab(); }).catch(fail); });
+    row.appendChild(eb);
+    var jb = document.createElement('button'), inJ = isJailedUid(uid);
+    jb.className = 'btn' + (inJ ? ' jail-on' : ''); jb.textContent = inJ ? '🚔 ' + t('jailRelease') : '🚔 ' + t('jailBtn');
+    jb.addEventListener('click', function(){
+      var p = isJailedUid(uid) ? releaseUid(uid) : jailUid(uid, tx(V_BY_ID.baguette.t));
+      (p || Promise.resolve()).then(function(){ msg.textContent = ''; renderEliteTab(); renderMembers(); }).catch(function(){ renderEliteTab(); fail(); });
+    });
+    row.appendChild(jb);
+    list.appendChild(row);
+  });
+}
+langHooks.push(renderEliteTab);
 
 function animate(){
   requestAnimationFrame(animate);
