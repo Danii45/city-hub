@@ -521,6 +521,8 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
         <div class="speed-hint" data-t="musicHint">Accordion music.</div>
         <div class="settings-label second"><span data-t="darkLabel">DARK MODE</span><button class="toggle" id="dark-toggle">OFF</button></div>
         <div class="settings-label second hidden" id="navy-row"><span data-t="navyLabel">DARK BLUE MODE</span><button class="toggle" id="navy-toggle">OFF</button></div>
+        <div class="settings-label second hidden" id="mikaai-row"><span data-t="mikaAiLabel">MIKA AI</span><button class="toggle" id="mikaai-toggle">OFF</button></div>
+        <div class="msg hidden" id="mikaai-note">Claude writes Mika's replies (claude.ai only). Everyone sees them.</div>
         <div class="settings-label second"><span data-t="skyLabel">SKY</span><button class="toggle" id="sky-toggle">ON</button></div>
         <div class="speed-hint" data-t="skyHint">Day, night and weather.</div>
       </div>
@@ -5802,8 +5804,18 @@ function mikaHeard(text, who, fromOwner){
   var mentioned = /\bmika\b/i.test(String(text)), m = mikaMem(who);
   if(!mentioned && !(m.at && Date.now() - m.at < MIKA_TALK_WINDOW)) return;   // talking to her, or still in a chat with her
   if((MIKA_NAP_RE.test(String(text)) || MIKA_LEASH_RE.test(String(text))) && fromOwner) return;   // she just yawns and goes to bed
+  var line = mikaComputeLine(text, who, mentioned);
+  if(!line) return;
+  setTimeout(function(){
+    addChatLine('Mika', line, 'orange', false, null);
+    if(pet.state === 'walk') pet.petT = Math.max(pet.petT, 0.8);   // a happy little wiggle
+  }, 1100);
+}
+/* what she says (and what she remembers), without saying it yet */
+function mikaComputeLine(text, who, mentioned){
+  var m = mikaMem(who);
   var line = mikaBrain(text, who, mentioned);
-  if(line === '') return;
+  if(line === '') return '';
   if(line === null){
     line = mikaReply(text, m.facts.name || who);
     var tp = mikaLastTopic;
@@ -5813,15 +5825,12 @@ function mikaHeard(text, who, fromOwner){
     if(open.length && mikaHash(who + '|ask|' + m.n) % 4 === 0 && !/\?$/.test(line)){ var qa = open[mikaHash(who + m.n) % open.length]; m.asked = qa.k; line += ' ' + qa.q.split('{name}').join(m.facts.name || who || 'friend'); }
   }
   m.n++; m.at = Date.now(); m.lastText = String(text).replace(/\bmika\b[,!]?\s*/ig, '').slice(0, 80);
-  setTimeout(function(){
-    addChatLine('Mika', line, 'orange', false, null);
-    if(pet.state === 'walk') pet.petT = Math.max(pet.petT, 0.8);   // a happy little wiggle
-  }, 1100);
+  return line;
 }
 function sendChat(text){
   text = filterChat(text);
   addChatLine(t('you'), text, myColor, false, myRole());
-  mikaHeard(text, net.name || 'friend', net.isOwner);
+  if(typeof mikaAIActive === 'function' && mikaAIActive()) mikaAIHeard(text, net.name || 'friend', net.isOwner); else mikaHeard(text, net.name || 'friend', net.isOwner);
   if(net.isOwner && MIKA_NAP_RE.test(text)) ownerNap();
   if(net.isOwner && MIKA_LEASH_RE.test(text)) ownerLeash();
   if(!mp.others.length) systemLine(t('chatAlone'));
@@ -5863,7 +5872,7 @@ function receiveChat(p){
   mp.chatSeen[p.peer] = c.n;
   if(firstLook && finite(c.at) && Date.now() - c.at > 120000) return;
   var text = cleanChat(c.t);
-  if(text){ addChatLine(playerName(p), filterChat(text), peerColor(p), false, peerRole(p)); var m = net.members[p.by]; mikaHeard(filterChat(text), (m && m.name && cleanNick(m.name)) || playerName(p), peerRole(p) === 'owner'); }
+  if(text){ addChatLine(playerName(p), filterChat(text), peerColor(p), false, peerRole(p)); var m = net.members[p.by]; if(!(p.presence && p.presence.mkai)) mikaHeard(filterChat(text), (m && m.name && cleanNick(m.name)) || playerName(p), peerRole(p) === 'owner'); }
 }
 
 /* ---------- What's in front of you: the E prompt, and what E does ---------- */
@@ -7282,6 +7291,7 @@ function presenceState(){
   if(flying && driving && fly.on){ s.fly = [r2(fly.rear), r2(fly.down), r2(fly.pitch), r2(fly.bank)]; }
   s.ver = updateCheck.ver;
   if(typeof lifeOn === 'function' && lifeOn() && life.eco.ch) s.look = lookCode(life.eco.ch);
+  if(typeof mikaAIActive === 'function' && mikaAIActive()){ s.mkai = 1; if(mikaAI.say) s.mk = mikaAI.say; }
   if(updateCheck.outdated()) s.old = 1;
   if(net.isOwner){ s.role = 'owner'; if(myAnnounce) s.announce = myAnnounce; if(myNap && napPhase()) s.nap = myNap; if(myLeash) s.leash = myLeash; }
   return s;
@@ -7421,7 +7431,7 @@ function onRoomPeers(change){
   var live = {};
   others.forEach(function(p){ live[p.peer] = true; });
   Object.keys(mp.avatars).forEach(function(k){ if(!live[k]) removeAvatar(k); });
-  others.forEach(function(p){ receiveChat(p); receiveAnnounce(p); receiveNap(p); receiveLeash(p); });
+  others.forEach(function(p){ receiveChat(p); receiveAnnounce(p); receiveNap(p); receiveLeash(p); receiveMikaSay(p); });
   resolveColorClash();
   renderPlayers();
   renderSwatches();
@@ -9480,6 +9490,94 @@ function goLandmark(l){
     placeAtLandmark(l);
     requestFirstPerson('walk');
   }
+}
+
+/* ---------- MIKA AI (claude.ai only): Claude writes Mika's replies ----------
+   SETTINGS → MIKA AI (only on the claude.ai version: pages there can ask Claude, using the account of the person
+   playing; the website can't). When it's on, whatever you say to Mika is answered by Claude playing Mika: Daniel's
+   very polite little dog, short kid-friendly answers, a little French, and she remembers your conversation. Your
+   game sends her answer to everyone, so they all see the same Mika (their own Mika stays quiet for your messages).
+   If Claude can't answer (busy, not allowed), she falls back to her usual replies. */
+var mikaAI = {ok:false, on:false, sample:null, busy:0, say:null, history:{}};
+try { mikaAI.on = localStorage.getItem('paris.mikaAI') === 'on'; } catch(e){}
+STR.en.mikaAiLabel = 'MIKA AI'; STR.fr.mikaAiLabel = 'MIKA IA';
+function mikaAIActive(){ return mikaAI.ok && mikaAI.on && !!mikaAI.sample; }
+if(CLAUDE_MODE) claude.use('sample').then(function(s){
+  if(!s) return;
+  mikaAI.sample = s; mikaAI.ok = true;
+  document.getElementById('mikaai-row').classList.remove('hidden');
+  document.getElementById('mikaai-note').classList.remove('hidden');
+  setToggle(document.getElementById('mikaai-toggle'), mikaAI.on);
+}).catch(function(){});
+document.getElementById('mikaai-toggle').addEventListener('click', function(){
+  mikaAI.on = !mikaAI.on;
+  try { localStorage.setItem('paris.mikaAI', mikaAI.on ? 'on' : 'off'); } catch(e){}
+  setToggle(document.getElementById('mikaai-toggle'), mikaAI.on);
+  showToast(mikaAI.on ? L2('Mika AI is on - say "Mika" in the chat to talk to her!', 'Mika IA est activée - dis « Mika » dans le chat pour lui parler !') : L2('Mika AI is off.', 'Mika IA est désactivée.'));
+  sendPresence(true);
+});
+langHooks.push(function(){ setToggle(document.getElementById('mikaai-toggle'), mikaAI.on); });
+function mikaAIContext(){
+  var bits = [];
+  bits.push(pet.sleeping ? 'You are napping in your bed right now (you wake up politely to answer).' : 'You are trotting around the park by the Eiffel Tower.');
+  if(skyState.night) bits.push('It is night in the game.');
+  if(skyState.rain > 0.4) bits.push(HOLIDAY ? 'It is snowing.' : 'It is raining.');
+  if(HOLIDAY) bits.push('It is the holiday season: there is a big Christmas tree and a Hanukkah menorah on the Champ de Mars, and you wear a Santa hat.');
+  var bf = mika.online ? bestFriend() : null;
+  if(bf) bits.push('Your best friend (the person who petted you most) is ' + bf.name + '.');
+  if(leash.on) bits.push('You are on a walk on your red leash with Daniel.');
+  return bits.join(' ');
+}
+var MIKA_AI_RULES = 'You are Mika, a small fluffy dog, in "Paris", a 3D multiplayer game Daniel (your real owner, a student) made for his French class. ' +
+  'Players walk, drive, build shops and houses, and chat; Madame is the French teacher. You speak in perfect, very polite, formal English (like a refined butler), ' +
+  'with a little French sprinkled in; if the player writes in French, answer in simple, correct French. Address the player by name. ' +
+  'Facts about you: your owner is Daniel; your bed is by the fountain next to the Eiffel Tower and you nap there every few minutes; players can pet you (walk up and press E); ' +
+  'if a car hits you, you fly to heaven with a choir and come back; you love naps, croissants, walks and being petted; you dislike pigeons a little and cats a lot. ' +
+  'Rules: reply in 1 to 3 short sentences (under 50 words), as plain chat text (no lists, no markdown, no emojis except rarely). Stay in character as Mika the dog. ' +
+  'Everyone playing is a student, so keep everything kind and school-appropriate; if someone is rude or asks for something inappropriate, gently and politely change the subject. ' +
+  'Never ask for personal information (address, school, phone, age, real full name). Encourage learning French when it fits naturally. ' +
+  'You can help with French words and simple questions about Paris, but keep it short.';
+/* answer one message with Claude; falls back to the usual Mika if anything goes wrong */
+function mikaAIHeard(text, who, fromOwner){
+  var mentioned = /\bmika\b/i.test(String(text)), m = mikaMem(who);
+  if(!mentioned && !(m.at && Date.now() - m.at < MIKA_TALK_WINDOW)) return;
+  if((MIKA_NAP_RE.test(String(text)) || MIKA_LEASH_RE.test(String(text))) && fromOwner) return;
+  if(mikaAI.busy > 2) return;
+  m.at = Date.now();
+  var key = String(who).toLowerCase(), hist = mikaAI.history[key] || (mikaAI.history[key] = []);
+  var input = [{role:'user', content:MIKA_AI_RULES + '\n\nRight now: ' + mikaAIContext() + '\n\nReply only with what Mika says. Ready?'}, {role:'assistant', content:'Indeed. I am Mika, at your service.'}]
+    .concat(hist.slice(-12), [{role:'user', content:who + ' says: ' + String(text).slice(0, 300) + (mentioned ? '' : '\n(They did not say "Mika". If this message is clearly meant for other players and not a follow-up to you, reply with exactly: (silent))')}]);
+  mikaAI.busy++;
+  mikaAI.sample(input, {modelTier:'quick', cache:false}).then(function(res){
+    var line = String(res && res.text || '').replace(/^\s*(Mika\s*:\s*)/i, '').replace(/[*_#`]+/g, function(x){ return x === '*' ? '*' : ''; }).trim().slice(0, 300);
+    if(/^\(?silent\)?\.?$/i.test(line)) return;
+    if(!line) throw new Error('empty');
+    line = filterChat(line);
+    hist.push({role:'user', content:who + ' says: ' + String(text).slice(0, 300)}, {role:'assistant', content:line});
+    if(hist.length > 24) hist.splice(0, hist.length - 24);
+    mikaAISay(line);
+  }).catch(function(){
+    var line = mikaComputeLine(text, who, true);
+    if(line) mikaAISay(line);
+  }).then(function(){ mikaAI.busy--; });
+}
+/* show Mika's answer here, and send it to everyone else */
+function mikaAISay(line){
+  addChatLine('Mika', line, 'orange', false, null);
+  if(pet.state === 'walk') pet.petT = Math.max(pet.petT, 0.8);
+  mikaAI.say = {n:Date.now(), t:line};
+  sendPresence(true);
+}
+function receiveMikaSay(p){
+  var s = p.presence && p.presence.mk;
+  if(!s || typeof s.t !== 'string' || !finite(s.n)) return;
+  mp.mkSeen = mp.mkSeen || {};
+  if(mp.mkSeen[p.peer] === s.n) return;
+  var first = !(p.peer in mp.mkSeen);
+  mp.mkSeen[p.peer] = s.n;
+  if(first && Date.now() - s.n > 60000) return;
+  addChatLine('Mika', filterChat(cleanChat(s.t)).slice(0, 300), 'orange', false, null);
+  if(pet.state === 'walk') pet.petT = Math.max(pet.petT, 0.8);
 }
 
 function animate(){
