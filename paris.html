@@ -4312,6 +4312,10 @@ function showToast(msg){
 }
 
 var IS_TOUCH = !!(window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches);
+/* secret PILOT mode (add ?pilot to the link): walk without locking the mouse (drag to look round), and window.parisPilot
+   lets a helper (Claude, driving a browser for Daniel) walk, turn, jump and chat: parisPilot.walk(2) walks 2 seconds,
+   .turn(90) turns right 90 degrees, .say('Bonjour !') chats, .where() says where you are. */
+var PILOT = /[?&]pilot\b/.test(location.search);
 var touchPlay = false;
 function onTower(){ return camera.position.y - EYE_HEIGHT > 5 && Math.abs(camera.position.x) < 20 && Math.abs(camera.position.z) < 20; }
 function requestFirstPerson(mode){
@@ -4329,7 +4333,7 @@ function requestFirstPerson(mode){
     setHint(touchPlay ? (driving ? 'hintDriveTouch' : 'hintWalkTouch') : (driving ? 'hintDrive' : 'hintWalk'));
     return;
   }
-  if(IS_TOUCH){ touchPlay = true; document.body.classList.add('touch-play'); enterFirstPerson(); return; }
+  if(IS_TOUCH || PILOT){ touchPlay = true; if(!PILOT) document.body.classList.add('touch-play'); enterFirstPerson(); return; }
   if(!canvasEl.requestPointerLock) return;
   try {
     var pr = canvasEl.requestPointerLock();
@@ -5837,6 +5841,17 @@ function mikaComputeLine(text, who, mentioned){
   m.n++; m.at = Date.now(); m.lastText = String(text).replace(/\bmika\b[,!]?\s*/ig, '').slice(0, 80);
   return line;
 }
+if(PILOT) window.addEventListener('keydown', function(e){ if(e.code === 'Escape' && flying && !chatOpen) exitFirstPerson(); });
+if(PILOT) window.parisPilot = {
+  walk:function(sec, back){ if(!flying) requestFirstPerson('walk'); var k = back ? 'KeyS' : 'KeyW'; keys[k] = true; setTimeout(function(){ keys[k] = false; }, Math.max(0, Math.min(10, +sec || 1))*1000); return 'walking'; },
+  strafe:function(sec, left){ var k = left ? 'KeyA' : 'KeyD'; keys[k] = true; setTimeout(function(){ keys[k] = false; }, Math.max(0, Math.min(10, +sec || 1))*1000); return 'stepping'; },
+  turn:function(deg){ yaw -= (+deg || 0)*Math.PI/180; if(flying && !driving) camera.rotation.set(pitch, yaw, 0); return 'turned'; },
+  look:function(deg){ pitch = Math.max(-1.4, Math.min(1.4, (+deg || 0)*Math.PI/180)); if(flying && !driving) camera.rotation.set(pitch, yaw, 0); return 'looking'; },
+  jump:function(){ tryJump(); return 'jump'; },
+  say:function(text){ text = cleanChat(String(text || '')); if(text) sendChat(text); return text; },
+  where:function(){ return {x:Math.round(camera.position.x), z:Math.round(camera.position.z), walking:flying && !driving}; },
+  stop:function(){ ['KeyW', 'KeyS', 'KeyA', 'KeyD'].forEach(function(k){ keys[k] = false; }); return 'stopped'; }
+};
 function sendChat(text){
   text = filterChat(text);
   addChatLine(t('you'), text, myColor, false, myRole());
