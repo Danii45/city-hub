@@ -9586,15 +9586,15 @@ function receiveMikaSay(p){
    runway with markings and lights; a control tower, a hangar and a windsock. At the desk, pick a test destination:
    the plane taxis to the runway, takes off and flies there; flying home, it lands back on the runway. The city's
    background buildings are hidden while you're out at the airport. */
-var CDG = {x:0, z:900};
+var CDG = {x:0, z:1000};
 var AIRPORTS = [
-  {id:'paris', x:CDG.x, z:CDG.z - 37, en:'Paris-CDG', fr:'Paris-CDG', gate:{x:CDG.x, z:CDG.z + 8}},
+  {id:'paris', x:CDG.x, z:CDG.z - 37.8, en:'Paris-CDG', fr:'Paris-CDG'},
   {id:'testa', x:2600, z:0, en:'Test City A (New York style)', fr:'Ville test A (style New York)', ground:0x8d8f94, cols:[0x6b7380, 0x9aa3ad, 0xb9a27a, 0x4f5966]},
   {id:'testb', x:-2600, z:0, en:'Test City B (Tokyo style)', fr:'Ville test B (style Tokyo)', ground:0x9a9c8a, cols:[0xe8e4dc, 0xc9c3b8, 0x7a8aa0, 0xd9d0c0]}
 ];
 var TAXIS = [
-  {x:-66, z:-46, to:{x:CDG.x - 6, z:CDG.z - 62, yaw:Math.PI}, en:'TAXI TO THE AIRPORT', fr:'TAXI POUR L\'AÉROPORT'},
-  {x:CDG.x - 14, z:CDG.z - 64, to:{x:-62, z:-42, yaw:0}, en:'TAXI TO PARIS', fr:'TAXI POUR PARIS'}
+  {x:-66, z:-46, to:{x:CDG.x - 6, z:CDG.z - 66, yaw:Math.PI}, en:'TAXI TO THE AIRPORT', fr:'TAXI POUR L\'AÉROPORT'},
+  {x:CDG.x - 16, z:CDG.z - 68, to:{x:-62, z:-42, yaw:0}, en:'TAXI TO PARIS', fr:'TAXI POUR PARIS'}
 ];
 function makePlane(s){
   var g = new THREE.Group(), white = solidMat(0xf2f2f0), blue = solidMat(0x2b4c9b), dark = solidMat(0x2a2d36);
@@ -9622,66 +9622,94 @@ function flat(w, d, x, z, col, y){ var m = new THREE.Mesh(new THREE.PlaneGeometr
 function bx(w, h, d, x, y, z, col, solid){ var m = box(w, h, d, solidMat(col)); m.position.set(x, y, z); root.add(m); if(solid) addSolid(x - w/2, x + w/2, z - d/2, z + d/2, 'airport', y - h/2 - 0.5, y + h/2); return m; }
 (function buildCDG(){
   var X = CDG.x, Z = CDG.z;
-  PLAY_AREAS.push({x0:X - 320, x1:X + 320, z0:Z - 80, z1:Z + 140});
-  flat(640, 220, X, Z + 30, 0x6f8a55, 0.01);                       // grass all round
-  // the landside: a road and a car park in front of the terminal
-  flat(200, 12, X, Z - 66, 0x3a3c42); flat(120, 22, X, Z - 48, 0x55585f);
-  for(var px = -55; px <= 55; px += 5) flat(0.15, 5, X + px, Z - 48, 0xeeeeee, 0.03);
-  // the terminal: glass front and back, a big roof, and you can walk in through the doors
-  var T = {x0:X - 40, x1:X + 40, z0:Z - 37, z1:Z - 13, h:12};
-  flat(80, 24, X, Z - 25, 0xd9d6cf, 0.04);                          // the floor inside
-  bx(84, 1.2, 28, X, T.h + 0.6, Z - 25, 0xe4e6ea);                  // roof
-  bx(1, T.h, 24, T.x0, T.h/2, Z - 25, 0xc9ccd2, true); bx(1, T.h, 24, T.x1, T.h/2, Z - 25, 0xc9ccd2, true);   // ends
+  PLAY_AREAS.push({x0:X - 720, x1:X + 720, z0:Z - 130, z1:Z + 380});
+  flat(1460, 520, X, Z + 125, 0x6f8a55, 0.01);                      // grass all round
+  // landside: a wide road, a drop-off lane and a big car park
+  flat(420, 16, X, Z - 82, 0x3a3c42); flat(260, 10, X, Z - 58, 0x55585f);
+  flat(300, 50, X, Z - 110, 0x55585f, 0.015);
+  for(var px = -145; px <= 145; px += 5) { flat(0.15, 6, X + px, Z - 100, 0xeeeeee, 0.03); flat(0.15, 6, X + px, Z - 120, 0xeeeeee, 0.03); }
+  // the terminal: 240 m of glass under a big curved roof
+  var T = {x0:X - 120, x1:X + 120, z0:Z - 45, z1:Z - 10, h:16};
+  flat(240, 35, X, Z - 27.5, 0xd9d6cf, 0.04);
+  var roof = new THREE.Mesh(new THREE.CylinderGeometry(60, 60, 248, 24, 1, false, Math.PI*0.36, Math.PI*0.28), solidMat(0xe4e6ea));
+  roof.rotation.z = Math.PI/2; roof.position.set(X, T.h - 51, Z - 27.5); roof.scale.set(1, 1, 0.75); root.add(roof);
+  bx(248, 1, 40, X, T.h + 0.3, Z - 27.5, 0xd2d5db);
+  bx(1, T.h, 35, T.x0, T.h/2, Z - 27.5, 0xc9ccd2, true); bx(1, T.h, 35, T.x1, T.h/2, Z - 27.5, 0xc9ccd2, true);
   var glass = new THREE.MeshLambertMaterial({color:0x9fc8e0, transparent:true, opacity:0.45});
-  [T.z0, T.z1].forEach(function(z, side){
-    [[X - 40, X - 4], [X + 4, X + 40]].forEach(function(seg){
-      var w = seg[1] - seg[0], g = new THREE.Mesh(new THREE.BoxGeometry(w, T.h, 0.3), glass); g.position.set((seg[0] + seg[1])/2, T.h/2, z); root.add(g);
-      addSolid(seg[0], seg[1], z - 0.2, z + 0.2, 'airport', -1, T.h);
-      for(var mx = seg[0]; mx <= seg[1]; mx += 4) bx(0.25, T.h, 0.35, mx, T.h/2, z, 0x8a8f98);
+  [T.z0, T.z1].forEach(function(z){
+    var doors = [-70, 0, 70], prev = T.x0;
+    doors.concat([999]).forEach(function(d){
+      var end = d === 999 ? T.x1 : X + d - 4, w = end - prev;
+      if(w > 0.5){ var g = new THREE.Mesh(new THREE.BoxGeometry(w, T.h, 0.3), glass); g.position.set((prev + end)/2, T.h/2, z); root.add(g); addSolid(prev, end, z - 0.2, z + 0.2, 'airport', -1, T.h);
+        for(var mx = prev; mx <= end; mx += 5) bx(0.3, T.h, 0.4, mx, T.h/2, z, 0x8a8f98); }
+      if(d !== 999) bx(8, T.h - 4, 0.4, X + d, (T.h + 4)/2, z, 0x8a8f98);
+      prev = X + d + 4;
     });
-    bx(8, T.h - 3.5, 0.35, X, (T.h + 3.5)/2, z, 0x8a8f98);           // over the doors
   });
-  airSign('AÉROPORT PARIS-CDG', X, T.h + 3, T.z0 - 0.3, Math.PI, 30);
-  // inside: check-in counters, a departures board, and the flight desk
+  airSign('AÉROPORT PARIS-CHARLES DE GAULLE', X, T.h + 4, T.z0 - 0.4, Math.PI, 70);
+  // inside: two long rows of check-in counters, the flight desk, a café and duty-free
   [-1, 1].forEach(function(sd){
-    for(var c = 0; c < 4; c++){ var cx = X + sd*(14 + c*5); bx(4, 1.1, 1.4, cx, 0.55, Z - 30, 0x2b4c9b, true); bx(4, 0.1, 1.5, cx, 1.15, Z - 30, 0xf2f2f2); }
-    airSign('ENREGISTREMENT · CHECK-IN', X + sd*21, 4.2, Z - 31.2, Math.PI, 16);
+    for(var c = 0; c < 10; c++){ var cx = X + sd*(14 + c*9); bx(7, 1.1, 1.6, cx, 0.55, Z - 33, 0x2b4c9b, true); bx(7, 0.1, 1.7, cx, 1.15, Z - 33, 0xf2f2f2); bx(0.2, 3, 0.2, cx, 2.6, Z - 33.6, 0x2a2d36); }
+    airSign('ENREGISTREMENT · CHECK-IN', X + sd*55, 6, Z - 34.2, Math.PI, 30);
   });
+  bx(10, 3, 8, X - 95, 1.5, Z - 18, 0x7a4a2a, true); airSign('CAFÉ', X - 95, 4, Z - 22.1, Math.PI, 8, '#7a4a2a');
+  bx(14, 3.5, 8, X + 95, 1.75, Z - 18, 0x6b2a7a, true); airSign('DUTY FREE', X + 95, 4.4, Z - 22.1, Math.PI, 10, '#6b2a7a');
   var board = document.createElement('canvas'); board.width = 1024; board.height = 512; var bk = board.getContext('2d');
   bk.fillStyle = '#141820'; bk.fillRect(0, 0, 1024, 512); bk.fillStyle = '#ffd23f'; bk.font = 'bold 54px monospace'; bk.fillText('DÉPARTS · DEPARTURES', 40, 76);
-  bk.font = '44px monospace'; bk.fillStyle = '#e8ecf2';
-  [['AF 001', 'VILLE TEST A', '14:30', 'À L\'HEURE'], ['AF 002', 'VILLE TEST B', '15:05', 'À L\'HEURE'], ['AF 003', 'VILLE TEST A', '17:40', 'EMBARQUEMENT']].forEach(function(r, i){ bk.fillText(r[0] + '  ' + r[1], 40, 170 + i*100); bk.fillText(r[2], 690, 170 + i*100); bk.fillStyle = i === 2 ? '#7fdc7f' : '#e8ecf2'; bk.font = '30px monospace'; bk.fillText(r[3], 690, 205 + i*100); bk.font = '44px monospace'; bk.fillStyle = '#e8ecf2'; });
-  var bm = new THREE.Mesh(new THREE.PlaneGeometry(12, 6), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(board)})); bm.position.set(X, 7.5, Z - 13.6); bm.rotation.y = Math.PI; root.add(bm);
-  bx(3.4, 1.1, 1.2, X, 0.55, Z - 37 + 3, 0xdfe3ea, true); bx(0.15, 3, 0.15, X, 1.5, Z - 37 + 2.4, 0x2a2d36);
-  airSign('✈ VOLS · FLIGHTS', X, 3.4, Z - 37 + 2.35, Math.PI, 4.4);
-  // the gate: a jet bridge out to the plane on the apron
-  flat(320, 70, X, Z + 22, 0xa7a9ad, 0.03);                         // apron (concrete)
-  bx(3, 3, 14, X - 7, 4.5, Z - 4, 0xc9ccd2);                        // jet bridge
-  bx(1.6, 4.5, 1.6, X - 7, 2.25, Z + 3, 0x6b6f78);
-  for(var lz = -10; lz <= 60; lz += 5) flat(0.25, 2.5, X, Z + lz, 0xf2c230, 0.05);   // yellow guide line
-  // taxiway and runway
-  flat(560, 14, X, Z + 60, 0x3a3c42, 0.04);
-  for(var tx = -270; tx <= 270; tx += 6) flat(3, 0.3, X + tx, Z + 60, 0xf2c230, 0.05);
-  flat(12, 40, X - 200, Z + 80, 0x3a3c42, 0.04);                   // the link to the runway
-  flat(620, 46, X, Z + 100, 0x2c2e33, 0.045);                       // runway
-  for(var rx = -280; rx <= 280; rx += 20) flat(10, 0.9, X + rx, Z + 100, 0xffffff, 0.06);   // centre line
-  [-1, 1].forEach(function(sd){
-    flat(620, 0.8, X, Z + 100 + sd*21.5, 0xffffff, 0.06);           // edge lines
-    for(var k = -7; k <= 7; k++) if(k) flat(14, 1.6, X + sd*300, Z + 100 + k*2.6, 0xffffff, 0.06);   // threshold stripes
-    for(var lx = -300; lx <= 300; lx += 20) bx(0.4, 0.4, 0.4, X + lx, 0.2, Z + 100 + sd*24, 0xfff2b0);   // edge lights
+  bk.font = '40px monospace';
+  [['AF 001', 'VILLE TEST A', '14:30', 'À L\'HEURE'], ['AF 002', 'VILLE TEST B', '15:05', 'À L\'HEURE'], ['AF 003', 'VILLE TEST A', '17:40', 'EMBARQUEMENT'], ['AF 004', 'VILLE TEST B', '19:15', 'RETARDÉ']].forEach(function(r, i){
+    bk.fillStyle = '#e8ecf2'; bk.fillText(r[0] + '  ' + r[1], 40, 160 + i*88); bk.fillText(r[2], 640, 160 + i*88);
+    bk.fillStyle = r[3] === 'EMBARQUEMENT' ? '#7fdc7f' : r[3] === 'RETARDÉ' ? '#ff7a6a' : '#e8ecf2'; bk.fillText(r[3], 790, 160 + i*88); });
+  [-40, 40].forEach(function(bxx){ var bm = new THREE.Mesh(new THREE.PlaneGeometry(16, 8), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(board)})); bm.position.set(X + bxx, 9, Z - 10.7); bm.rotation.y = Math.PI; root.add(bm); });
+  bx(3.4, 1.1, 1.2, X, 0.55, Z - 39, 0xdfe3ea, true); bx(0.15, 3, 0.15, X, 1.5, Z - 39.6, 0x2a2d36);
+  airSign('✈ VOLS · FLIGHTS', X, 3.4, Z - 39.65, Math.PI, 4.4);
+  // the apron, and two piers with gates, jet bridges and planes
+  flat(560, 150, X, Z + 65, 0xa7a9ad, 0.03);
+  [-90, 90].forEach(function(px){
+    bx(16, 9, 100, X + px, 4.5, Z + 40, 0xd2d5db, true);
+    var pg = new THREE.Mesh(new THREE.BoxGeometry(16.2, 3, 100.2), glass); pg.position.set(X + px, 5, Z + 40); root.add(pg);
+    [15, 45, 75].forEach(function(gz, gi){
+      [-1, 1].forEach(function(sd){
+        bx(12, 3, 3, X + px + sd*14, 5, Z + gz, 0xc9ccd2);           // jet bridge
+        bx(1.6, 5, 1.6, X + px + sd*19, 2.5, Z + gz, 0x6b6f78);
+        var pl = makePlane(2.2); pl.position.set(X + px + sd*38, 3.6, Z + gz); pl.rotation.y = sd < 0 ? 0 : Math.PI;   // nose to the pier
+        addSolid(X + px + sd*38 - 13, X + px + sd*38 + 13, Z + gz - 12, Z + gz + 12, 'airport', -1, 5);
+        airSign('PORTE ' + (px < 0 ? 'A' : 'B') + (gi*2 + (sd < 0 ? 1 : 2)), X + px + sd*8.2, 7.6, Z + gz, sd < 0 ? -Math.PI/2 : Math.PI/2, 5, '#f2c230');
+      });
+    });
   });
-  airSign('09', X - 270, 0.07, Z + 100, 0, 12, '#2c2e33').rotation.x = -Math.PI/2;
-  // control tower, hangar, windsock
-  bx(6, 34, 6, X + 110, 17, Z - 20, 0xd9d6cf, true);
-  var cab = new THREE.Mesh(new THREE.CylinderGeometry(7, 5, 6, 8), new THREE.MeshLambertMaterial({color:0x3f6f8f})); cab.position.set(X + 110, 37, Z - 20); root.add(cab);
-  bx(15, 1, 15, X + 110, 40.5, Z - 20, 0x8a8f98);
-  var hg = new THREE.Mesh(new THREE.CylinderGeometry(16, 16, 40, 20, 1, false, 0, Math.PI), solidMat(0xb9bec6)); hg.rotation.z = Math.PI/2; hg.rotation.y = Math.PI/2; hg.position.set(X - 120, 0, Z + 10); root.add(hg);
-  addSolid(X - 136, X - 104, Z - 10, Z + 30, 'airport', -1, 16);
-  var pole = bx(0.2, 7, 0.2, X + 150, 3.5, Z + 70, 0xdddddd);
-  var sock = new THREE.Mesh(new THREE.ConeGeometry(0.6, 3, 10, 1, true), solidMat(0xe07b2c)); sock.rotation.z = -Math.PI/2; sock.position.set(X + 151.5, 6.6, Z + 70); root.add(sock);
-  // the plane at the gate
-  AIRPORTS[0].plane = makePlane(1.6); AIRPORTS[0].plane.position.set(X, 2.6, Z + 8); AIRPORTS[0].plane.rotation.y = Math.PI/2;
-  AIRPORTS[0].rest = {x:X, y:2.6, z:Z + 8, ry:Math.PI/2};
+  for(var lz = -5; lz <= 140; lz += 6) flat(0.35, 3, X, Z + lz, 0xf2c230, 0.05);   // the centre guide line
+  // the departure gate in the middle: a jet bridge from the terminal and our plane
+  bx(3.2, 3.2, 16, X - 7, 5, Z - 2, 0xc9ccd2); bx(1.8, 5, 1.8, X - 7, 2.5, Z + 6, 0x6b6f78);
+  // taxiways and two long runways
+  flat(1420, 22, X, Z + 160, 0x3a3c42, 0.04);
+  for(var tx = -700; tx <= 700; tx += 8) flat(4, 0.4, X + tx, Z + 160, 0xf2c230, 0.05);
+  [-620, 620].forEach(function(cx){ flat(22, 140, X + cx, Z + 230, 0x3a3c42, 0.04); });
+  [Z + 220, Z + 330].forEach(function(rz, ri){
+    flat(1440, 60, X, rz, 0x2c2e33, 0.045);
+    for(var rx = -680; rx <= 680; rx += 30) flat(16, 1.2, X + rx, rz, 0xffffff, 0.06);
+    [-1, 1].forEach(function(sd){
+      flat(1440, 1, X, rz + sd*28, 0xffffff, 0.06);
+      for(var k = -9; k <= 9; k++) if(k) flat(22, 2, X + sd*700, rz + k*2.8, 0xffffff, 0.06);
+      for(var lx = -720; lx <= 720; lx += 30) bx(0.5, 0.5, 0.5, X + lx, 0.25, rz + sd*31, 0xfff2b0);
+      for(var ax = 1; ax <= 6; ax++) bx(0.6, 0.6, 0.6, X + sd*(720 + ax*12), 0.3, rz, 0xff5a3a);   // approach lights
+    });
+    airSign(ri ? '09L' : '09R', X - 650, 0.07, rz, 0, 22, '#2c2e33').rotation.x = -Math.PI/2;
+  });
+  // control tower, hangars, a windsock
+  bx(10, 70, 10, X + 200, 35, Z - 70, 0xd9d6cf, true);
+  var cab = new THREE.Mesh(new THREE.CylinderGeometry(12, 8, 10, 10), new THREE.MeshLambertMaterial({color:0x3f6f8f})); cab.position.set(X + 200, 75, Z - 70); root.add(cab);
+  bx(26, 1.5, 26, X + 200, 80.7, Z - 70, 0x8a8f98); bx(0.6, 12, 0.6, X + 200, 87, Z - 70, 0xc8231a);
+  [-330, -390, -450].forEach(function(hx){
+    var hg = new THREE.Mesh(new THREE.CylinderGeometry(26, 26, 60, 24, 1, false, 0, Math.PI), solidMat(0xb9bec6)); hg.rotation.z = Math.PI/2; hg.rotation.y = Math.PI/2; hg.position.set(X + hx, 0, Z + 40); root.add(hg);
+    addSolid(X + hx - 26, X + hx + 26, Z + 10, Z + 70, 'airport', -1, 26);
+  });
+  airSign('AIR FRANCE · MAINTENANCE', X - 390, 30, Z + 9.5, Math.PI, 40);
+  bx(0.25, 9, 0.25, X + 300, 4.5, Z + 270, 0xdddddd);
+  var sock = new THREE.Mesh(new THREE.ConeGeometry(0.8, 4, 10, 1, true), solidMat(0xe07b2c)); sock.rotation.z = -Math.PI/2; sock.position.set(X + 302, 8.5, Z + 270); root.add(sock);
+  // our plane, at the middle gate
+  AIRPORTS[0].plane = makePlane(2.2); AIRPORTS[0].plane.position.set(X, 3.6, Z + 22); AIRPORTS[0].plane.rotation.y = Math.PI/2;
+  AIRPORTS[0].rest = {x:X, y:3.6, z:Z + 22, ry:Math.PI/2};
 })();
 (function buildTestCities(){
   AIRPORTS.slice(1).forEach(function(a){
@@ -9762,12 +9790,12 @@ function showTaxiOffer(i){
 /* the flight: a path of points the plane follows (taxi, take-off, climb), then the landing at the other end */
 function departurePath(a){
   var r = a.rest;
-  if(a.id === 'paris') return [[r.x, r.y, r.z, 0], [r.x, r.y, CDG.z + 60, 3.5], [CDG.x - 200, r.y, CDG.z + 60, 5.5], [CDG.x - 200, r.y, CDG.z + 100, 2], [CDG.x - 40, r.y, CDG.z + 100, 3.5], [CDG.x + 80, r.y + 14, CDG.z + 100, 2], [CDG.x + 260, r.y + 70, CDG.z + 100, 3]];
+  if(a.id === 'paris') return [[r.x, r.y, r.z, 0], [r.x, r.y, CDG.z + 160, 3], [CDG.x - 620, r.y, CDG.z + 160, 4.5], [CDG.x - 620, r.y, CDG.z + 220, 1.5], [CDG.x - 640, r.y, CDG.z + 220, 0.5], [CDG.x - 150, r.y, CDG.z + 220, 4], [CDG.x + 200, r.y + 30, CDG.z + 220, 2], [CDG.x + 700, r.y + 160, CDG.z + 220, 3]];
   return [[r.x, r.y, r.z, 0], [r.x + 30, r.y, r.z, 2.5], [r.x + 70, r.y + 18, r.z, 2], [r.x + 200, r.y + 80, r.z, 3]];
 }
 function arrivalPath(a){
   var r = a.rest;
-  if(a.id === 'paris') return [[CDG.x - 420, 90, CDG.z + 100, 0], [CDG.x - 200, r.y + 0.2, CDG.z + 100, 4.5], [CDG.x + 20, r.y, CDG.z + 100, 3.5], [CDG.x + 40, r.y, CDG.z + 60, 2], [r.x, r.y, CDG.z + 60, 2], [r.x, r.y, r.z, 3]];
+  if(a.id === 'paris') return [[CDG.x - 1100, 170, CDG.z + 220, 0], [CDG.x - 560, r.y + 0.3, CDG.z + 220, 5], [CDG.x + 260, r.y, CDG.z + 220, 4], [CDG.x + 300, r.y, CDG.z + 220, 0.8], [CDG.x + 300, r.y, CDG.z + 160, 1.5], [r.x, r.y, CDG.z + 160, 3], [r.x, r.y, r.z, 2.5]];
   return [[r.x - 220, 80, r.z, 0], [r.x - 40, r.y + 0.2, r.z, 4], [r.x, r.y, r.z, 2.5]];
 }
 function startFlight(id){
@@ -9798,7 +9826,7 @@ function updateFlight(dt){
   if(f.leg === 'in' && done){
     var r2 = f.to.rest; pl.position.set(r2.x, r2.y, r2.z); pl.rotation.set(0, r2.ry, 0);
     controls.enabled = true;
-    var spot = f.to.id === 'paris' ? {x:CDG.x + 6, z:CDG.z - 32, yaw:0} : {x:f.to.x + 4, z:f.to.z + 4, yaw:Math.PI};
+    var spot = f.to.id === 'paris' ? {x:CDG.x + 6, z:CDG.z - 25, yaw:0} : {x:f.to.x + 4, z:f.to.z + 4, yaw:Math.PI};
     flight = {active:false, t:0, near:null, arrived:spot};
     camera.position.set(r2.x + 25, 14, r2.z - 25); controls.target.set(r2.x, 2, r2.z); controls.update();
     flyCard.el.innerHTML = '<h4>' + esc(L2('WELCOME TO ', 'BIENVENUE À ') + L2(f.to.en, f.to.fr).toUpperCase()) + '</h4><button class="btn go" data-fly="walk">' + esc(L2('WALK AROUND', 'SE PROMENER')) + '</button>';
@@ -9806,8 +9834,8 @@ function updateFlight(dt){
     return;
   }
   // the camera follows behind and to the side
-  var hd = pl.rotation.y, cx = x - Math.cos(hd)*22 + Math.sin(hd)*10, cz = z + Math.sin(hd)*22 + Math.cos(hd)*10;
-  camera.position.lerp(new THREE.Vector3(cx, y + 8, cz), Math.min(1, dt*3)); camera.lookAt(x, y + 1, z);
+  var hd = pl.rotation.y, sc = pl.scale.x, cx = x - Math.cos(hd)*22*sc + Math.sin(hd)*10*sc, cz = z + Math.sin(hd)*22*sc + Math.cos(hd)*10*sc;
+  camera.position.lerp(new THREE.Vector3(cx, y + 8*sc, cz), Math.min(1, dt*3)); camera.lookAt(x, y + sc, z);
 }
 var lastNear = null, skylineMesh = null;
 function airportTick(){
