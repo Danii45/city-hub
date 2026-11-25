@@ -5515,6 +5515,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 25, 2026 · 5:45 PM</span><br>FRENCH CHALLENGES everywhere: talk to Parisians in the street (E), shop at your classmates\' shops (SHOP HERE), and answer questions at the monuments. Right answers earn 🪙 jetons.</li>' +
   '<li><span class="when">Nov 25, 2026 · 5:30 PM</span><br>(Preview) Create your character when you log in, earn 🪙 jetons at work for outfits, every job starts at a real place in the city, and the new SHOP ASSISTANT job at classmates\' shops.</li>' +
   '<li><span class="when">Nov 25, 2026 · 5:15 PM</span><br>Madame herself now stands in the Baguette Village, beside the giant baguette.</li>' +
   '<li><span class="when">Nov 25, 2026 · 5:00 PM</span><br>TEACHERS: Daniel can make an account a teacher. Teachers get the 🥖 ÉLITE tab to make players elite and send them to (or let them out of) the Public Shame Chamber.</li>' +
@@ -6141,6 +6142,10 @@ function updatePrompt(){
   if(!flying || driving || panelPlot || builder.on || decor.on || blk.on || !titleScreen.classList.contains('hidden')){ setPrompt('', ''); return; }
   if(nearMika()){ setPrompt('<b>E</b>' + esc(t('petMika')), 'mika|' + LANG); return; }
   if(nearElevator()){ setPrompt('<b>E</b>' + esc(t('promptElevator')), 'elev|' + LANG); return; }
+  if(typeof nearParisian === 'function' && !(chal.cur)){
+    var np = nearParisian(); if(np){ setPrompt('<b>E</b>💬 ' + esc(t('chTalk')), 'chp' + np.i + '|' + LANG); return; }
+    var nm = nearMonumentQ(); if(nm){ setPrompt('<b>E</b>🏛 ' + esc(t('chMonument', {name:L2(nm.en, nm.fr)})), 'chm' + nm.id + '|' + LANG); return; }
+  }
   var room = roomAt(camera.position);
   if(room){
     if(nearRoomDoor()) setPrompt('<b>E</b>' + esc(t('goOutside')), 'roomdoor|' + LANG);
@@ -6160,6 +6165,10 @@ function interact(){
   if(!flying || driving) return;
   if(nearMika()){ petMika(); return; }
   if(nearElevator()){ useElevator(); return; }
+  if(typeof nearParisian === 'function' && !chal.cur){
+    var np = nearParisian(); if(np){ np.p.talk = 3; openChallenge('street', np.p, 'p' + np.i); return; }
+    var nm = nearMonumentQ(); if(nm){ openChallenge('monument', nm, 'm' + nm.id); return; }
+  }
   var room = roomAt(camera.position);
   if(room){
     var door = nearRoomDoor();
@@ -6261,6 +6270,7 @@ function renderPlotPanel(){
     title.textContent = plotTitle(p);
     sub.textContent = (p.kind === 'store' ? tx(shopType(d.ty)) + ' - ' : '') + t('ownedBy', {name:memberName(d.o)});
     if(isBlockHouse(p, d)) ppButton(row, 'goInside', 'go', function(){ goInside(p); });
+    if(p.kind === 'store') ppButton(row, 'shopHere', 'go', function(){ closePlotPanel(false); openChallenge('shop', p, 's' + p.id); });
     if(net.isOwner) ppButton(row, 'ownerRemove', 'danger', function(){ panelConfirm = 'remove'; renderPlotPanel(); });
     ppButton(row, 'close', '', function(){ closePlotPanel(); });
   }
@@ -10470,6 +10480,189 @@ function airportTick(){
   // out at the airport or a test city, the city's background buildings are hidden
   if(!skylineMesh) root.children.forEach(function(c){ if(c.userData && c.userData.skyline) skylineMesh = c; });
   if(skylineMesh){ var far = camera.position.z > 500 || Math.abs(camera.position.x) > 1000; if(skylineMesh.visible === far) skylineMesh.visible = !far; }
+}
+/* ---------- FRENCH CHALLENGES ALL OVER PARIS ----------
+   Little "pick the right answer" moments in French, everywhere in the city (like the shop assistant's tasks):
+   - walk up to a Parisian on the street and press E: they ask you something (the time, the weather, the way, the price
+     of a métro ticket, the day...);
+   - at a classmate's shop, click it and choose SHOP HERE: you're the customer (order, understand the price, pay);
+   - at a monument (Eiffel Tower, Arc de Triomphe, Notre-Dame, the Louvre, the Luxembourg Garden, the Moulin Rouge)
+     press E for a question about it.
+   A right answer earns 1 🪙 jeton (up to 30 a day). Each person / shop / monument can be asked again after a few minutes. */
+STR.en.chTalk = 'Talk to this Parisian (+🪙)'; STR.fr.chTalk = 'Parler avec ce Parisien (+🪙)';
+STR.en.chMonument = 'Question about {name} (+🪙)'; STR.fr.chMonument = 'Question sur {name} (+🪙)';
+STR.en.shopHere = '🛍 SHOP HERE (+🪙)'; STR.fr.shopHere = '🛍 FAIRE SES COURSES ICI (+🪙)';
+var chal = {el:null, cool:{}, cur:null};
+var FR_DAYS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+function frNum(n){
+  var U = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize'];
+  var T = {20:'vingt', 30:'trente', 40:'quarante', 50:'cinquante', 60:'soixante'};
+  if(n <= 16) return U[n];
+  if(n < 20) return 'dix-' + U[n - 10];
+  if(n < 70){ var t = Math.floor(n/10)*10, u = n % 10; return T[t] + (u === 0 ? '' : u === 1 ? ' et un' : '-' + U[u]); }
+  if(n < 80) return 'soixante' + (n === 71 ? ' et onze' : '-' + frNum(n - 60));
+  if(n === 80) return 'quatre-vingts';
+  if(n < 100) return 'quatre-vingt-' + frNum(n - 80);
+  if(n < 1000){ var h = Math.floor(n/100), r = n % 100; return (h === 1 ? 'cent' : U[h] + ' cent' + (r === 0 ? 's' : '')) + (r ? ' ' + frNum(r) : ''); }
+  return String(n);
+}
+function frPrice(v){ var e = Math.floor(v), c = Math.round((v - e)*100); return frNum(e) + (e === 1 ? ' euro' : ' euros') + (c ? ' ' + frNum(c) : ''); }
+function frTime(h, m){
+  var hh = function(x){ x = ((x - 1) % 12 + 12) % 12 + 1; return x === 12 ? 'midi' : frNum(x) + (x === 1 ? ' heure' : ' heures'); };
+  if(m === 0) return 'Il est ' + hh(h) + '.';
+  if(m === 15) return 'Il est ' + hh(h) + ' et quart.';
+  if(m === 30) return 'Il est ' + hh(h) + (hh(h) === 'midi' ? ' et demi.' : ' et demie.');
+  return 'Il est ' + hh(h + 1) + ' moins le quart.';
+}
+function mcq(r, right, wrongs){ var m = mc(r, right, wrongs); return m; }
+/* a Parisian asks you something */
+function streetQuestion(r){
+  var kind = Math.floor(r()*8);
+  if(kind === 0){
+    var h = 1 + Math.floor(r()*12), m = pickR(r, [0, 15, 30, 45]), ok = frTime(h, m), w = [];
+    for(var i=0;i<12;i++){ var h2 = 1 + Math.floor(r()*12), m2 = pickR(r, [0, 15, 30, 45]), x = frTime(h2, m2); if(x !== ok && w.indexOf(x) < 0) w.push(x); }
+    var q = mcq(r, ok, w);
+    return {who:'🙋', say:'Pardon, quelle heure est-il ?', hint:'🕒 ' + h + ':' + (m < 10 ? '0' : '') + m, en:'They ask the time. Your watch says ' + h + ':' + (m < 10 ? '0' : '') + m + '.', opts:q.opts, ans:q.ans};
+  }
+  if(kind === 1){
+    var W = [['☀', 'Il fait beau.'], ['🌧', 'Il pleut.'], ['❄', 'Il neige.'], ['🥶', 'Il fait froid.'], ['🥵', 'Il fait chaud.'], ['🌬', 'Il y a du vent.']], it = pickR(r, W);
+    var q1 = mcq(r, it[1], W.filter(function(x){ return x !== it; }).map(function(x){ return x[1]; }));
+    return {who:'🧥', say:'Quel temps fait-il aujourd\'hui ?', hint:it[0], en:'They ask about the weather. Look at the picture.', opts:q1.opts, ans:q1.ans};
+  }
+  if(kind === 2){
+    var D = [['⬅', 'C\'est à gauche.'], ['➡', 'C\'est à droite.'], ['⬆', 'C\'est tout droit.'], ['⬇', 'C\'est derrière vous.']], d = pickR(r, D), place = pickR(r, ['la tour Eiffel', 'le Louvre', 'la gare', 'le métro', 'la boulangerie', 'Notre-Dame']);
+    var q2 = mcq(r, d[1], D.filter(function(x){ return x !== d; }).map(function(x){ return x[1]; }));
+    return {who:'🗺', say:'Excusez-moi, où est ' + place + ' ?', hint:d[0], en:'A tourist is lost. Point them the way of the arrow.', opts:q2.opts, ans:q2.ans};
+  }
+  if(kind === 3){
+    var p = Math.round((1.5 + r()*3)*20)/20, ok3 = money2(p) + ' €', w3 = [];
+    [0.1, -0.1, 1, 10, 0.5, -0.05, 0.2].forEach(function(dv){ var v = Math.round((p + dv)*100)/100; if(v > 0) w3.push(money2(v) + ' €'); });
+    var q3 = mcq(r, ok3, w3);
+    return {who:'🚇', say:'Le ticket de métro coûte ' + frPrice(p) + '.', hint:'🎫', en:'Someone tells you the price of a métro ticket. How much is it?', opts:q3.opts, ans:q3.ans};
+  }
+  if(kind === 4){
+    var today = FR_DAYS[new Date().getDay()], ok4 = 'Nous sommes ' + today + '.';
+    var q4 = mcq(r, ok4, FR_DAYS.filter(function(x){ return x !== today; }).map(function(x){ return 'Nous sommes ' + x + '.'; }));
+    return {who:'📅', say:'Quel jour sommes-nous aujourd\'hui ?', hint:'', en:'What day is it today (really)?', opts:q4.opts, ans:q4.ans};
+  }
+  var P = pickR(r, [
+    ['Bonjour ! Comment allez-vous ?', 'Très bien, merci. Et vous ?', ['J\'ai douze ans.', 'Il est midi.', 'C\'est à droite.'], 'They ask how you are.'],
+    ['Vous êtes d\'où ?', 'Je viens du Canada.', ['Je vais bien, merci.', 'C\'est trois euros.', 'Il fait beau.'], 'They ask where you are from.'],
+    ['Comment vous appelez-vous ?', 'Je m\'appelle ' + ((life.eco && life.eco.ch && life.eco.ch.fn) || 'Camille') + '.', ['J\'habite à Paris.', 'J\'ai faim.', 'Il pleut.'], 'They ask your name.'],
+    ['Vous parlez français ?', 'Oui, un peu !', ['Non, il fait froid.', 'Oui, à gauche.', 'Au revoir, merci.'], 'They ask if you speak French.'],
+    ['Vous aimez Paris ?', 'Oui, j\'adore Paris !', ['Oui, j\'ai quinze ans.', 'Non, c\'est mardi.', 'Il est trois heures.'], 'They ask if you like Paris.'],
+    ['Vous avez un chien ?', 'Non, mais j\'adore Mika !', ['Oui, il est midi.', 'Non, c\'est à droite.', 'Oui, deux euros.'], 'They ask if you have a dog.'],
+    ['Merci beaucoup !', 'De rien !', ['Bon appétit !', 'Joyeux anniversaire !', 'À gauche !'], 'They thank you. What do you answer?']
+  ]);
+  var q5 = mcq(r, P[1], P[2]);
+  return {who:'🙂', say:P[0], hint:'', en:P[3], opts:q5.opts, ans:q5.ans};
+}
+/* you're the customer in a classmate's shop */
+function shopQuestion(r, p){
+  var tp = shopOf(p), items = SHOP_ITEMS[tp.id] || SHOP_ITEMS.grocery, kind = Math.floor(r()*4), it = pickR(r, items);
+  var who = '🧑‍🍳', name = p && p.data && p.data.nm ? '« ' + p.data.nm + ' »' : L2(tp.en, tp.fr);
+  if(kind === 0){
+    var q = mcq(r, 'Je voudrais ' + it[0] + ', s\'il vous plaît.', items.filter(function(x){ return x !== it; }).map(function(x){ return 'Je voudrais ' + x[0] + ', s\'il vous plaît.'; }).concat(['Donne-moi ' + it[0] + ' !']));
+    return {who:who, where:name, say:'Bonjour ! Vous désirez ?', hint:it[2], en:'You want ' + it[1] + '. How do you ask politely?', opts:q.opts, ans:q.ans};
+  }
+  if(kind === 1){
+    var ok = money2(it[3]) + ' €', w = [];
+    [0.5, -0.5, 1, 10, -0.2, 0.3].forEach(function(dv){ var v = Math.round((it[3] + dv)*100)/100; if(v > 0) w.push(money2(v) + ' €'); });
+    var q1 = mcq(r, ok, w);
+    return {who:who, where:name, say:'Voilà ' + it[0] + '. Ça fait ' + frPrice(it[3]) + ', s\'il vous plaît.', hint:it[2], en:'How much do you pay?', opts:q1.opts, ans:q1.ans};
+  }
+  if(kind === 2){
+    var q2 = mcq(r, 'Par carte, s\'il vous plaît.', ['À droite, merci.', 'Il fait beau.', 'J\'ai quinze ans.']);
+    return {who:who, where:name, say:'Vous payez en espèces ou par carte ?', hint:'💳', en:'They ask how you pay. Answer: by card.', opts:q2.opts, ans:q2.ans};
+  }
+  var q3 = mcq(r, L2('Anything else?', 'Autre chose ?'), L2('Goodbye!|Are you lost?|It is closed.', 'Au revoir !|Vous êtes perdu ?|C\'est fermé.').split('|'));
+  return {who:who, where:name, say:'Et avec ceci ?', hint:'🛍', en:'What does the shopkeeper mean?', opts:q3.opts, ans:q3.ans};
+}
+var MONUMENT_Q = {
+  eiffel:[['La tour Eiffel a été construite pour l\'Exposition universelle de...', '1889', ['1789', '1969', '2024']], ['La tour Eiffel mesure environ...', '330 mètres', ['33 mètres', '3 000 mètres', '120 mètres']], ['Qui a construit la tour Eiffel ?', 'L\'entreprise de Gustave Eiffel', ['Napoléon', 'Louis XIV', 'Victor Hugo']]],
+  arc:[['Qui a commandé l\'Arc de Triomphe ?', 'Napoléon', ['Gustave Eiffel', 'Marie Curie', 'Louis XIV']], ['Sous l\'Arc de Triomphe, il y a...', 'la tombe du Soldat inconnu', ['une piscine', 'un métro secret', 'un musée de glaces']], ['L\'Arc de Triomphe est en haut de quelle avenue ?', 'les Champs-Élysées', ['la rue de Rivoli', 'le boulevard Haussmann', 'la rue Mouffetard']]],
+  notredame:[['Notre-Dame est une cathédrale de style...', 'gothique', ['moderne', 'chinois', 'western']], ['En quelle année Notre-Dame a-t-elle brûlé ?', '2019', ['1889', '1945', '2001']], ['Quel écrivain a écrit « Notre-Dame de Paris » ?', 'Victor Hugo', ['Molière', 'Jules Verne', 'Astérix']]],
+  louvre:[['Quel tableau célèbre est au Louvre ?', 'La Joconde (Mona Lisa)', ['La Nuit étoilée', 'Le Cri', 'Les Tournesols']], ['Devant le Louvre, il y a une pyramide en...', 'verre', ['chocolat', 'pierre', 'bois']], ['Avant d\'être un musée, le Louvre était...', 'un palais royal', ['une gare', 'un stade', 'une école']]],
+  garden:[['Dans le jardin du Luxembourg, les enfants font naviguer de petits...', 'bateaux', ['avions', 'trains', 'chevaux']], ['Le palais du Luxembourg accueille aujourd\'hui...', 'le Sénat', ['un zoo', 'un aéroport', 'une piscine']], ['Le jardin a été créé pour la reine...', 'Marie de Médicis', ['Cléopâtre', 'Élisabeth II', 'Marie-Antoinette']]],
+  moulin:[['Le Moulin Rouge est célèbre pour une danse :', 'le french cancan', ['le tango', 'la valse', 'le hip-hop']], ['Le Moulin Rouge est dans le quartier de...', 'Montmartre', ['la Défense', 'Versailles', 'Marseille']], ['Sur le toit du Moulin Rouge, il y a...', 'un moulin rouge', ['une tour Eiffel', 'un bateau', 'une statue']]]
+};
+function monumentQuestion(r, l){
+  var bank = MONUMENT_Q[l.id], it = pickR(r, bank), q = mcq(r, it[1], it[2]);
+  return {who:'🏛', where:L2(l.en, l.fr), say:it[0], hint:'', en:'A question about ' + l.en + '.', opts:q.opts, ans:q.ans};
+}
+/* who / what is near you */
+function nearParisian(){
+  if(!people || !people.length) return null;
+  var x = camera.position.x, z = camera.position.z, best = null, bd = 2.8;
+  people.forEach(function(p, i){ var d = Math.hypot(p.x - x, p.z - z); if(d < bd && !(chal.cool['p' + i] > Date.now())){ bd = d; best = {p:p, i:i}; } });
+  return best;
+}
+function nearMonumentQ(){
+  if(typeof LANDMARK_INFO === 'undefined' || camera.position.y > 8) return null;
+  var x = camera.position.x, z = camera.position.z;
+  for(var i=0;i<LANDMARK_INFO.length;i++){ var l = LANDMARK_INFO[i]; if(MONUMENT_Q[l.id] && Math.hypot(l.x - x, l.z - z) < l.r + 6 && !(chal.cool['m' + l.id] > Date.now())) return l; }
+  return null;
+}
+/* the card */
+(function(){
+  var el = document.createElement('div'); el.id = 'fr-card'; el.className = 'card hidden';
+  var st = document.createElement('style');
+  st.textContent = '#fr-card{position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); z-index:46; width:min(560px, 94vw); max-height:90vh; overflow:auto; padding:14px 16px; font-family:"VT323", monospace; font-size:20px;}' +
+    '#fr-card.hidden{display:none;} #fr-card .fc-who{font-size:44px; float:left; margin:0 10px 4px 0; line-height:1;} #fr-card .fc-where{font-family:"Press Start 2P", monospace; font-size:9px; color:var(--accent); margin-bottom:6px;}' +
+    '#fr-card .fc-say{font-size:24px; line-height:1.15;} #fr-card .fc-hint{font-size:40px; text-align:center; margin:6px 0;} #fr-card .fc-en{color:var(--ink-soft); font-size:17px; clear:both; margin:6px 0;}' +
+    '#fr-card .fc-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;} #fr-card .lf-opt{margin:0; height:100%;} @media (max-width:520px){ #fr-card .fc-grid{grid-template-columns:1fr;} }' +
+    '#fr-card .fc-res{margin-top:10px; font-size:21px;} #fr-card .fc-res .good{color:var(--good);} #fr-card .fc-res .bad{color:var(--accent-2);} #fr-card .btn{margin-top:10px;}';
+  document.head.appendChild(st); document.body.appendChild(el); chal.el = el;
+  el.addEventListener('click', function(ev){
+    var b = ev.target.closest('[data-fc]'); if(!b || b.disabled) return;
+    var a = b.getAttribute('data-fc');
+    if(a === 'ans') answerChallenge(b.getAttribute('data-v')|0);
+    if(a === 'done'){ el.classList.add('hidden'); chal.cur = null; if(chal.resume) requestFirstPerson('walk'); }
+    if(a === 'again'){ openChallenge(chal.cur.kind, chal.cur.src, chal.cur.key); }
+    if(a === 'char'){ el.classList.add('hidden'); chal.cur = null; life.tab = 'style'; openLife(); }
+  });
+})();
+function openChallenge(kind, src, key){
+  var r = lifeRand(key + ':' + Date.now()), q = kind === 'street' ? streetQuestion(r) : kind === 'shop' ? shopQuestion(r, src) : monumentQuestion(r, src);
+  chal.resume = flying && !touchPlay;
+  chal.cur = {kind:kind, src:src, key:key, q:q, picked:-1};
+  if(flying) exitFirstPerson();
+  renderChallenge();
+  chal.el.classList.remove('hidden');
+}
+function renderChallenge(){
+  var c = chal.cur, q = c.q, h = '';
+  h += '<div class="fc-where">' + esc(q.where || L2('A Parisian', 'Un(e) Parisien(ne)')) + '</div><div class="fc-who">' + q.who + '</div><div class="fc-say">« ' + esc(q.say) + ' »</div>';
+  if(q.hint) h += '<div class="fc-hint">' + esc(q.hint) + '</div>';
+  if(LANG === 'en') h += '<div class="fc-en">' + esc(q.en) + '</div>'; else h += '<div class="fc-en"></div>';
+  h += '<div class="fc-grid">' + q.opts.map(function(o, i){
+    var cls = c.picked < 0 ? '' : i === q.ans ? ' right' : i === c.picked ? ' wrongpick' : '';
+    return '<button class="lf-opt' + cls + '" data-fc="ans" data-v="' + i + '"' + (c.picked >= 0 ? ' disabled' : '') + '>' + esc(o) + '</button>';
+  }).join('') + '</div>';
+  if(c.picked >= 0){
+    var ok = c.picked === q.ans;
+    h += '<div class="fc-res">' + (ok ? '<span class="good">✓ ' + L2('Bravo !', 'Bravo !') + '</span>' + (c.tok ? ' +1 🪙' : c.capped ? ' ' + L2('(no more jetons from questions today)', '(plus de jetons pour les questions aujourd\'hui)') : '') :
+      '<span class="bad">✗ ' + L2('Not quite - the right answer was: ', 'Pas tout à fait - la bonne réponse : ') + '</span>' + esc(q.opts[q.ans])) + '</div>';
+    if(c.needChar) h += '<div class="fc-en">' + L2('Create your character to collect jetons!', 'Crée ton personnage pour gagner des jetons !') + '</div><button class="btn" data-fc="char">' + esc(L2('CREATE MY CHARACTER', 'CRÉER MON PERSONNAGE')) + '</button> ';
+    if(c.kind === 'shop') h += '<button class="btn" data-fc="again">' + esc(L2('ANOTHER CUSTOMER QUESTION', 'ENCORE UNE QUESTION')) + '</button> ';
+    h += '<button class="btn go" data-fc="done">' + esc(L2('CONTINUE', 'CONTINUER')) + '</button>';
+  }
+  chal.el.innerHTML = h;
+}
+function answerChallenge(i){
+  var c = chal.cur; if(!c || c.picked >= 0) return;
+  c.picked = i;
+  chal.cool[c.key] = Date.now() + (c.kind === 'shop' ? 60000 : 4*60000);
+  if(i === c.q.ans){
+    var e = life.eco;
+    if(!e || !e.ch) c.needChar = true;
+    else {
+      var day = todayKey();
+      if(e.qd !== day){ e.qd = day; e.qn = 0; }
+      if((e.qn|0) < 30){ e.qn = (e.qn|0) + 1; e.tok = (e.tok|0) + 1; c.tok = 1; lifeSave(); } else c.capped = true;
+    }
+  }
+  renderChallenge();
 }
 /* ---------- JAIL (for Madame's class) ----------
    Say something inappropriate in the chat (anything the swear filter catches, English or French) and the message is
