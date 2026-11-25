@@ -2222,11 +2222,81 @@ if(mika.unlocked) setTimeout(function(){ unlockMikaBoard(true); }, 0);
 var MIKA_OUCH = ['Oh, great heavens!', 'Good heavens, {name}! Have you no shame?', 'Oh my word! Unhand me, you brute!', 'Merciful heavens! I have been struck!', 'How utterly uncivilised, {name}!',
   'Oh, the indignity!', 'Great heavens above, I am airborne!', 'Sacré bleu! My fur!', 'I shall be speaking to my lawyer, {name}.', 'Oh, good gracious me!', 'Heavens to Betsy!', 'Well, I never!'];
 var MIKA_BACK = ['I have returned, and I am most displeased.', 'Heaven was lovely, but I have unfinished business with your driving.', 'I am back. Do try to look where you are going.', 'As you were, everyone. Nothing to see here.'];
+/* ---------- Walkies: "mika pashle gulait" (the owner says it in the chat or an announcement) ----------
+   The owner gets a red leash and Mika trots along behind them wherever they go - walking or driving - for everyone
+   (the owner's presence says the leash is on, and everyone else sees her follow the owner). Say it again and she's
+   let off the leash: she trots back to her usual walk. */
+var MIKA_LEASH_RE = /\bmika\s+pashle\s+gulait\b/i;
+var leash = {on:false, mine:false, peer:null, blend:0, x:0, z:0, hx:0, hy:0, hz:0, hyaw:0, line:null, seen:false};
+var myLeash = null;
+leash.line = (function(){
+  var N = 16, pos = new Float32Array(N*3), g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  var l = new THREE.Line(g, new THREE.LineBasicMaterial({color:0xd0142a})); l.frustumCulled = false; l.visible = false; root.add(l);
+  return {mesh:l, pos:pos, N:N};
+})();
+function setLeash(on, who){
+  if(on === leash.on) return;
+  leash.on = on;
+  if(on){ leash.x = pet.x; leash.z = pet.z; }
+  var nm = who || 'friend';
+  setTimeout(function(){ addChatLine('Mika', on ? '*wags tail furiously* A walk! How perfectly splendid. Do lead the way, ' + nm + '.' : '*sits down happily* Thank you ever so much for the walk, ' + nm + '. I shall resume my rounds.', 'orange', false, null); }, 600);
+}
+function ownerLeash(){
+  if(!net.isOwner) return;
+  var on = !leash.on;
+  myLeash = on ? {n:Date.now()} : null;
+  leash.mine = on; leash.peer = null;
+  setLeash(on, net.name);
+  sendPresence(true);
+}
+function receiveLeash(p){
+  if(peerRole(p) !== 'owner') return;
+  var on = !!(p.presence && p.presence.leash);
+  if(on){ leash.peer = p.peer; leash.mine = false; if(!leash.on) setLeash(true, playerName(p)); }
+  else if(leash.peer === p.peer && leash.on){ leash.peer = null; setLeash(false, playerName(p)); }
+}
+/* where the person holding the leash is (and which way they face) */
+function leashHolder(){
+  if(leash.mine){
+    if(flying && driving) return {x:carPos.x, y:carPos.y + 1.0, z:carPos.z, yaw:carYaw, back:carSpec.radius + 2.2, hand:null};
+    if(flying){ var f = camera.position; return {x:f.x, y:f.y - EYE_HEIGHT, z:f.z, yaw:yaw, back:2.6, hand:true}; }
+    return null;
+  }
+  var a = leash.peer && mp.avatars[leash.peer];
+  if(!a || !a.model || !a.model.group.visible) return null;
+  return {x:a.pos.x, y:a.pos.y + (a.kind === 'walker' ? 1.0 : 1.0), z:a.pos.z, yaw:a.yaw, back:a.kind === 'walker' ? 2.6 : 3.8, hand:false};
+}
+function updateLeash(dt, routeX, routeZ){
+  var h = leash.on ? leashHolder() : null;
+  leash.blend += ((h ? 1 : 0) - leash.blend)*Math.min(1, dt*(h ? 3 : 0.8));
+  if(h){
+    // trot to a spot just behind (and a little beside) whoever holds the leash
+    var tx = h.x + Math.sin(h.yaw)*h.back + Math.cos(h.yaw)*0.7, tz = h.z + Math.cos(h.yaw)*h.back - Math.sin(h.yaw)*0.7;
+    var dx = tx - leash.x, dz = tz - leash.z, d = Math.hypot(dx, dz);
+    if(d > 30){ leash.x = tx; leash.z = tz; }
+    else if(d > 0.15){ var sp = Math.min(d, Math.max(4, d*4)*dt); leash.x += dx/d*sp; leash.z += dz/d*sp; }
+    leash.hx = h.x; leash.hy = h.y; leash.hz = h.z; leash.hyaw = h.yaw; leash.hand = h.hand;
+  } else if(leash.blend < 0.02){ leash.x = routeX; leash.z = routeZ; }
+  var L = leash.line, show = h && leash.blend > 0.3 && pet.state === 'walk';
+  L.mesh.visible = !!show;
+  if(show){
+    // from the hand (a little in front of you and to the right when it's you walking) down to Mika's collar, sagging
+    var ax = h.x, ay = h.y, az = h.z;
+    if(h.hand){ ax += -Math.sin(yaw)*0.5 + Math.cos(yaw)*0.35; az += -Math.cos(yaw)*0.5 - Math.sin(yaw)*0.35; ay += 0.9; }
+    var bx = pet.x, by = pet.sprite.position.y + (pet.sprite.scale.y || 1.2)*0.55, bz = pet.z;
+    var span = Math.hypot(bx - ax, bz - az), sag = Math.max(0.1, 1.2 - span*0.15);
+    for(var i=0;i<L.N;i++){ var u = i/(L.N - 1); L.pos[i*3] = ax + (bx - ax)*u; L.pos[i*3+1] = ay + (by - ay)*u - Math.sin(u*Math.PI)*sag; L.pos[i*3+2] = az + (bz - az)*u; }
+    L.mesh.geometry.attributes.position.needsUpdate = true;
+  }
+}
+
 function updatePet(dt){
   updateDoom(dt);
   updateUmbrella(dt);
   updateHearts(dt);
   updateMikaTag();
+  if(holiday.hat && pet.state !== 'walk') holiday.hat.visible = false;
+  if(leash.line && pet.state !== 'walk') leash.line.mesh.visible = false;
   if(pet.state === 'gone'){ pet.t -= dt; if(pet.t <= 0) spawnPet(); return; }
   if(pet.state === 'fly'){
     pet.vel.y -= 9*dt;
@@ -2250,6 +2320,12 @@ function updatePet(dt){
   }
   pet.s = pet.ds;
   var at = mikaSpot(petAt(pet.s)), ph = mikaPhase(); pet.x = at[0]; pet.z = at[1];
+  updateLeash(dt, at[0], at[1]);
+  if(leash.blend > 0.01){   // on the leash: she follows you (and is wide awake)
+    var bl = leash.blend*leash.blend*(3 - 2*leash.blend);
+    pet.x = at[0] + (leash.x - at[0])*bl; pet.z = at[1] + (leash.z - at[1])*bl;
+    if(leash.blend > 0.4) ph = {mode:'walk', f:0};
+  }
   setMikaSleeping(ph.mode === 'sleep');
   if(ph.mode === 'sleep'){
     var br = 1 + Math.sin(moveTime*1.8)*0.025;   // breathing
@@ -2262,7 +2338,9 @@ function updatePet(dt){
   }
   updateZzz(ph.mode === 'sleep');
   mikaChat(ph.mode === 'sleep');
-  if(flying && driving && Math.abs(driveSpeed) > 2.5 && carPos.y < 3){
+  // her Santa hat (over the holidays), on top of her head while she's awake
+  if(holiday.hat){ holiday.hat.visible = ph.mode !== 'sleep' && pet.sprite.visible; if(holiday.hat.visible){ var sw = pet.sprite.scale.x, sh = pet.sprite.scale.y; holiday.hat.position.set(pet.x, pet.sprite.position.y + sh*0.86, pet.z); holiday.hat.scale.set(sh*0.5, sh*0.5, 1); holiday.hat.material.rotation = pet.sprite.material.rotation; } }
+  if(flying && driving && Math.abs(driveSpeed) > 2.5 && carPos.y < 3 && !(leash.on && leash.mine)){
     var hx = pet.x - carPos.x, hz = pet.z - carPos.z, r = carSpec.radius + 0.6;
     if(hx*hx + hz*hz < r*r){
       var sp = Math.abs(driveSpeed), fx = -Math.sin(carYaw)*Math.sign(driveSpeed), fz = -Math.cos(carYaw)*Math.sign(driveSpeed);
@@ -5130,6 +5208,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 25, 2026 · 11:30 AM</span><br>HAPPY HOLIDAYS! A giant Christmas tree and a Hanukkah menorah (it lights one more candle each night of Hanukkah) on the Champ de Mars, wreaths on the street lamps, snow, and a Santa hat for Mika. And Mika can now go for walks on a leash with Daniel.</li>' +
   '<li><span class="when">Nov 25, 2026 · 10:55 AM</span><br>ROADSTER MANUAL flight: SPACE is a burst of thrust - let go and you fall. M switches to HOVER.</li>' +
   '<li><span class="when">Nov 25, 2026 · 10:45 AM</span><br>ROADSTER stunts: hold A or D in the air to barrel-roll.</li>' +
   '<li><span class="when">Nov 25, 2026 · 10:30 AM</span><br>The ROADSTER is now the new production model - big wing, rocket nozzles - and it FLIES: hold SPACE to lift off, SHIFT to go down, land to drive.</li>' +
@@ -5410,6 +5489,11 @@ var MIKA_TOPICS = [
 var MIKA_DEFAULT = ['Did someone call for me? Here I am, {name}, at your service.', 'You called, {name}? I am all ears. Quite literally.', 'I heard my name, {name}. How may I be of assistance?', 'Mika, at your service, {name}.', 'An interesting thought, {name}. Do tell me more.', 'I am listening attentively, {name}.'];
 var MIKA_QUESTION = ['An excellent question, {name}. I am merely a dog, but I suspect the answer is treats.', 'I am not entirely certain, {name}. I shall give it careful thought during my next nap.', 'A most thought-provoking enquiry, {name}. Do ask me again once I have eaten.'];
 /* Mika's big word lists: thousands of everyday words. Her answer mentions the word you used ({word}). */
+MIKA_TOPICS.push(
+  {w:'christmas xmas noel santa tree presents', p:['merry christmas','joyeux noel','happy holidays'], say:['Joyeux Noël, {name}! Have you seen the magnificent tree on the west lawn? I have been told the presents are not for me. I remain hopeful.', 'Merry Christmas, {name}! I am wearing my finest Santa hat for the occasion.']},
+  {w:'hanukkah chanukah hanukah menorah dreidel latkes', p:['happy hanukkah','chag sameach'], say:['Happy Hanukkah, {name}! The great menorah on the east lawn gains one more candle each night. Chag sameach!', 'Chag sameach, {name}! I would be delighted to share a latke, should one happen to fall.']},
+  {w:'snow snowing snowman snowflake winter cold', p:['its snowing'], say:['Snow, {name}! I do so enjoy leaving paw prints in it, though my paws grow rather chilly.']}
+);
 var MIKA_BIG = [
   {w:'avocado avocados macadamia nuts alcohol wine beer xylitol gum caffeine energy redbull cherry cherries', say:['I must decline the {word}, {name}. It is not safe for dogs, I am afraid.', 'Thank you, {name}, but {word} is not good for a dog. I shall pass most politely.']},
   {w:'mango mangoes pineapple watermelon melon strawberry strawberries blueberry blueberries raspberry raspberries blackberry blackberries peach peaches pear pears plum plums kiwi orange oranges lemon lemons lime limes coconut papaya apricot apricots fig figs pomegranate cranberry cranberries tangerine clementine grapefruit nectarine lychee guava dragonfruit passionfruit berries berry cantaloupe honeydew', say:['{word}, {name}? A most refreshing choice. I would accept a small piece with gratitude.', 'I have heard wonderful things about {word}, {name}. Do share, if you would be so kind.', 'Ah, {word}. How sophisticated your tastes are, {name}.']},
@@ -5500,7 +5584,7 @@ function mikaReply(text, who){
 }
 function mikaHeard(text, who, fromOwner){
   if(!/\bmika\b/i.test(String(text))) return;
-  if(MIKA_NAP_RE.test(String(text)) && fromOwner) return;   // she just yawns and goes to bed
+  if((MIKA_NAP_RE.test(String(text)) || MIKA_LEASH_RE.test(String(text))) && fromOwner) return;   // she just yawns and goes to bed
   var line = mikaReply(text, who);
   setTimeout(function(){
     addChatLine('Mika', line, 'orange', false, null);
@@ -5512,6 +5596,7 @@ function sendChat(text){
   addChatLine(t('you'), text, myColor, false, myRole());
   mikaHeard(text, net.name || 'friend', net.isOwner);
   if(net.isOwner && MIKA_NAP_RE.test(text)) ownerNap();
+  if(net.isOwner && MIKA_LEASH_RE.test(text)) ownerLeash();
   if(!mp.others.length) systemLine(t('chatAlone'));
   myChat = {n:Date.now(), t:text, at:Date.now()};
   sendPresence(true);
@@ -6876,6 +6961,7 @@ document.getElementById('announce-btn').addEventListener('click', function(){
   showAnnouncement(net.name, text);
   sendPresence(true);
   if(MIKA_NAP_RE.test(text)) ownerNap();
+  if(MIKA_LEASH_RE.test(text)) ownerLeash();
 });
 function showAnnouncement(name, text){
   annEl.querySelector('.ann-head').textContent = t('annHead', {name:name});
@@ -6915,7 +7001,7 @@ function presenceState(){
   if(flying && driving && fly.on){ s.fly = [r2(fly.rear), r2(fly.down), r2(fly.pitch), r2(fly.bank)]; }
   s.ver = updateCheck.ver;
   if(updateCheck.outdated()) s.old = 1;
-  if(net.isOwner){ s.role = 'owner'; if(myAnnounce) s.announce = myAnnounce; if(myNap && napPhase()) s.nap = myNap; }
+  if(net.isOwner){ s.role = 'owner'; if(myAnnounce) s.announce = myAnnounce; if(myNap && napPhase()) s.nap = myNap; if(myLeash) s.leash = myLeash; }
   return s;
 }
 function sendPresence(force){
@@ -7053,7 +7139,7 @@ function onRoomPeers(change){
   var live = {};
   others.forEach(function(p){ live[p.peer] = true; });
   Object.keys(mp.avatars).forEach(function(k){ if(!live[k]) removeAvatar(k); });
-  others.forEach(function(p){ receiveChat(p); receiveAnnounce(p); receiveNap(p); });
+  others.forEach(function(p){ receiveChat(p); receiveAnnounce(p); receiveNap(p); receiveLeash(p); });
   resolveColorClash();
   renderPlayers();
   renderSwatches();
@@ -7736,6 +7822,179 @@ var towerNight = (function(){
   return {light:light, beam:beam, sparkle:sparkle, col:col, N:N};
 })();
 /* rain: streaks falling all round the camera */
+/* ---------- THE HOLIDAYS (late November to early January) ----------
+   A giant Christmas tree on the west lawn of the Champ de Mars (ornaments, twinkling lights, a glowing star, presents
+   underneath and a JOYEUX NOËL sign), a big Hanukkah menorah on the east lawn whose candles light up night by night
+   (Hanukkah 2026: the evening of Dec 4 to Dec 12), wreaths with red bows on every street lamp, a Santa hat for Mika,
+   and snow instead of rain - with light snow on grey days too. */
+var HOLIDAY = (function(){ var d = new Date(), m = d.getMonth(), day = d.getDate(); return (m === 10 && day >= 20) || m === 11 || (m === 0 && day <= 7); })();
+var HANUKKAH_START = {2026:[11, 4], 2027:[11, 24], 2028:[11, 12], 2029:[11, 1]};   // the evening of the first candle (month 0-11, day)
+function hanukkahNight(){   // how many candles tonight (0 = not Hanukkah)
+  var now = new Date(), y = now.getFullYear(), list = [HANUKKAH_START[y], HANUKKAH_START[y - 1] && [HANUKKAH_START[y - 1][0], HANUKKAH_START[y - 1][1], y - 1]];
+  for(var i=0;i<list.length;i++){
+    var h = list[i]; if(!h) continue;
+    var start = new Date(h[2] || y, h[0], h[1], 16, 30), n = Math.floor((now - start)/86400000) + 1;
+    if(n >= 1 && n <= 8) return n;
+  }
+  return 0;
+}
+var holiday = {on:HOLIDAY, lights:null, star:null, flames:[], snow:null, hat:null, t:0};
+STR.en.wxSnow = 'It\'s snowing! ❄'; STR.fr.wxSnow = 'Il neige ! ❄';
+function holidaySign(lines, w, h, bg, fg){
+  var c = document.createElement('canvas'); c.width = 512; c.height = Math.round(512*h/w);
+  var x = c.getContext('2d'); x.fillStyle = bg; x.fillRect(0, 0, c.width, c.height);
+  x.strokeStyle = fg; x.lineWidth = 12; x.strokeRect(8, 8, c.width - 16, c.height - 16);
+  x.fillStyle = fg; x.textAlign = 'center'; x.textBaseline = 'middle';
+  lines.forEach(function(l, i){ x.font = 'bold ' + l[1] + 'px Georgia, serif'; x.fillText(l[0], c.width/2, c.height*(i + 1)/(lines.length + 1)); });
+  var m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c), side:THREE.DoubleSide}));
+  return m;
+}
+if(HOLIDAY) (function buildHoliday(){
+  /* the Christmas tree */
+  var TX = -46, TZ = 0, g = new THREE.Group(); g.position.set(TX, 0, TZ);
+  var green = new THREE.MeshLambertMaterial({color:0x1f6b3a}), green2 = new THREE.MeshLambertMaterial({color:0x185a30});
+  var trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 2.4, 10), new THREE.MeshLambertMaterial({color:0x5a3a22})); trunk.position.y = 1.2; g.add(trunk);
+  var tiers = [[5.2, 5.2, 2.2], [4.3, 4.6, 5.0], [3.3, 4.0, 7.6], [2.3, 3.4, 10.0], [1.3, 2.8, 12.2]];   // radius, height, base y
+  tiers.forEach(function(tr, i){ var c = new THREE.Mesh(new THREE.ConeGeometry(tr[0], tr[1], 14), i % 2 ? green2 : green); c.position.y = tr[2] + tr[1]/2; g.add(c); });
+  // ornaments on the branches
+  var orn = new THREE.InstancedMesh(new THREE.SphereGeometry(0.26, 10, 8), new THREE.MeshPhongMaterial({shininess:90, specular:0xffffff}), 90);
+  var cols = [0xd11f2a, 0xf2c230, 0x2a62d8, 0xdfe3ea, 0xb52cc9], mtx = new THREE.Matrix4(), col = new THREE.Color();
+  var lightPos = [], lightCol = [], k = 0;
+  tiers.forEach(function(tr){
+    for(var j=0;j<18;j++){
+      var u = Math.random()*0.75, ang = Math.random()*Math.PI*2, r = tr[0]*(1 - u)*0.97, y = tr[2] + tr[1]*u;
+      if(k < 90){ mtx.makeTranslation(Math.cos(ang)*r, y, Math.sin(ang)*r); orn.setMatrixAt(k, mtx); orn.setColorAt(k, col.setHex(cols[k % cols.length])); k++; }
+      for(var q=0;q<3;q++){ var a2 = Math.random()*Math.PI*2, u2 = Math.random()*0.9, r2 = tr[0]*(1 - u2) + 0.08; lightPos.push(Math.cos(a2)*r2, tr[2] + tr[1]*u2, Math.sin(a2)*r2); col.setHSL([0, 0.12, 0.33, 0.58, 0.8][Math.floor(Math.random()*5)], 1, 0.6); lightCol.push(col.r, col.g, col.b); }
+    }
+  });
+  orn.count = k; orn.instanceColor.needsUpdate = true; g.add(orn);
+  var lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lightPos, 3)); lg.setAttribute('color', new THREE.Float32BufferAttribute(lightCol, 3));
+  var lights = new THREE.Points(lg, new THREE.PointsMaterial({size:0.45, vertexColors:true, transparent:true, depthWrite:false, blending:THREE.AdditiveBlending}));
+  lights.userData.base = lightCol.slice(); g.add(lights); holiday.lights = lights;
+  // the star on top
+  var shape = new THREE.Shape();
+  for(var i=0;i<10;i++){ var rr = i % 2 ? 0.45 : 1.05, a = i*Math.PI/5 + Math.PI/2; if(i === 0) shape.moveTo(Math.cos(a)*rr, Math.sin(a)*rr); else shape.lineTo(Math.cos(a)*rr, Math.sin(a)*rr); }
+  var star = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, {depth:0.25, bevelEnabled:false}), new THREE.MeshBasicMaterial({color:0xffd84a}));
+  star.geometry.translate(0, 0, -0.125); star.position.y = 15.6; g.add(star); holiday.star = star;
+  var halo = new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexture(), color:0xffe28a, transparent:true, opacity:0.8, depthWrite:false, blending:THREE.AdditiveBlending}));
+  halo.scale.set(5, 5, 1); halo.position.y = 15.6; g.add(halo); holiday.halo = halo;
+  // presents underneath
+  [[2.6, 1.4, 0xd11f2a, 0xf2c230, 1.1], [-2.2, 2.4, 0x2a62d8, 0xf4f4f4, 0.9], [1.0, -2.8, 0x1d8a4a, 0xd11f2a, 1.2], [-2.8, -1.2, 0xf2c230, 0xd11f2a, 0.8], [3.3, -1.0, 0xb52cc9, 0xf4f4f4, 0.7], [-0.6, 3.2, 0xf4f4f4, 0xd11f2a, 0.95]].forEach(function(pr){
+    var sz = pr[4], bx = new THREE.Mesh(new THREE.BoxGeometry(sz, sz*0.8, sz), new THREE.MeshLambertMaterial({color:pr[2]})); bx.position.set(pr[0], sz*0.4, pr[1]); bx.rotation.y = pr[0]; g.add(bx);
+    var rib = new THREE.MeshLambertMaterial({color:pr[3]});
+    var r1 = new THREE.Mesh(new THREE.BoxGeometry(sz*1.02, sz*0.82, sz*0.16), rib); r1.position.copy(bx.position); r1.rotation.y = bx.rotation.y; g.add(r1);
+    var r2 = new THREE.Mesh(new THREE.BoxGeometry(sz*0.16, sz*0.82, sz*1.02), rib); r2.position.copy(bx.position); r2.rotation.y = bx.rotation.y; g.add(r2);
+    var bow = new THREE.Mesh(new THREE.TorusGeometry(sz*0.14, sz*0.05, 6, 12), rib); bow.position.set(pr[0], sz*0.85, pr[1]); bow.rotation.y = bx.rotation.y; g.add(bow);
+  });
+  var sign = holidaySign([['JOYEUX NOËL', 62], ['Merry Christmas', 42]], 5, 1.8, '#a3121c', '#f6e7b0');
+  sign.position.set(0, 1.6, 7.2); g.add(sign);
+  var post = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.6, 0.15), new THREE.MeshLambertMaterial({color:0x3b2a1c})); post.position.set(0, 0.8, 7.15); g.add(post);
+  root.add(g);
+  pushSegCollider(TX, TZ, TX, TZ, 5.4, -50, 16);
+
+  /* the Hanukkah menorah: nine branches, the shamash (helper candle) in the middle stands taller */
+  var MX = 46, MZ = 0, mg = new THREE.Group(); mg.position.set(MX, 0, MZ); mg.rotation.y = -Math.PI/2;   // faces the tower
+  var gold = new THREE.MeshPhongMaterial({color:0xd4a833, shininess:80, specular:0xfff2c0}), wax = new THREE.MeshLambertMaterial({color:0xf4f6ff}), blue = new THREE.MeshLambertMaterial({color:0x2d5fc4});
+  var base1 = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.0, 0.5, 20), gold); base1.position.y = 0.25; mg.add(base1);
+  var stem = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 4.6, 12), gold); stem.position.y = 2.8; mg.add(stem);
+  var bar = new THREE.Mesh(new THREE.BoxGeometry(7.4, 0.28, 0.3), gold); bar.position.y = 5.0; mg.add(bar);
+  holiday.flames = [];
+  for(var b=-4;b<=4;b++){
+    var x = b*0.9, isShamash = b === 0, top = isShamash ? 6.1 : 5.4;
+    if(!isShamash){ var arm = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, top - 5.0, 8), gold); arm.position.set(x, 5.0 + (top - 5.0)/2, 0); mg.add(arm); }
+    else { var tall = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 1.1, 8), gold); tall.position.set(0, 5.6, 0); mg.add(tall); }
+    var cup = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.14, 0.22, 12), gold); cup.position.set(x, top + 0.1, 0); mg.add(cup);
+    var candle = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.7, 10), b % 2 ? blue : wax); candle.position.set(x, top + 0.55, 0); mg.add(candle);
+    var fl = new THREE.Group(); fl.position.set(x, top + 0.95, 0);
+    var fc = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.36, 10), new THREE.MeshBasicMaterial({color:0xffa52a})); fc.position.y = 0.16; fl.add(fc);
+    var fi = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.2, 8), new THREE.MeshBasicMaterial({color:0xfff4c0})); fi.position.y = 0.12; fl.add(fi);
+    var fg2 = new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexture(), color:0xffb347, transparent:true, opacity:0.7, depthWrite:false, blending:THREE.AdditiveBlending})); fg2.scale.set(1.1, 1.1, 1); fg2.position.y = 0.15; fl.add(fg2);
+    fl.visible = false; mg.add(fl);
+    // lit right to left, one more each night; the shamash lights them all
+    holiday.flames.push({g:fl, order:isShamash ? 0 : (b > 0 ? 5 - b : 4 - b)});
+  }
+  var msign = holidaySign([['HAPPY HANUKKAH', 44], ['Joyeuse Hanoucca · Dec 4 - 12', 28]], 5, 1.6, '#1f3f8f', '#f2d27a');
+  msign.position.set(0, 1.5, 3.2); mg.add(msign);
+  var mpost = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.5, 0.15), new THREE.MeshLambertMaterial({color:0x3b2a1c})); mpost.position.set(0, 0.75, 3.15); mg.add(mpost);
+  root.add(mg);
+  pushSegCollider(MX, MZ - 3.7, MX, MZ + 3.7, 0.5, -50, 7);
+  pushSegCollider(MX, MZ, MX, MZ, 2.0, -50, 1);
+
+  /* a wreath with a red bow on every street lamp */
+  var N = LAMP_SPOTS.length;
+  if(N){
+    var wr = new THREE.InstancedMesh(new THREE.TorusGeometry(0.32, 0.12, 6, 14), new THREE.MeshLambertMaterial({color:0x1d6b38}), N);
+    var bw = new THREE.InstancedMesh(new THREE.BoxGeometry(0.26, 0.16, 0.08), new THREE.MeshLambertMaterial({color:0xc8141e}), N);
+    var m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), e4 = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1);
+    LAMP_SPOTS.forEach(function(sp, i){
+      var ang = Math.atan2(-sp[0], -sp[1]);   // face toward the middle of Paris
+      q4.setFromEuler(e4.set(0, ang, 0));
+      var ox = Math.sin(ang)*0.2, oz = Math.cos(ang)*0.2;
+      wr.setMatrixAt(i, m4.compose(new THREE.Vector3(sp[0] + ox, 3.4, sp[1] + oz), q4, one));
+      bw.setMatrixAt(i, m4.compose(new THREE.Vector3(sp[0] + ox*1.3, 3.1, sp[1] + oz*1.3), q4, one));
+    });
+    root.add(wr); root.add(bw);
+  }
+
+  /* snow: soft white flakes that drift down round you */
+  var SN = 1800, sp2 = new Float32Array(SN*3), seed = [];
+  for(var f=0;f<SN;f++) seed.push([Math.random()*70 - 35, Math.random()*30, Math.random()*70 - 35, 1.4 + Math.random()*1.4, Math.random()*6.28]);
+  var sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(sp2, 3));
+  var c = document.createElement('canvas'); c.width = c.height = 32; var x2 = c.getContext('2d'), gr = x2.createRadialGradient(16, 16, 0, 16, 16, 16);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.8)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x2.fillStyle = gr; x2.fillRect(0, 0, 32, 32);
+  var snow = new THREE.Points(sg, new THREE.PointsMaterial({size:0.32, map:new THREE.CanvasTexture(c), transparent:true, depthWrite:false, color:0xffffff}));
+  snow.frustumCulled = false; snow.visible = false; scene.add(snow);
+  holiday.snow = {mesh:snow, pos:sp2, seed:seed, N:SN};
+
+  /* Mika's Santa hat */
+  var hc = document.createElement('canvas'); hc.width = 128; hc.height = 128; var h = hc.getContext('2d');
+  h.fillStyle = '#d11f2a'; h.beginPath(); h.moveTo(18, 100); h.quadraticCurveTo(60, 10, 112, 30); h.lineTo(96, 100); h.closePath(); h.fill();
+  h.fillStyle = '#f7f7f7'; h.fillRect(10, 92, 100, 24); h.beginPath(); h.arc(112, 30, 13, 0, Math.PI*2); h.fill();
+  var hat = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(hc), transparent:true, depthWrite:false}));
+  hat.center.set(0.5, 0.1); hat.scale.set(0.9, 0.9, 1); hat.visible = false; root.add(hat); holiday.hat = hat;
+})();
+function glowTexture(){
+  if(glowTexture.t) return glowTexture.t;
+  var c = document.createElement('canvas'); c.width = c.height = 64; var x = c.getContext('2d'), gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64);
+  return (glowTexture.t = new THREE.CanvasTexture(c));
+}
+/* every frame: twinkle the tree, spin the star, light tonight's candles, let it snow */
+function updateHoliday(dt, snowAmt){
+  if(!holiday.on || !holiday.lights) return;
+  holiday.t += dt;
+  var T = holiday.t;
+  if(Math.floor(T*4) !== holiday.tw){   // twinkle 4 times a second
+    holiday.tw = Math.floor(T*4);
+    var ca = holiday.lights.geometry.attributes.color, base = holiday.lights.userData.base;
+    for(var i=0;i<ca.count;i++){ var on = (Math.sin(i*12.9898 + holiday.tw*0.9) > -0.3) ? 1 : 0.15; ca.array[i*3] = base[i*3]*on; ca.array[i*3+1] = base[i*3+1]*on; ca.array[i*3+2] = base[i*3+2]*on; }
+    ca.needsUpdate = true;
+  }
+  holiday.star.rotation.y = T*0.8;
+  holiday.halo.material.opacity = 0.55 + 0.25*Math.sin(T*2.2);
+  var n = hanukkahNight();
+  holiday.flames.forEach(function(f, i){
+    f.g.visible = n > 0 && f.order <= n;
+    if(f.g.visible){ f.g.scale.set(1 + 0.08*Math.sin(T*19 + i), 1 + 0.15*Math.sin(T*23 + i*2), 1); }
+  });
+  // snow
+  var sn = holiday.snow, show = snowAmt > 0.01 && !insideRoom();
+  sn.mesh.visible = show;
+  if(show){
+    var cx = camera.position.x, cy = camera.position.y, cz = camera.position.z, P = sn.pos, cnt = Math.floor(sn.N*snowAmt);
+    for(var q=0;q<sn.N;q++){
+      var sd = sn.seed[q];
+      if(q >= cnt){ P[q*3+1] = -999; continue; }
+      sd[1] -= sd[3]*dt; sd[4] += dt;
+      if(sd[1] < -2){ sd[1] += 32; sd[0] = Math.random()*70 - 35; sd[2] = Math.random()*70 - 35; }
+      P[q*3] = cx - 35 + (((sd[0] + Math.sin(sd[4])*0.8 - cx) % 70) + 70) % 70;
+      P[q*3+1] = Math.max(0, cy - 12) + sd[1];
+      P[q*3+2] = cz - 35 + (((sd[2] + Math.cos(sd[4]*0.7)*0.8 - cz) % 70) + 70) % 70;
+    }
+    sn.mesh.geometry.attributes.position.needsUpdate = true;
+  }
+}
+
 var rain = (function(){
   var N = 2200, pos = new Float32Array(N*6), seed = [];
   for(var i=0;i<N;i++) seed.push([Math.random()*60 - 30, Math.random()*30, Math.random()*60 - 30, 22 + Math.random()*8]);
@@ -7805,6 +8064,8 @@ function updateSky(dt){
   }
   // rain
   var r = w.rain;
+  updateHoliday(dt, HOLIDAY ? Math.max(r, cl > 0.5 ? (cl - 0.5)*0.8 : 0) : 0);
+  if(HOLIDAY) r = 0;   // it snows instead of raining over the holidays
   rain.mesh.visible = r > 0.01 && !insideRoom();
   if(rain.mesh.visible){
     rain.mesh.material.opacity = 0.55*r;
@@ -7823,7 +8084,7 @@ function updateSky(dt){
   rainSound(r);
   // say when it changes (not the moment you arrive)
   if(signedIn() && skyLive){
-    if(skyAnnounce.wx !== null && skyAnnounce.wx !== w.wx) systemLine(t(w.wx === 'rain' ? 'wxRain' : w.wx === 'cloudy' ? 'wxCloudy' : 'wxClear'));
+    if(skyAnnounce.wx !== null && skyAnnounce.wx !== w.wx) systemLine(t(w.wx === 'rain' ? (HOLIDAY ? 'wxSnow' : 'wxRain') : w.wx === 'cloudy' ? 'wxCloudy' : 'wxClear'));
     if(skyAnnounce.night !== null && skyAnnounce.night !== skyState.night) systemLine(t(skyState.night ? 'nightFalls' : 'dayBreaks'));
     skyAnnounce.wx = w.wx; skyAnnounce.night = skyState.night;
   }
