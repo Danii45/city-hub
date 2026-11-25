@@ -3669,7 +3669,7 @@ function updateRowVisibility(){
   });
 }
 /* the villages: a plaza with a fountain, trees round the edge, and a big welcome sign (and Madame's giant baguette) */
-var bigBaguette = null;
+var bigBaguette = null, farLand = null;
 (function buildVillages(){
   var B = new MeshBatch(), lawn = new FlatBatch(FLAT.lawn);
   VILLAGES.forEach(function(v){
@@ -3737,7 +3737,7 @@ var bigBaguette = null;
   /* the mountain: the village sits on its flat top; the slopes fall 260 m to a green valley, with snowy peaks around.
      It's far past the edge of Paris (and past the fog), so you fly there from MENU → VILLAGES. */
   function buildMountain(v){
-    var cz = v.z + 17, H = 260, rock = solidMat(0x7d776b), top = solidMat(PAVEMENT);
+    var cz = v.z + 17, H = 260, rock = solidMat(0xa8783e), top = solidMat(PAVEMENT);
     var geo = new THREE.CylinderGeometry(150, 560, H, 18, 5), pa = geo.attributes.position;
     for(var i = 0; i < pa.count; i++){
       var y = pa.getY(i);
@@ -3751,14 +3751,41 @@ var bigBaguette = null;
     // a stone wall round the edge of the top, so nobody walks off the cliff
     var MB = new MeshBatch(), W = new Lot(MB, v.x, cz, 0);
     for(var a = 0; a < Math.PI*2; a += Math.PI/36) W.box(13.5, 1.1, 1, Math.cos(a)*146, 0.55, Math.sin(a)*146, 0xbfb29a, 0, -a + Math.PI/2);
-    // snowy peaks all around
-    for(var n = 0; n < 9; n++){
-      var ang = n*0.7 + 0.4, dist = 650 + (n % 3)*180, ph = 260 + (n*67 % 160), px = Math.cos(ang)*dist, pz = Math.sin(ang)*dist;
-      var P = new Lot(MB, v.x + px, cz + pz, 0, -H);
-      P.part(new THREE.ConeGeometry(200 + (n % 4)*40, ph, 7), 0, ph/2, 0, 0x6f6a60);
-      P.part(new THREE.ConeGeometry((200 + (n % 4)*40)*0.3, ph*0.3, 7), 0, ph*0.85, 0, 0xf4f6f8);
-    }
     MB.build();
+    /* BAGUETTE LAND: the cliffs are covered in rings of giant baguettes, and the peaks round it are huge bundles of
+       baguettes leaning together (up to 600 m tall) - so they stick up over the horizon and you can see them from Paris */
+    var mats = [], up = new THREE.Vector3(1, 0, 0), q = new THREE.Quaternion(), M4 = new THREE.Matrix4(), sc = new THREE.Vector3(), pos = new THREE.Vector3();
+    function bag(x, y, z, dir, len, r){ q.setFromUnitVectors(up, dir.normalize()); sc.set(len/2, r, r); pos.set(x, y, z); mats.push(new THREE.Matrix4().compose(pos, q.clone(), sc.clone())); }
+    for(var ring = 0; ring < 16; ring++){
+      var f = (ring + 0.5)/16, ry = -H + f*H, rr = (560 - 410*f)*1.05 + 6, cnt = Math.floor(Math.PI*2*rr/30);
+      for(var j = 0; j < cnt; j++){
+        var an = (j + (ring % 2)*0.5)/cnt*Math.PI*2 + Math.sin(ring*3.1)*0.2;
+        var d = new THREE.Vector3(-Math.sin(an), 0.25*Math.sin(j*1.7 + ring), Math.cos(an));
+        bag(v.x + Math.cos(an)*rr, ry, cz + Math.sin(an)*rr, d, 50 + (j*13 % 10), 10);
+      }
+    }
+    for(var n = 0; n < 11; n++){
+      var ang = n*0.62 + 0.3, dist = 640 + (n % 3)*200, ph = 380 + (n*97 % 240), br = 120 + (n % 4)*30;
+      var px = v.x + Math.cos(ang)*dist, pz = cz + Math.sin(ang)*dist, apex = new THREE.Vector3(px, -H + ph, pz), L = Math.hypot(ph, br)*1.08;
+      for(var k = 0; k < 14; k++){
+        var ka = k/14*Math.PI*2 + n, foot = new THREE.Vector3(px + Math.cos(ka)*br, -H, pz + Math.sin(ka)*br);
+        var mid = foot.clone().add(apex).multiplyScalar(0.5);
+        bag(mid.x, mid.y, mid.z, apex.clone().sub(foot), L, L*0.05);
+      }
+    }
+    var bgeo = new THREE.SphereGeometry(1, 12, 8), bmat = solidMat(0xffffff);
+    var inst = new THREE.InstancedMesh(bgeo, bmat, mats.length), cc = new THREE.Color();
+    mats.forEach(function(m, i){ inst.setMatrixAt(i, m); cc.setHex([0xd99a45, 0xc98a3a, 0xe3ab58, 0xd0903f][i % 4]); inst.setColorAt(i, cc); });
+    inst.instanceMatrix.needsUpdate = true; if(inst.instanceColor) inst.instanceColor.needsUpdate = true;
+    inst.frustumCulled = false; root.add(inst);
+    /* far away (past the fog), the game draws a hazy copy of Baguette Land in the right spot, so it shows on the horizon */
+    var haze = new THREE.Color(SKY_HAZE), far = new THREE.Group();
+    function fogless(hex){ return new THREE.MeshBasicMaterial({color:new THREE.Color(hex).lerp(haze, 0.42), fog:false}); }
+    var fi = new THREE.InstancedMesh(bgeo, new THREE.MeshLambertMaterial({color:new THREE.Color(0xd99a45).lerp(haze, 0.3), fog:false, emissive:new THREE.Color(0x3a2a10)}), mats.length);
+    fi.instanceMatrix = inst.instanceMatrix; fi.frustumCulled = false; far.add(fi);
+    var fm = new THREE.Mesh(geo, fogless(0xa8783e)); fm.position.copy(mtn.position); far.add(fm);
+    farLand = {group:far, c:new THREE.Vector3(v.x, 0, cz), bag:null};
+    far.visible = false; scene.add(far);
   }
 })();
 function villageOf(p){ return V_BY_ID[(p && p.village) || 'kaiman']; }
@@ -5449,6 +5476,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 25, 2026 · 4:45 PM</span><br>THE AIRPORT: take the taxi from the Champ de Mars to Paris-CDG and fly to the test cities.</li>' +
   '<li><span class="when">Nov 25, 2026 · 4:30 PM</span><br>Hit Mika 3 times and you go straight to the Public Shame Chamber.</li>' +
   '<li><span class="when">Nov 25, 2026 · 4:00 PM</span><br>CLASS VILLAGES: every class has its own quartier to build in (MENU → VILLAGES). Madame\'s Baguette Village on the mountain is for elite players 🥖.</li>' +
   '<li><span class="when">Nov 25, 2026 · 3:30 PM</span><br>THE PUBLIC SHAME CHAMBER: inappropriate language in the chat sends you straight there. Only Madame can let you out.</li>' +
@@ -7449,6 +7477,9 @@ function renderMembers(){
     nm.textContent = m.name + (owned ? ' - ' + t('owns', {n:owned}) : '');
     row.appendChild(nm);
     if(!m.owner){
+      var tags = (isJailedUid(uid) ? '🚔 ' : '') + (m.elite ? '🥖 ' : '');
+      nm.textContent = tags + m.name + (RANKS[m.rank] ? ' · ' + tx(RANKS[m.rank]) : '') + (owned ? ' - ' + t('owns', {n:owned}) : '');
+      var build = function(box){
       var sel = document.createElement('select');
       sel.className = 'rank-select'; sel.title = t('rankLabel'); sel.setAttribute('aria-label', t('rankLabel') + ' - ' + m.name);
       [''].concat(RANK_ORDER).forEach(function(rk){ var o = document.createElement('option'); o.value = rk; o.textContent = rk ? tx(RANKS[rk]) : t('rankNone'); sel.appendChild(o); });
@@ -7460,7 +7491,7 @@ function renderMembers(){
           addMsg(v ? t('rankSet', {name:m.name, rank:tx(RANKS[v])}) : t('rankCleared', {name:m.name}), 'good');
         }).catch(function(){ addMsg(t('saveFail'), 'bad'); });
       });
-      row.appendChild(sel);
+      box.appendChild(pmField(t('rankLabel'), sel));
       var nv = document.createElement('button');
       nv.className = 'btn navy-give' + (m.navy ? ' on' : '');
       nv.textContent = t('navyGive') + (m.navy ? ' ✓' : '');
@@ -7471,7 +7502,7 @@ function renderMembers(){
           addMsg(t(give ? 'navyGiven' : 'navyTaken', {name:m.name}), 'good');
         }).catch(function(){ addMsg(t('saveFail'), 'bad'); });
       });
-      row.appendChild(nv);
+      box.appendChild(nv);
       var el = document.createElement('button');
       el.className = 'btn navy-give' + (m.elite ? ' on' : '');
       el.textContent = t('eliteGive') + (m.elite ? ' ✓' : '');
@@ -7479,7 +7510,7 @@ function renderMembers(){
         var give = !m.elite;
         net.db.ref('paris/members/' + uid + '/elite').set(give ? true : null).then(function(){ addMsg(t(give ? 'eliteGiven' : 'eliteTaken', {name:m.name}), 'good'); }).catch(function(){ addMsg(t('saveFail'), 'bad'); });
       });
-      row.appendChild(el);
+      box.appendChild(el);
       var cs = document.createElement('select');
       cs.className = 'rank-select'; cs.title = t('vgClassSel'); cs.setAttribute('aria-label', t('vgClassSel') + ' - ' + m.name);
       var c0 = document.createElement('option'); c0.value = ''; c0.textContent = t('vgClassSel') + '?'; cs.appendChild(c0);
@@ -7487,7 +7518,7 @@ function renderMembers(){
       cs.value = (ownersAll[uid] && ownersAll[uid].cls) || '';
       cs.addEventListener('keydown', function(e){ e.stopPropagation(); });
       cs.addEventListener('change', function(){ net.db.ref('paris/owners/' + uid + '/cls').set(cs.value || null).catch(function(){ addMsg(t('saveFail'), 'bad'); }); });
-      row.appendChild(cs);
+      box.appendChild(pmField(t('vgClassSel'), cs));
       var jailed = isJailedUid(uid), jb = document.createElement('button');
       jb.className = 'btn navy-give' + (jailed ? ' on' : '');
       jb.textContent = jailed ? '🚔 ' + t('jailRelease') : t('jailBtn');
@@ -7495,7 +7526,7 @@ function renderMembers(){
         if(isJailedUid(uid)) releaseUid(uid).then(function(){ addMsg(t('jailFree', {name:m.name}), 'good'); renderMembers(); }).catch(function(){ addMsg(t('saveFail'), 'bad'); });
         else { jailUid(uid, 'Madame'); addMsg(t('jailSent', {name:m.name}), 'good'); setTimeout(renderMembers, 600); }
       });
-      row.appendChild(jb);
+      box.appendChild(jb);
       var b = document.createElement('button');
       b.className = 'btn' + (memberConfirm === uid ? ' danger' : '');
       b.textContent = memberConfirm === uid ? t('removeMemberYes') : t('removeMember');
@@ -7505,12 +7536,57 @@ function renderMembers(){
         memberConfirm = null;
         net.db.ref('paris/members/' + uid).remove().then(function(){ addMsg(t('memberRemoved', {name:m.name}), 'good'); });
       });
-      row.appendChild(b);
+      box.appendChild(b);
+      };
+      var mg = document.createElement('button'); mg.className = 'btn go'; mg.textContent = '⚙ ' + t('pmManage');
+      mg.addEventListener('click', function(){ openPlayerMenu(uid); });
+      row.style.cursor = 'pointer'; nm.addEventListener('click', function(){ openPlayerMenu(uid); });
+      row.appendChild(mg);
+      pmBuilders[uid] = build;
     } else row.appendChild(roleBadge('owner'));
     list.appendChild(row);
   });
+  if(pm.uid) renderPlayerMenu();
 }
 langHooks.push(renderMembers);
+/* ---------- the PLAYER MENU: a wide card with everything for one player (rank, class, colours, elite, shame chamber, remove) ---------- */
+STR.en.pmManage = 'MANAGE'; STR.fr.pmManage = 'GÉRER';
+STR.en.pmClose = 'CLOSE'; STR.fr.pmClose = 'FERMER';
+STR.en.pmPlots = 'Plots'; STR.fr.pmPlots = 'Terrains';
+STR.en.pmNone = 'none yet'; STR.fr.pmNone = 'aucun pour l\'instant';
+var pmBuilders = {}, pm = {uid:null, el:null};
+function pmField(label, el){ var w = document.createElement('label'); w.className = 'pm-field'; var s = document.createElement('span'); s.textContent = label; w.appendChild(s); w.appendChild(el); return w; }
+(function(){
+  var st = document.createElement('style');
+  st.textContent = '#player-menu{position:fixed; inset:0; z-index:60; display:flex; align-items:center; justify-content:center; background:rgba(10,14,30,0.55);} #player-menu.hidden{display:none;}' +
+    '#player-menu .pm-card{width:min(760px, 94vw); max-height:88vh; overflow:auto; padding:16px 18px; font-family:"VT323", monospace;}' +
+    '#player-menu h3{margin:0 0 4px; font-family:"Press Start 2P", monospace; font-size:14px; color:var(--accent); overflow-wrap:anywhere;}' +
+    '#player-menu .pm-sub{font-size:18px; color:var(--ink-soft); margin-bottom:12px;}' +
+    '#player-menu .pm-grid{display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px;}' +
+    '#player-menu .pm-grid .btn{width:100%; font-size:9px; padding:12px 8px; margin:0;} #player-menu .pm-grid select{width:100%; margin:0;}' +
+    '#player-menu .pm-field{display:flex; flex-direction:column; gap:4px; font-size:16px; color:var(--ink-soft);}' +
+    '#player-menu .pm-foot{display:flex; justify-content:flex-end; margin-top:14px;}' +
+    '@media (max-width:560px){ #player-menu .pm-grid{grid-template-columns:repeat(2, minmax(0, 1fr));} }';
+  document.head.appendChild(st);
+  var el = document.createElement('div'); el.id = 'player-menu'; el.className = 'hidden';
+  el.innerHTML = '<div class="pm-card card"><h3></h3><div class="pm-sub"></div><div class="pm-grid"></div><div class="pm-foot"><button class="btn" id="pm-close"></button></div></div>';
+  document.body.appendChild(el); pm.el = el;
+  el.addEventListener('click', function(e){ if(e.target === el || e.target.id === 'pm-close') closePlayerMenu(); });
+  el.addEventListener('keydown', function(e){ if(e.key === 'Escape') closePlayerMenu(); e.stopPropagation(); });
+})();
+function openPlayerMenu(uid){ pm.uid = uid; memberConfirm = null; renderPlayerMenu(); pm.el.classList.remove('hidden'); }
+function closePlayerMenu(){ pm.uid = null; memberConfirm = null; pm.el.classList.add('hidden'); }
+function renderPlayerMenu(){
+  var uid = pm.uid, m = net.members[uid];
+  if(!uid || !m || !pmBuilders[uid]){ closePlayerMenu(); return; }
+  var plots = PLOTS.filter(function(p){ return p.data && p.data.o === uid; }).map(plotLabel);
+  var cls = ownersAll[uid] && ownersAll[uid].cls && V_BY_ID[ownersAll[uid].cls];
+  pm.el.querySelector('h3').textContent = (isJailedUid(uid) ? '🚔 ' : '') + (m.elite ? '🥖 ' : '') + m.name;
+  pm.el.querySelector('.pm-sub').textContent = (cls ? villageName(cls) + ' · ' : '') + t('pmPlots') + ': ' + (plots.length ? plots.join(', ') : t('pmNone'));
+  var grid = pm.el.querySelector('.pm-grid'); grid.textContent = '';
+  pmBuilders[uid](grid);
+  pm.el.querySelector('#pm-close').textContent = t('pmClose');
+}
 
 /* owner announcements: a big banner on everyone's screen */
 var announceInput = document.getElementById('announce-input'), annEl = document.getElementById('announce'), annTimer = null, myAnnounce = null;
@@ -10302,9 +10378,27 @@ function goVillage(v){
              to:new THREE.Vector3(to.x, 70, to.z), toT:new THREE.Vector3(tgt.x, 0, tgt.z), peak:Math.max(90, Math.min(420, d*0.3))};
   showToast(t('vgFlying', {v:villageName(v)}));
 }
+/* the hazy far copy of Baguette Land: drawn 700 m away in exactly the right direction and size */
+function farLandTick(){
+  if(!farLand) return;
+  var g = farLand.group, d = camera.position.distanceTo(farLand.c);
+  if(!farLand.bag && bigBaguette){
+    var bc = bigBaguette.clone(); bc.traverse(function(o){ if(o.material) o.material = new THREE.MeshBasicMaterial({color:o.material.color.clone().lerp(new THREE.Color(SKY_HAZE), 0.3), fog:false}); });
+    bc.position.sub(farLand.c); g.add(bc); farLand.bag = bc;
+    g.children.forEach(function(o){ if(o !== bc && o.position) o.position.sub(farLand.c); });
+  }
+  var show = d > 950;
+  g.visible = show;
+  if(!show) return;
+  var k = 700/d;
+  g.scale.setScalar(k);
+  g.position.copy(camera.position).add(farLand.c.clone().sub(camera.position).multiplyScalar(k));
+  if(farLand.bag) farLand.bag.rotation.y = bigBaguette.rotation.y;
+}
 function villageTick(){
   if(net.uid) villageListen();
   if(bigBaguette) bigBaguette.rotation.y = performance.now()*0.00025;
+  farLandTick();
   if(!vFlight) return;
   if(flying){ vFlight = null; return; }
   var k = Math.min(1, (performance.now() - vFlight.t0)/vFlight.dur), e = k < 0.5 ? 2*k*k : 1 - Math.pow(-2*k + 2, 2)/2;
