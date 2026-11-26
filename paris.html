@@ -15437,32 +15437,120 @@ function jobBoard(){
   showCard('<h3>💼 ' + L2('ALL THE JOBS', 'TOUS LES MÉTIERS') + '</h3><div class="gc-sub">' + L2('Click a job: description, a day in its life, pay, vocabulary and practice.', 'Clique sur un métier : description, une journée type, salaire, vocabulaire et entraînement.') + '</div><div class="gc-grid">' + JOBC.map(function(j, i){ return gOpt('jobopen', i, j.icon + ' <b>' + esc(j.fr) + '</b><br><span class="lf-soft">' + j.pay.toLocaleString('fr-FR') + ' € / ' + L2('month', 'mois') + '</span>'); }).join('') + '</div><div class="gc-row">' + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>');
 }
 GACT.jobopen = function(v){ jobCard(v|0); }; GACT.jobboard = jobBoard;
+/* more jobs */
+JOBC.push(
+ {id:'facteur', icon:'✉', fr:'Facteur / Factrice', en:'Postal worker', pay:1950, col:0xe3b52c, place:'La Poste', about:'Tu distribues les lettres et les colis dans les boîtes aux lettres. Tu marches ou tu roules à vélo jaune !', day:[['6 h', 'Je trie le courrier à La Poste.'], ['8 h', 'Je pars en tournée à vélo.'], ['11 h', 'Je donne un colis : « Signez ici, s\'il vous plaît. »'], ['13 h', 'Fin de la tournée et déjeuner.']], voc:[['la lettre', 'letter'], ['le timbre', 'stamp'], ['l\'enveloppe', 'envelope'], ['la boîte aux lettres', 'letterbox'], ['la tournée', 'the round'], ['le courrier', 'mail']], q:[['On colle un... sur l\'enveloppe.', 'timbre', ['fromage', 'bonbon', 'arbre']], ['Le facteur met les lettres dans...', 'la boîte aux lettres', ['le four', 'la piscine', 'le frigo']], ['Le chemin du facteur chaque jour, c\'est sa...', 'tournée', ['recette', 'chanson', 'couleur']], ['En France, les vélos de La Poste sont...', 'jaunes', ['roses', 'noirs', 'invisibles']]]},
+ {id:'coiffeur', icon:'💇', fr:'Coiffeur / Coiffeuse', en:'Hairdresser', pay:1900, col:0xd27aa0, place:'le salon de coiffure', about:'Tu coupes, laves et coiffes les cheveux. Tu écoutes ce que veut le client et tu donnes des conseils.', day:[['9 h', 'J\'ouvre le salon et je prépare mes ciseaux.'], ['10 h', 'Une coupe courte pour un enfant.'], ['14 h', 'Une couleur et un brushing.'], ['18 h', 'Je nettoie le salon.']], voc:[['les ciseaux', 'scissors'], ['le peigne', 'comb'], ['la brosse', 'brush'], ['le sèche-cheveux', 'hairdryer'], ['couper', 'to cut'], ['court / long', 'short / long']], q:[['Pour couper les cheveux, on utilise...', 'des ciseaux', ['une cuillère', 'un marteau', 'un stylo']], ['Pour sécher les cheveux :', 'le sèche-cheveux', ['le frigo', 'le four', 'le parapluie']], ['« Je voudrais les cheveux plus... »', 'courts', ['chauds', 'mouillés', 'bleus du ciel']], ['Le coiffeur travaille dans un...', 'salon de coiffure', ['aéroport', 'zoo', 'stade']]]},
+ {id:'mecanicien', icon:'🔧', fr:'Mécanicien / Mécanicienne', en:'Mechanic', pay:2100, col:0x2a4a8a, place:'le garage', about:'Tu répares les voitures, les motos et les vélos. Tu trouves les pannes et tu changes les pièces.', day:[['8 h', 'Une voiture ne démarre pas : je cherche la panne.'], ['10 h', 'Je change les pneus.'], ['14 h', 'Je fais la vidange (je change l\'huile).'], ['17 h', 'Je range mes outils.']], voc:[['la panne', 'breakdown'], ['le pneu', 'tyre'], ['le moteur', 'engine'], ['la clé', 'spanner'], ['réparer', 'to repair'], ['le garage', 'garage']], q:[['La voiture ne marche plus : elle est en...', 'panne', ['vacances', 'chocolat', 'couleur']], ['La roue en caoutchouc, c\'est le...', 'pneu', ['pain', 'peigne', 'piano']], ['Le mécanicien travaille au...', 'garage', ['cinéma', 'musée', 'zoo']], ['Pour tourner une vis, on utilise une...', 'clé', ['fourchette', 'chaussette', 'carte']]]},
+ {id:'architecte', icon:'📐', fr:'Architecte', en:'Architect', pay:3600, col:0x6a6a7a, place:'le cabinet d\'architecture', about:'Tu dessines les plans des maisons et des bâtiments. Tu penses à la beauté, à la sécurité et à l\'environnement.', day:[['9 h', 'Je rencontre une famille qui veut une maison.'], ['10 h', 'Je dessine les plans sur l\'ordinateur.'], ['14 h', 'Je visite le chantier.'], ['17 h', 'Je fabrique une maquette.']], voc:[['le plan', 'plan'], ['la maquette', 'scale model'], ['le chantier', 'building site'], ['le bâtiment', 'building'], ['dessiner', 'to draw'], ['la règle', 'ruler']], q:[['Un petit modèle d\'un bâtiment, c\'est une...', 'maquette', ['baguette', 'casquette', 'raquette']], ['Le lieu où on construit, c\'est le...', 'chantier', ['chapeau', 'château', 'chat']], ['L\'architecte dessine les...', 'plans', ['plantes', 'plats', 'planètes']], ['Qui a dessiné la pyramide du Louvre ?', 'un architecte (I. M. Pei)', ['un boulanger', 'un pilote', 'un chat']]]},
+ {id:'pharmacien', icon:'💊', fr:'Pharmacien / Pharmacienne', en:'Pharmacist', pay:3500, col:0x2f8a3a, place:'la pharmacie (la croix verte)', about:'Tu donnes les médicaments avec l\'ordonnance du médecin et tu donnes des conseils de santé.', day:[['9 h', 'J\'ouvre la pharmacie : la croix verte s\'allume.'], ['10 h', 'Je lis les ordonnances.'], ['15 h', 'Je conseille une crème pour le soleil.'], ['19 h', 'Je range les médicaments.']], voc:[['la pharmacie', 'pharmacy'], ['le médicament', 'medicine'], ['l\'ordonnance', 'prescription'], ['le sirop', 'syrup'], ['le pansement', 'plaster'], ['la croix verte', 'the green cross']], q:[['En France, le symbole de la pharmacie, c\'est...', 'une croix verte', ['un cercle rouge', 'une étoile jaune', 'une baguette']], ['Pour la toux, on prend du...', 'sirop', ['sable', 'sel', 'savon']], ['Le pharmacien lit l\'... du médecin.', 'ordonnance', ['addition', 'affiche', 'aventure']], ['On achète les médicaments à la...', 'pharmacie', ['boulangerie', 'piscine', 'gare']]]},
+ {id:'dentiste', icon:'🦷', fr:'Dentiste', en:'Dentist', pay:5000, col:0x5ab8e8, place:'le cabinet dentaire', about:'Tu soignes les dents. Tu dis aux patients de bien se brosser les dents trois fois par jour !', day:[['9 h', 'Contrôle des dents d\'un enfant.'], ['11 h', 'Je soigne une carie.'], ['14 h', 'Je nettoie les dents.'], ['17 h', 'Conseils : moins de bonbons !']], voc:[['la dent', 'tooth'], ['la carie', 'cavity'], ['la brosse à dents', 'toothbrush'], ['le dentifrice', 'toothpaste'], ['ouvrir la bouche', 'to open your mouth'], ['se brosser', 'to brush']], q:[['Pour laver les dents, on utilise une brosse à dents et du...', 'dentifrice', ['ketchup', 'fromage', 'shampoing']], ['Le dentiste dit : « Ouvrez la... »', 'bouche', ['porte', 'fenêtre', 'valise']], ['Trop de bonbons, ça donne des...', 'caries', ['ailes', 'cheveux', 'notes']], ['On se brosse les dents...', 'trois fois par jour', ['une fois par an', 'jamais', 'toutes les minutes']]]},
+ {id:'artiste', icon:'🎨', fr:'Artiste peintre', en:'Painter (artist)', pay:2000, col:0xe86a3a, place:'l\'atelier à Montmartre', about:'Tu peins des tableaux, tu exposes dans des galeries. Comme Monet ou Renoir !', day:[['10 h', 'Je prépare ma palette de couleurs.'], ['11 h', 'Je peins la Seine au bord de l\'eau.'], ['15 h', 'Je vends un tableau à Montmartre.'], ['18 h', 'Je nettoie mes pinceaux.']], voc:[['le tableau', 'painting'], ['le pinceau', 'brush'], ['la palette', 'palette'], ['le chevalet', 'easel'], ['peindre', 'to paint'], ['l\'exposition', 'exhibition']], q:[['Le peintre met sa toile sur un...', 'chevalet', ['cheval', 'chapeau', 'canapé']], ['On peint avec un...', 'pinceau', ['peigne', 'pneu', 'pain']], ['Le quartier des peintres à Paris :', 'Montmartre', ['La Défense', 'l\'aéroport', 'le périphérique']], ['Jaune + bleu =', 'vert', ['rouge', 'noir', 'blanc']]]},
+ {id:'musicien', icon:'🎻', fr:'Musicien / Musicienne', en:'Musician', pay:2200, col:0x8a1c3a, place:'l\'Opéra Garnier', about:'Tu joues d\'un instrument dans un orchestre ou un groupe. Tu répètes beaucoup et tu donnes des concerts.', day:[['10 h', 'Je fais mes gammes.'], ['14 h', 'Répétition avec l\'orchestre.'], ['20 h', 'Le concert commence !'], ['23 h', 'Applaudissements !']], voc:[['l\'instrument', 'instrument'], ['le violon', 'violin'], ['la répétition', 'rehearsal'], ['le concert', 'concert'], ['l\'orchestre', 'orchestra'], ['jouer de...', 'to play (an instrument)']], q:[['On dit « jouer... » un instrument :', 'du piano', ['au piano', 'le piano', 'sur piano']], ['S\'entraîner avec le groupe, c\'est la...', 'répétition', ['récréation', 'recette', 'réparation']], ['Un grand groupe de musiciens classiques :', 'un orchestre', ['une équipe de foot', 'une classe', 'une famille']], ['À la fin du concert, le public...', 'applaudit', ['dort', 'mange', 'part en courant']]]},
+ {id:'astronaute', icon:'🚀', fr:'Astronaute', en:'Astronaut', pay:6500, col:0xf2f2f2, place:'la station spatiale', about:'Tu voyages dans l\'espace, tu fais des expériences scientifiques. Thomas Pesquet est un astronaute français !', day:[['6 h', 'Je me réveille en flottant dans la station.'], ['8 h', 'Je fais une expérience sur les plantes.'], ['12 h', 'Je mange en tube !'], ['15 h', 'Sortie dans l\'espace avec mon scaphandre.']], voc:[['la fusée', 'rocket'], ['l\'espace', 'space'], ['le scaphandre', 'spacesuit'], ['flotter', 'to float'], ['la station spatiale', 'space station'], ['la Terre', 'Earth']], q:[['Un astronaute français célèbre :', 'Thomas Pesquet', ['Victor Hugo', 'Napoléon', 'Astérix']], ['Dans l\'espace, on...', 'flotte', ['nage', 'marche normalement', 'skie']], ['La combinaison de l\'astronaute, c\'est le...', 'scaphandre', ['pyjama', 'maillot', 'tablier']], ['On part dans l\'espace avec une...', 'fusée', ['trottinette', 'barque', 'montgolfière']]]},
+ {id:'chauffeur', icon:'🚌', fr:'Chauffeur / Chauffeuse de bus', en:'Bus driver', pay:2050, col:0x2f6a3a, place:'les rues de Paris', about:'Tu conduis le bus dans Paris, tu t\'arrêtes à chaque arrêt et tu dis bonjour aux passagers.', day:[['6 h', 'Je vérifie le bus au dépôt.'], ['7 h', 'Premier arrêt : « Bonjour ! »'], ['12 h', 'Pause.'], ['17 h', 'L\'heure de pointe : beaucoup de monde !']], voc:[['l\'arrêt de bus', 'bus stop'], ['le volant', 'steering wheel'], ['le terminus', 'last stop'], ['l\'heure de pointe', 'rush hour'], ['conduire', 'to drive'], ['le ticket', 'ticket']], q:[['Le dernier arrêt de la ligne :', 'le terminus', ['le début', 'le zoo', 'le toit']], ['Le moment où il y a beaucoup de monde :', 'l\'heure de pointe', ['la récréation', 'minuit', 'le dessert']], ['Pour tourner, le chauffeur utilise le...', 'volant', ['vélo', 'violon', 'vent']], ['Le bus s\'arrête à l\'...', 'arrêt de bus', ['arc-en-ciel', 'aquarium', 'avion']]]},
+ {id:'plombier', icon:'🪠', fr:'Plombier / Plombière', en:'Plumber', pay:2300, col:0x1f6fb8, place:'chez les clients', about:'Tu répares les tuyaux, les robinets et les fuites d\'eau. Tu installes les salles de bains.', day:[['8 h', 'Une fuite d\'eau dans une cuisine !'], ['10 h', 'Je change un robinet.'], ['14 h', 'J\'installe une douche.'], ['17 h', 'Je fais les factures.']], voc:[['la fuite', 'leak'], ['le robinet', 'tap'], ['le tuyau', 'pipe'], ['l\'évier', 'sink'], ['la douche', 'shower'], ['réparer', 'to fix']], q:[['L\'eau coule partout : il y a une...', 'fuite', ['fête', 'fleur', 'forêt']], ['On ouvre le... pour avoir de l\'eau.', 'robinet', ['ruban', 'rideau', 'radio']], ['L\'eau passe dans le...', 'tuyau', ['tapis', 'tableau', 'tiroir']], ['On se lave sous la...', 'douche', ['table', 'lampe', 'chaise']]]},
+ {id:'photographe', icon:'📷', fr:'Photographe', en:'Photographer', pay:2100, col:0x2a2d36, place:'partout dans Paris', about:'Tu prends des photos : mariages, mode, nature, sport. Tu choisis la lumière et le bon moment !', day:[['7 h', 'Photos de la tour Eiffel au lever du soleil.'], ['11 h', 'Séance photo de mode.'], ['15 h', 'Je retouche les photos à l\'ordinateur.'], ['20 h', 'Photos d\'un concert.']], voc:[['l\'appareil photo', 'camera'], ['la photo', 'photo'], ['la lumière', 'light'], ['l\'objectif', 'lens'], ['souriez !', 'smile!'], ['le flash', 'flash']], q:[['Le photographe dit au groupe :', '« Souriez ! »', ['« Dormez ! »', '« Mangez ! »', '« Partez ! »']], ['On prend des photos avec un...', 'appareil photo', ['aspirateur', 'arrosoir', 'ascenseur']], ['La partie en verre devant l\'appareil :', 'l\'objectif', ['l\'oreille', 'l\'oiseau', 'l\'orange']], ['La photo est trop sombre : il faut plus de...', 'lumière', ['sel', 'pluie', 'bruit']]]},
+ {id:'footballeur', icon:'⚽', fr:'Footballeur / Footballeuse', en:'Footballer', pay:5500, col:0x1f3f8f, place:'le stade', about:'Tu t\'entraînes tous les jours avec ton équipe et tu joues des matchs. L\'esprit d\'équipe est très important !', day:[['9 h', 'Entraînement : course et passes.'], ['12 h', 'Repas sain avec l\'équipe.'], ['15 h', 'Étirements et repos.'], ['21 h', 'Le match ! But !']], voc:[['le but', 'goal'], ['l\'équipe', 'team'], ['l\'entraîneur', 'coach'], ['le match', 'match'], ['marquer', 'to score'], ['l\'arbitre', 'referee']], q:[['Quand le ballon entre dans le filet, c\'est un...', 'but', ['bus', 'bol', 'bonbon']], ['La personne avec le sifflet :', 'l\'arbitre', ['l\'arbre', 'l\'artiste', 'l\'avocat']], ['Celui qui entraîne l\'équipe :', 'l\'entraîneur', ['l\'électricien', 'le facteur', 'le dentiste']], ['L\'équipe de France de foot s\'appelle « les... »', 'Bleus', ['Rouges', 'Verts', 'Jaunes']]]},
+ {id:'avocat', icon:'⚖', fr:'Avocat / Avocate', en:'Lawyer', pay:4500, col:0x1b1b1d, place:'le palais de justice', about:'Tu défends les personnes au tribunal. Tu connais les lois et tu parles devant le juge.', day:[['9 h', 'Je lis un dossier.'], ['11 h', 'Rendez-vous avec un client.'], ['14 h', 'Au tribunal, je plaide devant le juge.'], ['18 h', 'Je prépare le dossier de demain.']], voc:[['le tribunal', 'court'], ['le juge', 'judge'], ['la loi', 'law'], ['défendre', 'to defend'], ['plaider', 'to plead'], ['la robe noire', 'the black gown']], q:[['L\'avocat travaille au...', 'tribunal', ['tableau', 'toboggan', 'tunnel']], ['Au tribunal, l\'avocat porte une...', 'robe noire', ['cape rouge', 'combinaison spatiale', 'toque']], ['La personne qui décide au tribunal :', 'le juge', ['le jongleur', 'le jardinier', 'le journaliste']], ['L\'avocat... son client.', 'défend', ['mange', 'cache', 'oublie']]]}
+);
+var JDRESS = {serveur:{apron:0xffffff, tie:0x1b1b1d}, caissier:{tag:0xc8382f}, boulanger:{hat:0xffffff, apron:0xf6f2ea}, livreur:{cap:0x2f8a3a, bag:0x2f8a3a}, guide:{flag:0xc8382f, cap:0x1f3f8f}, banquier:{tie:0xc8382f}, medecin:{coat:0xffffff, steth:0x2a2d36}, infirmier:{coat:0x7ac8c8}, pompier:{helmet:0xc8382f, band:0xf2e23a}, prof:{book:0x8a3ad6}, veto:{coat:0x9ad89a}, chef:{hat:0xffffff, apron:0xffffff}, pilote:{cap:0x1b1b1d, tie:0x1b1b1d, band:0xe3b52c}, info:{laptop:0x8a8f98}, journaliste:{mic:0x2a2d36}, fermier:{straw:0xe3c86a}, facteur:{cap:0xe3b52c, bag:0x8a5a32}, coiffeur:{apron:0x1b1b1d}, mecanicien:{cap:0xc8382f, band:0x8a8f98}, architecte:{helmet:0xf2f2f2, roll:0x9fc8e0}, pharmacien:{coat:0xffffff, tag:0x2f8a3a}, dentiste:{coat:0x5ab8e8, mask:0x9ad8f0}, artiste:{beret:0x1b1b1d, apron:0xe86a3a}, musicien:{tie:0x1b1b1d, violin:0x8a4a1a}, astronaute:{helmet:0xffffff, band:0x1f6fb8}, chauffeur:{cap:0x2f6a3a}, plombier:{cap:0x1f6fb8, band:0x2a4a8a}, photographe:{camera:0x1b1b1d}, footballeur:{band:0xffffff, ball:0xffffff}, avocat:{coat:0x1b1b1d, band:0xffffff}};
+function jobDress(g, id, h){
+  var D = JDRESS[id] || {}, s = (h || 1.75)/1.75, M = function(c){ return solidMat(c); };
+  function add(geo, c, x, y, z){ var m = new THREE.Mesh(geo, M(c)); m.position.set(x*s, y*s, z*s); g.add(m); return m; }
+  if(D.coat) add(new THREE.BoxGeometry(0.66, 1.0, 0.36), D.coat, 0, 1.05, 0);
+  if(D.apron) add(new THREE.BoxGeometry(0.5, 0.9, 0.04), D.apron, 0, 0.95, -0.15);
+  if(D.tie) add(new THREE.BoxGeometry(0.08, 0.4, 0.03), D.tie, 0, 1.3, -0.17);
+  if(D.band) add(new THREE.BoxGeometry(0.66, 0.08, 0.36), D.band, 0, 1.05, 0);
+  if(D.steth){ add(new THREE.TorusGeometry(0.16, 0.02, 4, 12), D.steth, 0, 1.4, -0.12).rotation.x = 0.3; }
+  if(D.tag) add(new THREE.BoxGeometry(0.14, 0.08, 0.02), D.tag, 0.15, 1.45, -0.17);
+  if(D.hat){ add(new THREE.CylinderGeometry(0.2, 0.17, 0.4, 12), D.hat, 0, 1.98, 0); add(new THREE.SphereGeometry(0.24, 10, 6), D.hat, 0, 2.18, 0); }
+  if(D.cap){ add(new THREE.CylinderGeometry(0.21, 0.21, 0.12, 12), D.cap, 0, 1.86, 0); add(new THREE.BoxGeometry(0.3, 0.03, 0.2), D.cap, 0, 1.82, -0.2); }
+  if(D.helmet) add(new THREE.SphereGeometry(0.26, 12, 8, 0, Math.PI*2, 0, Math.PI/2), D.helmet, 0, 1.8, 0);
+  if(D.beret){ var b = add(new THREE.CylinderGeometry(0.24, 0.24, 0.07, 12), D.beret, 0.03, 1.94, 0); b.rotation.z = 0.2; }
+  if(D.straw){ add(new THREE.CylinderGeometry(0.4, 0.4, 0.03, 14), D.straw, 0, 1.88, 0); add(new THREE.CylinderGeometry(0.2, 0.22, 0.18, 12), D.straw, 0, 1.97, 0); }
+  if(D.mask) add(new THREE.BoxGeometry(0.22, 0.12, 0.03), D.mask, 0, 1.68, -0.2);
+  if(D.bag) add(new THREE.BoxGeometry(0.3, 0.3, 0.15), D.bag, 0.38, 0.95, 0);
+  if(D.flag){ add(new THREE.BoxGeometry(0.03, 0.9, 0.03), 0x8a8f98, 0.45, 1.6, -0.1); add(new THREE.BoxGeometry(0.3, 0.2, 0.02), D.flag, 0.6, 1.95, -0.1); }
+  if(D.book) add(new THREE.BoxGeometry(0.22, 0.3, 0.05), D.book, 0.35, 1.05, -0.2);
+  if(D.laptop) add(new THREE.BoxGeometry(0.35, 0.03, 0.25), D.laptop, 0, 1.1, -0.35);
+  if(D.mic){ add(new THREE.CylinderGeometry(0.03, 0.02, 0.25, 6), D.mic, 0.3, 1.35, -0.25); add(new THREE.SphereGeometry(0.05, 8, 6), 0x5a5a5a, 0.3, 1.5, -0.25); }
+  if(D.roll) add(new THREE.CylinderGeometry(0.04, 0.04, 0.6, 8), D.roll, 0.35, 1.1, -0.15);
+  if(D.violin) add(new THREE.BoxGeometry(0.2, 0.08, 0.45), D.violin, 0.2, 1.45, -0.2);
+  if(D.camera) add(new THREE.BoxGeometry(0.2, 0.14, 0.1), D.camera, 0, 1.4, -0.25);
+  if(D.ball) add(new THREE.SphereGeometry(0.12, 10, 8), D.ball, 0.4, 0.12, -0.3);
+}
+/* each stand's own props: the stand looks like the job */
+function jobProps(W, F, x, z, id, col){
+  var S = function(geo, c, dx, y, dz, rx, ry, rz){ W.part(geo, x + dx, y, z + dz, c, rx || 0, ry || 0, rz || 0); };
+  var bx = function(w, h, d, dx, y, dz, c){ W.box(w, h, d, x + dx, y, z + dz, c); };
+  var lab = {serveur:['la tasse', 'cup'], caissier:['la caisse', 'till'], boulanger:['le pain', 'bread'], livreur:['le colis', 'parcel'], guide:['la tour Eiffel', 'Eiffel Tower'], banquier:['le coffre-fort', 'safe'], medecin:['le stéthoscope', 'stethoscope'], infirmier:['la trousse de secours', 'first aid kit'], pompier:['le tuyau', 'hose'], prof:['le tableau', 'board'], veto:['le chien', 'dog'], chef:['la casserole', 'saucepan'], pilote:['l\'avion', 'plane'], info:['l\'ordinateur', 'computer'], journaliste:['le micro', 'microphone'], fermier:['la botte de paille', 'hay bale'], facteur:['la boîte aux lettres', 'letterbox'], coiffeur:['le fauteuil de coiffure', 'barber chair'], mecanicien:['le pneu', 'tyre'], architecte:['la maquette', 'scale model'], pharmacien:['la croix verte', 'green cross'], dentiste:['la dent géante', 'giant tooth'], artiste:['le chevalet', 'easel'], musicien:['le violon', 'violin'], astronaute:['la fusée', 'rocket'], chauffeur:['le bus', 'bus'], plombier:['le robinet', 'tap'], photographe:['l\'appareil photo', 'camera'], footballeur:['le ballon et le but', 'ball and goal'], avocat:['la balance de la justice', 'scales of justice']}[id];
+  switch(id){
+    case 'serveur': S(new THREE.CylinderGeometry(0.45, 0.45, 0.05, 14), 0xf2f2f2, 1.2, 0.75, 1.1); bx(0.05, 0.75, 0.05, 1.2, 0.37, 1.1, 0x2a2d36); S(new THREE.CylinderGeometry(0.07, 0.06, 0.12, 8), 0xffffff, 1.2, 0.84, 1.1); break;
+    case 'caissier': bx(0.6, 0.35, 0.45, 0.9, 1.25, 0, 0x2a2d36); bx(0.4, 0.25, 0.05, 0.9, 1.55, -0.15, 0x3a8ae8); break;
+    case 'boulanger': for(var i=0;i<4;i++) S(new THREE.CylinderGeometry(0.05, 0.05, 0.7, 6), 0xd99a45, -1.2 + i*0.25, 1.15, 0, Math.PI/2); S(new THREE.SphereGeometry(0.25, 10, 6), 0xb8722e, 1, 1.2, 0); break;
+    case 'livreur': bx(0.5, 0.4, 0.4, 1.4, 0.2, 1.1, 0xc8a070); bx(0.4, 0.3, 0.35, 1.4, 0.55, 1.1, 0xb88a5a); S(new THREE.TorusGeometry(0.3, 0.04, 6, 14), 0x1b1b1d, -1.4, 0.32, 1.1); S(new THREE.TorusGeometry(0.3, 0.04, 6, 14), 0x1b1b1d, -0.6, 0.32, 1.1); bx(0.8, 0.05, 0.05, -1, 0.6, 1.1, col); break;
+    case 'guide': S(new THREE.ConeGeometry(0.35, 1.6, 4), 0x8a6a4a, 1.1, 1.85, 0); break;
+    case 'banquier': bx(0.6, 0.6, 0.5, 1.2, 1.35, 0, 0x5a5a6a); S(new THREE.CylinderGeometry(0.12, 0.12, 0.05, 12), 0xb8b8c0, 1.2, 1.4, -0.27, Math.PI/2); for(var c=0;c<5;c++) S(new THREE.CylinderGeometry(0.08, 0.08, 0.03, 10), 0xe3b52c, -1 + c*0.05, 1.08 + c*0.03, 0); break;
+    case 'medecin': case 'infirmier': bx(1.8, 0.5, 0.8, 0, 0.25, 1.3, 0xf2f2f2); bx(1.8, 0.1, 0.8, 0, 0.55, 1.3, 0x9ad8f0); bx(0.5, 0.15, 0.5, -1.3, 1.6, -0.62, 0xc8382f); bx(0.15, 0.5, 0.52, -1.3, 1.6, -0.62, 0xc8382f); if(id === 'infirmier') bx(0.4, 0.3, 0.2, 1, 1.2, 0, 0xc8382f); break;
+    case 'pompier': bx(1.6, 0.6, 0.7, 0, 0.35, 1.3, 0xc8382f); bx(0.5, 0.4, 0.7, -0.55, 0.85, 1.3, 0xc8382f); bx(1.4, 0.04, 0.12, 0.2, 0.75, 1.3, 0xc8c8c8); S(new THREE.TorusGeometry(0.25, 0.06, 6, 14), 0xe3d8b0, 1.2, 1.2, 0); break;
+    case 'prof': bx(2.2, 1, 0.05, 0, 2, -0.62, 0x2a3a2a); bx(2.3, 1.1, 0.04, 0, 2, -0.64, 0x8a5a32); break;
+    case 'veto': bx(0.3, 0.25, 0.55, 1.2, 1.25, 0, 0xc8904a); bx(0.22, 0.22, 0.22, 1.2, 1.45, -0.3, 0xc8904a); break;
+    case 'chef': S(new THREE.CylinderGeometry(0.25, 0.25, 0.25, 12), 0x8a8f98, 1, 1.22, 0); S(new THREE.CylinderGeometry(0.28, 0.28, 0.04, 14), 0x1b1b1d, -1, 1.1, 0); break;
+    case 'pilote': bx(1.4, 0.18, 0.18, 0, 2.3, 0, 0xf2f2f2); bx(0.12, 0.05, 1.2, 0, 2.3, 0, 0xf2f2f2); bx(0.05, 0.3, 0.2, -0.6, 2.45, 0, col); break;
+    case 'info': for(var p=0;p<2;p++){ bx(0.5, 0.35, 0.04, -0.8 + p*1.6, 1.4, -0.2, 0x1b1b1d); bx(0.46, 0.3, 0.01, -0.8 + p*1.6, 1.4, -0.22, 0x3ab8e8); } break;
+    case 'journaliste': bx(0.08, 1.4, 0.08, 1.4, 0.7, 1.1, 0x2a2d36); bx(0.35, 0.25, 0.4, 1.4, 1.5, 1.1, 0x2a2d36); S(new THREE.CylinderGeometry(0.08, 0.1, 0.2, 8), 0x1b1b1d, 1.4, 1.5, 0.85, Math.PI/2); break;
+    case 'fermier': bx(0.9, 0.5, 0.6, 1.4, 0.25, 1.1, 0xe3c86a); bx(0.9, 0.5, 0.6, -1.4, 0.25, 1.1, 0xe3c86a); for(var w=0;w<6;w++) bx(0.04, 0.5, 0.04, -0.3 + w*0.12, 1.3, 0, 0xe3b52c); break;
+    case 'facteur': bx(0.5, 0.7, 0.4, 1.4, 1.2, 1.0, 0xe3b52c); bx(0.08, 0.8, 0.08, 1.4, 0.4, 1.0, 0x2a2d36); bx(0.3, 0.2, 0.02, -1, 1.06, 0, 0xfaf6ee); break;
+    case 'coiffeur': bx(0.6, 0.15, 0.6, 1.3, 0.55, 1.2, 0x1b1b1d); bx(0.6, 0.6, 0.1, 1.3, 0.9, 1.45, 0x1b1b1d); bx(0.6, 0.8, 0.05, -1.3, 1.6, -0.62, 0xcfe4ee); break;
+    case 'mecanicien': S(new THREE.TorusGeometry(0.3, 0.12, 8, 14), 0x1b1b1d, 1.3, 0.4, 1.2); S(new THREE.TorusGeometry(0.3, 0.12, 8, 14), 0x1b1b1d, 1.3, 0.65, 1.2); bx(0.3, 0.05, 0.08, -1, 1.06, 0, 0x8a8f98); break;
+    case 'architecte': bx(0.4, 0.5, 0.4, 0.9, 1.3, 0, 0xf2f2f2); bx(0.3, 0.8, 0.3, 1.3, 1.45, 0, 0xd8d8d8); S(new THREE.ConeGeometry(0.3, 0.3, 4), 0xc8382f, 0.9, 1.7, 0, 0, Math.PI/4); break;
+    case 'pharmacien': bx(0.6, 0.2, 0.06, 0, 2.3, -0.6, 0x2f8a3a); bx(0.2, 0.6, 0.06, 0, 2.3, -0.6, 0x2f8a3a); for(var b2=0;b2<5;b2++) bx(0.12, 0.2, 0.12, -1.2 + b2*0.2, 1.15, 0, [0xffffff, 0xc8382f, 0x3a8ae8][b2 % 3]); break;
+    case 'dentiste': S(new THREE.BoxGeometry(0.4, 0.4, 0.3), 0xffffff, 1.1, 1.35, 0); bx(0.12, 0.25, 0.25, 0.95, 1.05, 0, 0xffffff); bx(0.12, 0.25, 0.25, 1.25, 1.05, 0, 0xffffff); bx(0.04, 0.3, 0.04, -1, 1.2, 0, 0x3a8ae8); break;
+    case 'artiste': bx(0.05, 1.6, 0.05, 1.3, 0.8, 1.0, 0x8a5a32); bx(0.8, 0.6, 0.04, 1.3, 1.5, 0.98, 0xf6f2ea); bx(0.5, 0.3, 0.02, 1.3, 1.5, 0.95, 0x5a8ab8); S(new THREE.CylinderGeometry(0.2, 0.2, 0.02, 10), 0xd8b088, -1, 1.06, 0); break;
+    case 'musicien': bx(0.25, 0.08, 0.6, 1, 1.1, 0, 0x8a4a1a); bx(0.05, 1.2, 0.05, -1.3, 0.6, 1.0, 0x2a2d36); bx(0.5, 0.35, 0.03, -1.3, 1.25, 1.0, 0x2a2d36); break;
+    case 'astronaute': S(new THREE.CylinderGeometry(0.3, 0.3, 1.6, 12), 0xf2f2f2, 1.4, 0.8, 1.1); S(new THREE.ConeGeometry(0.3, 0.6, 12), 0xc8382f, 1.4, 1.9, 1.1); S(new THREE.ConeGeometry(0.2, 0.4, 4), 0x1f6fb8, 1.65, 0.2, 1.1); break;
+    case 'chauffeur': bx(1.6, 0.6, 0.5, 0, 0.4, 1.3, 0x2f6a3a); bx(1.5, 0.2, 0.52, 0, 0.6, 1.3, 0x9fc8e0); S(new THREE.TorusGeometry(0.15, 0.03, 6, 14), 0x1b1b1d, 1, 1.15, 0); break;
+    case 'plombier': bx(0.6, 0.06, 0.06, 1, 1.1, 0, 0x8a8f98); bx(0.06, 0.3, 0.06, 1.3, 1.25, 0, 0x8a8f98); S(new THREE.SphereGeometry(0.06, 8, 6), 0x3a8ae8, 1.3, 1.04, 0); bx(0.5, 0.3, 0.3, -1, 1.2, 0, 0xc8382f); break;
+    case 'photographe': bx(0.05, 1.3, 0.05, 1.4, 0.65, 1.0, 0x2a2d36); bx(0.35, 0.25, 0.2, 1.4, 1.4, 1.0, 0x1b1b1d); S(new THREE.CylinderGeometry(0.08, 0.08, 0.15, 10), 0x5a5a5a, 1.4, 1.4, 0.85, Math.PI/2); break;
+    case 'footballeur': bx(1.6, 0.06, 0.06, 0, 1.0, 1.4, 0xffffff); bx(0.06, 1, 0.06, -0.8, 0.5, 1.4, 0xffffff); bx(0.06, 1, 0.06, 0.8, 0.5, 1.4, 0xffffff); S(new THREE.SphereGeometry(0.15, 10, 8), 0xffffff, 0.3, 0.15, 1.0); break;
+    case 'avocat': bx(0.04, 0.6, 0.04, 1, 1.35, 0, 0xe3b52c); bx(0.6, 0.03, 0.03, 1, 1.65, 0, 0xe3b52c); S(new THREE.CylinderGeometry(0.12, 0.1, 0.03, 10), 0xe3b52c, 0.72, 1.45, 0); S(new THREE.CylinderGeometry(0.12, 0.1, 0.03, 10), 0xe3b52c, 1.28, 1.45, 0); break;
+  }
+  return lab;
+}
 /* the building (between the Invalides and the Centre Pompidou) and its job fair hall */
 var JOBCTR = {x:150, z:-660};
 (function(){
   var X = JOBCTR.x, Z = JOBCTR.z, B = new MeshBatch(), H = new Lot(B, X, Z, 0);
   H.box(28, 10, 16, 0, 5, 0, 0xe8eef4); H.box(29, 0.8, 17, 0, 10.4, 0, 0x1f6fb8); for(var w=-12; w<=12; w+=4){ if(Math.abs(w) < 2) continue; H.box(2.6, 2.4, 0.2, w, 3, 8.05, 0xa8d4ee); H.box(2.6, 2.4, 0.2, w, 7, 8.05, 0xa8d4ee); }
-  H.box(4, 4, 0.3, 0, 2, 8.1, 0x2a4a6a); B.build(); addSolid(X - 14, X + 14, Z - 8, Z + 8, 'champs', -1, 11);
-  airSign('💼 LE CENTRE DE L\'EMPLOI', X, 11.6, Z + 8.3, 0, 16, '#1f6fb8'); tag(X, 5, Z + 8, 'le centre de l\'emploi', 'the job centre', 6);
-  var o = makeInterior({id:'emploi', name:'Le Centre de l\'Emploi', en:'The Job Centre', w:46, d:28, h:8, wall:0xf2f6fa, floor:0xd8dce2, ceil:0xffffff, light:0xffffff, signBg:'#1f6fb8',
+  H.box(4, 4, 0.3, 0, 2, 8.1, 0x2a4a6a); JOBC.slice(0, 12).forEach(function(j, i){ H.box(1.6, 1.6, 0.1, -11 + i*2, 9, 8.12, j.col === 0xf2f2f2 ? 0xd8d8d8 : j.col); }); B.build(); addSolid(X - 14, X + 14, Z - 8, Z + 8, 'champs', -1, 11);
+  airSign('💼 LE CENTRE DE L\'EMPLOI · ' + JOBC.length + ' MÉTIERS', X, 11.6, Z + 8.3, 0, 18, '#1f6fb8'); tag(X, 5, Z + 8, 'le centre de l\'emploi', 'the job centre', 6);
+  var COLS = 10, ROWS = Math.ceil(JOBC.length/COLS), W = 72, D = 16 + ROWS*12;
+  var o = makeInterior({id:'emploi', name:'Le Centre de l\'Emploi', en:'The Job Centre', w:W, d:D, h:9, wall:0xf2f6fa, floor:0xd8dce2, ceil:0xffffff, light:0xffffff, signBg:'#1f6fb8',
     out:{x:X, z:Z + 12, yaw:Math.PI}, door:{x:X, z:Z + 9.4, r:2.6},
-    blurb:'Ici, tu peux découvrir seize métiers : une journée type, le salaire, le vocabulaire... et t\'entraîner pour gagner de l\'argent ! Va voir les stands, ou regarde le grand tableau des métiers.',
-    facts:[['En France, la durée légale du travail est de 35 heures par semaine.', 'In France the legal working week is 35 hours.', ['Combien d\'heures par semaine, en France ?', '35 heures', ['5 heures', '80 heures', '100 heures']]], ['Un « CV », c\'est un document qui présente tes études et tes expériences. On l\'envoie pour trouver un travail.', 'A "CV" is a document showing your studies and experience. You send it to find a job.', ['Qu\'est-ce qu\'un CV ?', 'un document qui présente tes études et tes expériences', ['une sorte de croissant', 'un jeu vidéo', 'un moyen de transport']]], ['Pour un entretien d\'embauche, on dit « Bonjour », on sourit, on écoute bien et on pose des questions !', 'At a job interview, say "Bonjour", smile, listen carefully and ask questions!', ['Comment dit-on « job interview » ?', 'un entretien d\'embauche', ['un rendez-vous chez le médecin', 'une fête', 'un examen de conduite']]]],
-    spots:[{x:0, z:-11.5, r:3.4, label:function(){ return '💼 ' + L2('The big board of all the jobs', 'Le grand tableau des métiers'); }, act:jobBoard}],
+    blurb:'Bienvenue au salon des métiers ! Il y a ' + JOBC.length + ' métiers : chaque stand te montre une journée type, le salaire, le vocabulaire et des exercices pour gagner de l\'argent. Parle aux travailleurs en uniforme !',
+    facts:[['En France, la durée légale du travail est de 35 heures par semaine.', 'In France the legal working week is 35 hours.', ['Combien d\'heures par semaine, en France ?', '35 heures', ['5 heures', '80 heures', '100 heures']]], ['Un « CV », c\'est un document qui présente tes études et tes expériences.', 'A CV shows your studies and experience.', ['Qu\'est-ce qu\'un CV ?', 'un document qui présente tes études et tes expériences', ['une sorte de croissant', 'un jeu vidéo', 'un moyen de transport']]], ['Pour un entretien d\'embauche, on dit « Bonjour », on sourit, on écoute bien et on pose des questions !', 'At a job interview: say Bonjour, smile, listen and ask questions!', ['Comment dit-on « job interview » ?', 'un entretien d\'embauche', ['un rendez-vous chez le médecin', 'une fête', 'un examen de conduite']]], ['En France, les salariés ont au moins cinq semaines de congés payés par an !', 'French employees get at least five weeks of paid holiday a year!', ['Combien de semaines de vacances payées, au minimum ?', 'cinq semaines', ['une semaine', 'zéro', 'vingt semaines']]]],
+    spots:[{x:0, z:-D/2 + 2.6, r:3.4, label:function(){ return '💼 ' + L2('The big board of all the jobs', 'Le grand tableau des métiers'); }, act:jobBoard}],
     build:function(L, X2, Z2, B2, F){
-      var Bd = new Lot(B2, X2, Z2 - 13.75, 0); Bd.box(18, 5, 0.15, 0, 4, 0, 0x1f3f8f); JOBC.forEach(function(j, i){ Bd.box(1.9, 1.1, 0.05, -7.6 + (i % 8)*2.17, 5.4 - Math.floor(i/8)*1.6, 0.1, j.col === 0xf2f2f2 ? 0xd8d8d8 : j.col); });
-      F.tagAt(0, 4, -13.7, 'le tableau des métiers', 'the jobs board', 3); airSign('LES MÉTIERS · LES SALAIRES · UNE JOURNÉE TYPE', X2, 7, Z2 - 13.6, 0, 14, '#1f3f8f');
-      JOBC.forEach(function(j, i){ var row = Math.floor(i/8), col = i % 8, x = -19.25 + col*5.5, z = row ? 4 : -4.5;
-        L.box(4, 1, 1.4, x, 0.5, z, j.col === 0xf2f2f2 ? 0xd8d8d8 : j.col); L.box(4.2, 0.08, 1.6, x, 1.04, z, 0xf6f6f6); L.box(0.1, 2.6, 0.1, x - 1.9, 2.3, z - 0.6, 0x8a8f98); L.box(0.1, 2.6, 0.1, x + 1.9, 2.3, z - 0.6, 0x8a8f98);
-        airSign(j.icon + ' ' + j.fr.split(' /')[0].toUpperCase(), X2 + x, 3.5, Z2 + z - 0.6, 0, 4, '#' + ('00000' + (j.col === 0xf2f2f2 ? 0x8a8a8a : j.col).toString(16)).slice(-6));
-        person({x:X2 + x, z:Z2 + z - 1.2, ry:Math.PI, shirt:j.col, pants:0x2a2d36, hair:[0x4a2a1a, 0xe8c070, 0x1b1b1d, 0x8a4a1a][i % 4], hat:j.id === 'chef' ? 0xffffff : j.id === 'pompier' ? 0xc8382f : null, h:1.7 + (i % 3)*0.05});
-        F.tagAt(x, 1.6, z - 1.2, j.fr.toLowerCase(), j.en, 0.6);
-        addSpot({x:X2 + x, z:Z2 + z + 1.3, r:1.9, label:function(){ return j.icon + ' ' + j.fr + ' - ' + L2('find out & practise', 'découvrir et s\'entraîner'); }, act:function(){ jobCard(i); }}); });
-      F.tagAt(-19.25, 1, -4.5, 'le stand', 'the stand', 1); F.item('banc', -12, 10); F.item('banc', 12, 10); F.item('plante', -21.5, 12); F.item('plante', 21.5, 12);
-      F.item('bureau', 18, 10); F.item('ordi', 18, 10); F.tagAt(18, 1.2, 10, 'l\'ordinateur pour écrire son CV', 'the computer to write your CV', 0.6);
+      var Bd = new Lot(B2, X2, Z2 - D/2 + 0.25, 0); Bd.box(26, 5, 0.15, 0, 4.5, 0, 0x1f3f8f); JOBC.forEach(function(j, i){ Bd.box(2.2, 1.0, 0.05, -11.7 + (i % 10)*2.6, 6.2 - Math.floor(i/10)*1.3, 0.1, j.col === 0xf2f2f2 ? 0xd8d8d8 : j.col); });
+      F.tagAt(0, 4, -D/2 + 0.4, 'le tableau des métiers', 'the jobs board', 3); airSign('LES MÉTIERS · LES SALAIRES · UNE JOURNÉE TYPE', X2, 7.6, Z2 - D/2 + 0.4, 0, 16, '#1f3f8f');
+      var Wl = new Lot(B2, X2, Z2, 0);
+      for(var bn=0; bn<8; bn++) Wl.box(6, 0.8, 0.04, -28 + bn*8, 8.2, -D/2 + 0.3, [0xc8382f, 0xffffff, 0x1f3f8f][bn % 3]);
+      JOBC.forEach(function(j, i){ var row = Math.floor(i/COLS), col = i % COLS, x = -31.5 + col*7, z = -D/2 + 9 + row*12, c = j.col === 0xf2f2f2 ? 0xc8c8c8 : j.col;
+        L.box(5, 0.04, 5, x, 0.02, z + 0.6, c); L.box(4.2, 1, 1.3, x, 0.5, z, c); L.box(4.4, 0.08, 1.5, x, 1.04, z, 0xf6f6f6); L.box(4.6, 2.8, 0.1, x, 1.6, z - 1.35, 0xffffff); L.box(4.6, 0.5, 0.12, x, 3.2, z - 1.35, c);
+        L.box(0.08, 3.4, 0.08, x - 2.3, 1.7, z - 1.3, 0x8a8f98); L.box(0.08, 3.4, 0.08, x + 2.3, 1.7, z - 1.3, 0x8a8f98);
+        airSign(j.icon + ' ' + j.fr.split(' /')[0].toUpperCase(), X2 + x, 3.9, Z2 + z - 1.3, 0, 4.4, '#' + ('00000' + (j.col === 0xf2f2f2 ? 0x8a8a8a : j.col).toString(16)).slice(-6));
+        airSign(j.pay.toLocaleString('fr-FR') + ' € / mois', X2 + x, 3.25, Z2 + z - 1.26, 0, 2.2, '#2a2d36');
+        var h = 1.7 + (i % 3)*0.06, g = person({x:X2 + x - 0.6, z:Z2 + z - 0.8, ry:Math.PI, shirt:c, pants:0x2a2d36, hair:[0x4a2a1a, 0xe8c070, 0x1b1b1d, 0x8a4a1a][i % 4], h:h}); jobDress(g, j.id, h);
+        var lab = jobProps(L, F, x, z, j.id, c); if(lab) F.tagAt(x + 1.1, 1.8, z, lab[0], lab[1], 0.5);
+        LBL.dyn.push({m:g, fr:j.fr.split(' /')[0].toLowerCase(), en:j.en, dy:h + 0.35, r:0.6, act:function(){ jobCard(i); }});
+        addSpot({x:X2 + x, z:Z2 + z + 1.6, r:2.1, label:function(){ return j.icon + ' ' + j.fr + ' - ' + L2('find out & practise', 'découvrir et s\'entraîner'); }, act:function(){ jobCard(i); }}); });
+      F.item('banc', -10, D/2 - 3); F.item('banc', 10, D/2 - 3); F.item('plante', -W/2 + 1.5, D/2 - 2); F.item('plante', W/2 - 1.5, -D/2 + 2);
+      F.item('bureau', 24, D/2 - 3); F.item('ordi', 24, D/2 - 3); F.tagAt(24, 1.2, D/2 - 3, 'l\'ordinateur pour écrire son CV', 'the computer to write your CV', 0.6);
     }});
-  EXTRA_PLACES.push(['💼', 'Le Centre de l\'Emploi (choisir un métier)', L2('16 jobs: a day in the life, pay, words, practice', '16 métiers : journée type, salaire, vocabulaire, entraînement'), X, Z + 13, Math.PI]);
+  EXTRA_PLACES.push(['💼', 'Le Centre de l\'Emploi (choisir un métier)', L2(JOBC.length + ' jobs: a day in the life, pay, words, practice', JOBC.length + ' métiers : journée type, salaire, vocabulaire, entraînement'), X, Z + 13, Math.PI]);
 })();
+
 /* ---------- 🍬 FULLER SHOPS: more goods, a candy shop full of sweets, themed shelves in the players' shops ---------- */
 GOODS.candy = GOODS.candy.concat([['les dragées', 'sugared almonds', 0xa8d8f0, 'ball'], ['la barbe à papa', 'candy floss', 0xf8b8d8, 'ball'], ['le nougat', 'nougat', 0xf2ead8], ['les calissons', 'calissons', 0xf6f2e2], ['les berlingots', 'berlingots', 0xe84a6a, 'ball'], ['les oursons en guimauve', 'marshmallow bears', 0xd08a5a], ['le chewing-gum', 'chewing gum', 0x6ad0b8], ['les bonbons acidulés', 'sour sweets', 0x8ae84a, 'ball'], ['le sucre d\'orge', 'barley sugar stick', 0xf2a83a, 'long']]);
 GOODS.chocolate = (GOODS.chocolate || []).concat([['la tablette de chocolat', 'chocolate bar', 0x5a3424], ['les truffes', 'truffles', 0x3a2416, 'ball'], ['les pralines', 'pralines', 0xc89a5a, 'ball'], ['le chocolat chaud', 'hot chocolate', 0x6a4030, 'tall']]);
@@ -16697,6 +16785,267 @@ function aeTick(dt){
   b.className = 'bar-btn'; b.id = 'ae-toggle'; b.textContent = '🦸'; b.title = L2('My alter ego (power-up)', 'Mon alter ego (super-pouvoirs)');
   s.parentNode.insertBefore(b, s); b.addEventListener('click', function(){ if(!aeData()) aeCreate(); else aeCard(); });
 })();
+/* ---------- 🏫 L'ÉCOLE ET LA COUR DE RÉCRÉATION: classic French schoolyard games ---------- */
+var ECOLE = {x:-172, z:-640};
+var PLAYG = {o:null, kids:[], loup:null, rope:null, swings:[]};
+function pgL(x, z){ var o = PLAYG.o; return {x:o.X + x, z:o.Z + z}; }
+(function(){
+  var X = ECOLE.x, Z = ECOLE.z, B = new MeshBatch(), H = new Lot(B, X, Z, 0);
+  H.box(16, 7, 9, 0, 3.5, 0, 0xf2e2c8); H.part(new THREE.ConeGeometry(11.5, 3, 4), 0, 8.5, 0, 0x5a6a8a, 0, Math.PI/4); H.box(3, 3.4, 0.3, 0, 1.7, 4.55, 0x1f3f8f);
+  [-5.5, -2.8, 2.8, 5.5].forEach(function(x){ H.box(1.6, 1.8, 0.2, x, 2, 4.55, 0x9fc8e0); H.box(1.6, 1.8, 0.2, x, 5.2, 4.55, 0x9fc8e0); });
+  H.box(0.1, 3, 0.1, 6.8, 8.6, 0, 0x8a8f98); H.box(1.4, 0.9, 0.04, 7.5, 9.6, 0, 0x1f3f8f); H.box(0.47, 0.9, 0.05, 7.97, 9.6, 0, 0xffffff); H.box(0.47, 0.9, 0.05, 8.43, 9.6, 0, 0xc8382f);
+  B.build(); addSolid(X - 8, X + 8, Z - 4.5, Z + 4.5, 'champs', -1, 10);
+  airSign('🏫 ÉCOLE · LA COUR DE RÉCRÉATION', X, 7.6, Z + 4.7, 0, 14, '#1f3f8f'); tag(X, 4, Z + 4.5, 'l\'école', 'the school', 5); airSign('Liberté · Égalité · Fraternité', X, 6.2, Z + 4.75, 0, 9, '#c8382f');
+  var o = makeInterior({id:'ecole', name:'La cour de récréation', en:'The school playground', w:60, d:40, h:9, ceil:false, wall:0xe8d8c0, floor:0xa8a49a, light:0xffffff, signBg:'#1f3f8f', hunt:true,
+    out:{x:X, z:Z + 7.5, yaw:Math.PI}, door:{x:X, z:Z + 5, r:2.4},
+    blurb:'Ding ding ding ! C\'est la récréation ! Joue aux jeux de la cour comme les enfants en France : la marelle, un, deux, trois, soleil, le chat perché, la corde à sauter et les billes !',
+    facts:[['En France, la récréation dure environ 15 minutes le matin et 15 minutes l\'après-midi.', 'In France, recess lasts about 15 minutes in the morning and afternoon.', ['Combien de temps dure la récré, en France ?', 'environ 15 minutes', ['3 heures', '1 minute', 'toute la journée']]], ['Le préau est la partie couverte de la cour : on y joue quand il pleut.', 'The préau is the covered part of the yard: you play there when it rains.', ['À quoi sert le préau ?', 'à jouer à l\'abri quand il pleut', ['à cuisiner', 'à dormir', 'à garer les voitures']]], ['Le mercredi après-midi, beaucoup d\'écoles primaires françaises n\'ont pas classe !', 'On Wednesday afternoons many French primary schools have no class!', ['Quel jour les enfants ont souvent congé l\'après-midi ?', 'le mercredi', ['le lundi', 'le vendredi', 'le dimanche matin']]]],
+    spots:[{x:-20, z:4, r:3, label:function(){ return '🪨 ' + L2('LA MARELLE (hopscotch): play!', 'LA MARELLE : jouer !'); }, act:marelleStart},
+      {x:0, z:15, r:3, label:function(){ return '🌞 ' + L2('UN, DEUX, TROIS, SOLEIL!', 'UN, DEUX, TROIS, SOLEIL !'); }, act:soleilStart},
+      {x:-6, z:4, r:2.6, label:function(){ return '🐱 ' + L2('LE CHAT PERCHÉ (tag): you are the cat!', 'LE CHAT PERCHÉ : tu es le chat !'); }, act:chatStart},
+      {x:19, z:6, r:3, label:function(){ return '🪢 ' + L2('LA CORDE À SAUTER (jump rope)', 'LA CORDE À SAUTER'); }, act:cordeStart},
+      {x:19, z:-8, r:3, label:function(){ return '🔵 ' + L2('LES BILLES (marbles)', 'LES BILLES'); }, act:billesStart},
+      {x:-22, z:-14, r:3, label:function(){ return '👩‍🏫 ' + L2('Talk to the teacher on duty (rules & words)', 'Parler à la maîtresse (règles et vocabulaire)'); }, act:maitresseCard},
+      {x:8, z:-15, r:2.6, label:function(){ return '📜 ' + L2('Counting rhymes: who will be "it"?', 'Les comptines : qui sera le loup ?'); }, act:comptineCard}],
+    onLeave:function(){ SOL.on = false; CHATG.on = false; },
+    build:function(L, X2, Z2, B2, F){ PLAYG.o = this; var W = new Lot(B2, X2, Z2, 0);
+      var c = document.createElement('canvas'); c.width = 256; c.height = 1024; var k = c.getContext('2d'); k.clearRect(0, 0, 256, 1024); k.strokeStyle = '#ffffff'; k.lineWidth = 8; k.fillStyle = '#ffffff'; k.font = 'bold 46px sans-serif'; k.textAlign = 'center';
+      var cells = [[1, 0, 1], [2, 0, 1], [3, 0, 1], [4, -1, 1], [5, 1, 1], [6, 0, 1], [7, -1, 1], [8, 1, 1], [9, 0, 1], [10, 0, 1]], y = 930;
+      k.fillText('TERRE', 128, 1010); cells.forEach(function(cl, i){ var bx = 128 + cl[1]*60 - (cl[1] ? 0 : 0); if(cl[1] === -1 || cl[1] === 1){ } }); 
+      var rows = [[1], [2], [3], [4, 5], [6], [7, 8], [9], [10]], n = 0; rows.forEach(function(r, i){ var yy = 900 - i*100; r.forEach(function(num, j){ var x0 = r.length === 1 ? 78 : 18 + j*120; k.strokeRect(x0, yy - 90, r.length === 1 ? 100 : 100, 90); k.fillText(num, x0 + 50, yy - 28); }); });
+      k.beginPath(); k.arc(128, 90, 80, Math.PI, 0); k.stroke(); k.fillText('CIEL', 128, 70);
+      var mar = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 9.6), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c), transparent:true})); mar.rotation.x = -Math.PI/2; mar.position.set(X2 - 20, 0.02, Z2 + 0); root.add(mar);
+      F.tagAt(-20, 0.4, 0, 'la marelle', 'hopscotch', 1.5); W.box(0.2, 0.1, 0.16, -19.2, 0.06, 4.6, 0x8a8f98); F.tagAt(-19.2, 0.3, 4.6, 'le caillou', 'the pebble', 0.3);
+      W.box(10, 0.03, 0.15, 0, 0.02, 13, 0xffffff); F.tagAt(0, 0.4, 13, 'la ligne de départ', 'the start line', 1);
+      W.box(24, 0.15, 6, -14, 3.6, -17, 0x8a5a32); for(var p=0;p<4;p++) W.box(0.3, 3.6, 0.3, -24 + p*6.6, 1.8, -14.2, 0x6b4a32); F.tagAt(-14, 3, -16, 'le préau', 'the covered play area', 3); F.item('banc', -18, -18); F.item('banc', -10, -18); F.item('banc', -14, -18);
+      W.box(0.4, 0.4, 0.3, 0, 6, -19.8, 0xe3b52c); W.part(new THREE.ConeGeometry(0.35, 0.5, 12), 0, 5.6, -19.6, 0xe3b52c); F.tagAt(0, 6, -19.6, 'la cloche', 'the bell', 0.6);
+      W.box(4, 2.6, 0.12, 0, 1.5, -19.75, 0x2a3a2a); F.tagAt(0, 1.6, -19.5, 'le mur du loup', 'the wolf\'s wall', 1);
+      W.box(5, 0.8, 1.2, 25, 2.2, 14, 0xc8382f, 0.5); W.box(1.2, 3, 1.2, 22.5, 1.5, 14, 0x1f6fb8); for(var s=0;s<6;s++) W.box(1, 0.08, 0.3, 21.5, 0.4 + s*0.45, 14, 0xe3b52c); F.tagAt(24, 2.6, 14, 'le toboggan', 'the slide', 1);
+      W.box(0.15, 3.4, 0.15, 11, 1.7, 16.5, 0x8a8f98); W.box(0.15, 3.4, 0.15, 17, 1.7, 16.5, 0x8a8f98); W.box(6.2, 0.15, 0.15, 14, 3.4, 16.5, 0x8a8f98); F.tagAt(14, 3, 16.5, 'les balançoires', 'the swings', 1.5);
+      [12.5, 15.5].forEach(function(x){ var sw = new THREE.Group(); sw.position.set(X2 + x, 3.4, Z2 + 16.5); var seat = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.08, 0.4), solidMat(0xc8382f)); seat.position.y = -2.6; sw.add(seat); [-0.35, 0.35].forEach(function(dx){ var ch = new THREE.Mesh(new THREE.BoxGeometry(0.03, 2.6, 0.03), solidMat(0x5a5a5a)); ch.position.set(dx, -1.3, 0); sw.add(ch); }); root.add(sw); PLAYG.swings.push(sw); });
+      W.cyl(3, 3, 0.3, -24, 0.15, 14, 0xe8d8a0, 20); W.cyl(3.1, 3.1, 0.35, -24, 0.12, 14, 0x8a5a32, 20); W.part(new THREE.ConeGeometry(0.4, 0.4, 8), -23, 0.45, 13.5, 0xc8382f); W.box(0.4, 0.3, 0.3, -25, 0.4, 14.6, 0x1f6fb8); F.tagAt(-24, 0.8, 14, 'le bac à sable', 'the sandpit', 2); F.tagAt(-23, 0.8, 13.5, 'le seau et la pelle', 'the bucket and spade', 0.4);
+      W.cyl(1.6, 1.6, 0.12, 8, 0.5, 6, 0xf2c230, 16); W.cyl(0.1, 0.1, 1, 8, 0.5, 6, 0x8a8f98, 8); F.tagAt(8, 1, 6, 'le tourniquet', 'the roundabout', 1);
+      W.box(0.2, 3.5, 0.2, 27, 1.75, -4, 0x8a8f98); W.box(1.6, 1, 0.08, 26.8, 3.8, -4, 0xffffff); W.part(new THREE.TorusGeometry(0.35, 0.04, 6, 16), 26.3, 3.4, -4, 0xe8642a, Math.PI/2, 0, 0); F.tagAt(27, 2.5, -4, 'le panier de basket', 'the basketball hoop', 0.8);
+      W.part(new THREE.SphereGeometry(0.2, 10, 8), 21, 0.2, -4, 0xe8642a); F.tagAt(21, 0.5, -4, 'le ballon', 'the ball', 0.4);
+      W.cyl(2, 2, 0.04, 19, 0.02, -8, 0xc8a878, 20); for(var b=0;b<9;b++) W.part(new THREE.SphereGeometry(0.06, 8, 6), 19 + Math.cos(b)*1.2, 0.07, -8 + Math.sin(b*1.7)*1.1, [0x3a8ae8, 0xe84a4a, 0x3ab83a, 0xf2c230][b % 4]); F.tagAt(19, 0.4, -8, 'les billes', 'the marbles', 1);
+      [[-28, -18], [28, 18], [-28, 18]].forEach(function(t){ W.cyl(0.4, 0.5, 4, t[0], 2, t[1], 0x6b4a32, 8); W.part(new THREE.SphereGeometry(2.6, 10, 8), t[0], 5.2, t[1], 0x4a8a3a); }); F.tagAt(-28, 2, -18, 'le marronnier', 'the chestnut tree', 1.5);
+      W.box(0.6, 1, 0.4, 26, 0.5, -17, 0xc8ccd2); F.tagAt(26, 1.2, -17, 'la fontaine à eau', 'the water fountain', 0.5);
+      PLAYG.loup = person({x:X2, z:Z2 - 18.8, ry:0, shirt:0x8a3ad6, pants:0x2a2d36, hair:0x4a2a1a, h:1.3}); LBL.dyn.push({m:PLAYG.loup, fr:'le loup (Léo)', en:'the wolf ("it")', dy:1.6, r:0.5});
+      person({x:X2 - 22, z:Z2 - 15, ry:Math.PI, shirt:0x2f8a3a, pants:0x2a3a5a, hair:0x8a4a1a, h:1.68}); F.tagAt(-22, 2, -15, 'la maîtresse (Madame Martin)', 'the teacher on duty', 0.5);
+      var r1 = person({x:X2 + 16.5, z:Z2 + 6, ry:-Math.PI/2, shirt:0xf28aa0, pants:0x2a3a5a, hair:0x1b1b1d, h:1.3}), r2 = person({x:X2 + 21.5, z:Z2 + 6, ry:Math.PI/2, shirt:0x3ab8e8, pants:0x2a3a5a, hair:0xe8c070, h:1.3});
+      var rope = new THREE.Mesh(new THREE.TorusGeometry(2.5, 0.03, 4, 24, Math.PI), solidMat(0xe84a6a)); rope.position.set(X2 + 19, 0.95, Z2 + 6); root.add(rope); PLAYG.rope = rope; F.tagAt(19, 1.6, 6, 'la corde à sauter', 'the jump rope', 1);
+      PLAYG.kids = [];
+      [[-8, 6, 0xc8382f, 0x1b1b1d], [-4, 2, 0x1f6fb8, 0xe8c070], [-10, 0, 0xe3b52c, 0x8a4a1a], [-2, 7, 0x2f8a3a, 0x4a2a1a]].forEach(function(k2, i){ var m = person({x:X2 + k2[0], z:Z2 + k2[1], ry:0, shirt:k2[2], pants:0x2a3a5a, hair:k2[3], h:1.25 + i*0.04}); PLAYG.kids.push({m:m, hx:k2[0], hz:k2[1], caught:false}); LBL.dyn.push({m:m, fr:['Chloé', 'Hugo', 'Inès', 'Nathan'][i], en:'a pupil (un élève)', dy:1.5, r:0.5}); });
+    }});
+  EXTRA_PLACES.push(['🏫', 'L\'école : la cour de récréation (jeux de la cour)', L2('Hopscotch, 1-2-3 soleil, tag, jump rope, marbles', 'Marelle, 1-2-3 soleil, chat perché, corde à sauter, billes'), X, Z + 8, Math.PI]);
+})();
+/* 🌞 un, deux, trois, soleil: walk to the wall, but freeze when the wolf turns around! */
+var SOL = {on:false};
+function soleilStart(){
+  closeCard(); var s = pgL(0, 14); camera.position.set(s.x, EYE_HEIGHT, s.z); yaw = 0; pitch = 0; camera.rotation.set(pitch, yaw, 0, 'YXZ');
+  SOL = {on:true, phase:'count', t:performance.now() + 2600 + Math.random()*1800, tries:0}; PLAYG.loup.rotation.y = 0;
+  say('Un, deux, trois, soleil ! Avance quand le loup compte. Arrête-toi quand il se retourne !');
+  hudMsg('🌞 ' + L2('Walk towards the wolf while he counts. FREEZE when he says « soleil ! » and turns around!', 'Avance vers le loup quand il compte. NE BOUGE PLUS quand il dit « soleil ! » et se retourne !'), true);
+  setTimeout(function(){ if(SOL.on) say('Un... deux... trois...'); }, 400);
+}
+/* 🐱 le chat perché: catch the four pupils in 60 seconds */
+var CHATG = {on:false};
+function chatStart(){ closeCard(); PLAYG.kids.forEach(function(k){ k.caught = false; var p = pgL(k.hx, k.hz); k.m.position.set(p.x, 0, p.z); k.m.rotation.z = 0; }); CHATG = {on:true, until:Date.now() + 60000, n:0}; say('C\'est toi le chat ! Attrape tout le monde avant la fin !'); hudMsg('🐱 ' + L2('You are the cat: touch the 4 pupils in 60 seconds!', 'Tu es le chat : touche les 4 élèves en 60 secondes !'), true); }
+function playTick(dt){
+  var now = performance.now();
+  PLAYG.swings.forEach(function(s, i){ s.rotation.x = Math.sin(now*0.0022 + i*1.7)*0.5; });
+  if(PLAYG.rope) PLAYG.rope.rotation.x = now*0.006;
+  if(!PLAYG.o || INT.cur !== PLAYG.o){ return; }
+  var cp = camera.position;
+  if(SOL.on){
+    var lp = PLAYG.loup.position;
+    if(Math.hypot(cp.x - lp.x, cp.z - lp.z) < 2.2){ SOL.on = false; PLAYG.loup.rotation.y = 0; var g = !(chal.cool.soleil > Date.now()) ? addJeton(2) : 0; if(g) chal.cool.soleil = Date.now() + 4*60000; say('Bravo, tu as touché le mur ! Tu as gagné !'); hudMsg('🏆 ' + L2('You won! ', 'Tu as gagné ! ') + (g ? '+' + g + ' 🪙' : '')); return; }
+    if(SOL.phase === 'count' && now > SOL.t){ SOL.phase = 'look'; SOL.t = now + 2200; SOL.px = cp.x; SOL.pz = cp.z; PLAYG.loup.rotation.y = Math.PI; say('Soleil !'); hudMsg('👀 « SOLEIL ! » ' + L2('Don\'t move!', 'Ne bouge plus !'), true); }
+    else if(SOL.phase === 'look'){
+      if(Math.hypot(cp.x - SOL.px, cp.z - SOL.pz) > 0.35){ SOL.tries++; say('Je t\'ai vu bouger ! Retourne au départ !'); var s = pgL(0, 14); camera.position.set(s.x, EYE_HEIGHT, s.z); SOL.px = s.x; SOL.pz = s.z; hudMsg('🙈 ' + L2('Seen! Back to the start line.', 'Vu ! Retour à la ligne de départ.'), true); }
+      if(now > SOL.t){ SOL.phase = 'count'; SOL.t = now + 1800 + Math.random()*2400; PLAYG.loup.rotation.y = 0; say('Un, deux, trois...'); hudMsg('🌞 ' + L2('He\'s counting: GO!', 'Il compte : AVANCE !'), true); }
+    }
+  }
+  if(CHATG.on){
+    var left = Math.ceil((CHATG.until - Date.now())/1000);
+    if(left <= 0){ CHATG.on = false; say('C\'est fini ! Tu as attrapé ' + CHATG.n + ' élèves.'); hudMsg('⏱ ' + CHATG.n + '/4'); return; }
+    PLAYG.kids.forEach(function(k){ if(k.caught) return; var m = k.m.position, dx = m.x - cp.x, dz = m.z - cp.z, d = Math.hypot(dx, dz);
+      if(d < 1.3){ k.caught = true; CHATG.n++; k.m.rotation.z = 0.001; say(['Oh non ! Je suis pris !', 'Attrapé !', 'Zut ! C\'est moi le chat maintenant ?', 'Bien joué !'][CHATG.n % 4]); hudMsg('🐱 ' + CHATG.n + '/4 · ' + left + ' s', true);
+        if(CHATG.n >= 4){ CHATG.on = false; var g = !(chal.cool.chat > Date.now()) ? addJeton(2) : 0; if(g) chal.cool.chat = Date.now() + 4*60000; say('Bravo ! Tu as attrapé tout le monde !'); hudMsg('🏆 ' + L2('Everyone caught! ', 'Tout le monde est attrapé ! ') + (g ? '+' + g + ' 🪙' : '')); } return; }
+      var sp = d < 9 ? 7.5 : 2, ox = PLAYG.o.X, oz = PLAYG.o.Z; if(d > 0.01){ m.x += dx/d*sp*dt; m.z += dz/d*sp*dt; }
+      m.x = Math.max(ox - 27, Math.min(ox + 27, m.x)); m.z = Math.max(oz - 12, Math.min(oz + 17, m.z)); k.m.rotation.y = Math.atan2(dx, dz); });
+  }
+}
+/* 🪨 la marelle */
+var MAR = {};
+function marelleStart(){ MAR = {stone:1 + Math.floor(Math.random()*9), n:0, err:0}; MAR.seq = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].filter(function(x){ return x !== MAR.stone; }); say('Je lance le caillou... sur la case ' + NUM_FR[MAR.stone] + ' ! Il ne faut pas sauter sur cette case.'); marQ(); }
+function marDraw(){ var c = document.getElementById('mar-c'); if(!c) return; var k = c.getContext('2d'); k.fillStyle = '#a8a49a'; k.fillRect(0, 0, 420, 170); k.strokeStyle = '#fff'; k.lineWidth = 3; k.fillStyle = '#fff'; k.font = 'bold 16px sans-serif'; k.textAlign = 'center';
+  var pos = {1:[40, 85], 2:[85, 85], 3:[130, 85], 4:[175, 60], 5:[175, 110], 6:[220, 85], 7:[265, 60], 8:[265, 110], 9:[310, 85], 10:[355, 85]};
+  Object.keys(pos).forEach(function(n){ var p = pos[n], h = (n == 4 || n == 5 || n == 7 || n == 8) ? 50 : 70; k.strokeRect(p[0] - 22, p[1] - h/2, 44, h); var done = MAR.seq.indexOf(+n) >= 0 && MAR.seq.indexOf(+n) < MAR.n; if(done){ k.fillStyle = '#f2c230'; k.fillRect(p[0] - 20, p[1] - h/2 + 2, 40, h - 4); k.fillStyle = '#fff'; } k.fillText(n, p[0], p[1] + 6); if(+n === MAR.stone){ k.fillStyle = '#5a5a5a'; k.beginPath(); k.arc(p[0] + 10, p[1] - 12, 7, 0, 7); k.fill(); k.fillStyle = '#fff'; } });
+  k.fillText('CIEL', 395, 90); k.fillText('TERRE', 20, 160); }
+function marQ(msg){
+  if(MAR.n >= MAR.seq.length){ var g = !(chal.cool.mar > Date.now()) ? addJeton(MAR.err <= 1 ? 2 : 1) : 0; if(g) chal.cool.mar = Date.now() + 4*60000; say('Ciel ! Bravo, tu as fini la marelle !'); showCard('<h3>🪨 ' + L2('HOPSCOTCH', 'LA MARELLE') + '</h3><canvas id="mar-c" width="420" height="170" style="width:100%"></canvas><div class="gc-big gc-say">Ciel ! Bravo, tu as fini la marelle !</div>' + (g ? '<div class="gc-big">+' + g + ' 🪙</div>' : '') + noCharLine() + '<div class="gc-row">' + gBtn('marre', null, L2('AGAIN', 'ENCORE')) + gBtn('close', null, 'OK', 'go') + '</div>'); marDraw(); return; }
+  var want = MAR.seq[MAR.n], opts = shuffleR(Math.random, [want, MAR.stone, want === 10 ? 8 : want + 1].filter(function(v, i, a){ return a.indexOf(v) === i; }).concat([(want + 4) % 10 + 1]).filter(function(v, i, a){ return a.indexOf(v) === i; }).slice(0, 4)); MAR.opts = opts;
+  showCard('<h3>🪨 ' + L2('HOPSCOTCH', 'LA MARELLE') + ' · ' + L2('the pebble is on ', 'le caillou est sur ') + NUM_FR[MAR.stone] + '</h3><canvas id="mar-c" width="420" height="170" style="width:100%"></canvas>' + (msg || '') + '<div class="gc-sub">' + L2('Hop! Which square next? (skip the pebble!)', 'Saute ! Quelle case maintenant ? (pas celle du caillou !)') + '</div><div class="gc-row">' + opts.map(function(v){ return gBtn('marhop', v, '🦶 ' + NUM_FR[v]); }).join('') + '</div>');
+  marDraw();
+}
+GACT.marhop = function(v){ var want = MAR.seq[MAR.n]; v = v|0; if(v === want){ say(NUM_FR[v]); MAR.n++; marQ(); } else { MAR.err++; say(v === MAR.stone ? 'Attention, c\'est la case du caillou !' : 'Non, ce n\'est pas la bonne case.'); showToast(v === MAR.stone ? '🪨 ' + L2('That\'s the pebble\'s square!', 'C\'est la case du caillou !') : '✗'); } };
+GACT.marre = marelleStart;
+/* 🪢 la corde à sauter: click JUMP when the rope is at the bottom; count in French */
+var CORDE = {};
+function cordeStart(){ CORDE = {n:0, best:0, t0:performance.now(), speed:1}; say('On saute à la corde ! Clique sur SAUTE quand la corde passe en bas.'); showCard('<h3>🪢 ' + L2('JUMP ROPE', 'LA CORDE À SAUTER') + '</h3><canvas id="corde-c" width="420" height="200" style="width:100%"></canvas><div class="gc-big" id="corde-n">0</div><div class="gc-row">' + gBtn('cordejump', null, '⬆ ' + L2('JUMP!', 'SAUTE !'), 'go', ' data-enter="1"') + gBtn('close', null, L2('STOP', 'ARRÊTER')) + '</div><div class="gc-sub">' + L2('Get to 10 jumps!', 'Arrive à 10 sauts !') + '</div>'); cordeLoop(); }
+function cordeAng(){ return ((performance.now() - CORDE.t0)/1000*Math.PI*1.4*CORDE.speed) % (Math.PI*2); }
+function cordeLoop(){ cancelAnimationFrame(CORDE.anim); (function f(){ var c = document.getElementById('corde-c'); if(!c) return; var k = c.getContext('2d'), a = cordeAng(), jumpY = CORDE.jt && performance.now() - CORDE.jt < 400 ? Math.sin((performance.now() - CORDE.jt)/400*Math.PI)*40 : 0; k.fillStyle = '#a8a49a'; k.fillRect(0, 0, 420, 200);
+  k.fillStyle = '#3ab8e8'; k.fillRect(30, 80, 20, 60); k.fillStyle = '#f28aa0'; k.fillRect(370, 80, 20, 60); k.fillStyle = '#f0c8a0'; k.beginPath(); k.arc(40, 70, 12, 0, 7); k.arc(380, 70, 12, 0, 7); k.fill();
+  var ry = 110 + Math.cos(a)*80; k.strokeStyle = '#e84a6a'; k.lineWidth = 4; k.beginPath(); k.moveTo(50, 110); k.quadraticCurveTo(210, ry*1.15 - 15, 370, 110); k.stroke();
+  k.fillStyle = '#c8382f'; k.fillRect(195, 120 - jumpY, 30, 50); k.fillStyle = '#f0c8a0'; k.beginPath(); k.arc(210, 108 - jumpY, 12, 0, 7); k.fill(); k.fillStyle = '#2a3a5a'; k.fillRect(198, 170 - jumpY, 10, 25); k.fillRect(212, 170 - jumpY, 10, 25);
+  CORDE.anim = requestAnimationFrame(f); })(); }
+GACT.cordejump = function(){ var a = cordeAng(), atBottom = Math.cos(a) > 0.55; CORDE.jt = performance.now();
+  if(atBottom){ CORDE.n++; say(NUM_FR[Math.min(20, CORDE.n)] || String(CORDE.n)); CORDE.speed = 1 + CORDE.n*0.05; } else { if(CORDE.n) say('Oups ! La corde m\'a touché ! On recommence.'); CORDE.n = 0; CORDE.speed = 1; }
+  var el = document.getElementById('corde-n'); if(el) el.textContent = CORDE.n + ' · ' + (NUM_FR[CORDE.n] || '');
+  if(CORDE.n >= 10){ var g = !(chal.cool.corde > Date.now()) ? addJeton(2) : 0; if(g) chal.cool.corde = Date.now() + 4*60000; say('Dix ! Bravo, championne ou champion de la corde à sauter !'); showToast('🏆 10 !' + (g ? ' +' + g + ' 🪙' : '')); CORDE.n = 0; } };
+/* 🔵 les billes: shoot into the hole (le pot) */
+var BIL = {};
+function billesStart(){ BIL = {hits:0, shots:0, hole:120 + Math.random()*180, t0:performance.now(), ball:null}; say('On joue aux billes ! Vise le pot et tire quand la flèche est bien placée.'); showCard('<h3>🔵 ' + L2('MARBLES', 'LES BILLES') + '</h3><canvas id="bil-c" width="420" height="220" style="width:100%"></canvas><div class="gc-big" id="bil-n">0 / 3</div><div class="gc-row">' + gBtn('bilshoot', null, '👆 ' + L2('SHOOT!', 'TIRE !'), 'go', ' data-enter="1"') + gBtn('close', null, L2('STOP', 'ARRÊTER')) + '</div><div class="gc-text">📚 la bille · l\'agate · le calot (la grosse bille) · le pot (le trou) · viser · tirer · gagner</div>'); bilLoop(); }
+function bilAim(){ return 210 + Math.sin((performance.now() - BIL.t0)/1000*2.2)*170; }
+function bilLoop(){ cancelAnimationFrame(BIL.anim); (function f(){ var c = document.getElementById('bil-c'); if(!c) return; var k = c.getContext('2d'); k.fillStyle = '#c8a878'; k.fillRect(0, 0, 420, 220);
+  k.fillStyle = '#5a4030'; k.beginPath(); k.ellipse(BIL.hole, 40, 18, 9, 0, 0, 7); k.fill(); k.fillStyle = '#23243a'; k.font = '12px sans-serif'; k.fillText('le pot', BIL.hole - 16, 66);
+  var ax = bilAim(); k.strokeStyle = 'rgba(255,255,255,.8)'; k.setLineDash([6, 6]); k.lineWidth = 2; k.beginPath(); k.moveTo(210, 190); k.lineTo(ax, 40); k.stroke(); k.setLineDash([]);
+  if(BIL.ball){ var u = Math.min(1, (performance.now() - BIL.ball.t)/600), bx = 210 + (BIL.ball.x - 210)*u, by = 190 - 150*u; k.fillStyle = '#3a8ae8'; k.beginPath(); k.arc(bx, by, 9, 0, 7); k.fill(); if(u >= 1) BIL.ball = null; }
+  else { k.fillStyle = '#3a8ae8'; k.beginPath(); k.arc(210, 190, 9, 0, 7); k.fill(); }
+  BIL.anim = requestAnimationFrame(f); })(); }
+GACT.bilshoot = function(){ if(BIL.ball) return; var ax = bilAim(), hit = Math.abs(ax - BIL.hole) < 20; BIL.ball = {x:ax, t:performance.now()}; BIL.shots++;
+  setTimeout(function(){ if(hit){ BIL.hits++; say(['Dans le pot !', 'Bien visé !', 'Encore une !'][BIL.hits % 3]); BIL.hole = 60 + Math.random()*300; } else say('Raté ! Vise mieux.');
+    var el = document.getElementById('bil-n'); if(el) el.textContent = BIL.hits + ' / 3';
+    if(BIL.hits >= 3){ var g = !(chal.cool.billes > Date.now()) ? addJeton(2) : 0; if(g) chal.cool.billes = Date.now() + 4*60000; say('Bravo ! Tu as gagné toutes les billes !'); showToast('🏆 ' + L2('You won the marbles!', 'Tu as gagné les billes !') + (g ? ' +' + g + ' 🪙' : '')); BIL.hits = 0; } }, 620); };
+/* the teacher on duty and the counting rhymes */
+var REC_VOC = [['la cour de récréation (la récré)', 'the playground (recess)'], ['la marelle', 'hopscotch'], ['la corde à sauter', 'jump rope'], ['les billes', 'marbles'], ['le loup', '"it" (in tag)'], ['le chat perché', 'off-ground tag'], ['cache-cache', 'hide-and-seek'], ['le toboggan', 'the slide'], ['la balançoire', 'the swing'], ['le bac à sable', 'the sandpit'], ['le préau', 'the covered yard'], ['la cloche', 'the bell'], ['le goûter', 'the snack'], ['la maîtresse / le maître', 'the (primary) teacher']];
+function maitresseCard(){ say('Bonjour ! Dans la cour, on joue gentiment, on partage, et quand la cloche sonne, on se met en rang !');
+  showCard('<h3>👩‍🏫 ' + L2('MADAME MARTIN, THE TEACHER ON DUTY', 'MADAME MARTIN, LA MAÎTRESSE') + '</h3><div class="gc-big gc-say">« Bonjour ! Dans la cour, on joue gentiment, on partage, et quand la cloche sonne, on se met en rang ! »</div><div class="gc-sub">' + L2('The rules of the playground', 'Les règles de la cour') + '</div><div class="gc-text gc-say" style="text-align:left">✅ On joue ensemble et on invite les autres.<br>✅ On partage les jeux et le ballon.<br>✅ Si quelqu\'un tombe, on l\'aide et on prévient la maîtresse.<br>🚫 On ne se bat pas, on ne se moque pas.<br>🔔 Quand la cloche sonne, on se met en rang.</div><div class="gc-grid">' + REC_VOC.map(function(w){ return '<div class="gc-text gc-say" style="margin:2px">' + esc(w[0]) + '<br><span class="lf-soft">' + esc(w[1]) + '</span></div>'; }).join('') + '</div><div class="gc-row">' + gBtn('recquiz', null, '🎯 ' + L2('QUIZ (+🪙)', 'QUIZ (+🪙)'), 'go') + gBtn('close', null, 'OK') + '</div>'); }
+var RQ = {};
+GACT.recquiz = function(){ RQ = {n:0, ok:0, list:shuffleR(Math.random, REC_VOC.slice()).slice(0, 5)}; recQ(); };
+function recQ(msg){ if(RQ.n >= RQ.list.length){ var g = !(chal.cool.recq > Date.now()) ? addJeton(RQ.ok >= 4 ? 2 : RQ.ok >= 2 ? 1 : 0) : 0; if(g) chal.cool.recq = Date.now() + 4*60000; showCard('<h3>🏫 ' + RQ.ok + ' / ' + RQ.list.length + (g ? ' · +' + g + ' 🪙' : '') + '</h3>' + noCharLine() + '<div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); return; }
+  var w = RQ.list[RQ.n], m = mc(Math.random, w[0], shuffleR(Math.random, REC_VOC.filter(function(x){ return x !== w; })).slice(0, 3).map(function(x){ return x[0]; })); RQ.m = m;
+  showCard('<h3>🏫 ' + (RQ.n + 1) + '/' + RQ.list.length + '</h3>' + (msg || '') + '<div class="gc-big">« ' + esc(w[1]) + ' »</div><div class="gc-sub">' + L2('in French?', 'en français ?') + '</div><div class="gc-grid">' + m.opts.map(function(o, k){ return gOpt('recans', k, esc(o)); }).join('') + '</div>'); }
+GACT.recans = function(v){ if(RQ.busy) return; RQ.busy = true; setTimeout(function(){ RQ.busy = false; }, 350); var ok = (v|0) === RQ.m.ans; if(ok) RQ.ok++; RQ.n++; recQ(ok ? '<div class="good">✓</div>' : '<div class="bad">✗ ' + esc(RQ.m.opts[RQ.m.ans]) + '</div>'); };
+var COMPTINES = [['Am stram gram, pic et pic et colégram, bour et bour et ratatam, am stram gram !', 'A very old French counting-out rhyme (like "eeny, meeny, miny, moe"). The child on the last word is "it".'], ['Plouf, plouf, ce sera toi qui seras le loup... mais comme le roi et la reine ne le veulent pas, ce ne sera pas toi !', 'Another traditional counting-out rhyme to choose who is "it".']];
+function comptineCard(){ var names = ['Chloé', 'Hugo', 'Inès', 'Nathan', hasChar() ? life.eco.ch.fn : 'toi'], c = COMPTINES[Math.floor(Math.random()*COMPTINES.length)], who = names[Math.floor(Math.random()*names.length)]; say(c[0] + ' C\'est ' + who + ' le loup !');
+  showCard('<h3>📜 ' + L2('COUNTING RHYMES (traditional)', 'LES COMPTINES (traditionnelles)') + '</h3><div class="gc-sub">' + L2('To choose who will be "it", children point at each other on every word:', 'Pour choisir qui sera le loup, on montre chaque enfant à chaque mot :') + '</div><div class="gc-big gc-say">« ' + esc(c[0]) + ' »</div><div class="gc-sub">' + esc(c[1]) + '</div><div class="gc-big">🐺 C\'est ' + esc(who) + ' le loup !</div><div class="gc-row">' + gBtn('comptine', null, L2('AGAIN', 'ENCORE'), 'go') + gBtn('close', null, 'OK') + '</div>'); }
+GACT.comptine = comptineCard;
+/* ---------- ✈ A REAL FLIGHT: boarding, your seat, passengers, the flight attendant, safety demo, captain, drinks and meal, landing ---------- */
+var CAB = {o:null, step:0, to:null, att:null, sky:null, seatRow:7, seated:false, go:false};
+(function(){
+  var o = makeInterior({id:'cabine', name:'La cabine de l\'avion', en:'The plane cabin', w:6, d:34, h:3, wall:0xf2f4f6, floor:0x3a4a6a, ceil:0xfafbfc, light:0xffffff, title:false, noExit:true, greeter:false, hunt:false, out:{x:CDG.x + 6, z:CDG.z - 25, yaw:0},
+    build:function(L, X, Z, B, F){ CAB.o = this;
+      for(var r=0;r<11;r++){ var z = -12 + r*2.2; [-2.3, -1.55, 1.55, 2.3].forEach(function(x){ var S = new Lot(B, X + x, Z + z, 0); S.box(0.66, 0.12, 0.6, 0, 0.45, 0, 0x2a4a8a); S.box(0.66, 0.85, 0.12, 0, 0.9, 0.3, 0x2a4a8a); S.box(0.5, 0.18, 0.08, 0, 1.4, 0.3, 0xf2f4f6); }); }
+      F.tagAt(-2.3, 1, -1, 'le siège', 'the seat', 0.4); F.tagAt(-0, 0.2, 0, 'l\'allée', 'the aisle', 1); F.tagAt(-1.9, 2.6, 0, 'le compartiment à bagages', 'the overhead bin', 1);
+      [-1, 1].forEach(function(s){ L.box(1.6, 0.6, 32, s*2.2, 2.6, 0, 0xe8ecf0); });
+      var c = document.createElement('canvas'); c.width = 512; c.height = 128; var k = c.getContext('2d'), g = k.createLinearGradient(0, 0, 0, 128); g.addColorStop(0, '#5aa8e8'); g.addColorStop(1, '#cfe8f8'); k.fillStyle = g; k.fillRect(0, 0, 512, 128); k.fillStyle = 'rgba(255,255,255,.95)'; for(var i=0;i<9;i++){ k.beginPath(); k.ellipse(30 + i*60, 60 + (i % 3)*18, 34, 12, 0, 0, 7); k.fill(); }
+      var tex = new THREE.CanvasTexture(c); tex.wrapS = THREE.RepeatWrapping; CAB.sky = tex;
+      var c2 = document.createElement('canvas'); c2.width = 512; c2.height = 128; var k2 = c2.getContext('2d'); k2.fillStyle = '#9fc8e0'; k2.fillRect(0, 0, 512, 70); k2.fillStyle = '#7a7f88'; k2.fillRect(0, 70, 512, 58); k2.fillStyle = '#ffffff'; for(var j=0;j<8;j++) k2.fillRect(j*64, 96, 30, 4); var tex2 = new THREE.CanvasTexture(c2); tex2.wrapS = THREE.RepeatWrapping; CAB.ground = tex2;
+      CAB.winMat = new THREE.MeshBasicMaterial({map:tex2});
+      for(var r2=0;r2<11;r2++){ [-1, 1].forEach(function(s){ var w = new THREE.Mesh(new THREE.PlaneGeometry(0.45, 0.6), CAB.winMat); w.position.set(X + s*2.95, 1.45, Z - 12 + r2*2.2 + 0.4); w.rotation.y = s < 0 ? Math.PI/2 : -Math.PI/2; root.add(w); }); }
+      F.tagAt(-2.9, 1.5, -3, 'le hublot', 'the plane window', 0.4);
+      var sign = document.createElement('canvas'); sign.width = 256; sign.height = 64; var ks = sign.getContext('2d'); ks.fillStyle = '#1b1b1d'; ks.fillRect(0, 0, 256, 64); ks.fillStyle = '#f2c230'; ks.font = 'bold 26px sans-serif'; ks.textAlign = 'center'; ks.fillText('🔔 ATTACHEZ VOS CEINTURES', 128, 42);
+      var sm = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.35), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(sign)})); sm.position.set(X, 2.6, Z - 15.5); root.add(sm); F.tagAt(0, 2.6, -15.4, 'le signal « attachez vos ceintures »', 'the seatbelt sign', 0.6);
+      L.box(5.6, 3, 0.2, 0, 1.5, -16.6, 0xd8dce2); L.box(1.2, 2.2, 0.22, 0, 1.1, -16.5, 0x8a8f98); F.tagAt(0, 1.6, -16.4, 'le poste de pilotage', 'the cockpit', 0.6);
+      L.box(0.6, 1, 0.8, 0.3, 0.5, 15, 0x8a8f98); F.tagAt(0.3, 1.2, 15, 'le chariot', 'the trolley', 0.4);
+      var cols = [0xc8382f, 0x1f6fb8, 0x2f8a3a, 0xe3b52c, 0x8a3ad6, 0xf28aa0, 0x2a2d36, 0xf2f2f2], hairs = [0x1b1b1d, 0x4a2a1a, 0x8a4a1a, 0xe8c070, 0xd8d8d8];
+      for(var r3=0;r3<11;r3++) [-2.3, -1.55, 1.55, 2.3].forEach(function(x, j){ if(r3 === CAB.seatRow && x === -2.3) return; if((r3*7 + j*3) % 5 === 0) return; person({x:X + x, z:Z - 12 + r3*2.2 - 0.05, ry:0, sit:true, shirt:cols[(r3 + j) % 8], pants:0x2a3a5a, hair:hairs[(r3*3 + j) % 5], h:1.15 + ((r3 + j) % 4)*0.05}); });
+      F.tagAt(1.55, 1.5, 2.3, 'le passager / la passagère', 'the passenger', 0.4);
+      CAB.att = person({x:X, z:Z - 14, ry:Math.PI, shirt:0x1f3f8f, pants:0x1f3f8f, hair:0x4a2a1a, h:1.72}); var sc = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.08, 0.05), solidMat(0xc8382f)); sc.position.set(0, 1.42, -0.14); CAB.att.add(sc);
+      LBL.dyn.push({m:CAB.att, fr:'Camille, l\'hôtesse de l\'air', en:'Camille, the flight attendant', dy:2.0, r:0.6, act:function(){ cabTalk(); }});
+    }});
+  CAB.o = o;
+  o.spots = [{x:-1.4, z:-12 + CAB.seatRow*2.2 + 0.6, r:1.2, label:function(){ return '💺 ' + L2('Sit in your seat 8A (window)', 'S\'asseoir au siège 8A (hublot)'); }, act:function(){ cabSit(); }}];
+  INT.anim.push(function(dt, now){ if(INT.cur !== CAB.o) return; var T = CAB.winMat && CAB.winMat.map; if(T && CAB.flying) T.offset.x += dt*(CAB.step >= 3 ? 0.12 : 0.6); if(CAB.shake && now < CAB.shake) camera.rotation.z = Math.sin(now*0.05)*0.015; else if(CAB.seated && CAB.flying) camera.rotation.z = Math.sin(now*0.0015)*0.004;
+    if(CAB.attTo != null){ var p = CAB.att.position, tz = CAB.o.Z + CAB.attTo; p.z += Math.sign(tz - p.z)*Math.min(Math.abs(tz - p.z), dt*2.2); CAB.att.rotation.y = tz > p.z ? 0 : Math.PI; if(Math.abs(tz - p.z) < 0.05){ CAB.att.rotation.y = Math.PI/2; } } });
+})();
+var _startFlightC = startFlight;
+startFlight = function(id){
+  if(CAB.go){ CAB.go = false; _startFlightC(id); return; }
+  var to = AIRPORTS.filter(function(a){ return a.id === id; })[0]; if(!to) return;
+  CAB.to = to; CAB.id = id; CAB.step = 0; CAB.seated = false; CAB.flying = false; CAB.attTo = -10.5;
+  flyCard.el.classList.add('hidden'); if(INT.cur && INT.cur !== CAB.o) INT.cur = null;
+  enterInterior(CAB.o, {x:0, z:-14.5, yaw:Math.PI});
+  setTimeout(function(){ if(CAB.o.built){ CAB.winMat.map = CAB.ground; CAB.winMat.needsUpdate = true; CAB.att.position.set(CAB.o.X, 0, CAB.o.Z - 12.5); } cabBoard(); }, 1100);
+};
+function cabStep(title, line, opts, act){ say(line); showCard('<h3>✈ ' + esc(title) + '</h3><div class="gc-big gc-say">« ' + esc(line) + ' »</div>' + (opts || '') + (act ? '' : '')); }
+function cabBoard(){ var m = mc(Math.random, 'Bonjour ! Voici ma carte d\'embarquement.', ['Salut. Bouge.', 'Je veux le meilleur siège !', 'Où est la piscine ?']); CAB.m = m;
+  cabStep(L2('BOARDING', 'L\'EMBARQUEMENT'), 'Bonjour et bienvenue à bord ! Votre carte d\'embarquement, s\'il vous plaît.', '<div class="gc-grid">' + m.opts.map(function(o, k){ return gOpt('cabans', k, '« ' + esc(o) + ' »'); }).join('') + '</div>'); CAB.next = function(){ CAB.attTo = -12.5; say('Merci ! Vous êtes au siège 8A, à gauche, côté hublot. Bon vol !'); showCard('<h3>💺 ' + L2('YOUR SEAT: 8A', 'TON SIÈGE : 8A') + '</h3><div class="gc-big gc-say">« Merci ! Vous êtes au siège 8A, à gauche, côté hublot. Bon vol ! »</div><div class="gc-text">' + L2('Walk down the aisle to row 8 and sit down (or click below).', 'Marche dans l\'allée jusqu\'au rang 8 et assieds-toi (ou clique ici).') + '</div><div class="gc-row">' + gBtn('cabsit', null, '💺 ' + L2('GO TO MY SEAT', 'ALLER À MA PLACE'), 'go') + '</div>'); }; }
+GACT.cabans = function(v){ if((v|0) !== CAB.m.ans){ say('Pardon ? Soyez poli, s\'il vous plaît.'); showToast('🙂 ' + L2('Be polite!', 'Sois poli(e) !')); return; } var n = CAB.next; CAB.next = null; if(n) n(); };
+GACT.cabsit = function(){ cabSit(); };
+function cabSit(){ if(CAB.seated) return; var o = CAB.o; CAB.seated = true; closeCard(); camera.position.set(o.X - 2.3, 1.35, o.Z - 12 + CAB.seatRow*2.2 + 0.1); yaw = 0.35; pitch = -0.05; camera.rotation.set(pitch, yaw, 0, 'YXZ');
+  setTimeout(cabSafety, 800); }
+function cabSafety(){ CAB.step = 1; CAB.attTo = -12 + CAB.seatRow*2.2 - 3;
+  var m = mc(Math.random, 'le gilet de sauvetage', ['le parapluie', 'le sac à dos', 'le chapeau']); CAB.m = m;
+  CAB.next = cabTakeoff;
+  cabStep(L2('SAFETY DEMONSTRATION', 'LES CONSIGNES DE SÉCURITÉ'), 'Mesdames et messieurs, attachez votre ceinture. Les sorties de secours sont à l\'avant et à l\'arrière. Le gilet de sauvetage est sous votre siège. En cas de besoin, des masques à oxygène tombent du plafond.', '<div class="gc-text">📚 la ceinture · les sorties de secours · le gilet de sauvetage · le masque à oxygène · le hublot · l\'allée</div><div class="gc-sub">' + L2('What is under your seat?', 'Qu\'est-ce qu\'il y a sous ton siège ?') + '</div><div class="gc-grid">' + m.opts.map(function(o, k){ return gOpt('cabans', k, esc(o)); }).join('') + '</div>'); }
+function cabTakeoff(){ CAB.step = 2; CAB.flying = true; closeCard(); CAB.attTo = -14.5;
+  say('Mesdames et messieurs, bonjour. Ici votre commandant de bord. Nous allons décoller pour ' + CAB.to.fr + '. Personnel de cabine, préparez-vous au décollage.');
+  hudMsg('🛫 ' + L2('Take-off! ', 'Décollage ! ') + '« Ici votre commandant de bord... »', true);
+  var o = CAB.o, t0 = performance.now(); (function climb(){ if(INT.cur !== o) return; var u = (performance.now() - t0)/5000; if(u < 1){ pitch = 0.1*Math.sin(u*Math.PI); camera.rotation.set(pitch, yaw, 0, 'YXZ'); requestAnimationFrame(climb); } else { CAB.winMat.map = CAB.sky; CAB.winMat.needsUpdate = true; pitch = -0.05; camera.rotation.set(pitch, yaw, 0, 'YXZ'); setTimeout(cabService, 1500); } })(); }
+function cabService(){ CAB.step = 3; CAB.attTo = -12 + CAB.seatRow*2.2 - 0.6; hudBox.classList.add('hidden');
+  setTimeout(function(){ cabStep(L2('THE TROLLEY SERVICE', 'LE SERVICE À BORD'), 'Bonjour ! Qu\'est-ce que vous voulez boire ? Nous avons du jus d\'orange, de l\'eau, du thé ou un chocolat chaud.', '<div class="gc-grid">' + ['Un jus d\'orange, s\'il vous plaît.', 'De l\'eau, s\'il vous plaît.', 'Un thé, s\'il vous plaît.', 'Un chocolat chaud, s\'il vous plaît.'].map(function(d, k){ return gOpt('cabdrink', k, '« ' + esc(d) + ' »'); }).join('') + '</div>'); }, 2200); }
+GACT.cabdrink = function(v){ say(['Un jus d\'orange', 'De l\'eau', 'Un thé', 'Un chocolat chaud'][v|0] + ', voilà ! Et pour le repas : du poulet ou des pâtes ?');
+  cabStep(L2('THE MEAL', 'LE REPAS'), 'Voilà ! Et pour le repas : du poulet ou des pâtes ?', '<div class="gc-grid">' + ['Du poulet, s\'il vous plaît.', 'Des pâtes, s\'il vous plaît.', 'Je n\'ai pas faim, merci.'].map(function(d, k){ return gOpt('cabmeal', k, '« ' + esc(d) + ' »'); }).join('') + '</div>'); };
+GACT.cabmeal = function(v){ say(v == 2 ? 'Très bien. Appelez-moi si vous avez besoin de quelque chose !' : 'Voilà, bon appétit ! Attention, c\'est chaud.'); closeCard(); CAB.attTo = 13; setTimeout(cabTurb, 4000); };
+function cabTurb(){ CAB.shake = performance.now() + 3500; say('Mesdames et messieurs, nous traversons une zone de turbulences. Veuillez regagner vos sièges et attacher vos ceintures.'); hudMsg('⚠ ' + L2('Turbulence!', 'Des turbulences !'), true);
+  var m = mc(Math.random, 'J\'attache ma ceinture.', ['Je me lève et je cours.', 'J\'ouvre le hublot.', 'Je saute partout.']); CAB.m = m; CAB.next = cabLanding;
+  setTimeout(function(){ cabStep(L2('TURBULENCE', 'LES TURBULENCES'), 'Attachez vos ceintures, s\'il vous plaît !', '<div class="gc-sub">' + L2('What do you do?', 'Qu\'est-ce que tu fais ?') + '</div><div class="gc-grid">' + m.opts.map(function(o, k){ return gOpt('cabans', k, esc(o)); }).join('') + '</div>'); }, 1500); }
+function cabLanding(){ CAB.step = 4; closeCard(); var to = CAB.to;
+  say('Mesdames et messieurs, nous commençons notre descente vers ' + to.fr + '. Merci d\'avoir voyagé avec nous. À bientôt !'); hudMsg('🛬 ' + L2('Landing in ', 'Atterrissage à ') + to.fr, true);
+  setTimeout(function(){ CAB.winMat.map = CAB.ground; CAB.winMat.needsUpdate = true; CAB.flying = true; }, 3500);
+  setTimeout(function(){ CAB.flying = false; var g = !(chal.cool.flight > Date.now()) ? addJeton(3) : 0; if(g) chal.cool.flight = Date.now() + 5*60000;
+    showCard('<h3>🛬 ' + L2('WELCOME TO ', 'BIENVENUE À ') + esc(to.fr.toUpperCase()) + '</h3><div class="gc-big gc-say">« Au revoir et merci ! Bon séjour à ' + esc(to.fr) + ' ! »</div>' + (g ? '<div class="gc-big">+' + g + ' 🪙</div>' : '') + noCharLine() + '<div class="gc-text">📚 l\'hôtesse de l\'air / le steward · le commandant de bord · décoller · atterrir · la carte d\'embarquement · bon vol · bon séjour</div><div class="gc-row">' + gBtn('cabout', null, '🚶 ' + L2('GET OFF THE PLANE', 'DESCENDRE DE L\'AVION'), 'go') + '</div>'); }, 7000); }
+GACT.cabout = function(){ closeCard(); var id = CAB.id, o = CAB.o; INT.cur = o; leaveInterior(o); CAB.go = true;
+  setTimeout(function(){ startFlight(id); if(flight && flight.active){ flight.leg = 'in'; flight.path = arrivalPath(flight.to); flight.seg = 0; flight.segT = 0; flight.plane = flight.to.plane; } }, 600); };
+function cabTalk(){ var lines = ['Vous avez besoin de quelque chose ?', 'Le vol dure environ sept heures.', 'Nous volons à dix mille mètres d\'altitude !', 'Il fait moins cinquante degrés dehors !', 'Les toilettes sont à l\'arrière de l\'avion.']; var l = pickR(Math.random, lines); say(l); showToast('💬 ' + l); }
+/* ---------- 🚇 a livelier Métro: more passengers who get on and off, a ticket inspector and a musician ---------- */
+var MPAX = {list:[], insp:false};
+(function(){ var _b = RAME.build; RAME.build = function(L, X, Z, B, F){ _b.apply(this, arguments);
+  var cols = [0xc8382f, 0x1f6fb8, 0x2f8a3a, 0xe3b52c, 0x8a3ad6, 0xf28aa0, 0x2a2d36, 0xe8642a], hairs = [0x1b1b1d, 0x4a2a1a, 0x8a4a1a, 0xe8c070, 0xd8d8d8];
+  [[-2.6, -8.5, 1], [2.6, -6, 1], [-2.6, -1, 1], [2.6, 3.5, 1], [-2.6, 6, 1], [2.6, 8.5, 1], [0.4, -9, 0], [-0.4, 2.8, 0], [0.5, 8.6, 0], [-0.6, -4.2, 0]].forEach(function(p, i){
+    var m = person({x:X + p[0], z:Z + p[1], ry:p[2] ? (p[0] < 0 ? Math.PI/2 : -Math.PI/2) : (i % 2 ? 0 : Math.PI), sit:!!p[2], shirt:cols[i % 8], pants:[0x2a3a5a, 0x3a2a1a, 0x1b1b1d][i % 3], hair:hairs[i % 5], h:1.55 + (i % 4)*0.08});
+    if(i === 2){ var np = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 0.02), solidMat(0xf2f2ec)); np.position.set(0, 1.0, -0.35); m.add(np); }
+    if(i === 4){ var ph = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.15, 0.02), solidMat(0x1b1b1d)); ph.position.set(0.1, 1.15, -0.3); m.add(ph); }
+    MPAX.list.push(m); });
+  F.tagAt(-2.6, 1.4, -1, 'le journal', 'the newspaper', 0.3);
+  MPAX.music = person({x:X + 1.2, z:Z - 0.5, ry:-Math.PI/2, shirt:0x2a2d36, pants:0x2a2d36, hair:0x1b1b1d, hat:0x1b1b1d, h:1.75}); var acc = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.3), solidMat(0xc8382f)); acc.position.set(0, 1.1, -0.25); MPAX.music.add(acc);
+  LBL.dyn.push({m:MPAX.music, fr:'le musicien (l\'accordéon)', en:'the musician (accordion)', dy:2, r:0.6, act:function(){ say('Bonjour ! Un peu de musique pour votre voyage !'); if(typeof playNotes === 'function') playNotes([[67, 1], [72, 1], [72, 1], [74, 1], [76, 2], [74, 1], [72, 1], [71, 2], [67, 2]], 'square', 0.12, 180); }});
+  MPAX.insp = person({x:X, z:Z + 11, ry:Math.PI, shirt:0x1f3f8f, pants:0x1f3f8f, hair:0x4a2a1a, hat:0x1f3f8f, h:1.8}); MPAX.insp.visible = false;
+  LBL.dyn.push({m:MPAX.insp, fr:'le contrôleur', en:'the ticket inspector', dy:2.1, r:0.6, act:function(){ inspCard(); }});
+}; })();
+var _metroDepartP = metroDepart;
+metroDepart = function(){ _metroDepartP();
+  MPAX.list.forEach(function(m, i){ if(Math.random() < 0.3) m.visible = !m.visible; });
+  if(MPAX.music) MPAX.music.visible = Math.random() < 0.5;
+  var T = MET.trip; if(T && T.idx === 1 && MPAX.insp && !T.checked){ T.checked = true; MPAX.insp.visible = true; MPAX.insp.position.z = RAME.Z + 11; setTimeout(function(){ if(INT.cur === RAME){ MPAX.insp.position.z = camera.position.z + 1.4; inspCard(); } }, 2500); }
+  else if(MPAX.insp && T && T.idx > 1) MPAX.insp.visible = false;
+};
+function inspCard(){ var m = mc(Math.random, 'Oui, voici mon ticket.', ['Non, je n\'ai pas de ticket, et alors ?', 'Je ne parle pas aux contrôleurs.', 'C\'est quoi un ticket ?']); MPAX.m = m; say('Contrôle des titres de transport. Bonjour, votre ticket, s\'il vous plaît !');
+  showCard('<h3>🎫 ' + L2('TICKET INSPECTION', 'LE CONTRÔLE DES BILLETS') + '</h3><div class="gc-big gc-say">« Contrôle des titres de transport. Bonjour, votre ticket, s\'il vous plaît ! »</div><div class="gc-grid">' + m.opts.map(function(o, k){ return gOpt('inspans', k, '« ' + esc(o) + ' »'); }).join('') + '</div><div class="gc-sub">' + L2('Without a valid ticket, you pay a fine (une amende)!', 'Sans ticket validé, on paie une amende !') + '</div>'); }
+GACT.inspans = function(v){ if((v|0) !== MPAX.m.ans){ say('Sans ticket, c\'est une amende de cinquante euros ! Soyez poli, s\'il vous plaît.'); showToast('🎫 ' + L2('Show your ticket politely!', 'Montre ton ticket poliment !')); return; } say('Merci, c\'est en règle. Bon voyage !'); var g = !(chal.cool.insp > Date.now()) ? addJeton(1) : 0; if(g) chal.cool.insp = Date.now() + 5*60000; showToast('✓ ' + L2('All good!', 'C\'est en règle !') + (g ? ' +1 🪙' : '')); closeCard(); };
+/* ---------- 🚆 the Québec train: passengers on board, the conductor and the snack trolley ---------- */
+var _startRideT = startRide;
+startRide = function(kind){ _startRideT.apply(this, arguments); if(kind !== 'qtrain' || !ride.on) return;
+  var m = ride.model; if(m && !m.userData.pax){ m.userData.pax = true; var cols = [0xc8382f, 0x1f6fb8, 0x2f8a3a, 0xe3b52c, 0x8a3ad6, 0xf28aa0];
+    for(var c=0;c<2;c++) for(var r=0;r<4;r++) [-0.65, 0.65].forEach(function(x, j){ if((c + r + j) % 3 === 2) return; var p = person({x:0, z:0, ry:Math.PI, sit:true, shirt:cols[(c*4 + r + j) % 6], pants:0x2a3a5a, hair:[0x1b1b1d, 0x4a2a1a, 0xe8c070, 0xd8d8d8][(r + j) % 4], h:1.0}); root.remove(p); p.position.set(x, 0.4, c*7.8 + 1.5 - 2.4 + r*1.6 + 4.4); m.add(p); }); }
+  setTimeout(function(){ if(!ride.on || ride.kind !== 'qtrain') return; var mm = mc(Math.random, 'Bonjour, voici mon billet.', ['Je n\'en ai pas, désolé.', 'Laissez-moi tranquille !', 'Un billet ? Pour quoi faire ?']); MPAX.m = mm; say('Bonjour mesdames et messieurs, contrôle des billets, s\'il vous plaît !');
+    showCard('<h3>🎫 ' + L2('THE CONDUCTOR', 'LE CONTRÔLEUR DU TRAIN') + '</h3><div class="gc-big gc-say">« Bonjour ! Contrôle des billets, s\'il vous plaît ! »</div><div class="gc-grid">' + mm.opts.map(function(o, k){ return gOpt('trainans', k, '« ' + esc(o) + ' »'); }).join('') + '</div>'); }, 6000);
+};
+GACT.trainans = function(v){ if((v|0) !== MPAX.m.ans){ say('Il faut un billet pour voyager en train !'); return; } say('Merci et bon voyage ! Le chariot du bar passe dans quelques minutes.');
+  showCard('<h3>🥤 ' + L2('THE SNACK TROLLEY', 'LE CHARIOT DU BAR') + '</h3><div class="gc-big gc-say">« Merci ! Bon voyage ! Vous voulez quelque chose du chariot ? »</div><div class="gc-grid">' + ['Un café, s\'il vous plaît.', 'Un jus de pomme, s\'il vous plaît.', 'Un muffin aux bleuets, s\'il vous plaît.', 'Non merci, ça va.'].map(function(d, k){ return gOpt('trainsnack', k, '« ' + esc(d) + ' »'); }).join('') + '</div>'); };
+GACT.trainsnack = function(v){ say(v == 3 ? 'Très bien, bon voyage !' : 'Voilà ! Ça fait trois dollars cinquante. Merci !'); var g = !(chal.cool.train > Date.now()) ? addJeton(1) : 0; if(g) chal.cool.train = Date.now() + 5*60000; closeCard(); showToast('🚆 ' + L2('Enjoy the view of Québec!', 'Profite de la vue sur Québec !') + (g ? ' +1 🪙' : '')); };
+/* plots (players' shops and houses) and monuments: the click card has ENTER, and a double-click goes straight in */
+var _browseGoD = browseGo;
+browseGo = function(it){
+  if(it && it.plot){ BROWSE.pick = it; showCard('<h3>' + it.icon + ' ' + esc(it.name) + '</h3><div class="gc-sub">' + L2('You can go inside.', 'Tu peux entrer.') + '</div><div class="gc-row">' + gBtn('plotin', null, '🚪 ' + L2('ENTER', 'ENTRER'), 'go', ' data-enter="1"') + gBtn('brgo', 'door', '📍 ' + L2('GO TO THE DOOR', 'ALLER DEVANT')) + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>'); return; }
+  _browseGoD(it);
+};
+GACT.plotin = function(){ var it = BROWSE.pick; closeCard(); if(it && it.plot){ if(BROWSE.on) setBrowse(false); enterPlot(it.plot); } };
+var _browseTravelD = browseTravel;
+browseTravel = function(it, inside){ if(inside && it && it.plot){ if(BROWSE.on) setBrowse(false); enterPlot(it.plot); return; } _browseTravelD(it, inside); };
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
@@ -17273,7 +17622,7 @@ function animate(){
   updateSpeedo();
   lifeTick(dt);
   jailTick();
-  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt);
+  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016);
   if(!ICE.t || performance.now() - ICE.t > 1000){ ICE.t = performance.now(); if(Math.hypot(camera.position.x - QC.x, camera.position.z - QC.z) < 800) iceSync(); }
   villageTick();
   sendPresence(false);
