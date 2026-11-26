@@ -20292,7 +20292,7 @@ var FIG = {list:[]};
   FIGS.forEach(function(f, i){ var sp = spots[i % spots.length], p = freeAt(sp[0], sp[1]), x = p[0], z = p[1], B = new MeshBatch(), L = new Lot(B, x, z, 0);
     L.box(2.2, 0.4, 2.2, 0, 0.2, 0, 0xd8d0c0); L.box(1.6, 1.6, 1.6, 0, 1.2, 0, 0xe8e0d0); L.box(1.9, 0.18, 1.9, 0, 2.08, 0, 0xd8d0c0); L.box(1.2, 0.5, 0.05, 0, 1.25, 0.83, 0x7a5a2a); B.build(); addSolidC(x, z, 2.2, 2.2, 'static', -1, 2.2);
     var st = person({x:x, y:2.17, z:z, ry:Math.PI, shirt:0x4f7a68, pants:0x4f7a68, hair:0x456b5c, skin:0x5c8a76, h:1.9, noRig:true}); st.traverse(function(o){ if(o.isMesh) o.material = solidMat(0x5c8a76); });
-    airSign(f[0] + ' ' + f[1].toUpperCase(), x, 4.6, z + 0.9, Math.PI, 3.6, '#4a3a1a'); FIG.list.push({x:x, z:z});
+    airSign(f[0] + ' ' + f[1].toUpperCase(), x, 4.6, z + 0.9, 0, 3.6, '#4a3a1a'); FIG.list.push({x:x, z:z});
     addSpot({x:x, z:z + 1.8, r:2.8, label:function(){ return '🗿 ' + f[1] + ' · ' + L2('read the plaque', 'lire la plaque'); }, act:function(){ GACT.figo(i); }});
     tag(x, 1.3, z + 0.9, 'la statue de ' + f[1], 'the statue of ' + f[1], 1); });
   EXTRA_PLACES.push(['🗿', 'Les Grands Français (' + FIGS.length + ' statues)', L2('Scientists, explorers, chefs, writers, artists', 'Scientifiques, explorateurs, chefs, écrivains, artistes'), FIG.list[0].x, FIG.list[0].z + 4, 0]); })();
@@ -20835,6 +20835,27 @@ function jfFreeMe(f){ var e = hasChar() ? life.eco : null; jail.local = false; d
 (function(){ setInterval(function(){ if(JF.on || !net.db || !net.uid) return; JF.on = true; try { net.db.ref('paris/mod/jfree').on('value', function(s){ JF.all = s.val() || {}; var f = JF.all[net.uid]; if(f && !isStaff() && (f.at || 0) > JF.seen) jfFreeMe(f); }, function(){ JF.on = false; }); } catch(e){ JF.on = false; } }, 1500); })();
 /* freeing yourself with the quiz also walks you out of the cell */
 var _jailFreeSelfJF = jailFreeSelf; jailFreeSelf = function(){ var r = _jailFreeSelfJF.apply(this, arguments); setTimeout(function(){ if(flying && Math.hypot(camera.position.x - JAIL.x, camera.position.z - JAIL.z) < 30) goTo({x:0, z:40, yaw:0}); }, 600); return r; };
+/* ---------- 👁 FIRST PERSON FIRST: it's the default view for everyone (C / V still switch to third person), a natural
+   field of view, your own arms and hands in view, a small clean crosshair, and no hint boxes stuck in the middle. ---------- */
+try { if(localStorage.getItem('paris.fpDefault') !== '1'){ localStorage.setItem('paris.fpDefault', '1'); localStorage.setItem('paris.tp', '0'); TP.on = false; } } catch(e){}
+scene.add(camera);
+var FP = {arms:null, t:0, lastYaw:0, sway:0, sig:''};
+function fpWalk(){ return flying && !driving && !(ride && ride.on) && !tpActive() && !(typeof POOL !== 'undefined' && POOL.ride) && !(typeof PK !== 'undefined' && PK.ride) && !(typeof MET !== 'undefined' && MET.riding); }
+function fpBuildArms(){ var e = hasChar() ? life.eco : null, ch = e && e.ch || {}, skin = LOOK.skin[ch.skin|0] || LOOK.skin[1], S = typeof styleOf === 'function' ? styleOf(ch) : {sp:0}, sleeve = S.sp === 1 ? 0x8a8f98 : S.sp === 2 ? 0x1f2124 : S.sp === 3 ? 0xb3242a : S.sp === 4 ? 0x7fb3e0 : S.sp === 5 ? 0xb04a3a : 0xc8382f, sig = skin + '|' + sleeve; if(FP.arms && FP.sig === sig) return; FP.sig = sig; if(FP.arms) camera.remove(FP.arms);
+  var g = new THREE.Group(); [-1, 1].forEach(function(sd){ var a = new THREE.Group(); var sl = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.11, 0.42), new THREE.MeshLambertMaterial({color:sleeve})); sl.position.z = 0.1; a.add(sl); var hd = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.07, 0.13), new THREE.MeshLambertMaterial({color:skin})); hd.position.z = -0.16; a.add(hd); var th = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.04, 0.07), new THREE.MeshLambertMaterial({color:skin})); th.position.set(-sd*0.055, 0.01, -0.13); a.add(th); a.position.set(sd*0.3, -0.33, -0.62); a.rotation.set(0.3, -sd*0.1, 0); a.scale.setScalar(0.6); a.userData.sd = sd; g.add(a); });
+  g.traverse(function(o){ if(o.isMesh){ o.renderOrder = 999; o.material.depthTest = true; o.frustumCulled = false; } }); camera.add(g); FP.arms = g; }
+function fpTick(dt){ var on = fpWalk(); if(on) fpBuildArms(); if(FP.arms) FP.arms.visible = on && !document.body.classList.contains('photo-mode');
+  // field of view: 72° walking in first person; 62° inside a car; 45° otherwise
+  var want = on ? 72 : (typeof insideView === 'function' && insideView() ? 62 : 45); if(Math.abs(camera.fov - want) > 0.05){ camera.fov += (want - camera.fov)*Math.min(1, dt*8); if(Math.abs(camera.fov - want) < 0.1) camera.fov = want; camera.updateProjectionMatrix(); }
+  var nearW = on ? 0.1 : 0.3; if(camera.near !== nearW){ camera.near = nearW; camera.updateProjectionMatrix(); }
+  if(!on || !FP.arms) return; var moving = keyFwd() || keyBack() || keyLeft() || keyRight() || stickAmount() > STICK_DEAD; FP.t += dt*(moving ? (CROUCH && CROUCH.on ? 6 : 10) : 1.5);
+  var dy = Math.atan2(Math.sin(yaw - FP.lastYaw), Math.cos(yaw - FP.lastYaw)); FP.lastYaw = yaw; FP.sway += (Math.max(-0.08, Math.min(0.08, dy*1.5)) - FP.sway)*Math.min(1, dt*8);
+  FP.arms.children.forEach(function(a){ var sd = a.userData.sd, b = moving ? Math.sin(FP.t + (sd > 0 ? 0 : Math.PI))*0.018 : Math.sin(FP.t)*0.004; a.position.set(sd*0.3 + FP.sway, -0.33 + b - (CROUCH && CROUCH.on ? 0.02 : 0), -0.62 + (moving ? Math.cos(FP.t)*0.01 : 0)); }); }
+/* a small clean crosshair (a dot in a thin ring), only when you're walking in first person */
+(function(){ var st = document.createElement('style'); st.textContent = '#crosshair{font-size:0 !important;width:12px !important;height:12px !important;border:2px solid rgba(255,255,255,.85);border-radius:50%;box-shadow:0 0 3px rgba(0,0,0,.7)}#crosshair::after{content:"";width:3px;height:3px;border-radius:50%;background:#fff;box-shadow:0 0 2px #000}'; document.head.appendChild(st);
+  setInterval(function(){ var c = document.getElementById('crosshair'); if(c && !c.classList.contains('hidden') && !fpWalk()) c.style.visibility = 'hidden'; else if(c) c.style.visibility = ''; }, 300); })();
+/* hint boxes don't sit in the middle of your view: the mouse tip shows 5 s then goes */
+(function(){ var shownAt = 0, last = ''; setInterval(function(){ if(!hudBox || hudBox.classList.contains('hidden')){ last = ''; return; } var t = hudBox.textContent || ''; if(t !== last){ last = t; shownAt = Date.now(); } if(/^🖱/.test(t) && Date.now() - shownAt > 5000) hudBox.classList.add('hidden'); }, 500); })();
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
@@ -21411,7 +21432,7 @@ function animate(){
   updateSpeedo();
   lifeTick(dt);
   jailTick();
-  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt); ambTrainTick(dt); wearOthersTick(); jamTick(); pkTick(dt); bumpTick(dt); cullTick(dt); rigTick(dt); crouchTick(dt); metroTick(dt); copTick(dt); specTick(); msprTick(dt); haloTick(dt); nitroTick(dt); f1Tick(dt); shadowTick(); rdTick(); poolTick(); tlTick(dt); tcarsTick(dt);
+  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt); ambTrainTick(dt); wearOthersTick(); jamTick(); pkTick(dt); bumpTick(dt); cullTick(dt); rigTick(dt); crouchTick(dt); metroTick(dt); copTick(dt); specTick(); msprTick(dt); haloTick(dt); nitroTick(dt); f1Tick(dt); shadowTick(); rdTick(); poolTick(); tlTick(dt); tcarsTick(dt); fpTick(dt);
   if(!ICE.t || performance.now() - ICE.t > 1000){ ICE.t = performance.now(); if(Math.hypot(camera.position.x - QC.x, camera.position.z - QC.z) < 800) iceSync(); }
   villageTick();
   sendPresence(false);
