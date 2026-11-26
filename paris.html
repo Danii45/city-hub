@@ -14856,6 +14856,7 @@ function mapGroups(){
   g('🥦 ' + L2('Supermarket & chefs\' centre', 'Le supermarché et le Centre des Chefs'), [place('🛒', 'Supermarché du Monde', L2('entrance', 'l\'entrée'), GROC.x, GROC.z - 36, Math.PI), place('👨‍🍳', 'Le Centre des Chefs', L2('cooking classes, recipes', 'cours de cuisine, recettes'), CHEF.x, CHEF.z - 29, Math.PI)]
     .concat(AISLES.map(function(a, i){ var col = i % 5, row = Math.floor(i/5); return place(a.icon, L2('Aisle: ', 'Rayon : ') + a.fr, 'Supermarché', GROC.x - 30 + col*15, GROC.z - 14 + row*14 - 3.5, Math.PI, function(){ openAisle(i); }); }))
     .concat(RECIPES.map(function(r){ return place(r.icon, r.nm, L2('recipe', 'recette'), CHEF.x, CHEF.z - 29, Math.PI); })));
+  g('🔪 ' + L2('The French cooking school', 'L\'École de Cuisine Française'), [EC.hall, EC.sauces, EC.patis, EC.cuis, EC.brig].map(function(o){ return inside(o, '🔪'); }).concat([{icon:'📝', name:L2('The recipe maker', 'Le créateur de recettes'), sub:L2('cook it at home for points', 'à cuisiner à la maison'), go:function(){ closeCard(); INT.cur = null; enterInterior(EC.hall, {x:0, z:-8, yaw:0}); setTimeout(recipeMaker, 1600); }}]));
   g('🎤 ' + L2('The stadium & the arcade', 'Le stade et l\'arcade'), [place('🎤', STAD.name, L2('live concerts', 'concerts en direct'), STAD.door.x, STAD.door.z, STAD.door.yaw), place('🕹', ARC.name, L2('verb and vocabulary games', 'jeux de verbes et de vocabulaire'), ARC.door.x, ARC.door.z, ARC.door.yaw)]);
   g('🦁 ' + L2('The zoo and its habitats', 'Le zoo et ses habitats'), [place('🦁', 'Zoo de Paris', L2('the entrance', 'l\'entrée'), -250, 606, Math.PI), place('🏠', L2('Adoption centre', 'Centre d\'adoption'), 'Zoo', -40, 820, -Math.PI/2)]
     .concat(HABITATS.map(function(h){ var o = byId['zoo-' + h.id]; return place(h.icon, h.fr, L2('the habitat', 'l\'habitat'), h.x, h.z < 750 ? h.z + h.d/2 + 6 : h.z - h.d/2 - 6, h.z < 750 ? Math.PI : 0); }))
@@ -15057,6 +15058,246 @@ canvasEl.addEventListener('click', function(){
   var d = Math.hypot(LBL.cur.x - camera.position.x, LBL.cur.z - camera.position.z); if(d > 10) return;
   LBL.cur.act();
 });
+/* ---------- 🔪 L'ÉCOLE DE CUISINE FRANÇAISE (chef land): the Knife Door, the cuts, the mother sauces, pastry,
+   cooking methods, the kitchen brigade, and the recipe maker (cook it at home for points) ---------- */
+var CUTS = [
+  {id:'julienne', nm:'la julienne', sh:'stick', w:3, l:50, use:'Des bâtonnets très fins (3 mm × 3 mm × 5 cm), pour les garnitures, les salades et les sautés.', en:'Very thin sticks (3 mm × 3 mm × 5 cm), for garnishes, salads and stir-fries.', vid:'8c5R1I1gE-w'},
+  {id:'allumette', nm:'l\'allumette', sh:'stick', w:3, l:60, use:'Comme une allumette : 3 mm × 3 mm × 6 cm. Avec les pommes de terre, on fait des « pommes allumettes » (des frites très fines).', en:'Like a matchstick: 3 mm × 3 mm × 6 cm. With potatoes you make "pommes allumettes" (very thin fries).', vid:'DpyzrmPaTLw'},
+  {id:'batonnet', nm:'le bâtonnet', sh:'stick', w:6, l:60, use:'Des bâtons de 6 mm × 6 mm × 6 cm. On s\'en sert pour les crudités et pour faire de la macédoine.', en:'Sticks 6 mm × 6 mm × 6 cm. Used for raw vegetable sticks and to make macédoine.', vid:'DpyzrmPaTLw'},
+  {id:'pontneuf', nm:'le pont-neuf', sh:'stick', w:10, l:60, use:'De gros bâtons de 1 cm × 1 cm × 6 cm : les vraies frites classiques ! Le nom vient du plus vieux pont de Paris.', en:'Big sticks 1 cm × 1 cm × 6 cm: real classic chips! The name comes from the oldest bridge in Paris.', vid:'DpyzrmPaTLw'},
+  {id:'brunoise', nm:'la brunoise', sh:'cube', w:3, use:'De tout petits cubes de 3 mm. On coupe d\'abord en julienne, puis en cubes. Pour les sauces et les farces.', en:'Tiny 3 mm cubes. First cut a julienne, then into cubes. For sauces and stuffings.', vid:'8c5R1I1gE-w'},
+  {id:'macedoine', nm:'la macédoine', sh:'cube', w:5, use:'Des cubes de 5 mm. La « salade macédoine » mélange des légumes coupés comme ça.', en:'5 mm cubes. "Salade macédoine" mixes vegetables cut this way.', vid:'8c5R1I1gE-w'},
+  {id:'mirepoix', nm:'la mirepoix', sh:'cube', w:15, use:'De gros morceaux (1 à 2 cm) d\'oignon, de carotte et de céleri. C\'est la base des fonds, des sauces et des ragoûts.', en:'Big pieces (1-2 cm) of onion, carrot and celery. The base for stocks, sauces and stews.', vid:'8c5R1I1gE-w'},
+  {id:'paysanne', nm:'la paysanne', sh:'slice', w:10, use:'Des tranches fines (environ 1 cm de côté et 2 mm d\'épaisseur), pour les soupes de légumes.', en:'Thin slices (about 1 cm across and 2 mm thick), for vegetable soups.', vid:'8c5R1I1gE-w'},
+  {id:'rondelles', nm:'les rondelles', sh:'round', w:4, use:'Des tranches rondes : on coupe une carotte ou un concombre perpendiculairement.', en:'Round slices: cut a carrot or cucumber straight across.', vid:'8c5R1I1gE-w'},
+  {id:'sifflet', nm:'le sifflet (en biais)', sh:'diag', w:4, use:'Des tranches coupées en biais (de travers). C\'est joli dans les sautés.', en:'Slices cut on the slant. They look nice in stir-fries.', vid:'8c5R1I1gE-w'},
+  {id:'chiffonade', nm:'la chiffonade', sh:'ribbon', w:2, use:'On empile des feuilles (basilic, laitue, oseille), on les roule comme un cigare et on coupe en fines lanières.', en:'Stack leaves (basil, lettuce, sorrel), roll them like a cigar and slice into fine ribbons.', vid:'eb-F6_PcMqE'},
+  {id:'ciseler', nm:'ciseler', sh:'cube', w:2, use:'Couper très finement un oignon, une échalote ou des herbes, sans les écraser.', en:'Chop an onion, shallot or herbs very finely without crushing them.', vid:'8c5R1I1gE-w'},
+  {id:'emincer', nm:'émincer', sh:'slice', w:2, use:'Couper en tranches très fines : un oignon émincé, des champignons émincés...', en:'Slice very thinly: sliced onion, sliced mushrooms...', vid:'8c5R1I1gE-w'},
+  {id:'tourner', nm:'tourner (la coupe tournée)', sh:'barrel', w:50, use:'Une coupe de grand chef : un petit tonneau à 7 faces, de 5 cm de long. Avec les pommes de terre et les carottes.', en:'A great chef\'s cut: a little 7-sided barrel, 5 cm long. With potatoes and carrots.', vid:'QuyhxE1As6U'},
+  {id:'concasser', nm:'concasser', sh:'cube', w:8, use:'Couper grossièrement. Les « tomates concassées » sont pelées, épépinées et coupées en morceaux.', en:'Chop roughly. "Tomates concassées" are peeled, seeded and chopped.', vid:'8c5R1I1gE-w'}
+];
+var KNIVES = [['le couteau de chef', 'the chef\'s knife', 'Le grand couteau qui sert à presque tout.'], ['l\'office (le petit couteau)', 'the paring knife', 'Pour éplucher et faire les petits travaux.'], ['le couteau à pain', 'the bread knife', 'Il a des dents pour couper le pain sans l\'écraser.'], ['le couteau à filet de sole', 'the filleting knife', 'Très souple, pour lever les filets de poisson.'], ['l\'économe', 'the peeler', 'Pour éplucher les légumes.'], ['le fusil', 'the honing steel', 'Pour garder la lame bien coupante.']];
+function playClip(id, title){
+  player.list = null; player.cur = -1; player.clip = true; player.el.classList.remove('hidden');
+  document.getElementById('yp-t').textContent = '🎬 ' + title; document.getElementById('yp-m').textContent = '';
+  ytReady(function(){
+    if(player.yt && player.yt.loadVideoById){ player.yt.loadVideoById(id); return; }
+    player.yt = new YT.Player('yp-frame', {videoId:id, host:'https://www.youtube-nocookie.com', playerVars:{autoplay:1, rel:0, playsinline:1, modestbranding:1},
+      events:{onReady:function(e){ try{ e.target.setVolume(VOL.songs); e.target.playVideo(); }catch(x){} }, onStateChange:function(e){ if(e.data === 0) songStep(1); }, onError:function(){ document.getElementById('yp-m').textContent = L2('This video can\'t play here (it may be blocked at school). Watch the animated demo instead!', 'Cette vidéo ne peut pas jouer ici (peut-être bloquée à l\'école). Regarde la démo animée !'); }}});
+  });
+}
+var _songStepC = songStep;
+songStep = function(d){ if(player.clip){ player.clip = false; return; } _songStepC(d); };
+var _playSongC = playSong;
+playSong = function(t, a){ player.clip = false; _playSongC(t, a); };
+/* the animated demonstration of a cut (drawn in the card) */
+function cutDemo(canvas, cut){
+  var k = canvas.getContext('2d'), W = canvas.width, H = canvas.height, t0 = performance.now(), orange = '#f28a1a', dark = '#c86a10';
+  function frame(){
+    if(!canvas.isConnected) return;
+    var t = Math.min(1, (performance.now() - t0)/2600); k.fillStyle = '#e8d8b8'; k.fillRect(0, 0, W, H); k.fillStyle = '#c8a878'; k.fillRect(20, 20, W - 40, H - 40);
+    var leaf = cut.sh === 'ribbon', base = leaf ? '#4a9a3a' : orange;
+    if(t < 0.55){
+      var u = t/0.55, cuts = Math.floor(u*10), kx;
+      if(leaf){ k.fillStyle = base; k.beginPath(); k.ellipse(W/2, H/2, 120, 30, 0, 0, Math.PI*2); k.fill(); k.strokeStyle = '#2f6a2a'; for(var r=0;r<4;r++){ k.beginPath(); k.ellipse(W/2, H/2, 120 - r*25, 30 - r*6, 0, 0, Math.PI*2); k.stroke(); } }
+      else if(cut.sh === 'round' || cut.sh === 'diag'){ k.fillStyle = base; k.beginPath(); k.moveTo(60, H/2 - 26); k.lineTo(W - 60, H/2 - 14); k.lineTo(W - 60, H/2 + 14); k.lineTo(60, H/2 + 26); k.closePath(); k.fill(); }
+      else { k.fillStyle = base; k.fillRect(70, H/2 - 40, W - 140, 80); }
+      k.strokeStyle = dark; k.lineWidth = 2; for(var c=0;c<cuts;c++){ var x = 75 + c*((W - 150)/10); k.beginPath(); if(cut.sh === 'diag'){ k.moveTo(x - 12, H/2 - 40); k.lineTo(x + 12, H/2 + 40); } else { k.moveTo(x, H/2 - 42); k.lineTo(x, H/2 + 42); } k.stroke(); }
+      kx = 75 + cuts*((W - 150)/10); k.fillStyle = '#c8ccd2'; k.beginPath(); k.moveTo(kx, H/2 - 70); k.lineTo(kx + 8, H/2 - 70); k.lineTo(kx + 8, H/2 + 20 - (u*30 % 30)); k.lineTo(kx - 6, H/2 + 30 - (u*30 % 30)); k.closePath(); k.fill(); k.fillStyle = '#1b1b1d'; k.fillRect(kx - 2, H/2 - 110, 12, 42);
+    } else {
+      var v = Math.min(1, (t - 0.55)/0.3), s = Math.max(3, cut.w*1.6);
+      k.fillStyle = base;
+      for(var i=0;i<18;i++){ var x0 = 50 + (i % 6)*((W - 100)/6) + 8, y0 = 50 + Math.floor(i/6)*((H - 100)/3) + 8;
+        k.save(); k.translate(x0 + 20, y0 + 16); k.globalAlpha = v;
+        if(cut.sh === 'stick'){ k.fillRect(-Math.max(2, cut.w*0.7), -Math.min(34, cut.l*0.55), Math.max(4, cut.w*1.4), Math.min(68, cut.l*1.1)); }
+        else if(cut.sh === 'cube'){ k.fillRect(-s/2, -s/2, s, s); k.fillStyle = dark; k.fillRect(-s/2, -s/2, s, Math.max(1, s*0.25)); k.fillStyle = base; }
+        else if(cut.sh === 'slice'){ k.fillRect(-12, -12, 24, 24); k.strokeStyle = dark; k.strokeRect(-12, -12, 24, 24); }
+        else if(cut.sh === 'round'){ k.beginPath(); k.arc(0, 0, 14, 0, Math.PI*2); k.fill(); k.strokeStyle = dark; k.beginPath(); k.arc(0, 0, 6, 0, Math.PI*2); k.stroke(); }
+        else if(cut.sh === 'diag'){ k.beginPath(); k.ellipse(0, 0, 20, 10, 0.4, 0, Math.PI*2); k.fill(); }
+        else if(cut.sh === 'ribbon'){ k.strokeStyle = base; k.lineWidth = 3; k.beginPath(); for(var p=0;p<30;p++) k.lineTo(-25 + p*1.7, Math.sin(p*0.5 + i)*6); k.stroke(); }
+        else if(cut.sh === 'barrel'){ k.beginPath(); for(var a=0;a<7;a++){ var ang = a/7*Math.PI*2; k.lineTo(Math.cos(ang)*12, Math.sin(ang)*22); } k.closePath(); k.fill(); k.strokeStyle = dark; k.stroke(); }
+        k.restore(); }
+      k.globalAlpha = 1; k.fillStyle = '#1b1b1d'; k.font = 'bold 22px sans-serif'; k.textAlign = 'center'; k.fillText(cut.nm.toUpperCase(), W/2, H - 14);
+    }
+    if(t < 1) requestAnimationFrame(frame); else setTimeout(function(){ if(canvas.isConnected){ t0 = performance.now(); requestAnimationFrame(frame); } }, 1600);
+  }
+  frame();
+}
+function cutCard(i){
+  var c = CUTS[i];
+  say(c.nm + '. ' + c.use);
+  showCard('<h3>🔪 ' + esc(c.nm.toUpperCase()) + '</h3><canvas id="cutcv" width="480" height="240" style="width:100%; max-width:480px; display:block; margin:0 auto; border:3px solid var(--panel-border)"></canvas>' +
+    '<div class="gc-text">' + esc(c.use) + '</div>' + (LANG === 'en' ? '<div class="gc-sub">' + esc(c.en) + '</div>' : '') +
+    '<div class="gc-sub">⚠ ' + L2('Always ask an adult before using a knife. Hold the food with your fingers curled like a claw!', 'Demande toujours à un adulte avant d\'utiliser un couteau. Tiens l\'aliment avec les doigts en griffe !') + '</div>' +
+    '<div class="gc-row">' + gBtn('cutvid', i, '🎬 ' + L2('WATCH THE VIDEO', 'VOIR LA VIDÉO'), 'go') + gBtn('cutquiz', null, '❓ ' + L2('CUT QUIZ', 'QUIZ DES COUPES')) + gBtn('close', null, 'OK') + '</div>');
+  cutDemo(document.getElementById('cutcv'), c);
+}
+GACT.cutvid = function(v){ var c = CUTS[v|0]; playClip(c.vid, c.nm); };
+var CQ = null;
+GACT.cutquiz = function(){ CQ = {n:0, ok:0, list:shuffleR(Math.random, CUTS).slice(0, 6)}; cutQ(); };
+function cutQ(msg){
+  if(CQ.n >= CQ.list.length){ var g = CQ.ok >= 5 ? addJeton(3) : CQ.ok >= 3 ? addJeton(1) : 0; showCard('<h3>🔪 ' + L2('CUT QUIZ', 'QUIZ DES COUPES') + '</h3><div class="gc-big">' + CQ.ok + ' / ' + CQ.list.length + (g ? ' · +' + g + ' 🪙' : '') + '</div>' + noCharLine() + '<div class="gc-row">' + gBtn('cutquiz', null, L2('AGAIN', 'ENCORE'), 'go') + gBtn('close', null, 'OK') + '</div>'); return; }
+  var c = CQ.list[CQ.n], m = mc(Math.random, c.nm, CUTS.filter(function(x){ return x !== c; }).map(function(x){ return x.nm; })); CQ.m = m;
+  showCard('<h3>🔪 ' + L2('WHICH CUT IS IT?', 'QUELLE EST CETTE COUPE ?') + ' ' + (CQ.n + 1) + '/' + CQ.list.length + '</h3>' + (msg || '') + '<div class="gc-big">' + esc(c.use.replace(/^.*? : /, '').replace(new RegExp(c.nm.replace(/^(le |la |l'|les )/, ''), 'gi'), '…')) + '</div><div class="gc-grid">' + m.opts.map(function(o, k){ return gOpt('cutans', k, esc(o)); }).join('') + '</div>');
+}
+GACT.cutans = function(v){ var ok = (v|0) === CQ.m.ans; if(ok) CQ.ok++; CQ.n++; cutQ(ok ? '<div class="good">✓ ' + esc(CQ.m.opts[CQ.m.ans]) + '</div>' : '<div class="bad">✗ ' + esc(CQ.m.opts[CQ.m.ans]) + '</div>'); };
+/* ---------- 📝 LE CRÉATEUR DE RECETTES: pick ingredients, get a French recipe, cook it at home for points ---------- */
+var RX_DISH = [['poelee', '🍳 une poêlée', 'Poêlée', 'sauter'], ['soupe', '🍲 une soupe', 'Soupe', 'mijoter'], ['gratin', '🧀 un gratin', 'Gratin', 'gratiner'], ['salade', '🥗 une salade composée', 'Salade composée', 'cru'], ['omelette', '🍳 une omelette', 'Omelette', 'omelette'], ['pates', '🍝 des pâtes', 'Pâtes', 'pates']];
+var RX_ING = {
+  'Légumes':[['carotte', 'la carotte', '2 carottes', 'julienne', 'aux carottes'], ['oignon', 'l\'oignon', '1 oignon', 'ciseler', 'à l\'oignon'], ['poireau', 'le poireau', '1 poireau', 'emincer', 'aux poireaux'], ['courgette', 'la courgette', '1 courgette', 'rondelles', 'à la courgette'], ['poivron', 'le poivron', '1 poivron rouge', 'julienne', 'au poivron'], ['tomate', 'la tomate', '2 tomates', 'concasser', 'à la tomate'], ['champignon', 'les champignons', '200 g de champignons', 'emincer', 'aux champignons'], ['patate', 'la pomme de terre', '3 pommes de terre', 'macedoine', 'aux pommes de terre'], ['epinard', 'les épinards', '2 poignées d\'épinards', 'chiffonade', 'aux épinards'], ['brocoli', 'le brocoli', '1 brocoli', 'concasser', 'au brocoli']],
+  'Protéines':[['poulet', 'le poulet', '2 blancs de poulet', 'batonnet', 'au poulet'], ['oeuf', 'les œufs', '4 œufs', null, 'aux œufs'], ['jambon', 'le jambon', '2 tranches de jambon', 'paysanne', 'au jambon'], ['tofu', 'le tofu', '200 g de tofu', 'macedoine', 'au tofu'], ['poischiche', 'les pois chiches', '1 boîte de pois chiches', null, 'aux pois chiches'], ['saumon', 'le saumon', '2 filets de saumon', 'batonnet', 'au saumon']],
+  'Féculents':[['riz', 'le riz', '200 g de riz', null, 'au riz'], ['pates', 'les pâtes', '250 g de pâtes', null, 'aux pâtes'], ['pain', 'le pain', '4 tranches de pain', 'macedoine', 'au pain grillé']],
+  'Produits laitiers':[['fromage', 'le fromage râpé', '100 g de fromage râpé', null, 'au fromage'], ['creme', 'la crème', '20 cl de crème', null, 'à la crème'], ['lait', 'le lait', '50 cl de lait', null, 'au lait'], ['beurre', 'le beurre', '30 g de beurre', null, 'au beurre']],
+  'Herbes et épices':[['thym', 'le thym', '2 branches de thym', null, 'au thym'], ['persil', 'le persil', '1 bouquet de persil', 'ciseler', 'au persil'], ['basilic', 'le basilic', '10 feuilles de basilic', 'chiffonade', 'au basilic'], ['ail', 'l\'ail', '2 gousses d\'ail', 'ciseler', 'à l\'ail'], ['provence', 'les herbes de Provence', '1 c. à café d\'herbes de Provence', null, 'aux herbes de Provence']]
+};
+var RX = {dish:null, sel:[]};
+function rxAll(){ var a = []; Object.keys(RX_ING).forEach(function(k){ a = a.concat(RX_ING[k]); }); return a; }
+function rxIng(id){ return rxAll().filter(function(x){ return x[0] === id; })[0]; }
+function recipeMaker(){
+  RX = {dish:RX.dish, sel:RX.sel || []};
+  var h = '<h3>📝 ' + L2('THE RECIPE MAKER', 'LE CRÉATEUR DE RECETTES') + '</h3><div class="gc-sub">' + L2('1. Choose a dish. 2. Pick 3 to 7 ingredients. 3. Make the recipe!', '1. Choisis un plat. 2. Choisis 3 à 7 ingrédients. 3. Crée la recette !') + '</div><div class="gc-grid">' +
+    RX_DISH.map(function(d){ return gOpt('rxdish', d[0], esc(d[1]), RX.dish === d[0] ? 'sel' : ''); }).join('') + '</div>';
+  Object.keys(RX_ING).forEach(function(cat){ h += '<div class="gc-sub" style="margin-top:6px"><b>' + esc(cat) + '</b></div><div class="gc-grid">' + RX_ING[cat].map(function(it){ return gOpt('rxing', it[0], (RX.sel.indexOf(it[0]) >= 0 ? '✅ ' : '⬜ ') + esc(it[1]), RX.sel.indexOf(it[0]) >= 0 ? 'sel' : ''); }).join('') + '</div>'; });
+  h += '<div class="gc-row">' + gBtn('rxmake', null, '👨‍🍳 ' + L2('MAKE MY RECIPE', 'CRÉER MA RECETTE') + ' (' + RX.sel.length + ')', 'go') + gBtn('rxmine', null, '📒 ' + L2('MY RECIPES', 'MES RECETTES')) + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>';
+  var sc = gcard.el.querySelector('.gc-body, .card-body'), top = gcard.el.scrollTop; showCard(h); gcard.el.scrollTop = top;
+}
+GACT.rxdish = function(v){ RX.dish = v; recipeMaker(); };
+GACT.rxing = function(v){ var i = RX.sel.indexOf(v); if(i >= 0) RX.sel.splice(i, 1); else if(RX.sel.length < 7) RX.sel.push(v); else showToast(L2('7 ingredients maximum!', '7 ingrédients maximum !')); say(rxIng(v)[1]); recipeMaker(); };
+function buildRecipe(dish, sel){
+  var D = RX_DISH.filter(function(d){ return d[0] === dish; })[0] || RX_DISH[0], ings = sel.map(rxIng);
+  var mains = ings.filter(function(x){ return !/thym|persil|basilic|ail|provence|beurre/.test(x[0]); }), herbs = ings.filter(function(x){ return /thym|persil|basilic|ail|provence/.test(x[0]); });
+  var title = D[2] + ' ' + (mains.slice(0, 2).map(function(x){ return x[4]; }).join(' et ') || 'du chef') + (herbs[0] ? ', ' + herbs[0][4] : '');
+  var steps = ['Lave-toi les mains et mets un tablier. Demande à un adulte de t\'aider avec le couteau et la cuisinière.', 'Prépare tous tes ingrédients et ton matériel : c\'est la « mise en place ».'];
+  var EN = {julienne:'en julienne', allumette:'en allumettes', batonnet:'en bâtonnets', pontneuf:'en pont-neuf', brunoise:'en brunoise', macedoine:'en macédoine', mirepoix:'en mirepoix', paysanne:'en paysanne', rondelles:'en rondelles', sifflet:'en sifflet', chiffonade:'en chiffonade'}, VB = {ciseler:'cisèle', emincer:'émince', concasser:'concasse'};
+  ings.forEach(function(x){ if(!x[3]) return; var pl = /^(les|des)/.test(x[1]), pr = pl ? 'les' : /^la /.test(x[1]) ? 'la' : /^l'/.test(x[1]) ? (/oignon|ail/.test(x[0]) ? 'le' : 'la') : 'le', prot = /poulet|jambon|tofu|saumon/.test(x[0]), herb = /persil|basilic|ail/.test(x[0]);
+    var first = prot ? 'Prends ' + x[1] : herb ? 'Lave ' + x[1] : 'Lave et épluche ' + x[1];
+    steps.push(first + ', puis ' + (VB[x[3]] ? VB[x[3]] + '-' + pr : 'coupe-' + pr + ' ' + EN[x[3]]) + '.'); });
+  if(dish === 'poelee'){ steps.push('Fais chauffer un peu d\'huile ou de beurre dans une poêle, à feu moyen.', 'Fais sauter les ingrédients les plus durs d\'abord, puis les autres, pendant 10 à 12 minutes. Remue souvent !', 'Ajoute le sel, le poivre et les herbes. Goûte et rectifie l\'assaisonnement.'); }
+  if(dish === 'soupe'){ steps.push('Dans une casserole, fais revenir les légumes 5 minutes avec un peu de beurre.', 'Ajoute 1 litre d\'eau ou de bouillon. Laisse mijoter 25 minutes à petit feu.', 'Assaisonne avec du sel, du poivre et les herbes. Tu peux mixer la soupe si tu veux.'); }
+  if(dish === 'gratin'){ steps.push('Préchauffe le four à 190 °C.', 'Mets les ingrédients dans un plat à gratin, avec de la crème ou du lait.', 'Couvre de fromage râpé et fais cuire 30 minutes, jusqu\'à ce que le dessus soit doré.'); }
+  if(dish === 'salade'){ steps.push('Mets tous les ingrédients coupés dans un saladier.', 'Prépare une vinaigrette : 1 cuillère de moutarde, 1 cuillère de vinaigre, 3 cuillères d\'huile, sel, poivre.', 'Mélange la salade avec la vinaigrette juste avant de servir.'); }
+  if(dish === 'omelette'){ steps.push('Casse 4 œufs dans un bol, ajoute du sel et du poivre, et bats-les avec une fourchette.', 'Fais cuire les autres ingrédients 5 minutes dans une poêle avec du beurre.', 'Verse les œufs, laisse cuire 3 à 4 minutes à feu doux, puis plie l\'omelette en deux.'); }
+  if(dish === 'pates'){ steps.push('Fais bouillir une grande casserole d\'eau salée et fais cuire les pâtes (regarde le temps sur le paquet).', 'Pendant ce temps, fais sauter les autres ingrédients dans une poêle.', 'Égoutte les pâtes et mélange-les avec la garniture. Ajoute le fromage à la fin.'); }
+  steps.push('Dresse joliment ton plat dans les assiettes. Bon appétit !', 'Range et nettoie la cuisine avec ta famille.');
+  return {title:title, dish:dish, sel:sel.slice(), ings:ings.map(function(x){ return x[2]; }).concat(['du sel et du poivre', 'un peu d\'huile d\'olive']), steps:steps, serves:4, time:dish === 'salade' ? 20 : dish === 'gratin' ? 50 : dish === 'soupe' ? 40 : 30};
+}
+function recipeHtml(r){
+  return '<div class="gc-big gc-say">' + esc(r.title) + '</div><div class="gc-sub">👥 ' + r.serves + ' personnes · ⏱ ' + r.time + ' minutes</div><div class="gc-text" style="text-align:left"><b>Ingrédients :</b><br>• ' + r.ings.map(esc).join('<br>• ') + '</div><div class="gc-text" style="text-align:left"><b>Préparation :</b>' + r.steps.map(function(s, i){ return '<div class="gc-say" style="margin:3px 0">' + (i + 1) + '. ' + esc(s) + '</div>'; }).join('') + '</div>';
+}
+GACT.rxmake = function(){
+  if(!RX.dish){ showToast(L2('Choose a dish first!', 'Choisis d\'abord un plat !')); return; }
+  if(RX.sel.length < 3){ showToast(L2('Pick at least 3 ingredients!', 'Choisis au moins 3 ingrédients !')); return; }
+  RX.cur = buildRecipe(RX.dish, RX.sel); say(RX.cur.title);
+  showCard('<h3>📝 ' + L2('YOUR RECIPE', 'TA RECETTE') + '</h3>' + recipeHtml(RX.cur) + '<div class="gc-row">' + gBtn('rxhome', null, '🏠 ' + L2('COOK IT AT HOME (+🪙)', 'LA CUISINER À LA MAISON (+🪙)'), 'go') + gBtn('rxsave', null, '📒 ' + L2('SAVE', 'SAUVEGARDER')) + gBtn('rxback', null, L2('CHANGE', 'MODIFIER')) + '</div>');
+};
+GACT.rxback = recipeMaker;
+GACT.rxsave = function(){ if(!hasChar()){ showToast(L2('Create your character first (LIFE).', 'Crée d\'abord ton personnage (LIFE).')); return; } var e = life.eco; e.recipes = (e.recipes || []).slice(-19); e.recipes.push({t:RX.cur.title, d:RX.cur.dish, s:RX.cur.sel, at:Date.now()}); lifeSave(true); showToast('📒 ' + L2('Saved!', 'Sauvegardée !')); };
+GACT.rxmine = function(){
+  var e = life.eco || {}, rs = e.recipes || [], home = e.home || [];
+  showCard('<h3>📒 ' + L2('MY RECIPES', 'MES RECETTES') + '</h3>' + (rs.length ? '<div class="gc-grid">' + rs.map(function(r, i){ return gOpt('rxopen', i, '📝 ' + esc(r.t) + (home.some(function(h){ return h.t === r.t; }) ? ' ✅' : '')); }).join('') + '</div>' : '<div class="gc-text">' + L2('No recipes yet - make one!', 'Pas encore de recettes - crées-en une !') + '</div>') + '<div class="gc-sub">✅ = ' + L2('cooked at home', 'cuisinée à la maison') + ' (' + home.length + ')</div><div class="gc-row">' + gBtn('rxback', null, L2('BACK', 'RETOUR'), 'go') + '</div>');
+};
+GACT.rxopen = function(v){ var r = (life.eco.recipes || [])[v|0]; if(!r) return; RX.dish = r.d; RX.sel = r.s.slice(); GACT.rxmake(); };
+/* cooking at home: tick each step as you do it, then tell the game how it went */
+GACT.rxhome = function(){ RX.home = {r:RX.cur, done:[]}; rxHomeCard(); };
+function rxHomeCard(){
+  var H = RX.home, r = H.r;
+  showCard('<h3>🏠 ' + L2('COOKING AT HOME', 'À LA MAISON') + ' · ' + esc(r.title) + '</h3><div class="gc-sub">' + L2('Do each step in your real kitchen (with an adult!) and tick it. Keep this page open on a tablet or computer.', 'Fais chaque étape dans ta vraie cuisine (avec un adulte !) et coche-la. Garde cette page ouverte sur une tablette ou un ordinateur.') + '</div><div class="gc-text" style="text-align:left">' +
+    r.steps.map(function(s, i){ var d = H.done.indexOf(i) >= 0; return '<div style="margin:4px 0">' + gBtn('rxtick', i, d ? '✅' : '⬜', d ? 'go' : '') + ' <span class="gc-say">' + esc(s) + '</span></div>'; }).join('') + '</div>' +
+    '<div class="gc-row">' + (H.done.length === r.steps.length ? gBtn('rxdone', null, '🍽 ' + L2('MY DISH IS READY!', 'MON PLAT EST PRÊT !'), 'go') : '<span class="gc-sub">' + H.done.length + ' / ' + r.steps.length + '</span>') + gBtn('close', null, L2('LATER', 'PLUS TARD')) + '</div>');
+}
+GACT.rxtick = function(v){ var H = RX.home, i = v|0, k = H.done.indexOf(i); if(k >= 0) H.done.splice(k, 1); else { H.done.push(i); say(H.r.steps[i]); } var top = gcard.el.scrollTop; rxHomeCard(); gcard.el.scrollTop = top; };
+GACT.rxdone = function(){
+  showCard('<h3>🍽 ' + L2('BRAVO, CHEF!', 'BRAVO, CHEF !') + '</h3><div class="gc-big">' + L2('How was your dish?', 'C\'était comment, ton plat ?') + '</div><div class="gc-grid">' +
+    [['Délicieux ! Toute la famille a aimé.', '😋'], ['C\'était bon, mais un peu trop salé.', '🧂'], ['C\'était bon, mais je vais ajouter plus d\'épices la prochaine fois.', '🌶'], ['Pas mal ! Je vais le refaire.', '👍']].map(function(o, i){ return gOpt('rxrate', i, o[1] + ' « ' + esc(o[0]) + ' »'); }).join('') + '</div>');
+};
+GACT.rxrate = function(v){
+  var r = RX.home.r, e = life.eco || {}, today = new Date().toDateString(), got = 0;
+  if(hasChar()){ e.home = (e.home || []).slice(-49); var dup = e.home.some(function(h){ return h.t === r.title && h.day === today; }); if(!dup){ e.home.push({t:r.title, day:today, at:Date.now(), rate:v|0}); got = addJeton(5); lifeSave(true); } }
+  say('Bravo, chef ! Tu as cuisiné à la maison !');
+  showCard('<h3>👨‍🍳 ' + L2('HOME CHEF!', 'CHEF À LA MAISON !') + '</h3><div class="gc-emoji">🏆</div><div class="gc-big">' + (got ? '+' + got + ' 🪙' : L2('Already counted today', 'Déjà compté aujourd\'hui')) + '</div><div class="gc-text">📸 ' + L2('Show a photo of your dish to Madame in class!', 'Montre une photo de ton plat à Madame en classe !') + '</div>' + noCharLine() + '<div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>');
+};
+/* the other rooms: data */
+var SAUCES = [['la béchamel', 'du lait + un roux blanc (beurre et farine)', 'Pour les gratins, les lasagnes, le croque-monsieur.', 0xf6f2e6], ['le velouté', 'un fond blanc (bouillon de volaille ou de poisson) + un roux blond', 'Pour les volailles et les poissons.', 0xf2e2b0], ['la sauce espagnole', 'un fond brun (bouillon de veau) + un roux brun + des tomates', 'Pour les viandes rouges. C\'est la base de la demi-glace.', 0x6b3a1a], ['la sauce tomate', 'des tomates, des légumes et des herbes', 'Pour les pâtes, les poissons, les légumes.', 0xc8382f], ['la sauce hollandaise', 'du beurre clarifié + des jaunes d\'œufs + du citron', 'Pour les asperges, les œufs Bénédicte, les poissons.', 0xf2d040]];
+var PASTRY = [['la pâte à choux', 'Cuite deux fois (dans la casserole puis au four), elle gonfle et devient creuse : éclairs, profiteroles, chouquettes.', 0xe0a04a], ['la pâte feuilletée', 'Du beurre et de la pâte pliés plusieurs fois : des centaines de couches ! Mille-feuille, chaussons aux pommes.', 0xe8c070], ['la pâte brisée et la pâte sablée', 'Pour les tartes : la brisée est croustillante, la sablée est sucrée et fond dans la bouche.', 0xd8a050], ['la crème pâtissière', 'Lait, œufs, sucre, farine et vanille : on la met dans les éclairs, les choux et les tartes aux fruits.', 0xf2d870], ['la meringue', 'Des blancs d\'œufs battus en neige avec du sucre, cuits au four tout doucement.', 0xfaf6ee], ['le macaron', 'Deux coques de poudre d\'amande et de meringue, avec une ganache au milieu.', 0xe86aa0]];
+var METHODS = [['sauter', 'Cuire vite, à feu vif, dans une poêle avec un peu de matière grasse, en remuant.', '🍳'], ['rôtir', 'Cuire au four, à chaleur sèche : le poulet rôti, les légumes rôtis.', '🍗'], ['braiser', 'Cuire longtemps, à couvert, avec un peu de liquide : le bœuf bourguignon.', '🥘'], ['pocher', 'Cuire doucement dans un liquide qui frémit : les œufs pochés, les poires pochées.', '🥚'], ['mijoter', 'Cuire longtemps à petit feu : les soupes, le ratatouille.', '🍲'], ['frire', 'Plonger dans l\'huile très chaude : les frites, les beignets. (Avec un adulte !)', '🍟'], ['griller', 'Cuire sur un gril, à feu vif : les légumes grillés, les brochettes.', '🔥'], ['gratiner', 'Faire dorer le dessus au four, souvent avec du fromage : le gratin dauphinois.', '🧀'], ['blanchir', 'Plonger quelques minutes dans l\'eau bouillante, puis dans l\'eau glacée.', '💧'], ['cuire à la vapeur', 'Cuire au-dessus de l\'eau bouillante : les légumes gardent leurs vitamines.', '♨']];
+var BRIGADE = [['le chef de cuisine', 'Il dirige toute la cuisine et crée les menus.'], ['le sous-chef', 'Il aide le chef et le remplace quand il n\'est pas là.'], ['le saucier', 'Il prépare les sauces (et souvent les viandes sautées).'], ['le poissonnier', 'Il prépare les poissons et les fruits de mer.'], ['le rôtisseur', 'Il s\'occupe des rôtis et des grillades.'], ['l\'entremétier', 'Il prépare les légumes, les soupes et les œufs.'], ['le garde-manger', 'Il prépare les plats froids : salades, terrines, entrées.'], ['le pâtissier', 'Il fait les desserts, les pâtisseries et le pain.'], ['le commis', 'L\'apprenti : il aide tout le monde et apprend.'], ['le plongeur', 'Il lave la vaisselle et les casseroles. Sans lui, rien ne marche !']];
+/* the building: L'École de Cuisine Française with its giant KNIFE DOOR */
+var ECOLE = {x:CHEF.x + 3, z:CHEF.z + 78};
+(function(){
+  var X = ECOLE.x, Z = ECOLE.z, B = new MeshBatch(), H = new Lot(B, X, Z, 0);
+  H.box(40, 12, 22, 0, 6, 0, 0xf2ece0); H.box(41, 1, 23, 0, 12.5, 0, 0x1f3f8f); H.box(40, 0.6, 0.4, 0, 9, -11.2, 0xc8382f); H.box(40, 0.6, 0.4, 0, 8.4, -11.2, 0xffffff); H.box(40, 0.6, 0.4, 0, 7.8, -11.2, 0x1f3f8f);
+  // the giant knife door: a blade and its handle
+  var bl = new THREE.Shape(); bl.moveTo(-2.6, 0); bl.lineTo(2.6, 0); bl.lineTo(2.6, 8.4); bl.quadraticCurveTo(2.6, 11.6, -2.6, 13.2); bl.lineTo(-2.6, 0);
+  var blade = new THREE.Mesh(new THREE.ExtrudeGeometry(bl, {depth:0.5, bevelEnabled:false}), new THREE.MeshLambertMaterial({color:0xc8ccd4})); blade.position.set(X, 3.2, Z - 11.7); root.add(blade);
+  var edge = new THREE.Mesh(new THREE.BoxGeometry(0.2, 8.4, 0.55), new THREE.MeshBasicMaterial({color:0xf6f8fa})); edge.position.set(X + 2.55, 7.4, Z - 11.45); root.add(edge);
+  var handle = new THREE.Mesh(new THREE.BoxGeometry(4.4, 3.2, 0.9), solidMat(0x1b1b1d)); handle.position.set(X, 1.6, Z - 11.5); root.add(handle);
+  [-1.3, 0, 1.3].forEach(function(rx){ var rv = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.95, 10), solidMat(0xd8dce0)); rv.rotation.x = Math.PI/2; rv.position.set(X + rx, 1.6, Z - 11.5); root.add(rv); });
+  B.build(); addSolid(X - 20, X + 20, Z - 11, Z + 11, 'zoo', -1, 13);
+  airSign('🔪 L\'ÉCOLE DE CUISINE FRANÇAISE', X, 14.4, Z - 11.6, Math.PI, 22, '#1f3f8f'); airSign('LA PORTE DES COUTEAUX', X, 0.6, Z - 12.3, Math.PI, 5, '#c8382f');
+  tag(X, 9, Z - 11.5, 'la porte des couteaux (la lame)', 'the knife door (the blade)', 3); tag(X, 1.6, Z - 11.6, 'le manche', 'the handle', 1.2); tag(X - 14, 6, Z - 11, 'l\'école de cuisine', 'the cooking school', 6);
+})();
+var EC = {};
+function backToHall(){ return {x:0, z:-13, r:2.4, label:function(){ return '⟵ ' + L2('Back to the Knife Hall', 'Retour à la Salle des Couteaux'); }, act:function(){ INT.cur = null; enterInterior(EC.hall, {x:0, z:10, yaw:0}); }}; }
+EC.hall = makeInterior({id:'ecole-hall', name:'La Salle des Couteaux', en:'The Knife Hall', w:44, d:30, h:9, wall:0xf2f2ee, floor:0x2a2d36, ceil:0xf6f6f2, light:0xffffff, signBg:'#c8382f',
+  out:{x:ECOLE.x, z:ECOLE.z - 16, yaw:Math.PI}, door:{x:ECOLE.x, z:ECOLE.z - 13.2, r:2.8},
+  blurb:'Ici, tu apprends toutes les coupes de la cuisine française : la julienne, la brunoise, la chiffonade... Chaque planche a une démonstration et une vidéo. Au fond, il y a le créateur de recettes, et des portes vers les sauces, la pâtisserie, les cuissons et la brigade !',
+  facts:[['En cuisine française, on dit « Oui, chef ! » quand le chef donne un ordre.', 'In a French kitchen you say "Oui, chef!" when the chef gives an order.', ['Que dit-on au chef ?', 'Oui, chef !', ['Non, merci !', 'Bonne nuit !', 'À demain !']]], ['Pour couper en sécurité, on tient l\'aliment avec les doigts en « griffe » : le bout des doigts est replié vers l\'intérieur.', 'To cut safely, hold the food with your fingers like a claw, fingertips tucked in.', ['Comment tient-on l\'aliment pour couper ?', 'avec les doigts en griffe', ['avec les pieds', 'à pleine main ouverte', 'avec les dents']]], ['Auguste Escoffier (1846-1935) est « le roi des chefs ». Il a organisé la brigade de cuisine et écrit le « Guide culinaire ».', 'Auguste Escoffier (1846-1935) is "the king of chefs". He organised the kitchen brigade and wrote "Le Guide culinaire".', ['Qui a organisé la brigade de cuisine ?', 'Auguste Escoffier', ['Napoléon', 'Coco Chanel', 'Victor Hugo']]]],
+  spots:[{x:0, z:-11, r:3.4, label:function(){ return '📝 ' + L2('THE RECIPE MAKER (cook it at home!)', 'LE CRÉATEUR DE RECETTES (à cuisiner à la maison !)'); }, act:recipeMaker},
+         {x:-19, z:-6, r:2.6, label:function(){ return '🥣 ' + L2('Door: the five mother sauces', 'Porte : les cinq sauces mères'); }, act:function(){ INT.cur = null; enterInterior(EC.sauces, {x:0, z:-9, yaw:Math.PI}); }},
+         {x:-19, z:6, r:2.6, label:function(){ return '🥐 ' + L2('Door: the pastry workshop', 'Porte : l\'atelier pâtisserie'); }, act:function(){ INT.cur = null; enterInterior(EC.patis, {x:0, z:-9, yaw:Math.PI}); }},
+         {x:19, z:-6, r:2.6, label:function(){ return '🔥 ' + L2('Door: the cooking methods', 'Porte : les techniques de cuisson'); }, act:function(){ INT.cur = null; enterInterior(EC.cuis, {x:0, z:-9, yaw:Math.PI}); }},
+         {x:19, z:6, r:2.6, label:function(){ return '👨‍🍳 ' + L2('Door: the kitchen brigade', 'Porte : la brigade de cuisine'); }, act:function(){ INT.cur = null; enterInterior(EC.brig, {x:0, z:-9, yaw:Math.PI}); }},
+         {x:12, z:-12, r:2.6, label:function(){ return '❓ ' + L2('The cut quiz', 'Le quiz des coupes'); }, act:function(){ GACT.cutquiz(); }}],
+  build:function(L, X, Z, B, F){
+    for(var t=-15; t<=15; t+=2) L.box(0.05, 9, 30, t*1.4, 4.5, 0, 0xe8e8e4);
+    CUTS.forEach(function(c, i){
+      var row = Math.floor(i/5), col = i % 5, x = -14 + col*7, z = -4 + row*6;
+      L.box(5, 0.9, 2.4, x, 0.45, z, 0xb8c0c8); L.box(5.2, 0.08, 2.6, x, 0.94, z, 0xe8ecef); L.box(2.6, 0.08, 1.6, x, 1.02, z, 0xc8a878);
+      var S = new Lot(B, X + x, Z + z, 0, 1.06), vegCol = c.sh === 'ribbon' ? 0x4a9a3a : 0xf28a1a, n = 0;
+      for(var a=0;a<4;a++) for(var b=0;b<3;b++){ var px = -0.8 + a*0.5, pz = -0.4 + b*0.4;
+        if(c.sh === 'stick') S.box(Math.max(0.03, c.w*0.012), Math.max(0.03, c.w*0.012), c.l*0.012, px, 0.04, pz, vegCol, 0, 0.2*(a - b));
+        else if(c.sh === 'cube') S.box(Math.max(0.04, c.w*0.014), Math.max(0.04, c.w*0.014), Math.max(0.04, c.w*0.014), px, 0.04, pz, vegCol);
+        else if(c.sh === 'slice') S.box(0.14, 0.03, 0.14, px, 0.02, pz, vegCol, 0, 0.4*a);
+        else if(c.sh === 'round') S.cyl(0.11, 0.11, 0.04, px, 0.02, pz, vegCol, 10);
+        else if(c.sh === 'diag') S.part(new THREE.CylinderGeometry(0.11, 0.11, 0.04, 10).scale(1.6, 1, 1), px, 0.02, pz, vegCol, 0, 0.5);
+        else if(c.sh === 'ribbon') S.box(0.3, 0.01, 0.02, px, 0.01, pz, vegCol, 0, a*0.7);
+        else S.part(new THREE.CylinderGeometry(0.06, 0.09, 0.4, 7).rotateZ(Math.PI/2), px, 0.06, pz, vegCol); }
+      S.box(1.1, 0.03, 0.12, 0.9, 0.03, 0.5, 0xc8ccd4, 0, 0.3); S.box(0.4, 0.06, 0.12, 1.5, 0.04, 0.3, 0x1b1b1d, 0, 0.3);
+      airSign(c.nm.toUpperCase(), X + x, 2.2, Z + z - 1.25, 0, 3.6, '#c8382f');
+      F.tagAt(x, 1.2, z, c.nm, c.en.split(' (')[0].split(':')[0], 0.7);
+      addSpot({x:X + x, z:Z + z + 1.9, r:1.8, label:function(){ return '🔪 ' + c.nm + ' - ' + L2('demo + video', 'démo + vidéo'); }, act:function(){ cutCard(i); }});
+    });
+    F.tagAt(-14, 1.02, -4, 'la planche à découper', 'the chopping board', 0.5); F.tagAt(-13.1, 1.1, -3.5, 'le couteau de chef', 'the chef\'s knife', 0.3);
+    var Wb = new Lot(B, X, Z - 14.75, 0); Wb.box(16, 3, 0.1, 0, 4.2, 0, 0x5a3a22);
+    KNIVES.forEach(function(kn, i){ var kx = -6.5 + i*2.6; Wb.box(0.22, 1.4, 0.06, kx, 4.6, 0.08, 0xc8ccd4); Wb.box(0.28, 0.6, 0.1, kx, 3.6, 0.08, 0x1b1b1d); F.tagAt(kx, 4.2, -14.6, kn[0] + ' - ' + kn[2], kn[1], 0.5); });
+    airSign('LES COUTEAUX DU CHEF', X, 6.2, Z - 14.6, 0, 8, '#1b1b1d');
+    var R = new Lot(B, X, Z - 11.5, 0); R.box(6, 1, 1.6, 0, 0.5, 0, 0x1f3f8f); R.box(2.4, 1.4, 0.1, 0, 1.8, -0.4, 0x5aa0c8); F.tagAt(0, 1.6, -11.5, 'le créateur de recettes', 'the recipe maker', 1);
+    [[-21.75, -6, '🥣 LES SAUCES MÈRES'], [-21.75, 6, '🥐 LA PÂTISSERIE'], [21.75, -6, '🔥 LES CUISSONS'], [21.75, 6, '👨‍🍳 LA BRIGADE']].forEach(function(d){ var s = d[0] < 0 ? 1 : -1; L.box(0.2, 4, 3, d[0] + s*0.05, 2, d[1], 0x8a1c24); airSign(d[2], X + d[0] + s*0.2, 4.8, Z + d[1], s > 0 ? Math.PI/2 : -Math.PI/2, 6, '#8a1c24'); });
+    person({x:X + 4, z:Z - 10.5, ry:Math.PI, shirt:0xffffff, pants:0x1b1b1d, hair:0x4a2a1a, hat:0xffffff, h:1.8}); F.tagAt(4, 1.7, -10.5, 'le chef (la toque)', 'the chef (the chef\'s hat)', 0.5);
+  }});
+function roomOf(id, name, en, w, d, wall, blurb, facts, build, spots){ return makeInterior({id:id, name:name, en:en, w:w, d:d, h:7, wall:wall, floor:0x2a2d36, ceil:0xf6f6f2, light:0xffffff, signBg:'#8a1c24', out:{x:ECOLE.x, z:ECOLE.z - 16, yaw:Math.PI}, blurb:blurb, facts:facts, build:build, spots:[backToHall()].concat(spots)}); }
+function stationSpots(list, kind, xs){ return list.map(function(it, i){ return {x:-10 + i*(20/Math.max(1, list.length - 1)), z:-1.6, r:1.9, label:function(){ return kind + ' ' + it[0]; }, act:function(){ var others = list.filter(function(o){ return o !== it; }).map(function(o){ return o[0]; }); say(it[0] + '. ' + it[1]); infoCard(kind + ' ' + it[0].toUpperCase(), it[1] + (it[2] && typeof it[2] === 'string' && it[2].length > 3 ? ' ' + it[2] : ''), '', [it[1].split(':')[0].split(' + ')[0].length > 60 ? 'Quel est ce mot : ' + it[1].slice(0, 70) + '... ?' : 'De quoi parle-t-on : « ' + it[1].slice(0, 90) + '... » ?', it[0], shuffleR(Math.random, others).slice(0, 3)], kind + it[0]); }}; }); }
+EC.sauces = roomOf('ecole-sauces', 'Les Cinq Sauces Mères', 'The five mother sauces', 26, 20, 0xf6efe2, 'Auguste Escoffier a classé les sauces françaises : il y a cinq sauces mères. Avec elles, on fait des centaines d\'autres sauces !',
+  [['Le roux, c\'est du beurre fondu et de la farine cuits ensemble. Roux blanc, blond ou brun : ça dépend du temps de cuisson !', 'A roux is melted butter and flour cooked together. White, blond or brown roux depends on the cooking time!', ['Le roux, c\'est...', 'du beurre et de la farine cuits ensemble', ['du sucre et du sel', 'de l\'eau et du lait', 'des œufs et du chocolat']]]],
+  function(L, X, Z, B, F){ SAUCES.forEach(function(s, i){ var x = -10 + i*5; L.box(3.4, 0.9, 1.8, x, 0.45, -3.4, 0x8a8f98); L.cyl(0.6, 0.55, 0.6, x, 1.2, -3.4, 0xb8c0c8, 14); L.cyl(0.55, 0.55, 0.05, x, 1.46, -3.4, s[3], 14); L.box(0.7, 0.05, 0.08, x + 0.9, 1.5, -3.4, 0x2a2d36); F.tagAt(x, 1.5, -3.4, s[0], s[1], 0.6); airSign(s[0].toUpperCase(), X + x, 2.8, Z - 4.4, 0, 4, '#8a1c24'); });
+    F.tagAt(-10, 1.3, -3.4, 'la casserole', 'the saucepan', 0.3); F.item('etagere', 0, -9.6); F.wallItem('ardoise', 8, 3, -9.75, 0); },
+  stationSpots(SAUCES, '🥣'));
+EC.patis = roomOf('ecole-patis', 'L\'Atelier Pâtisserie', 'The pastry workshop', 30, 20, 0xfaeef2, 'La pâtisserie française, c\'est de la précision : on pèse tout au gramme près ! Ici, tu découvres les grandes pâtes et les crèmes.',
+  [['En pâtisserie, on pèse les ingrédients avec une balance, au gramme près. Une erreur, et le gâteau peut rater !', 'In pastry you weigh ingredients to the gram. One mistake and the cake can fail!', ['Avec quoi pèse-t-on la farine ?', 'avec une balance', ['avec une règle', 'avec une horloge', 'avec un thermomètre']]]],
+  function(L, X, Z, B, F){ PASTRY.forEach(function(p, i){ var x = -12.5 + i*5; L.box(4, 0.9, 1.8, x, 0.45, -3.4, 0xf2f2f2); L.box(4.1, 0.06, 1.9, x, 0.93, -3.4, 0xd8d0c8); var S = new Lot(B, X + x, Z - 3.4, 0, 0.96); for(var k=0;k<5;k++) S.part(new THREE.SphereGeometry(0.16, 8, 6), -0.8 + k*0.4, 0.1, 0, p[2]); F.tagAt(x, 1.2, -3.4, p[0], p[1].split(':')[0], 0.6); airSign(p[0].toUpperCase(), X + x, 2.8, Z - 4.4, 0, 4, '#c8508a'); });
+    F.item('balance', -12, -3.4, 0, null, -0.2); F.item('four', 12, -9.2); F.item('four', 13, -9.2); F.good('le fouet', 'the whisk', 0xc8ccd4, -7, 0.96, -3, 'long'); F.good('le rouleau à pâtisserie', 'the rolling pin', 0xc8a878, -2, 0.96, -3, 'long'); F.good('la poche à douille', 'the piping bag', 0xffffff, 3, 0.96, -3); },
+  stationSpots(PASTRY, '🥐'));
+EC.cuis = roomOf('ecole-cuis', 'Les Techniques de Cuisson', 'Cooking methods', 34, 20, 0xf2f2ee, 'Sauter, rôtir, braiser, pocher... En cuisine française, chaque cuisson a son nom. Regarde chaque fourneau !',
+  [['« Al dente », c\'est de l\'italien, mais en France on le dit aussi : des pâtes encore un peu fermes sous la dent.', '"Al dente" is Italian, but the French use it too: pasta still a little firm to the bite.', ['Des pâtes « al dente », c\'est...', 'encore un peu fermes', ['très molles', 'brûlées', 'crues']]]],
+  function(L, X, Z, B, F){ METHODS.forEach(function(m, i){ var x = -14.5 + i*3.2; L.box(2.8, 0.9, 1.6, x, 0.45, -3.6, 0x2a2d36); L.box(2.8, 0.05, 1.6, x, 0.92, -3.6, 0x1b1b1d); L.cyl(0.4, 0.35, 0.25, x, 1.08, -3.6, 0x8a8f98, 12); var fl = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.2, 6), new THREE.MeshBasicMaterial({color:0x5aa0ff})); fl.position.set(X + x - 0.5, 1.0, Z - 3.2); root.add(fl); F.tagAt(x, 1.3, -3.6, m[2] + ' ' + m[0], m[1].split(':')[0], 0.5); });
+    F.tagAt(-14.5, 0.9, -3.6, 'le fourneau (la cuisinière)', 'the stove', 0.6); F.tagAt(-14.5, 1.1, -3.6, 'la poêle', 'the frying pan', 0.3); F.item('frigo', 15.6, -8.5); F.item('evier', 13, -9.2); },
+  METHODS.map(function(m, i){ return {x:-14.5 + i*3.2, z:-1.8, r:1.5, label:function(){ return m[2] + ' ' + m[0]; }, act:function(){ say(m[0] + '. ' + m[1]); infoCard(m[2] + ' ' + m[0].toUpperCase(), m[1], '', ['Quelle cuisson : « ' + m[1].replace(/ :.*$/, '').slice(0, 80) + ' » ?', m[0], shuffleR(Math.random, METHODS.filter(function(o){ return o !== m; }).map(function(o){ return o[0]; })).slice(0, 3)], 'cuis' + m[0]); }}; }));
+EC.brig = roomOf('ecole-brig', 'La Brigade de Cuisine', 'The kitchen brigade', 34, 22, 0xf2f2ee, 'Dans un grand restaurant, chacun a son poste : c\'est la brigade de cuisine, inventée par Auguste Escoffier. Parle avec chaque membre !',
+  [['Le chef porte une toque blanche. On dit que les 100 plis de la toque montrent les 100 façons de cuisiner un œuf !', 'The chef wears a tall white hat. They say its 100 pleats show the 100 ways to cook an egg!', ['Comment s\'appelle le chapeau du chef ?', 'la toque', ['le béret', 'le casque', 'la casquette']]]],
+  function(L, X, Z, B, F){ BRIGADE.forEach(function(b, i){ var row = i < 5 ? 0 : 1, x = -12 + (i % 5)*6, z = row ? 3 : -4; L.box(3.4, 0.9, 1.6, x, 0.45, z - 1.4, 0xb8c0c8); person({x:X + x, z:Z + z - 2.6, ry:0, shirt:0xffffff, pants:[0x1b1b1d, 0x2a3a5a][i % 2], hair:[0x4a2a1a, 0xe8c070, 0x1b1b1d, 0x8a4a1a][i % 4], hat:i === 0 ? 0xffffff : null, h:i === 8 ? 1.55 : 1.75}); F.tagAt(x, 1.7, z - 2.6, b[0], b[1], 0.5); airSign(b[0].toUpperCase(), X + x, 2.6, Z + z - 0.55, Math.PI, 4.2, '#1f3f8f'); }); },
+  BRIGADE.map(function(b, i){ var row = i < 5 ? 0 : 1, x = -12 + (i % 5)*6, z = row ? 3 : -4; return {x:x, z:z - 0.6, r:1.6, label:function(){ return '💬 ' + b[0]; }, act:function(){ say('Bonjour ! Je suis ' + b[0] + '. ' + b[1]); infoCard('👨‍🍳 ' + b[0].toUpperCase(), '« Bonjour ! Je suis ' + b[0] + '. ' + b[1] + ' »', '', ['Qui ' + b[1].replace(/^Il |^L'apprenti : il /, '').replace(/\.$/, '').slice(0, 80) + ' ?', b[0], shuffleR(Math.random, BRIGADE.filter(function(o){ return o !== b; }).map(function(o){ return o[0]; })).slice(0, 3)], 'brig' + i); }}; }));
+EXTRA_PLACES.push(['🔪', 'L\'École de Cuisine Française (la Porte des Couteaux)', L2('Knife cuts, sauces, pastry, recipe maker', 'Les coupes, les sauces, la pâtisserie, le créateur de recettes'), ECOLE.x, ECOLE.z - 18, Math.PI]);
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
