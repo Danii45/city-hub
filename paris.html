@@ -3089,7 +3089,7 @@ function buildShop(E, I, p, d, quads, opts){
   quads.push(signQuad(p.slot, p.cx, p.cz, p.rot, 0, 3.75, 6.15, 7.6, 0.8));
   var awTop = 3.15, awOut = 1.5;
   E.box(9.2, 0.07, awOut/Math.cos(0.38), 0, awTop - Math.tan(0.38)*awOut/2, 6 + awOut/2, awn, 0.38);
-  for(var k=0;k<5;k++) E.box(9.2/11, 0.02, awOut/Math.cos(0.38), -4.6 + 9.2/11*(2*k + 1.5), awTop - Math.tan(0.38)*awOut/2 + 0.06, 6 + awOut/2, STRIPE(awn), 0.38);
+  if(exOf(d).aw !== 1) for(var k=0;k<5;k++) E.box(9.2/11, 0.02, awOut/Math.cos(0.38), -4.6 + 9.2/11*(2*k + 1.5), awTop - Math.tan(0.38)*awOut/2 + 0.06, 6 + awOut/2, STRIPE(awn), 0.38);
   var valY = awTop - Math.tan(0.38)*awOut - 0.17;
   E.box(9.2, 0.36, 0.05, 0, valY, 6 + awOut + 0.02, awn);
   quads.push(signQuad(p.slot + 1, p.cx, p.cz, p.rot, 0, valY, 6 + awOut + 0.06, 3.4, 0.3));
@@ -3169,14 +3169,11 @@ function buildHouse(E, I, p, d, quads, opts){
   /* --- the garden: lawn, a path to the door, hedges with a gate, flowers and a mailbox --- */
   E.box(10, 0.04, 12, 0, 0.02, 0, GARDEN_GREEN);
   E.box(1.3, 0.05, 6 - zf - 0.4, dx, 0.035, (zf + 0.4 + 6)/2, 0xd8d0c0);
-  [[-5, dx - 0.75], [dx + 0.75, 5]].forEach(function(s){ if(s[1] - s[0] > 0.1) E.box(s[1] - s[0], 0.85, 0.5, (s[0] + s[1])/2, 0.43, 5.72, HEDGE); });
-  [-1, 1].forEach(function(s){ E.box(0.4, 0.85, 11.5, s*4.8, 0.43, -0.27, HEDGE); });
+  houseFence(E, d, dx);
   [-1, 1].forEach(function(s){ E.box(0.22, 1.1, 0.22, dx + s*0.75, 0.55, 5.72, 0xf4f1ea); });   // gate posts
   E.box(0.08, 1.1, 0.08, dx + 1.25, 0.55, 5.35, 0x3a3a3a); E.box(0.42, 0.34, 0.3, dx + 1.25, 1.2, 5.35, trim);   // mailbox
   var bedX = dx <= 0 ? 2.6 : -2.6;
-  E.box(2.6, 0.22, 1.3, bedX, 0.11, 4.4, 0x6b4a32);
-  for(var fx = 0; fx < 6; fx++) E.box(0.24, 0.24, 0.24, bedX - 1.0 + fx*0.4, 0.34, 4.4 + (fx % 2 ? 0.3 : -0.3), [0xe86aa0, 0xc8382f, 0xe3b52c, 0xf4f1ea, 0x7a4fb0, 0xe07b2c][fx]);
-  E.part(new THREE.IcosahedronGeometry(0.75, 0), -bedX, 0.6, 4.3, HEDGE);
+  houseGardenB(E, d, bedX); houseGardenA(E, d, -bedX);
   /* --- the ground floor room --- */
   var shutters = type === 0 || type === 3, narrowWin = type === 5;
   buildRoom(E, I, d, L, wall, trim, opts, function(mx, w, wallH, fz){
@@ -19083,6 +19080,192 @@ GACT.achamps = function(){ var L = arcChamps(); showCard('<h3>🏆 ' + L2('ARCAD
   addSpot({x:X, z:Z + 9.75, r:3.4, label:function(){ return '💃 ' + L2('The direction dance', 'La danse des directions'); }, act:GACT.dance});
   addSpot({x:wx + 2.4, z:wz, r:2.2, label:function(){ return '🔨 ' + L2('Whack-a-word', 'Le tape-mot'); }, act:GACT.whack});
 })();
+/* ---------- ✨ MAKE IT YOURS: many more ways to tailor your shop and your house ----------
+   d.ex holds the extras, like "fb2.li1.ga5": two letters + a number each. Everyone sees them (they're part of the plot). */
+TRIM_COLORS.push(0xffffff, 0x8a8f98, 0x5ab8f2, 0xa8e05a, 0xf28aa0, 0xc84ad6, 0xb8823a, 0xd8a24a);
+AWNING_COLORS.push(0x5ab8f2, 0xa8e05a, 0xf28aa0, 0x3ab8a0, 0xffd23a, 0x8a2a5a);
+FLOOR_TYPES.push({hex:0xe8d8b8}, {hex:0x5a3a2a}, {a:0x2f7d46, b:0xf4f1ea}, {hex:0x8a9096}, {a:0xffd23a, b:0x2b4c9b}, {hex:0xf2d0e0});
+var EX_OPTS = {
+  fb:{fr:'Les jardinières (fleurs aux fenêtres)', en:'Window flower boxes', o:['aucune', 'roses', 'rouges', 'jaunes', 'violettes', 'mélangées', 'herbes aromatiques']},
+  pt:{fr:'Les plantes près de la porte', en:'Plants by the door', o:['aucune', 'buis en boule', 'cyprès', 'pots de fleurs', 'palmiers', 'lavande']},
+  li:{fr:'Les lumières', en:'Lights', o:['aucune', 'lanternes', 'guirlande lumineuse', 'les deux', 'guirlande de Noël']},
+  fg:{fr:'Le drapeau', en:'Flag', o:['aucun', 'la France', 'le Canada', 'les Franco-Ontariens', 'le Québec', 'l\'Europe', 'l\'Ontario']},
+  dm:{fr:'La porte', en:'Door decoration', o:['rien', 'une couronne', 'un paillasson', 'les deux', 'une citrouille']},
+  rf:{fr:'Le toit', en:'Roof extra', o:['rien', 'des cheminées', 'une antenne', 'des panneaux solaires', 'une girouette (coq)', 'un nid de cigogne']},
+  bl:{fr:'Le balcon (boutique)', en:'Balcony (shop)', o:['aucun', 'fer noir', 'blanc', 'doré', 'vert']},
+  bs:{fr:'L\'enseigne suspendue', en:'Hanging sign', o:['aucune', 'rouge', 'bleue', 'verte', 'dorée', 'noire', 'rose']},
+  te:{fr:'Devant la boutique', en:'In front of the shop', o:['rien', 'tables de bistrot', 'un banc', 'des vélos', 'une ardoise (menu)', 'un distributeur de ballons']},
+  aw:{fr:'Le store (l\'auvent)', en:'Awning style', o:['à rayures', 'uni']},
+  fn:{fr:'La clôture du jardin', en:'Garden fence', o:['une haie', 'une palissade blanche', 'une grille noire', 'un muret en pierre', 'une clôture en bois', 'une haie fleurie']},
+  ga:{fr:'Dans le jardin (gauche/droite)', en:'Garden item', o:['un buisson', 'un pommier', 'un sapin', 'un érable rouge', 'un palmier', 'une fontaine', 'une balançoire', 'un trampoline', 'une niche', 'un barbecue', 'un banc', 'des nains de jardin', 'un bain d\'oiseaux', 'un bonhomme de neige']},
+  gb:{fr:'Le coin du jardin', en:'Garden corner', o:['des fleurs mélangées', 'des roses', 'des tulipes', 'des tournesols', 'un potager', 'une mare', 'un bac à sable', 'un jardin de pierres', 'une petite piscine']}
+};
+var EX_SHOP = ['aw', 'fb', 'bl', 'bs', 'te', 'pt', 'li', 'fg', 'dm', 'rf'], EX_HOUSE = ['fn', 'ga', 'gb', 'fb', 'pt', 'li', 'fg', 'dm', 'rf'];
+var EX_CACHE = {};
+function exOf(d){ var s = d && typeof d.ex === 'string' ? d.ex : ''; if(EX_CACHE[s]) return EX_CACHE[s]; var o = {}; s.split('.').forEach(function(p){ var m = /^([a-z]{2})(\d{1,2})$/.exec(p); if(m && EX_OPTS[m[1]] && +m[2] < EX_OPTS[m[1]].o.length) o[m[1]] = +m[2]; }); EX_CACHE[s] = o; return o; }
+function exStr(o){ return Object.keys(o).filter(function(k){ return o[k]; }).map(function(k){ return k + o[k]; }).join('.'); }
+var FLW = [[0xe86aa0, 0xf2a0c0], [0xc8382f, 0xe84a4a], [0xe3b52c, 0xffd23a], [0x7a4fb0, 0xc84ad6], [0xe86aa0, 0xe3b52c, 0x7a4fb0, 0xc8382f], [0x3a8a3a, 0x6ab84a]];
+function flowerBox(E, x, y, z, w, kind){ var cs = FLW[(kind - 1) % FLW.length]; E.box(w, 0.22, 0.3, x, y, z, 0x6b4a32); for(var k=0;k<Math.round(w/0.3);k++) E.box(0.2, 0.2, 0.2, x - w/2 + 0.2 + k*0.3, y + 0.2, z, cs[k % cs.length]); }
+function plantPot(E, x, z, y0, kind){ E.cyl(0.28, 0.22, 0.5, x, y0 + 0.25, z, 0xb5523b, 10);
+  if(kind === 1) E.part(new THREE.SphereGeometry(0.45, 10, 8), x, y0 + 0.95, z, 0x3a7036);
+  else if(kind === 2) E.part(new THREE.ConeGeometry(0.35, 1.8, 8), x, y0 + 1.4, z, 0x2f5a2f);
+  else if(kind === 3){ for(var k=0;k<5;k++) E.box(0.16, 0.16, 0.16, x - 0.2 + (k % 3)*0.2, y0 + 0.6 + Math.floor(k/3)*0.15, z - 0.1 + (k % 2)*0.2, [0xe86aa0, 0xc8382f, 0xe3b52c, 0xf4f1ea, 0x7a4fb0][k]); }
+  else if(kind === 4){ E.cyl(0.06, 0.08, 1.4, x, y0 + 1.1, z, 0x8a6a3a, 6); for(var a=0;a<5;a++) E.box(0.9, 0.04, 0.22, x + Math.cos(a*1.26)*0.4, y0 + 1.8, z + Math.sin(a*1.26)*0.4, 0x3a8a3a, 0, -a*1.26, -0.4); }
+  else { for(var l=0;l<6;l++) E.box(0.06, 0.6, 0.06, x - 0.2 + (l % 3)*0.2, y0 + 0.75, z - 0.08 + Math.floor(l/3)*0.16, 0x8a6ac8); } }
+function flagOn(E, x, y, z, kind, out){ E.box(0.06, 0.06, 1.4, x, y + 0.35, z + 0.6, 0x8a8f98, -0.5); var fx = x, fy = y + 0.85, fz = z + 1.25, W = 0.9, H = 0.6;
+  var A = [null, [0x2b4c9b, 0xffffff, 0xc8382f], [0xc8382f, 0xffffff, 0xc8382f], [0x2f7d46, 0xffffff], [0x2b4c9b], [0x1f3f8f], [0xc8382f]][kind];
+  A.forEach(function(c, i){ E.box(out ? 0.04 : W/A.length, H, out ? W/A.length : 0.04, out ? fx + 0.45 : fx - W/2 + (i + 0.5)*W/A.length, fy, out ? fz - W/2 + (i + 0.5)*W/A.length : fz, c); });
+  if(kind === 2) E.box(0.06, 0.2, 0.2, fx + 0.45, fy, fz, 0xc8382f); if(kind === 4){ E.box(0.06, 0.08, W, fx + 0.45, fy, fz, 0xffffff); E.box(0.06, H, 0.08, fx + 0.45, fy, fz, 0xffffff); } if(kind === 5) for(var s=0;s<8;s++) E.box(0.06, 0.06, 0.06, fx + 0.45, fy + Math.sin(s*0.785)*0.2, fz + Math.cos(s*0.785)*0.2, 0xffd23a); }
+function exFront(E, X, p, d, front, top, roofH, flat, dx, dw, gf){
+  if(X.pt) [-1, 1].forEach(function(s){ plantPot(E, dx + s*(dw/2 + 0.55), front + 0.4, 0, X.pt); });
+  if(X.li === 1 || X.li === 3) [-1, 1].forEach(function(s){ E.box(0.08, 0.4, 0.08, dx + s*(dw/2 + 0.25), 2.3, front + 0.2, 0x23232a); E.box(0.22, 0.3, 0.22, dx + s*(dw/2 + 0.25), 2.05, front + 0.25, 0xfff2b0); });
+  if(X.li >= 2){ var cols = X.li === 4 ? [0xc8382f, 0x2f7d46, 0xffd23a, 0xffffff] : [0xfff2b0, 0xffd27a, 0xfff8e0]; for(var k=0;k<24;k++) E.box(0.1, 0.12, 0.1, -4.6 + k*0.4, gf - 0.25 - Math.sin(k*0.785)*0.08, front + 0.12, cols[k % cols.length]); }
+  if(X.dm === 1 || X.dm === 3) E.part(new THREE.TorusGeometry(0.28, 0.08, 6, 14), dx, 2.0, front + 0.1, X.li === 4 ? 0x2f7d46 : 0x3a7036);
+  if(X.dm === 2 || X.dm === 3) E.box(1.2, 0.03, 0.6, dx, 0.03, front + 0.45, 0x8a5a32);
+  if(X.dm === 4){ E.part(new THREE.SphereGeometry(0.32, 10, 8), dx + dw/2 + 0.5, 0.3, front + 0.5, 0xe8762a); E.box(0.06, 0.12, 0.06, dx + dw/2 + 0.5, 0.65, front + 0.5, 0x3a7036); }
+  if(X.fg) flagOn(E, dx <= 0 ? 3.6 : -3.6, gf + 0.3, front, X.fg, false);
+  if(X.rf === 1) [-2.5, 2.5].forEach(function(x){ E.box(0.7, 1.8, 0.7, x, top + roofH*0.6 + 0.6, -1.2, 0xc9714f); E.cyl(0.1, 0.1, 0.35, x, top + roofH*0.6 + 1.65, -1.2, 0xb5523b, 6); });
+  if(X.rf === 2){ E.cyl(0.04, 0.04, 2.4, -2.5, top + roofH + 0.9, -1, 0x8a8f98, 6); [0, 0.5, 1].forEach(function(h){ E.box(1.2 - h*0.6, 0.04, 0.04, -2.5, top + roofH + 1.2 + h*0.6, -1, 0x8a8f98); }); E.part(new THREE.SphereGeometry(0.35, 10, 6, 0, Math.PI), 2.5, top + roofH*0.5 + 0.6, -1.5, 0xe8e8e8, 0, Math.PI/2, 0); }
+  if(X.rf === 3){ if(flat) for(var q=0;q<3;q++) E.box(2, 0.08, 1.2, -2.6 + q*2.6, top + 0.9, -2, 0x1f3f8f, -0.3); else for(var q2=0;q2<2;q2++) E.box(2, 0.08, 1.2, -1.4 + q2*2.8, top + roofH*0.55, -1.6, 0x1f3f8f, -0.6); }
+  if(X.rf === 4){ E.cyl(0.03, 0.03, 1.2, 0, top + roofH + 0.6, -0.2, 0x23232a, 6); E.box(0.7, 0.03, 0.03, 0, top + roofH + 0.5, -0.2, 0x23232a); E.box(0.03, 0.03, 0.7, 0, top + roofH + 0.5, -0.2, 0x23232a); E.box(0.12, 0.35, 0.45, 0, top + roofH + 1.3, -0.2, 0x23232a); }
+  if(X.rf === 5){ E.cyl(0.6, 0.5, 0.3, 2.5, top + roofH + 0.2, -0.8, 0x8a6a3a, 10); E.part(new THREE.SphereGeometry(0.25, 8, 6), 2.5, top + roofH + 0.55, -0.8, 0xffffff); }
+}
+var _buildPlotEX = buildPlot;
+buildPlot = function(ext, inn, p, d, quads, opts){ _buildPlotEX.apply(this, arguments); opts = opts || {}; if(!d || opts.cutaway || isBlockHouse(p, d)) return; var X = exOf(d); if(!Object.keys(X).length) return; var E = new Lot(ext, p.cx, p.cz, p.rot);
+  try {
+  if(p.kind === 'house'){ var L = LAYOUT.house, zf = L.cz + L.d/2, top = L.gf + (d.fl - 1)*L.fh, ty = d.st, rH = [4.6, 3, 0.5, 3.8, 2.8, 0.9][ty] || 3, dxh = L.doors[d.dp];
+    exFront(E, X, p, d, zf, top, rH, ty === 2 || ty === 5, dxh, L.dw, L.gf);
+    if(X.fb && ty !== 2 && ty !== 5) for(var f=1; f<d.fl; f++){ var my = L.gf + (f - 1)*L.fh + L.fh*0.5, wh = ty === 4 ? 1.8 : 1.4; (ty === 1 || ty === 4 ? [-2.6, 0, 2.6] : [-2.2, 2.2]).forEach(function(x){ flowerBox(E, x, my - wh/2 - 0.14, zf + 0.2, 1.3, X.fb); }); }
+  } else { var S = LAYOUT.store, topS = S.gf + (d.fl - 1)*S.fh, st = d.st, rHS = [3.2, 4.2, 0.7, 6.2][st] || 3, dxs = S.doors[d.dp], awn = pick(AWNING_COLORS, d.ca);
+    exFront(E, X, p, d, 6, topS, rHS, st === 2, dxs, S.dw, S.gf);
+    if(X.fb){ if(st !== 2) for(var g=1; g<d.fl; g++){ var my2 = S.gf + (g - 1)*S.fh + S.fh*0.52, wh2 = st === 3 ? 1.5 : 1.9; [-3, 0, 3].forEach(function(x){ flowerBox(E, x, my2 - wh2/2 - 0.14, 6.18, 1.4, X.fb); }); } [-1, 1].forEach(function(s){ var x = s*3.4; if(Math.abs(x - dxs) > 1.8) flowerBox(E, x, 0.25, 6.3, 2.2, X.fb); }); }
+    if(X.bl && d.fl > 1){ var bc = [0, 0x23232a, 0xf4f1ea, 0xd8a24a, 0x2f7d46][X.bl], y0 = S.gf; E.box(10, 0.12, 0.8, 0, y0 + 0.5, 6.4, shadeHex(pick(WALL_COLORS, d.cw), 0.8)); E.box(10, 0.06, 0.06, 0, y0 + 1.5, 6.76, bc); for(var bx = -4.8; bx <= 4.8; bx += 0.3) E.box(0.03, 0.95, 0.03, bx, y0 + 1.02, 6.76, bc); }
+    if(X.bs){ var sx = dxs <= 0 ? 4.3 : -4.3, sc = [0, 0xc8382f, 0x2b4c9b, 0x2f7d46, 0xd8a24a, 0x23232a, 0xe86aa0][X.bs]; E.box(0.05, 0.05, 1.2, sx, S.gf + 0.3, 6.6, 0x23232a); E.box(0.1, 0.9, 0.9, sx, S.gf - 0.25, 6.85, sc); E.box(0.12, 0.6, 0.6, sx, S.gf - 0.25, 6.85, 0xf4f1ea); E.part(new THREE.SphereGeometry(0.16, 8, 6), sx, S.gf - 0.25, 6.85, awn); }
+    if(X.te === 1) [-2.2, 2.2].forEach(function(x){ if(Math.abs(x - dxs) < 1.4) return; E.cyl(0.3, 0.3, 0.04, x, 0.74, 7.3, CREAM, 10); E.cyl(0.03, 0.03, 0.72, x, 0.36, 7.3, DARK, 6); [-0.45, 0.45].forEach(function(c){ E.box(0.32, 0.05, 0.32, x + c, 0.45, 7.3, awn); }); E.cyl(0.02, 0.02, 2.2, x, 1.1, 7.3, 0xf4f1ea, 4); E.part(new THREE.ConeGeometry(1.1, 0.5, 8), x, 2.3, 7.3, awn); });
+    if(X.te === 2){ var bxx = dxs <= 0 ? 3 : -3; E.box(1.8, 0.08, 0.45, bxx, 0.48, 6.6, 0x8a5a32); E.box(1.8, 0.45, 0.06, bxx, 0.75, 6.4, 0x8a5a32); [-0.8, 0.8].forEach(function(o){ E.box(0.06, 0.48, 0.4, bxx + o, 0.24, 6.6, 0x23232a); }); }
+    if(X.te === 3){ var rx = dxs <= 0 ? 3 : -3; E.box(2, 0.06, 0.06, rx, 0.7, 6.7, 0x8a8f98); [0, 1].forEach(function(b){ var bx2 = rx - 0.5 + b; E.part(new THREE.TorusGeometry(0.3, 0.04, 6, 14), bx2, 0.35, 6.7 - 0.3, 0x23232a, 0, Math.PI/2, 0); E.part(new THREE.TorusGeometry(0.3, 0.04, 6, 14), bx2, 0.35, 6.7 + 0.5, 0x23232a, 0, Math.PI/2, 0); E.box(0.06, 0.06, 0.8, bx2, 0.6, 6.95, [0xc8382f, 0x2b4c9b][b]); }); }
+    if(X.te === 4){ var cx = dxs + (dxs <= 0 ? 1.6 : -1.6); E.box(0.7, 1.0, 0.06, cx, 0.6, 6.9, 0x23232a, 0.15); E.box(0.6, 0.8, 0.07, cx, 0.62, 6.93, 0x2a3a2a, 0.15); E.box(0.4, 0.03, 0.08, cx, 0.8, 6.97, 0xf4f1ea, 0.15); E.box(0.3, 0.03, 0.08, cx, 0.6, 6.97, 0xf4f1ea, 0.15); }
+    if(X.te === 5){ var px = dxs <= 0 ? 3 : -3; for(var b2=0;b2<6;b2++){ E.box(0.02, 1.6, 0.02, px, 0.8 + b2*0.05, 6.7, 0xf4f1ea); E.part(new THREE.SphereGeometry(0.3, 8, 6), px - 0.4 + (b2 % 3)*0.4, 1.9 + Math.floor(b2/3)*0.45, 6.7, [0xff4a6a, 0xffd23a, 0x4ad6ff, 0x6aff7a, 0xc84aff, 0xff8a3a][b2]); } }
+  } } catch(err){}
+};
+/* the house garden: the fence, and the two garden spots, replace the old fixed hedge / bush / flowerbed */
+function houseFence(E, d, dx){ var X = exOf(d), k = X.fn || 0; var seg = function(x0, x1, z0, z1){ var along = Math.abs(x1 - x0) > Math.abs(z1 - z0), len = along ? x1 - x0 : z1 - z0, cx = (x0 + x1)/2, cz = (z0 + z1)/2;
+    if(k === 0 || k === 5){ E.box(along ? len : 0.4, 0.85, along ? 0.5 : len, cx, 0.43, cz, HEDGE); if(k === 5) for(var i=0;i<len/0.7;i++) E.box(0.14, 0.14, 0.14, along ? x0 + 0.35 + i*0.7 : cx + 0.22*(i % 2 ? 1 : -1), 0.8, along ? cz + 0.26 : z0 + 0.35 + i*0.7, [0xe86aa0, 0xf4f1ea, 0xe3b52c][i % 3]); return; }
+    var col = k === 1 ? 0xf4f1ea : k === 2 ? 0x23232a : k === 3 ? 0xb9b4a8 : 0x8a5a32, h = k === 3 ? 0.7 : 0.9;
+    if(k === 3){ E.box(along ? len : 0.45, h, along ? 0.45 : len, cx, h/2, cz, col); return; }
+    if(k === 4){ E.box(along ? len : 0.08, h, along ? 0.08 : len, cx, h/2, cz, col); return; }
+    var n = Math.max(1, Math.round(len/(k === 2 ? 0.18 : 0.3))); for(var j=0;j<=n;j++){ var f = j/n; E.box(0.07, h, 0.07, along ? x0 + len*f : cx, h/2, along ? cz : z0 + len*f, col); } [0.3, 0.72].forEach(function(y){ E.box(along ? len : 0.05, 0.06, along ? 0.05 : len, cx, y, cz, col); }); };
+  [[-5, dx - 0.75], [dx + 0.75, 5]].forEach(function(s){ if(s[1] - s[0] > 0.1) seg(s[0], s[1], 5.72, 5.72); }); [-1, 1].forEach(function(s){ seg(s*4.8, s*4.8, -6.02, 5.48); }); }
+function houseGardenA(E, d, x){ var k = exOf(d).ga || 0, z = 4.3;
+  if(k === 0){ E.part(new THREE.IcosahedronGeometry(0.75, 0), x, 0.6, z, HEDGE); return; }
+  if(k >= 1 && k <= 4){ E.cyl(0.14, 0.18, 1.8, x, 0.9, z, 0x6b4a32, 8); if(k === 1){ E.part(new THREE.SphereGeometry(1.0, 10, 8), x, 2.3, z, 0x3a8a3a); for(var a=0;a<6;a++) E.part(new THREE.SphereGeometry(0.12, 6, 5), x + Math.cos(a)*0.8, 2.1 + (a % 2)*0.4, z + Math.sin(a)*0.8, 0xc8382f); } else if(k === 2) E.part(new THREE.ConeGeometry(0.9, 2.6, 8), x, 2.6, z, 0x2f5a2f); else if(k === 3) E.part(new THREE.SphereGeometry(1.0, 10, 8), x, 2.3, z, 0xc8452a); else { for(var l=0;l<6;l++) E.box(1.4, 0.05, 0.3, x + Math.cos(l*1.05)*0.6, 1.9, z + Math.sin(l*1.05)*0.6, 0x3a8a3a, 0, -l*1.05, -0.35); } return; }
+  if(k === 5){ E.cyl(0.9, 1.0, 0.4, x, 0.2, z, 0xb9b4a8, 14); E.cyl(0.75, 0.75, 0.05, x, 0.38, z, 0x5ab8f2, 14); E.cyl(0.12, 0.15, 0.8, x, 0.7, z, 0xb9b4a8, 8); E.cyl(0.35, 0.2, 0.15, x, 1.1, z, 0xb9b4a8, 10); return; }
+  if(k === 6){ [-0.7, 0.7].forEach(function(o){ E.box(0.1, 2, 0.1, x + o, 1, z - 0.5, 0x8a5a32, 0.25); E.box(0.1, 2, 0.1, x + o, 1, z + 0.5, 0x8a5a32, -0.25); }); E.box(1.6, 0.1, 0.1, x, 1.95, z, 0x8a5a32); E.box(0.02, 1.2, 0.02, x - 0.25, 1.35, z, 0x8a8f98); E.box(0.02, 1.2, 0.02, x + 0.25, 1.35, z, 0x8a8f98); E.box(0.6, 0.06, 0.25, x, 0.75, z, 0xc8382f); return; }
+  if(k === 7){ E.cyl(0.85, 0.85, 0.1, x, 0.5, z, 0x2b4c9b, 16); E.cyl(0.7, 0.7, 0.11, x, 0.51, z, 0x23232a, 16); for(var t=0;t<4;t++) E.box(0.06, 0.5, 0.06, x + Math.cos(t*1.57)*0.75, 0.25, z + Math.sin(t*1.57)*0.75, 0x8a8f98); return; }
+  if(k === 8){ E.box(1, 0.8, 1.1, x, 0.4, z, 0xc8382f); E.part(new THREE.ConeGeometry(0.85, 0.5, 4), x, 1.05, z, 0x6b4a32, 0, Math.PI/4, 0); E.box(0.4, 0.5, 0.05, x, 0.3, z + 0.56, 0x23232a); return; }
+  if(k === 9){ E.cyl(0.4, 0.3, 0.4, x, 0.85, z, 0x23232a, 10); [0, 2.1, 4.2].forEach(function(a){ E.box(0.04, 0.7, 0.04, x + Math.cos(a)*0.3, 0.35, z + Math.sin(a)*0.3, 0x23232a); }); E.box(0.6, 0.02, 0.6, x, 1.06, z, 0x8a8f98); return; }
+  if(k === 10){ E.box(1.6, 0.08, 0.45, x, 0.48, z, 0x8a5a32); E.box(1.6, 0.4, 0.06, x, 0.75, z - 0.22, 0x8a5a32); [-0.7, 0.7].forEach(function(o){ E.box(0.06, 0.48, 0.4, x + o, 0.24, z, 0x23232a); }); return; }
+  if(k === 11){ [-0.5, 0, 0.5].forEach(function(o, i){ E.cyl(0.13, 0.16, 0.35, x + o, 0.18, z, [0x2b4c9b, 0x2f7d46, 0xe3b52c][i], 8); E.part(new THREE.SphereGeometry(0.11, 8, 6), x + o, 0.45, z, 0xf2c8a0); E.part(new THREE.ConeGeometry(0.12, 0.3, 8), x + o, 0.66, z, 0xc8382f); }); return; }
+  if(k === 12){ E.cyl(0.1, 0.15, 0.8, x, 0.4, z, 0xb9b4a8, 8); E.cyl(0.5, 0.3, 0.15, x, 0.85, z, 0xb9b4a8, 12); E.cyl(0.42, 0.42, 0.02, x, 0.93, z, 0x5ab8f2, 12); E.part(new THREE.SphereGeometry(0.1, 6, 5), x + 0.3, 1.0, z, 0x2b4c9b); return; }
+  if(k === 13){ E.part(new THREE.SphereGeometry(0.55, 10, 8), x, 0.5, z, 0xffffff); E.part(new THREE.SphereGeometry(0.4, 10, 8), x, 1.25, z, 0xffffff); E.part(new THREE.SphereGeometry(0.28, 10, 8), x, 1.8, z, 0xffffff); E.part(new THREE.ConeGeometry(0.05, 0.25, 6), x, 1.8, z + 0.35, 0xe8762a, Math.PI/2, 0, 0); E.cyl(0.18, 0.18, 0.25, x, 2.15, z, 0x23232a, 10); return; } }
+function houseGardenB(E, d, x){ var k = exOf(d).gb || 0, z = 4.4;
+  if(k <= 4){ E.box(2.6, 0.22, 1.3, x, 0.11, z, 0x6b4a32); var C = [[0xe86aa0, 0xc8382f, 0xe3b52c, 0xf4f1ea, 0x7a4fb0, 0xe07b2c], [0xc8382f, 0xe84a4a, 0xa82a2a], [0xe86aa0, 0xffd23a, 0xc8382f, 0x7a4fb0], [0xffd23a], [0x3a8a3a, 0xe8762a, 0xc8382f]][k];
+    for(var fx=0; fx<(k === 3 ? 4 : 6); fx++){ var px = x - 1.0 + fx*(k === 3 ? 0.65 : 0.4), pz = z + (fx % 2 ? 0.3 : -0.3); if(k === 3){ E.box(0.06, 1.4, 0.06, px, 0.85, pz, 0x3a7036); E.cyl(0.22, 0.22, 0.06, px, 1.55, pz + 0.05, 0xffd23a, 10, 0); E.cyl(0.09, 0.09, 0.07, px, 1.55, pz + 0.08, 0x6b4a32, 8); } else if(k === 4){ E.part(new THREE.SphereGeometry(0.2, 8, 6), px, 0.38, pz, fx % 3 === 1 ? 0xe8762a : fx % 3 === 2 ? 0xc8382f : 0x3a8a3a); } else { if(k === 2) E.box(0.04, 0.35, 0.04, px, 0.4, pz, 0x3a7036); E.box(0.22, 0.22, 0.22, px, k === 2 ? 0.62 : 0.34, pz, C[fx % C.length]); } } return; }
+  if(k === 5){ E.cyl(1.2, 1.2, 0.06, x, 0.05, z, 0x3a6a8a, 16); E.part(new THREE.SphereGeometry(0.12, 6, 5), x + 0.4, 0.12, z, 0x3a8a3a); E.part(new THREE.SphereGeometry(0.1, 6, 5), x - 0.3, 0.12, z + 0.3, 0xe86aa0); [0, 1.2, 2.4, 3.6, 4.8].forEach(function(a){ E.part(new THREE.SphereGeometry(0.18, 6, 5), x + Math.cos(a)*1.25, 0.1, z + Math.sin(a)*1.25*0.9, 0x9a9a9e); }); return; }
+  if(k === 6){ E.box(2.4, 0.25, 1.4, x, 0.12, z, 0x8a5a32); E.box(2.2, 0.06, 1.2, x, 0.24, z, 0xf0d98a); E.cyl(0.15, 0.1, 0.25, x + 0.6, 0.38, z, 0xc8382f, 8); E.part(new THREE.SphereGeometry(0.2, 6, 5), x - 0.5, 0.3, z, 0xf0d98a); return; }
+  if(k === 7){ for(var r=0;r<7;r++) E.part(new THREE.DodecahedronGeometry(0.18 + (r % 3)*0.08, 0), x - 1 + r*0.33, 0.15, z + (r % 2 ? 0.3 : -0.25), [0x9a9a9e, 0x8a8f98, 0xb9b4a8][r % 3]); E.box(2.6, 0.04, 1.3, x, 0.03, z, 0xe8e0d0); return; }
+  if(k === 8){ E.box(2.4, 0.4, 1.4, x, 0.2, z, 0xf4f1ea); E.box(2.2, 0.06, 1.2, x, 0.38, z, 0x5ab8f2); E.part(new THREE.TorusGeometry(0.25, 0.08, 6, 12), x + 0.5, 0.42, z, 0xff4a6a, Math.PI/2, 0, 0); } }
+/* the builder: a ✨ EXTRAS section for each kind of building */
+var _renderBuilderEX = renderBuilder;
+renderBuilder = function(){ _renderBuilderEX.apply(this, arguments); if(!builder.on) return; var d = editing.d; if(d.md === 'b') return; var keys = builder.p.kind === 'store' ? EX_SHOP : EX_HOUSE, X = JSON.parse(JSON.stringify(exOf(d)));
+  var h = document.createElement('div'); h.className = 'opt-label'; h.innerHTML = '<span>✨ ' + L2('EXTRAS: MAKE IT YOURS', 'LES EXTRAS : PERSONNALISE !') + '</span>'; h.style.marginTop = '14px'; bdBody.appendChild(h);
+  keys.forEach(function(k){ var O = EX_OPTS[k], lb = document.createElement('div'); lb.className = 'opt-label'; lb.innerHTML = '<span>' + esc(L2(O.en, O.fr)) + '</span>'; bdBody.appendChild(lb);
+    bdBody.appendChild(chipRow(O.o, X[k] || 0, function(i){ X[k] = i; d.ex = exStr(X); builderChanged(); try { say(O.o[i]); } catch(e){} })); }); };
+/* save and clean the new field */
+var _cleanPlotEX = cleanPlot; cleanPlot = function(d, p){ var c = _cleanPlotEX(d, p); if(c && d) c.ex = typeof d.ex === 'string' && /^[a-z0-9.]{0,160}$/.test(d.ex) ? d.ex : ''; return c; };
+var _plotRecordEX = plotRecord; plotRecord = function(p, d){ var r = _plotRecordEX(p, d); r.ex = typeof d.ex === 'string' && /^[a-z0-9.]{0,160}$/.test(d.ex) ? d.ex : ''; return r; };
+if(typeof claudeRecord === 'function'){ var _claudeRecordEX = claudeRecord; claudeRecord = function(p, d, at){ var r = _claudeRecordEX(p, d, at); if(r && typeof r === 'object') r.ex = typeof d.ex === 'string' && /^[a-z0-9.]{0,160}$/.test(d.ex) ? d.ex : ''; return r; }; }
+
+/* 🛋 28 more things to put inside (labelled in French, with audio) */
+var NEW_ITEMS2 = [
+  {id:'xa', en:'BEAN BAG', fr:'POUF', art:'le pouf', w:2, d:2, who:'sh', c:3, build:function(b, C, cy, sp){ sp(0.42, 0, 0.32, 0, C); sp(0.3, 0, 0.55, -0.1, C); }},
+  {id:'xb', en:'BUNK BED', fr:'LITS SUPERPOSÉS', art:'les lits superposés', w:4, d:4, who:'h', c:1, build:function(b, C){ [0.35, 1.45].forEach(function(y){ b(1.9, 0.12, 0.95, 0, y, 0, 0x8a5a32); b(1.8, 0.14, 0.9, 0, y + 0.13, 0, 0xf6f2ea); b(1.8, 0.08, 0.6, 0.1, y + 0.24, 0, C); }); [[-0.95, -0.45], [0.95, -0.45], [-0.95, 0.45], [0.95, 0.45]].forEach(function(k){ b(0.08, 2.1, 0.08, k[0], 1.05, k[1], 0x6b4a32); }); for(var r=0;r<4;r++) b(0.05, 0.05, 0.4, 0.97, 0.5 + r*0.35, 0.3, 0x6b4a32); }},
+  {id:'xc', en:'DESK + COMPUTER', fr:'BUREAU + ORDINATEUR', art:'l\'ordinateur', w:4, d:2, who:'sh', c:9, build:function(b, C){ b(1.6, 0.06, 0.7, 0, 0.74, 0, C); [-0.75, 0.75].forEach(function(x){ b(0.06, 0.72, 0.65, x, 0.36, 0, shadeHex(C, 0.7)); }); b(0.6, 0.38, 0.04, 0, 1.05, -0.2, 0x1b1b1d); b(0.54, 0.32, 0.05, 0, 1.05, -0.18, 0x5ab8f2); b(0.08, 0.2, 0.08, 0, 0.84, -0.22, 0x23232a); b(0.45, 0.02, 0.15, 0, 0.78, 0.1, 0x23232a); }},
+  {id:'xd', en:'TELESCOPE', fr:'TÉLESCOPE', art:'le télescope', w:2, d:2, who:'h', c:7, build:function(b, C, cy){ [0, 2.1, 4.2].forEach(function(a){ b(0.04, 1.1, 0.04, Math.cos(a)*0.25, 0.5, Math.sin(a)*0.25, 0x23232a); }); cy(0.08, 0.11, 1.0, 0, 1.25, 0, C, 10); }},
+  {id:'xe', en:'DOLLHOUSE', fr:'MAISON DE POUPÉE', art:'la maison de poupée', w:2, d:2, who:'h', c:4, build:function(b, C){ b(0.8, 0.8, 0.5, 0, 0.4, 0, C); b(0.84, 0.06, 0.54, 0, 0.82, 0, 0xffffff); b(0.15, 0.25, 0.02, 0, 0.13, 0.26, 0x8a5a32); b(0.18, 0.15, 0.02, -0.22, 0.55, 0.26, 0x8ad0f0); b(0.18, 0.15, 0.02, 0.22, 0.55, 0.26, 0x8ad0f0); }},
+  {id:'xf', en:'TRAIN SET', fr:'CIRCUIT DE TRAIN', art:'le circuit de train', w:4, d:4, who:'h', c:0, build:function(b, C){ b(1.8, 0.04, 1.8, 0, 0.02, 0, 0x3a7036); b(1.6, 0.03, 0.1, 0, 0.05, -0.7, 0x6b4a32); b(1.6, 0.03, 0.1, 0, 0.05, 0.7, 0x6b4a32); b(0.1, 0.03, 1.5, -0.75, 0.05, 0, 0x6b4a32); b(0.1, 0.03, 1.5, 0.75, 0.05, 0, 0x6b4a32); b(0.35, 0.2, 0.15, 0, 0.16, -0.7, C); b(0.25, 0.15, 0.13, 0.35, 0.13, -0.7, 0x2b4c9b); }},
+  {id:'xg', en:'DRUM KIT', fr:'BATTERIE', art:'la batterie', w:3, d:3, who:'sh', c:0, build:function(b, C, cy){ cy(0.32, 0.32, 0.45, 0, 0.3, 0.2, C, 14); [-0.45, 0.45].forEach(function(x){ cy(0.2, 0.2, 0.22, x, 0.75, 0, C, 12); }); cy(0.25, 0.25, 0.02, 0.7, 1.05, -0.2, 0xd8a24a, 14); b(0.02, 1.0, 0.02, 0.7, 0.55, -0.2, 0x8a8f98); cy(0.18, 0.18, 0.45, -0.1, 0.25, -0.6, 0x23232a, 10); }},
+  {id:'xh', en:'EASEL', fr:'CHEVALET', art:'le chevalet', w:2, d:1, who:'sh', c:8, build:function(b){ b(0.05, 1.6, 0.05, -0.3, 0.8, 0, 0x8a5a32, 0.08); b(0.05, 1.6, 0.05, 0.3, 0.8, 0, 0x8a5a32, 0.08); b(0.05, 1.5, 0.05, 0, 0.75, -0.3, 0x8a5a32, -0.25); b(0.8, 0.6, 0.03, 0, 1.15, 0.06, 0xf6f2ea, 0.08); b(0.3, 0.2, 0.035, -0.15, 1.2, 0.08, 0x5ab8f2, 0.08); b(0.25, 0.15, 0.035, 0.15, 1.05, 0.08, 0xe86aa0, 0.08); }},
+  {id:'xi', en:'GLOBE', fr:'GLOBE TERRESTRE', art:'le globe terrestre', w:1, d:1, who:'sh', c:2, build:function(b, C, cy, sp){ cy(0.15, 0.18, 0.05, 0, 0.03, 0, 0x8a5a32, 10); b(0.03, 0.55, 0.03, 0, 0.3, 0, 0xd8a24a); sp(0.22, 0, 0.75, 0, 0x2b6ab8); sp(0.1, 0.1, 0.82, 0.12, 0x3a8a3a); }},
+  {id:'xj', en:'COAT RACK', fr:'PORTEMANTEAU', art:'le portemanteau', w:1, d:1, who:'sh', c:9, build:function(b, C, cy){ cy(0.03, 0.03, 1.8, 0, 0.9, 0, 0x6b4a32, 6); cy(0.2, 0.25, 0.05, 0, 0.03, 0, 0x6b4a32, 10); b(0.35, 0.6, 0.12, 0.12, 1.3, 0, C); b(0.25, 0.08, 0.25, -0.05, 1.82, 0, 0x23232a); }},
+  {id:'xk', en:'ROCKING CHAIR', fr:'CHAISE À BASCULE', art:'la chaise à bascule', w:2, d:2, who:'h', c:9, build:function(b, C){ b(0.5, 0.06, 0.5, 0, 0.45, 0, C); b(0.5, 0.7, 0.06, 0, 0.82, -0.25, C, -0.15); [-0.24, 0.24].forEach(function(x){ b(0.04, 0.06, 0.8, x, 0.08, 0, shadeHex(C, 0.6)); b(0.04, 0.4, 0.04, x, 0.25, 0.18, shadeHex(C, 0.6)); b(0.04, 0.4, 0.04, x, 0.25, -0.18, shadeHex(C, 0.6)); }); }},
+  {id:'xl', en:'PING-PONG TABLE', fr:'TABLE DE PING-PONG', art:'la table de ping-pong', w:6, d:4, who:'h', c:2, build:function(b, C){ b(2.7, 0.05, 1.5, 0, 0.76, 0, C); b(0.02, 0.16, 1.55, 0, 0.86, 0, 0xffffff); b(2.7, 0.01, 0.03, 0, 0.79, 0, 0xffffff); [[-1.2, -0.6], [1.2, -0.6], [-1.2, 0.6], [1.2, 0.6]].forEach(function(k){ b(0.06, 0.74, 0.06, k[0], 0.37, k[1], 0x23232a); }); }},
+  {id:'xm', en:'HAMSTER CAGE', fr:'CAGE À HAMSTER', art:'la cage à hamster', w:2, d:1, who:'h', c:3, build:function(b, C, cy, sp){ b(0.7, 0.08, 0.4, 0, 0.75, 0, C); b(0.7, 0.4, 0.4, 0, 0.99, 0, 0xcfe8ff); cy(0.12, 0.12, 0.04, 0.18, 0.95, 0, 0xe86aa0, 12); sp(0.07, -0.15, 0.84, 0, 0xd8a24a); b(0.6, 0.7, 0.35, 0, 0.35, 0, 0x8a5a32); }},
+  {id:'xn', en:'COLD DISPLAY CASE', fr:'VITRINE RÉFRIGÉRÉE', art:'la vitrine réfrigérée', w:4, d:2, who:'s', c:8, build:function(b, C){ b(1.8, 0.8, 0.8, 0, 0.4, 0, C); b(1.8, 0.5, 0.75, 0, 1.05, 0, 0xcfe8ff); for(var k=0;k<5;k++) b(0.22, 0.1, 0.22, -0.7 + k*0.35, 0.86, 0, [0xe86aa0, 0xffd23a, 0x6b3a1a, 0xf4f1ea, 0xc8382f][k]); }},
+  {id:'xo', en:'CAKE STAND', fr:'PRÉSENTOIR À GÂTEAUX', art:'le présentoir à gâteaux', w:2, d:2, who:'s', c:8, build:function(b, C, cy){ cy(0.25, 0.25, 0.7, 0, 0.35, 0, C, 12); cy(0.4, 0.4, 0.03, 0, 0.72, 0, 0xf4f1ea, 14); cy(0.25, 0.25, 0.2, 0, 0.84, 0, 0xe86aa0, 14); cy(0.15, 0.15, 0.12, 0, 1.0, 0, 0xf6f2ea, 12); b(0.05, 0.08, 0.05, 0, 1.1, 0, 0xc8382f); }},
+  {id:'xp', en:'NEON "OUVERT"', fr:'ENSEIGNE « OUVERT »', art:'l\'enseigne lumineuse', w:2, d:1, who:'s', c:4, build:function(b, C){ b(0.9, 0.35, 0.04, 0, 1.6, 0, 0x1b1b1d); b(0.8, 0.06, 0.05, 0, 1.72, 0.01, C); b(0.8, 0.06, 0.05, 0, 1.48, 0.01, C); b(0.06, 0.28, 0.05, -0.37, 1.6, 0.01, C); b(0.06, 0.28, 0.05, 0.37, 1.6, 0.01, C); b(0.02, 1.4, 0.02, 0, 0.7, 0, 0x8a8f98); }},
+  {id:'xq', en:'MANNEQUIN', fr:'MANNEQUIN', art:'le mannequin', w:1, d:1, who:'s', c:4, build:function(b, C, cy, sp){ cy(0.15, 0.18, 0.04, 0, 0.02, 0, 0x23232a, 10); b(0.03, 0.9, 0.03, 0, 0.45, 0, 0x23232a); b(0.36, 0.6, 0.22, 0, 1.2, 0, C); sp(0.11, 0, 1.62, 0, 0xf2e2d0); }},
+  {id:'xr', en:'POPCORN MACHINE', fr:'MACHINE À POP-CORN', art:'la machine à pop-corn', w:2, d:2, who:'s', c:0, build:function(b, C){ b(0.6, 0.8, 0.5, 0, 0.4, 0, C); b(0.55, 0.55, 0.45, 0, 1.08, 0, 0xcfe8ff); b(0.5, 0.25, 0.4, 0, 0.92, 0, 0xfff2b0); b(0.62, 0.1, 0.52, 0, 1.4, 0, C); }},
+  {id:'xs', en:'ESPRESSO MACHINE', fr:'MACHINE À EXPRESSO', art:'la machine à expresso', w:2, d:1, who:'sh', c:7, build:function(b, C, cy){ b(0.8, 0.8, 0.45, 0, 0.4, 0, 0x8a5a32); b(0.5, 0.35, 0.3, 0, 0.98, 0, C); b(0.45, 0.06, 0.3, 0, 1.18, 0, 0x8a8f98); cy(0.04, 0.04, 0.08, -0.1, 0.85, 0.12, 0x23232a, 6); cy(0.05, 0.04, 0.06, -0.1, 0.83, 0.12, 0xffffff, 8); }},
+  {id:'xt', en:'BALLOONS', fr:'BOUQUET DE BALLONS', art:'les ballons', w:1, d:1, who:'sh', c:0, build:function(b, C, cy, sp){ b(0.15, 0.1, 0.15, 0, 0.05, 0, 0x8a8f98); [[0, 1.7, 0], [0.2, 1.55, 0.1], [-0.2, 1.55, -0.1], [0.05, 1.4, -0.2]].forEach(function(p, i){ b(0.01, p[1], 0.01, p[0]/2, p[1]/2, p[2]/2, 0xffffff); sp(0.17, p[0], p[1] + 0.15, p[2], [C, 0xffd23a, 0x5ab8f2, 0xe86aa0][i]); }); }},
+  {id:'xu', en:'DISCO BALL', fr:'BOULE À FACETTES', art:'la boule à facettes', w:1, d:1, who:'sh', c:8, build:function(b, C, cy, sp){ b(0.01, 0.6, 0.01, 0, 2.7, 0, 0x8a8f98); sp(0.28, 0, 2.2, 0, 0xd8dce4); }},
+  {id:'xv', en:'INDOOR TREE', fr:'FICUS', art:'le ficus', w:2, d:2, who:'sh', c:9, build:function(b, C, cy, sp){ cy(0.25, 0.2, 0.45, 0, 0.23, 0, 0xe8e0d0, 10); cy(0.04, 0.05, 0.9, 0, 0.9, 0, 0x6b4a32, 6); sp(0.45, 0, 1.55, 0, 0x3a8a3a); sp(0.3, 0.25, 1.35, 0.1, 0x4a9a4a); }},
+  {id:'xw', en:'CHRISTMAS TREE', fr:'SAPIN DE NOËL', art:'le sapin de Noël', w:2, d:2, who:'sh', c:0, build:function(b, C, cy, sp){ cy(0.1, 0.12, 0.3, 0, 0.15, 0, 0x6b4a32, 6); cy(0, 0.7, 0.9, 0, 0.75, 0, 0x2f5a2f, 10); cy(0, 0.55, 0.8, 0, 1.25, 0, 0x2f5a2f, 10); cy(0, 0.4, 0.6, 0, 1.65, 0, 0x2f5a2f, 10); sp(0.08, 0, 2.0, 0, 0xffd23a); [[0.4, 0.7, 0.3], [-0.35, 0.95, 0.25], [0.2, 1.3, -0.3], [-0.2, 1.5, 0.2]].forEach(function(p, i){ sp(0.06, p[0], p[1], p[2], [C, 0x5ab8f2, 0xffd23a, 0xe86aa0][i]); }); b(0.3, 0.2, 0.3, 0.5, 0.1, 0.4, 0xc8382f); }},
+  {id:'xx', en:'GRANDFATHER CLOCK', fr:'HORLOGE COMTOISE', art:'l\'horloge comtoise', w:1, d:1, who:'sh', c:9, build:function(b, C, cy){ b(0.45, 2.0, 0.3, 0, 1.0, 0, 0x6b4a32); cy(0.17, 0.17, 0.03, 0, 1.65, 0.16, 0xf6f2ea, 14); b(0.02, 0.12, 0.02, 0, 1.68, 0.18, 0x23232a); cy(0.07, 0.07, 0.02, 0, 0.9, 0.16, 0xd8a24a, 10); }},
+  {id:'xy', en:'ARCADE CABINET', fr:'BORNE D\'ARCADE', art:'la borne d\'arcade', w:2, d:2, who:'sh', c:5, build:function(b, C, cy, sp){ b(0.7, 1.7, 0.6, 0, 0.85, 0, C); b(0.55, 0.42, 0.05, 0, 1.3, 0.31, 0x0a0a14); b(0.5, 0.36, 0.05, 0, 1.3, 0.32, 0x5ab8f2); b(0.65, 0.08, 0.3, 0, 0.98, 0.35, 0x23232a); sp(0.05, -0.15, 1.05, 0.4, 0xff3a3a); }},
+  {id:'xz', en:'TROPHY SHELF', fr:'ÉTAGÈRE À TROPHÉES', art:'les trophées', w:3, d:1, who:'sh', c:9, build:function(b, C, cy){ b(1.3, 0.05, 0.3, 0, 1.0, 0, C); b(1.3, 0.05, 0.3, 0, 1.5, 0, C); [-0.4, 0, 0.4].forEach(function(x, i){ cy(0.08, 0.04, 0.2, x, 1.16, 0, 0xd8a24a, 8); cy(0.05, 0.05, 0.1, x, 1.66, 0, [0xd8a24a, 0xc8ccd6, 0xb8823a][i], 8); }); }},
+  {id:'xq2', en:'FISH BOWL', fr:'BOCAL À POISSON', art:'le bocal à poisson', w:1, d:1, who:'sh', c:6, build:function(b, C, cy, sp){ b(0.4, 0.7, 0.4, 0, 0.35, 0, 0x8a5a32); sp(0.22, 0, 0.92, 0, 0xcfe8ff); sp(0.06, 0.05, 0.9, 0.05, 0xf28a2a); }},
+  {id:'xr2', en:'HAMMOCK CHAIR', fr:'FAUTEUIL SUSPENDU', art:'le fauteuil suspendu', w:2, d:2, who:'h', c:2, build:function(b, C, cy, sp){ b(0.02, 1.2, 0.02, 0, 2.3, 0, 0x8a8f98); sp(0.45, 0, 1.2, 0, C); sp(0.32, 0, 1.25, 0.15, 0xf6f2ea); }}
+];
+NEW_ITEMS2.forEach(function(it){ if(!ITEM_BY_ID[it.id]){ ITEMS.push(it); ITEM_BY_ID[it.id] = it; } });
+/* ---------- 💬 GREETINGS ARE REQUIRED: every student writes, in French, the greeting for their home AND their shop/restaurant ----------
+   Until both are written (for the places they own), the greeting editor stays open - they can't keep playing without it. */
+var FR_W = ['je', 'j', 'tu', 'il', 'elle', 'on', 'nous', 'vous', 'ils', 'elles', 'le', 'la', 'les', 'l', 'un', 'une', 'des', 'de', 'du', 'd', 'et', 'est', 'c', 'ce', 'ici', 'chez', 'moi', 'toi', 'mon', 'ma', 'mes', 'ton', 'ta', 'notre', 'votre', 'bienvenue', 'bonjour', 'salut', 'merci', 'bonsoir', 'au', 'aux', 'a', 'avec', 'pour', 'dans', 'sur', 'qui', 'que', 'qu', 'oui', 'non', 'tres', 'bon', 'bonne', 'suis', 'es', 'sont', 'ai', 'as', 'avons', 'avez', 'aime', 'adore', 'entre', 'entrez', 'maison', 'magasin', 'boutique', 'restaurant', 'voici', 'voila', 'il', 'y', 'plait', 'sil', 'appetit', 'bientot', 'nous', 'desirez', 'sers', 'specialite', 'aujourd', 'hui', 'vend', 'vendons', 'fais', 'comme', 'pas', 'ne', 'n'];
+var EN_W = ['the', 'and', 'is', 'are', 'welcome', 'hello', 'hi', 'my', 'to', 'you', 'your', 'house', 'home', 'shop', 'store', 'come', 'in', 'thanks', 'thank', 'please', 'we', 'have', 'this', 'it', 'of', 'for', 'with', 'our', 'here', 'buy', 'sell'];
+function frenchOK(t){ var W = lcWords(t), fr = W.filter(function(w){ return FR_W.indexOf(w) >= 0; }).length, en = W.filter(function(w){ return EN_W.indexOf(w) >= 0 && FR_W.indexOf(w) < 0; }).length; return W.length >= 4 && fr >= 2 && en <= Math.max(1, Math.floor(fr/3)); }
+var FR_NEED = L2('Write it in French: at least 4 words, like « Bienvenue chez moi ! » - not in English.', 'Écris-le en français : au moins 4 mots, comme « Bienvenue chez moi ! » - pas en anglais.');
+var _hgsaveFR = GACT.hgsave; GACT.hgsave = function(){ hgKeep(); var t = HGE.t.replace(/___/g, '').replace(/\s+/g, ' ').trim(); if(t.length >= 8 && !frenchOK(t)){ showToast('🇫🇷 ' + FR_NEED); hgEditor('<div class="bad">🇫🇷 ' + esc(FR_NEED) + '</div>'); return; } return _hgsaveFR.apply(this, arguments); };
+function myShop(){ return (typeof PLOTS !== 'undefined' ? PLOTS : []).filter(function(p){ return p.data && p.data.o === net.uid && p.kind === 'store'; })[0]; }
+/* the shop / restaurant greeting editor */
+var SG_START = ['Bonjour et bienvenue à ___ !', 'Bienvenue dans mon magasin !', 'Bienvenue dans mon restaurant !', 'Qu\'est-ce que je vous sers ?', 'Vous désirez ?', 'Aujourd\'hui, nous avons ___.', 'Notre spécialité, c\'est ___.', 'Je vous recommande ___.', 'Ici, on vend ___.', 'Tout est ___ !', 'Prenez votre temps !', 'Bon appétit !', 'Merci et à bientôt !', 'Je m\'appelle ___, je suis le/la propriétaire.'];
+var SG_ADJ = ['délicieux', 'délicieuse', 'frais', 'fraîche', 'chaud', 'sucré', 'magnifique', 'pas cher', 'fait maison', 'excellent'];
+var SG_POL = ['s\'il vous plaît', 'merci', 'avec plaisir', 'bonne journée', 'à bientôt', 'bon appétit'];
+var SGE = {};
+function sgBank(){ var p = myShop(), ty = p && p.data && p.data.ty, G = (typeof GOODS !== 'undefined' && (GOODS[ty] || GOODS.grocery)) || []; return {'Mes produits':G.slice(0, 10).map(function(g){ return g[0]; }), 'Adjectifs':SG_ADJ, 'Politesse':SG_POL}; }
+function sgEditor(msg){ if(!hasChar()){ showCard('<h3>🏪</h3>' + noCharLine() + '<div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); return; }
+  var d = life.eco.sg || {}, B = sgBank(), p = myShop(); if(SGE.t == null) SGE = {t:d.t || '', e:d.e || '🏪', c:d.c|0, v:d.v|0};
+  showCard('<h3>🏪 ' + L2('MY SHOP / RESTAURANT GREETING (required!)', 'L\'ACCUEIL DE MON MAGASIN / RESTAURANT (obligatoire !)') + '</h3>' + (msg || '') + '<div class="gc-sub">' + L2('Your character greets every customer who comes into ', 'Ton personnage accueille chaque client qui entre dans ') + '<b>' + esc(p ? plotTitle(p) : L2('your shop', 'ton magasin')) + '</b>. ' + L2('Write it in French!', 'Écris-le en français !') + '</div>' +
+    '<textarea id="sg-t" maxlength="220" rows="3" style="width:95%;font-size:16px;padding:6px" onkeydown="event.stopPropagation()">' + esc(SGE.t) + '</textarea>' +
+    '<div class="gc-sub">✏ ' + L2('Sentence starters (click to add)', 'Débuts de phrase (clique pour ajouter)') + '</div><div class="gc-row" style="flex-wrap:wrap">' + SG_START.map(function(s, i){ return gBtn('sgadd', i, s); }).join('') + '</div>' +
+    '<div class="gc-sub">📚 ' + L2('Word banks (a word replaces ___ or is added)', 'Banques de mots (un mot remplace ___ ou s\'ajoute)') + '</div>' + Object.keys(B).map(function(k){ return '<div class="gc-text" style="text-align:left"><b>' + esc(k) + ' :</b> ' + B[k].map(function(w, i){ return gBtn('sgword', k + '|' + i, w); }).join(' ') + '</div>'; }).join('') +
+    '<div class="gc-sub">😀 Emoji</div><div class="gc-row" style="flex-wrap:wrap">' + ['🏪', '☕', '🥐', '🍰', '🧀', '🍕', '🍦', '🍫', '📚', '👗', '💐', '🧸', '🎵', '🎨', '🛒', '🍬'].map(function(e){ return gBtn('sgemo', e, e, SGE.e === e ? 'go' : ''); }).join('') + '</div>' +
+    '<div class="gc-sub">🎨 ' + L2('Colour', 'Couleur') + '</div><div class="gc-row">' + HG_COLS.map(function(c, i){ return '<button class="btn' + (SGE.c === i ? ' go' : '') + '" data-g="sgcol" data-v="' + i + '" style="background:' + c + ';width:36px;height:30px"></button>'; }).join('') + '</div>' +
+    '<div class="gc-sub">🗣 ' + L2('Your character\'s voice', 'La voix de ton personnage') + '</div><div class="gc-row">' + HG_VOICES.map(function(v, i){ return gBtn('sgvoice', i, v[0], SGE.v === i ? 'go' : ''); }).join('') + '</div>' +
+    '<div class="gc-row">' + gBtn('sgtest', null, '▶ ' + L2('PREVIEW', 'ÉCOUTER')) + gBtn('sgsave', null, '💾 ' + L2('SAVE MY GREETING', 'ENREGISTRER'), 'go') + gBtn('close', null, L2('LATER', 'PLUS TARD')) + '</div>'); }
+function sgKeep(){ var t = document.getElementById('sg-t'); if(t) SGE.t = t.value.replace(/[<>]/g, '').slice(0, 220); }
+GACT.sgadd = function(i){ sgKeep(); var s = SG_START[i|0], p = myShop(); if(/bienvenue à ___/.test(s) && p) s = s.replace('___', plotTitle(p)); if(/Je m'appelle ___/.test(s)) s = s.replace('___', life.eco.ch.fn); SGE.t = (SGE.t ? SGE.t.trim() + ' ' : '') + s; sgEditor(); };
+GACT.sgword = function(v){ sgKeep(); var p = String(v).split('|'), w = sgBank()[p[0]][+p[1]]; SGE.t = SGE.t.indexOf('___') >= 0 ? SGE.t.replace('___', w) : (SGE.t ? SGE.t.trim() + ' ' : '') + w; sgEditor(); };
+GACT.sgemo = function(v){ sgKeep(); SGE.e = v; sgEditor(); }; GACT.sgcol = function(v){ sgKeep(); SGE.c = v|0; sgEditor(); }; GACT.sgvoice = function(v){ sgKeep(); SGE.v = v|0; sgEditor(); };
+GACT.sgtest = function(){ sgKeep(); hgSpeak({t:SGE.t, v:SGE.v}); };
+GACT.sgsave = function(){ sgKeep(); var t = SGE.t.replace(/___/g, '').replace(/\s+/g, ' ').trim(); if(t.length < 8){ showToast(L2('Write a greeting in French first!', 'Écris d\'abord un message en français !')); return; } if(!frenchOK(t)){ sgEditor('<div class="bad">🇫🇷 ' + esc(FR_NEED) + '</div>'); return; } if(hasBadWord(t)){ showToast('🙅'); return; }
+  life.eco.sg = {t:t, e:SGE.e, c:SGE.c, v:SGE.v, at:Date.now()}; lifeSave(true); SGE = {}; say('Super ! L\'accueil de ton magasin est enregistré.'); showCard('<h3>✅ ' + L2('SAVED!', 'ENREGISTRÉ !') + '</h3><div class="gc-big gc-say">' + esc(t) + '</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); };
+/* the shop greeter: the owner's character at the door says the greeting */
+function shopGreet(p){ var own = p.data.o, mine = own === net.uid, e = mine ? life.eco : (life.all && life.all[own]), h = e && e.sg, nm = memberName(own);
+  if(mine && !h){ SGE = {}; sgEditor('<div class="bad">' + L2('Every shop needs a greeting. Write yours!', 'Chaque magasin a besoin d\'un accueil. Écris le tien !') + '</div>'); return true; }
+  if(!h) return false; var col = HG_COLS[h.c|0] || HG_COLS[0];
+  greetBox.setAttribute('data-say', h.t);
+  greetBox.innerHTML = '<div class="gh" style="background:' + col + ';color:#fff"><span>' + esc(h.e || '🏪') + ' ' + esc((e.ch && e.ch.fn) || nm) + ' · ' + esc(plotTitle(p)) + '</span><span><button data-g="ss">🔊</button><button data-g="x">✕</button></span></div><div style="font-size:21px;padding:4px 0">' + esc(h.e || '') + ' ' + esc(h.t) + '</div>' + (mine ? '<div class="gc-row"><button class="btn" data-g="se">✏ ' + L2('EDIT', 'MODIFIER') + '</button></div>' : '');
+  greetBox.classList.remove('hidden'); clearTimeout(greetBox.tm); greetBox.tm = setTimeout(function(){ greetBox.classList.add('hidden'); }, 30000); GB.o = null; HGM.sh = h; hgSpeak(h);
+  try { var L = layoutOf(p.kind), spot = plotToWorld(p, (L.doors[p.data.dp] || 0) + 1.6, (L.cz || 0) + L.d/2 - 2.2); if(!HGM.model){ HGM.model = buildWalker(); root.add(HGM.model.group); } var g = HGM.model.group; g.visible = true; g.position.set(spot.x, 0, spot.z); g.rotation.y = p.rot + Math.PI; if(e.ch) applyLook(HGM.model, [e.ch.skin|0, e.ch.hair|0, e.ch.pants|0, e.ch.hat|0].join('') + ((e.out|0) || '')); } catch(err){}
+  return true; }
+var _greetPlotS = greetPlot; greetPlot = function(p){ if(p && p.data && p.kind === 'store'){ var e = p.data.o === net.uid ? life.eco : (life.all && life.all[p.data.o]); if(((e && e.sg) || p.data.o === net.uid) && shopGreet(p)) return; } return _greetPlotS(p); };
+greetBox.addEventListener('click', function(ev){ var b = ev.target.closest('button'); if(!b) return; var a = b.getAttribute('data-g'); if(a === 'ss' && HGM.sh){ ev.stopImmediatePropagation(); hgSpeak(HGM.sh); } if(a === 'se'){ ev.stopImmediatePropagation(); greetBox.classList.add('hidden'); SGE = {}; sgEditor(); } }, true);
+var _renderPlotPanelS = renderPlotPanel; renderPlotPanel = function(){ _renderPlotPanelS(); var p = panelPlot; if(!p || !p.data || panelConfirm || p.kind !== 'store' || p.data.o !== net.uid) return; var row = document.getElementById('pp-btns'), b = document.createElement('button'); b.className = 'btn' + (hasChar() && life.eco.sg ? '' : ' go'); b.textContent = '💬 ' + L2('MY SHOP GREETING', 'L\'ACCUEIL DU MAGASIN') + (hasChar() && life.eco.sg ? '' : ' ⚠'); b.addEventListener('click', function(){ closePlotPanel(false); SGE = {}; sgEditor(); }); row.appendChild(b); };
+/* 🔒 the gate: no greeting = no playing (teachers don't need one) */
+function greetNeed(){ if(!hasChar() || (typeof amTeacher === 'function' && amTeacher())) return null; if(myHouse() && !life.eco.hg) return 'h'; if(myShop() && !life.eco.sg) return 's'; return null; }
+setInterval(function(){ var n = greetNeed(); if(!n || !titleScreen.classList.contains('hidden')) return; var open = gcard.el && !gcard.el.classList.contains('hidden'), ed = open && gcard.el.querySelector(n === 'h' ? '#hg-t' : '#sg-t');
+  if(!ed){ if(document.pointerLockElement) try { document.exitPointerLock(); } catch(e){} var m = '<div class="bad">🔒 ' + L2('Before you keep playing, write your ' + (n === 'h' ? 'home' : 'shop / restaurant') + ' greeting in French.', 'Avant de continuer à jouer, écris en français l\'accueil de ' + (n === 'h' ? 'ta maison' : 'ton magasin / restaurant') + '.') + '</div>'; if(n === 'h'){ HGE = {}; hgEditor(m); } else { SGE = {}; sgEditor(m); } say(n === 'h' ? 'Écris le message d\'accueil de ta maison, en français !' : 'Écris l\'accueil de ton magasin, en français !'); }
+  gcard.el.querySelectorAll('[data-g="close"]').forEach(function(b){ b.remove(); }); }, 2500);
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
