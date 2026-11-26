@@ -590,6 +590,16 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
   </div>
 </div>
 <script>
+/* 🛡 signed saved timers (anti-cheat) */
+(function(){ var SALT = 'pq-paris-7919';
+  function h(s){ var x = 2166136261; for(var i=0;i<s.length;i++){ x ^= s.charCodeAt(i); x = Math.imul(x, 16777619) >>> 0; } return x.toString(36); }
+  var KEYS = /^paris\.(want|jailStars|jailAt|spd|jail|jailWhy|runHits\..*|mikaHits\..*)$/;
+  var _set = Storage.prototype.setItem, _get = Storage.prototype.getItem;
+  Storage.prototype.setItem = function(k, v){ if(this === localStorage && KEYS.test(k)){ v = String(v); return _set.call(this, k, v + '~' + h(SALT + k + v)); } return _set.apply(this, arguments); };
+  Storage.prototype.getItem = function(k){ var v = _get.apply(this, arguments); if(this === localStorage && KEYS.test(k) && v != null){ var i = v.lastIndexOf('~'); if(i < 0) return null; var raw = v.slice(0, i); if(v.slice(i + 1) !== h(SALT + k + raw)){ try { localStorage.removeItem(k); } catch(e){} return k === 'paris.spd' ? '0' : null; } return raw; } return v; };
+  try { Object.defineProperty(Storage.prototype, 'setItem', {writable:false, configurable:false}); Object.defineProperty(Storage.prototype, 'getItem', {writable:false, configurable:false}); } catch(e){}
+})();
+
 (function(){
 "use strict";
 
@@ -20375,6 +20385,51 @@ GACT.honsign = function(){ var e = hasChar() ? life.eco : null; if(!e) return; H
 jSentence = function(){ var e = hasChar() ? life.eco : null, at = jailRecAt() || 1, stars = 0, jat = Date.now(); try { stars = parseInt(localStorage.getItem('paris.jailStars'), 10) || 0; jat = parseInt(localStorage.getItem('paris.jailAt'), 10) || Date.now(); } catch(x){}
   if(e){ if(e.jlast !== at){ e.jlast = at; e.joff = (e.joff || 0) + 1; e.jbail = 0; lifeSave(true); } } var off = e ? e.joff || 1 : 1;
   return {off:off, need:Math.min(20, off*5), bail:off >= 4 ? 100 + stars*25 : 0, stars:stars, waitUntil:jat + stars*30000, paid:!!(e && e.jbail)}; };
+/* ---------- ✂ DESIGNER LAB+: 40 colours, 20 patterns, "surprise me" (never a repeat), and SELL your designs in your shop ---------- */
+[[0x7a1f2a, 'bordeaux'], [0xff6f61, 'corail'], [0xffb07a, 'pêche'], [0xb5e550, 'vert pomme'], [0x6b8e23, 'kaki'], [0x0f5e4a, 'vert sapin'], [0x7fd8f0, 'bleu ciel'], [0x4b0082, 'indigo'], [0xc8a2e8, 'lilas'], [0xff2fa0, 'fuchsia'], [0xffe4e1, 'rose pâle'], [0xd2a26a, 'camel'],
+ [0x5a3a22, 'chocolat'], [0xf5f0dc, 'crème'], [0xb0b8c0, 'argenté'], [0xff7f00, 'orange vif'], [0x00c8c8, 'cyan'], [0xa0ff60, 'vert fluo'], [0xff4060, 'rouge cerise'], [0x405060, 'ardoise'], [0xe8d070, 'moutarde'], [0x9a7aa0, 'mauve'], [0x205090, 'bleu roi'], [0x2a2a40, 'nuit']].forEach(function(c){ WCOL.push(c[0]); WCOLN.push(c[1]); });
+WPAT.push(['en zigzag', 'zigzag'], ['camouflage', 'camo'], ['tie-dye', 'tie-dye'], ['léopard', 'leopard'], ['à damier', 'checkerboard'], ['à toiles d\'araignée', 'spider web'], ['galaxie', 'galaxy'], ['à flammes', 'flames'], ['à vagues', 'waves'], ['à losanges', 'diamonds'], ['à éclairs', 'lightning'], ['à notes de musique', 'music notes'], ['à fraises', 'strawberries']);
+var _wTexF = wTex; wTex = function(c1, c2, p){ if(p < 7) return _wTexF(c1, c2, p); var k = c1 + '.' + c2 + '.' + p; if(WTEX[k]) return WTEX[k]; var c = document.createElement('canvas'); c.width = c.height = 64; var x = c.getContext('2d'), A = hexCss(WCOL[c1] || 0), B = hexCss(WCOL[c2] || 0); x.fillStyle = A; x.fillRect(0, 0, 64, 64); x.fillStyle = B; x.strokeStyle = B; x.lineWidth = 4; var R = lifeRand('pat' + k);
+  if(p === 7){ x.beginPath(); for(var y=8;y<64;y+=16){ x.moveTo(0, y); for(var i=0;i<=8;i++) x.lineTo(i*8, y + (i % 2 ? 6 : -6)); } x.stroke(); }
+  else if(p === 8){ for(var n=0;n<14;n++){ x.globalAlpha = 0.7; x.beginPath(); x.ellipse(R()*64, R()*64, 6 + R()*10, 4 + R()*6, R()*3, 0, 7); x.fill(); } x.globalAlpha = 1; }
+  else if(p === 9){ for(var r=40;r>0;r-=8){ x.fillStyle = r % 16 ? B : A; x.globalAlpha = 0.6; x.beginPath(); x.arc(32, 32, r, 0, 7); x.fill(); } x.globalAlpha = 1; }
+  else if(p === 10){ for(var s=0;s<10;s++){ var px = R()*64, py = R()*64; x.beginPath(); x.ellipse(px, py, 5, 4, R()*3, 0, 7); x.stroke(); x.beginPath(); x.arc(px, py, 1.5, 0, 7); x.fill(); } }
+  else if(p === 11){ for(var a=0;a<8;a++) for(var b=0;b<8;b++) if((a + b) % 2) x.fillRect(a*8, b*8, 8, 8); }
+  else if(p === 12){ x.lineWidth = 1.5; for(var t=0;t<8;t++){ x.beginPath(); x.moveTo(32, 32); x.lineTo(32 + Math.cos(t*0.785)*46, 32 + Math.sin(t*0.785)*46); x.stroke(); } for(var rr=8;rr<46;rr+=8){ x.beginPath(); x.arc(32, 32, rr, 0, 7); x.stroke(); } }
+  else if(p === 13){ x.fillStyle = '#0b0b24'; x.fillRect(0, 0, 64, 64); x.fillStyle = A; x.globalAlpha = 0.5; x.beginPath(); x.ellipse(32, 32, 30, 10, 0.6, 0, 7); x.fill(); x.globalAlpha = 1; x.fillStyle = B; for(var st=0;st<26;st++) x.fillRect(R()*64, R()*64, 2, 2); }
+  else if(p === 14){ for(var f=0;f<4;f++){ x.beginPath(); x.moveTo(f*16, 64); x.quadraticCurveTo(f*16 + 2, 30, f*16 + 8, 18 + R()*10); x.quadraticCurveTo(f*16 + 14, 40, f*16 + 16, 64); x.fill(); } }
+  else if(p === 15){ x.beginPath(); for(var w=8;w<64;w+=16){ x.moveTo(0, w); x.bezierCurveTo(16, w - 8, 32, w + 8, 64, w); } x.stroke(); }
+  else if(p === 16){ for(var d1=0;d1<4;d1++) for(var d2=0;d2<4;d2++){ var cx = d1*16 + 8, cy = d2*16 + 8; x.beginPath(); x.moveTo(cx, cy - 7); x.lineTo(cx + 6, cy); x.lineTo(cx, cy + 7); x.lineTo(cx - 6, cy); x.closePath(); x.fill(); } }
+  else { x.font = '15px sans-serif'; x.textAlign = 'center'; var chs = {17:'⚡', 18:'♪', 19:'🍓'}; var ch = chs[p] || '★'; for(var s1=0;s1<4;s1++) for(var t1=0;t1<4;t1++) x.fillText(ch, 8 + s1*16 + (t1 % 2)*8, 14 + t1*16); }
+  var T = new THREE.CanvasTexture(c); T.wrapS = T.wrapT = THREE.RepeatWrapping; T.magFilter = THREE.NearestFilter; return WTEX[k] = new THREE.MeshLambertMaterial({map:T}); };
+/* ✨ surprise me: a random, never-repeated design */
+GACT.dzrand = function(){ dzKeep(); var L = dzList(), items = WEAR.filter(function(w){ return !w.gift; }), tries = 0, d; do { var W = items[Math.floor(Math.random()*items.length)]; d = {t:W.id, c1:Math.floor(Math.random()*WCOL.length), c2:Math.floor(Math.random()*WCOL.length), p:Math.floor(Math.random()*WPAT.length)}; tries++; } while(tries < 50 && (d.c1 === d.c2 || L.some(function(x){ return x.t === d.t && x.c1 === d.c1 && x.c2 === d.c2 && x.p === d.p; }))); DZ.t = d.t; DZ.c1 = d.c1; DZ.c2 = d.c2; DZ.p = d.p; designLab('<div class="good">✨ ' + L2('A brand-new combination! There are more than ', 'Une combinaison toute neuve ! Il y a plus de ') + (items.length*WCOL.length*WCOL.length*WPAT.length).toLocaleString() + L2(' possible designs.', ' créations possibles.') + '</div>'); };
+var _designLabF = designLab; designLab = function(msg){ _designLabF(msg); var card = gcard.el; if(!card) return; var row = card.querySelector('.gc-row'); if(row){ var b = document.createElement('button'); b.className = 'btn'; b.setAttribute('data-g', 'dzrand'); b.textContent = '✨ ' + L2('SURPRISE ME', 'SURPRENDS-MOI'); row.appendChild(b); var s2 = document.createElement('button'); s2.className = 'btn'; s2.setAttribute('data-g', 'dzshop'); s2.textContent = '🏷 ' + L2('SELL MY DESIGNS', 'VENDRE MES CRÉATIONS'); row.appendChild(s2); } };
+/* selling: set a price per design; your designs are sold in your shop; buyers pay, you collect */
+var DZPR = [0, 5, 10, 20, 35, 50, 80];
+GACT.dzshop = function(){ var L = dzList(), e = hasChar() ? life.eco : null; if(!e){ return; } var earn = dzEarnings();
+  showCard('<h3>🏷 ' + L2('SELL MY DESIGNS', 'VENDRE MES CRÉATIONS') + '</h3><div class="gc-sub">' + L2('Players who visit your shop can buy them. 0 = not for sale.', 'Les joueurs qui visitent ton magasin peuvent les acheter. 0 = pas à vendre.') + (myStorePlot() ? '' : '<br>⚠ ' + L2('You need a shop (commercial plot) to sell!', 'Il te faut un magasin (terrain commercial) pour vendre !')) + '</div>' + (L.length ? L.map(function(d, i){ return '<div class="gc-text" style="text-align:left"><b>' + esc(d.n) + '</b> · ' + esc(wDesc(WEAR_BY[d.t], d.c1, d.c2, d.p)) + '<br>' + DZPR.map(function(pr){ return '<button class="btn" data-g="dzpr" data-v="' + i + '|' + pr + '" style="' + ((d.pr|0) === pr ? 'outline:3px solid #2f6fd0' : '') + '">' + (pr ? pr + ' €' : '✗') + '</button>'; }).join('') + '</div>'; }).join('') : '<div class="gc-text">' + L2('Save a design first!', 'Enregistre d\'abord une création !') + '</div>') +
+    '<div class="gc-big">💰 ' + L2('To collect: ', 'À encaisser : ') + earn.amt + ' € (' + earn.n + ' ' + L2('sales', 'ventes') + ')</div><div class="gc-row">' + (earn.amt ? gBtn('dzcollect', null, '💰 ' + L2('COLLECT', 'ENCAISSER'), 'go') : '') + gBtn('designlab', null, '✂ ' + L2('BACK', 'RETOUR')) + gBtn('close', null, 'OK') + '</div>'); };
+GACT.dzpr = function(v){ var p = String(v).split('|'), d = dzList()[+p[0]]; if(!d) return; d.pr = +p[1]; lifeSave(true); GACT.dzshop(); };
+function myStorePlot(){ for(var i=0;i<PLOTS.length;i++){ var p = PLOTS[i]; if(p.kind === 'store' && p.data && p.data.o === net.uid) return p; } return null; }
+function dzEarnings(){ var e = life.eco, since = e.dzCol || 0, amt = 0, n = 0, all = life.all || {}; Object.keys(all).forEach(function(k){ var b = all[k] && all[k].dzb; if(!b) return; b.forEach(function(x){ if(x.o === net.uid && x.at > since){ amt += x.pr|0; n++; } }); }); return {amt:amt, n:n}; }
+GACT.dzcollect = function(){ var e = life.eco, E = dzEarnings(); if(!E.amt) return; e.cash = (+e.cash || 0) + E.amt; e.dzCol = Date.now(); if(typeof finRec === 'function') finRec(E.amt, 'ventes'); lifeSave(true); say('J\'ai vendu ' + E.n + ' vêtements ! ' + E.amt + ' euros !'); GACT.dzshop(); };
+/* the rack in a designer's shop: walk into any shop whose owner sells designs */
+var DZR = {p:null, btn:null};
+(function(){ var b = document.createElement('button'); b.className = 'bar-btn'; b.style.cssText = 'position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:30;font-size:14px;padding:10px 14px;display:none'; b.addEventListener('click', function(){ GACT.dzrack(); }); document.body.appendChild(b); DZR.btn = b; })();
+setInterval(function(){ var show = false; if(flying && !driving && !INT.cur && typeof plotAt === 'function'){ var p = plotAt(camera.position.x, camera.position.z, 0); if(p && p.kind === 'store' && p.data && p.data.o && p.data.o !== net.uid){ var o = life.all && life.all[p.data.o], L = o && o.dz ? o.dz.filter(function(d){ return d.pr > 0; }) : []; if(L.length){ show = true; DZR.p = p; DZR.btn.textContent = '🛍 ' + L2('Designer clothes by ', 'Créations de ') + ((o.ch && o.ch.fn) || memberName(p.data.o)) + ' (' + L.length + ')'; } } } DZR.btn.style.display = show ? '' : 'none'; }, 800);
+GACT.dzrack = function(){ var p = DZR.p; if(!p) return; var uid = p.data.o, o = life.all[uid], L = (o.dz || []).map(function(d, i){ return {d:d, i:i}; }).filter(function(x){ return x.d.pr > 0; }), e = hasChar() ? life.eco : null;
+  showCard('<h3>🛍 ' + L2('DESIGNER CLOTHES', 'LES CRÉATIONS DU STYLISTE') + '</h3><div class="gc-sub">' + esc((o.ch && o.ch.fn) || '') + ' · ' + L2('you have ', 'tu as ') + Math.round(e ? +e.cash || 0 : 0) + ' €</div><div class="gc-grid">' + L.map(function(x){ var d = x.d; return gOpt('dzbuy', uid + '|' + x.i, '<b>' + esc(d.n) + '</b><br><span class="lf-soft">' + esc(wDesc(WEAR_BY[d.t], d.c1, d.c2, d.p)) + ' · ' + d.pr + ' €</span>'); }).join('') + '</div><div class="gc-text">« Je voudrais acheter ce vêtement, s\'il vous plaît. »</div><div class="gc-row">' + gBtn('close', null, 'OK') + '</div>'); };
+GACT.dzbuy = function(v){ var p = String(v).split('|'), uid = p[0], o = life.all[uid], d = o && o.dz && o.dz[+p[1]], e = hasChar() ? life.eco : null; if(!d || !e || !(d.pr > 0)) return; if(uid === net.uid) return; if((+e.cash || 0) < d.pr){ showToast(L2('Not enough money!', 'Pas assez d\'argent !')); return; }
+  e.cash = +e.cash - d.pr; if(typeof finRec === 'function') finRec(-d.pr, 'vêtements'); e.dzb = (e.dzb || []).concat([{o:uid, n:String(d.n).slice(0, 24), t:d.t, c1:d.c1, c2:d.c2, p:d.p, pr:d.pr, at:Date.now()}]).slice(-60); lifeSave(true); if(typeof ghAdd === 'function') ghAdd(1, 'support');
+  WR.item = d.t; WR.c1 = d.c1; WR.c2 = d.c2; WR.p = d.p; WR.sel = WEAR_BY[d.t].s; GACT.wput(); say('J\'achète « ' + d.n + ' ». Merci !'); showToast('🛍 ' + d.n + ' · −' + d.pr + ' €'); };
+(function(){
+  // impossible jumps in money / tokens between two checks (a few seconds apart)
+  var last = null, strikes = 0;
+  setInterval(function(){ if(!hasChar() || isStaff()) { last = null; return; } var e = life.eco, now = {c:+e.cash || 0, t:e.tok|0, s:+e.sav || 0};
+    if(last){ var dc = (now.c + now.s) - (last.c + last.s), dt = now.t - last.t; if(dc > 5000 || dt > 300){ strikes++; e.cash = last.c; e.tok = last.t; e.sav = last.s; lifeSave(true); showToast('🛡 ' + L2('That change was blocked (anti-cheat).', 'Ce changement a été bloqué (anti-triche).')); try { if(net.db) net.db.ref('paris/mod/cheat/' + net.uid).set({at:Date.now(), dc:Math.round(dc), dt:dt, name:net.name || ''}).catch(function(){}); } catch(x){} if(strikes >= 2 && typeof jailUid === 'function'){ jail.reason = 'cheat'; jailUid(net.uid, 'TRICHE / CHEATING'); } now = {c:+e.cash || 0, t:e.tok|0, s:+e.sav || 0}; } }
+    last = now; }, 2500);
+})();
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
