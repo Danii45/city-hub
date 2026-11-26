@@ -5517,6 +5517,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 25, 2026 · 11:00 PM</span><br>NEW: the ZOO (7 habitats, learning centres, pet ADOPTION - your pet follows you), the SUPERMARKET (world aisles, origins and nutrition facts), the CHEF CENTRE (recipes, cooking classes, recipe creator) and 📻 RADIO PARIS (request songs for everyone and vote).</li>' +
   '<li><span class="when">Nov 25, 2026 · 10:30 PM</span><br>🔍 SEARCH any place. NEW: the Champs-Élysées with 28 shops and restaurants, the Concorde, Grand Palais, Opéra, Panthéon, Invalides and Pompidou; the ARCADE (verbs and vocabulary games); the CONCERT STADIUM; the MALL; and QUÉBEC\'s CARNAVAL (fly there!) with the ice palace, sledding, skiing, skating, dogsled, snowmobile, culture stations, food stands and your own vacation ice palace.</li>' +
   '<li><span class="when">Nov 25, 2026 · 5:45 PM</span><br>FRENCH CHALLENGES everywhere: talk to Parisians in the street (E), shop at your classmates\' shops (SHOP HERE), and answer questions at the monuments. Right answers earn 🪙 jetons.</li>' +
   '<li><span class="when">Nov 25, 2026 · 5:30 PM</span><br>(Preview) Create your character when you log in, earn 🪙 jetons at work for outfits, every job starts at a real place in the city, and the new SHOP ASSISTANT job at classmates\' shops.</li>' +
@@ -7734,6 +7735,8 @@ function presenceState(){
   if(typeof life !== 'undefined' && life.eco && life.eco.ch) s.look = lookCode(life.eco.ch);
   if(typeof mikaAIActive === 'function' && mikaAIActive()){ s.mkai = 1; if(mikaAI.say) s.mk = mikaAI.say; }
   if(typeof jail !== 'undefined' && jail.me) s.jail = 1;
+  if(typeof life !== 'undefined' && life.eco && life.eco.pet) s.pet = life.eco.pet.k + '|' + (life.eco.pet.c|0);
+  if(typeof radio !== 'undefined'){ if(radio.req) s.rq = radio.req; var vk = Object.keys(radio.vote)[0]; if(vk) s.vt = vk + '#' + radio.vote[vk]; }
   if(typeof amElite === 'function' && !net.isOwner && !amTeacher() && amElite()) s.el = 1;
   if(updateCheck.outdated()) s.old = 1;
   if(net.isOwner){ s.role = 'owner'; if(myAnnounce) s.announce = myAnnounce; if(myNap && napPhase()) s.nap = myNap; if(myLeash) s.leash = myLeash; }
@@ -11756,7 +11759,7 @@ var SINGERS = [
 ];
 var STAD = {name:'Le Stade des Concerts', x:440, z:-560};
 STAD.door = {x:440, z:-500, yaw:0};
-function singerNow(){ return SINGERS[Math.floor(Date.now()/180000) % SINGERS.length]; }
+function singerNow(){ var r = typeof radioNow === 'function' ? radioNow() : null; if(r) return SINGERS[SONGS[r.i].si]; return SINGERS[Math.floor(Date.now()/180000) % SINGERS.length]; }
 (function buildStadium(){
   var X = STAD.x, Z = STAD.z, B = new MeshBatch(), L = new Lot(B, 0, 0, 0);
   PLAY_AREAS.push({x0:340, x1:525, z0:-640, z1:-488});
@@ -11788,11 +11791,12 @@ function singerNow(){ return SINGERS[Math.floor(Date.now()/180000) % SINGERS.len
 })();
 function drawStageScreen(){
   var s = singerNow(), k = STAD.screen.getContext('2d'), t = performance.now()/1000;
-  if(STAD.last === s.nm && Math.floor(t*2) === STAD.tick) return; STAD.last = s.nm; STAD.tick = Math.floor(t*2);
+  if(Math.floor(t*2) === STAD.tick) return; STAD.last = s.nm; STAD.tick = Math.floor(t*2);
   var g = k.createLinearGradient(0, 0, 1024, 512); g.addColorStop(0, 'hsl(' + (t*40 % 360) + ',70%,25%)'); g.addColorStop(1, '#0a0a14'); k.fillStyle = g; k.fillRect(0, 0, 1024, 512);
   k.fillStyle = '#ffd23f'; k.font = 'bold 40px sans-serif'; k.textAlign = 'center'; k.fillText(L2('LIVE ON STAGE', 'EN CONCERT'), 512, 70);
   k.fillStyle = '#fff'; k.font = 'bold 110px Georgia, serif'; k.fillText(s.nm, 512, 220, 980);
-  k.font = '44px sans-serif'; k.fillText('♪ ' + s.songs[Math.floor(t/20) % s.songs.length] + ' ♪', 512, 320, 980);
+  var rq = typeof radioNow === 'function' ? radioNow() : null;
+  k.font = '44px sans-serif'; k.fillText('♪ ' + (rq ? SONGS[rq.i].t + ' · ' + L2('asked by ', 'demandée par ') + rq.who : s.songs[Math.floor(t/20) % s.songs.length]) + ' ♪', 512, 320, 980);
   k.fillStyle = '#cfd6e0'; k.font = '34px sans-serif'; k.fillText(s.from, 512, 400, 980);
   STAD.tex.needsUpdate = true;
 }
@@ -11808,7 +11812,7 @@ function stadiumTick(){
 function openSinger(i, q){
   var s = SINGERS[i], h = '<h3>🎤 ' + esc(s.nm) + '</h3><div class="gc-sub">' + esc(s.from) + ' · ' + esc(s.yrs) + '</div><div class="gc-text">' + esc(s.fr) + '</div>' + (LANG === 'en' ? '<div class="gc-sub">' + esc(s.en) + '</div>' : '');
   h += '<div class="gc-text"><b>' + L2('Best-known songs', 'Chansons célèbres') + ' :</b><br>' + s.songs.map(function(x){ return '♪ ' + esc(x); }).join('<br>') + '</div>';
-  h += '<div class="gc-sub">' + L2('Ask your teacher to listen to them together!', 'Demande à ton enseignant(e) de les écouter ensemble !') + '</div>';
+  h += '<div class="gc-row" style="margin-top:4px">' + s.songs.map(function(x){ var tt = x.replace(/ \(.*\)$/, ''); return gBtn('playsong', tt + '§' + s.nm, '▶ ' + tt + (VIDS[tt] ? '' : ' ↗')); }).join('') + '</div><div class="gc-sub">' + L2('▶ plays the official video (↗ opens it on YouTube).', '▶ lance le clip officiel (↗ l\'ouvre sur YouTube).') + '</div>';
   if(!q) h += '<div class="gc-row">' + gBtn('singq', i, L2('QUIZ (+🪙)', 'QUIZ (+🪙)'), 'go', ' data-enter="1"') + gBtn('singlist', null, L2('ALL THE SINGERS', 'TOUS LES CHANTEURS')) + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>';
   else {
     h += '<div class="gc-big">' + esc(q.say) + '</div><div class="gc-grid">' + q.opts.map(function(o, k){ return gOpt('singans', k, esc(o), q.picked == null ? '' : k === q.ans ? 'right' : k === q.picked ? 'wrongpick' : '', q.picked != null); }).join('') + '</div>';
@@ -11948,6 +11952,614 @@ GACT.mallorder = function(v){
   openMallShop(c.i, '<div class="good gc-big">' + o.icon + ' ' + L2('Bought and wearing it: ', 'Achetée et portée : ') + esc(L2(o.en, o.fr)) + ' ! « Merci, bonne journée ! »</div>');
 };
 
+/* ---------- LE QUARTIER DU ZOO ET DU MARCHÉ (south of the city, past Mrs. Clancy's village) ----------
+   Taxi from the Champ de Mars, or 🔍 search. The ZOO DE PARIS: walk past seven habitats (savanna, jungle, polar ice,
+   ocean aquarium, Canadian forest, farm, pets); each has a learning centre (press E: animals in French, facts,
+   a question for 🪙). Beside the pets: the ADOPTION CENTRE (a little quiz about caring for a pet, then you adopt
+   one, name it and it follows you everywhere - everyone sees it). Then the SUPERMARCHÉ and the CHEF CENTRE. */
+var ZD = {x0:-480, x1:480, z0:590, z1:860};
+PLAY_AREAS.push({x0:ZD.x0, x1:ZD.x1, z0:ZD.z0, z1:ZD.z1});
+flat(960, 270, 0, 725, 0xcfc6b2, 0.02);
+flat(960, 14, 0, 600, 0x3a3c42, 0.03);
+TAXIS.push({x:-78, z:-46, to:{x:0, z:608, yaw:Math.PI}, en:'TAXI TO THE ZOO AND THE MARKET', fr:'TAXI POUR LE ZOO ET LE MARCHÉ'});
+TAXIS.push({x:6, z:612, to:{x:-62, z:-42, yaw:0}, en:'TAXI TO THE EIFFEL TOWER', fr:'TAXI POUR LA TOUR EIFFEL'});
+/* the animals: simple low-poly models built from boxes and spheres */
+function animalModel(k){
+  var g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+  function B(w, h, d, x, y, z, c){ var m = box(w, h, d, solidMat(c)); m.position.set(x, y, z); body.add(m); return m; }
+  function S(r, x, y, z, c, sx, sy, sz){ var m = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), solidMat(c)); m.position.set(x, y, z); m.scale.set(sx || 1, sy || 1, sz || 1); body.add(m); return m; }
+  function legs(c, h, w, l, t){ [[-w, -l], [w, -l], [-w, l], [w, l]].forEach(function(p){ B(t || 0.25, h, t || 0.25, p[0], h/2, p[1], c); }); }
+  var A = {
+    lion:function(){ legs(0xc89a4a, 0.9, 0.35, 0.7); B(0.9, 0.8, 1.8, 0, 1.3, 0, 0xc89a4a); S(0.62, 0, 1.75, -1.05, 0x7a4a1a); B(0.5, 0.5, 0.5, 0, 1.7, -1.35, 0xd8a85a); B(0.12, 0.12, 1, 0, 1.4, 1.3, 0xc89a4a); },
+    girafe:function(){ legs(0xe0b060, 2.2, 0.35, 0.6, 0.22); B(0.9, 1, 1.6, 0, 2.6, 0, 0xe0b060); var n = B(0.35, 2.6, 0.35, 0, 4.2, -0.75, 0xe0b060); n.rotation.x = 0.25; B(0.45, 0.45, 0.8, 0, 5.5, -1.3, 0xe0b060); [[-0.25, 0.3], [0.25, -0.3], [0, 0.6]].forEach(function(p){ B(0.3, 0.3, 0.05, p[0], 2.7, p[1] - 0.82, 0x8a5a2a); }); },
+    elephant:function(){ legs(0x8a8f98, 1.4, 0.5, 0.8, 0.55); B(1.8, 1.6, 2.6, 0, 2.2, 0, 0x8a8f98); B(1.1, 1.1, 1, 0, 2.6, -1.6, 0x8a8f98); var tr = B(0.28, 1.5, 0.28, 0, 1.7, -2.2, 0x8a8f98); tr.rotation.x = 0.2; [-1, 1].forEach(function(s){ B(0.1, 1.1, 0.9, s*0.6, 2.6, -1.4, 0x7a7f88); B(0.12, 0.12, 0.6, s*0.35, 2.1, -2.2, 0xf4f0e0); }); },
+    zebre:function(){ legs(0xf4f4f4, 1.1, 0.3, 0.6, 0.22); B(0.7, 0.8, 1.6, 0, 1.5, 0, 0xf4f4f4); for(var i=-2;i<=2;i++) B(0.72, 0.82, 0.1, 0, 1.5, i*0.3, 0x1b1b1d); var n = B(0.3, 0.9, 0.3, 0, 2.1, -0.75, 0xf4f4f4); n.rotation.x = 0.4; B(0.3, 0.3, 0.6, 0, 2.4, -1.1, 0x1b1b1d); },
+    singe:function(){ B(0.5, 0.7, 0.4, 0, 1, 0, 0x7a4a2a); S(0.3, 0, 1.55, 0, 0x7a4a2a); S(0.18, 0, 1.5, -0.22, 0xd8b088); [-1, 1].forEach(function(s){ B(0.15, 0.7, 0.15, s*0.35, 0.95, 0, 0x7a4a2a); B(0.15, 0.6, 0.15, s*0.15, 0.3, 0, 0x7a4a2a); }); var t = B(0.08, 0.08, 0.9, 0, 0.8, 0.5, 0x7a4a2a); t.rotation.x = -0.6; },
+    tigre:function(){ legs(0xe07b2c, 0.8, 0.35, 0.7); B(0.85, 0.75, 1.8, 0, 1.2, 0, 0xe07b2c); for(var i=-3;i<=3;i++) B(0.87, 0.77, 0.08, 0, 1.2, i*0.24, 0x1b1b1d); S(0.4, 0, 1.55, -1.05, 0xe07b2c); B(0.12, 0.12, 1, 0, 1.3, 1.3, 0xe07b2c); },
+    perroquet:function(){ S(0.3, 0, 1.2, 0, 0xc8382f, 1, 1.4, 1); S(0.2, 0, 1.65, -0.05, 0xc8382f); var bk = B(0.08, 0.15, 0.12, 0, 1.6, -0.25, 0xe3b52c); [-1, 1].forEach(function(s){ B(0.06, 0.4, 0.3, s*0.28, 1.2, 0.05, 0x1f6fb8); }); B(0.12, 0.5, 0.06, 0, 0.8, 0.2, 0x2f9a4a); B(0.06, 0.8, 0.06, 0, 0.4, 0, 0x6b4a32); },
+    ours_polaire:function(){ legs(0xf4f4f0, 0.8, 0.45, 0.8, 0.4); B(1.2, 1.1, 2.2, 0, 1.3, 0, 0xf4f4f0); S(0.5, 0, 1.6, -1.25, 0xf4f4f0); S(0.18, 0, 1.5, -1.7, 0x1b1b1d); },
+    manchot:function(){ S(0.35, 0, 0.6, 0, 0x1b1b1d, 1, 1.6, 0.9); S(0.28, 0, 0.6, -0.12, 0xf4f4f4, 0.9, 1.4, 0.6); S(0.22, 0, 1.25, 0, 0x1b1b1d); B(0.08, 0.06, 0.15, 0, 1.22, -0.25, 0xe3b52c); [-1, 1].forEach(function(s){ B(0.05, 0.45, 0.2, s*0.36, 0.65, 0, 0x1b1b1d); }); },
+    phoque:function(){ S(0.4, 0, 0.4, 0, 0x8a8f98, 1, 0.9, 2.4); S(0.3, 0, 0.6, -0.95, 0x8a8f98); B(0.6, 0.06, 0.3, 0, 0.1, 0.9, 0x6a6f78); },
+    dauphin:function(){ S(0.45, 0, 0, 0, 0x8aa0b8, 1, 0.9, 3); B(0.08, 0.5, 0.4, 0, 0.45, 0, 0x7a90a8); B(0.8, 0.06, 0.3, 0, 0, 1.35, 0x7a90a8); S(0.15, 0, -0.05, -1.45, 0x8aa0b8, 1, 1, 2); },
+    requin:function(){ S(0.5, 0, 0, 0, 0x6a7a88, 1, 0.9, 3.4); B(0.08, 0.8, 0.6, 0, 0.6, 0, 0x5a6a78); B(0.08, 0.9, 0.4, 0, 0, 1.7, 0x5a6a78); [-1, 1].forEach(function(s){ var f = B(0.7, 0.06, 0.35, s*0.55, -0.2, -0.3, 0x5a6a78); f.rotation.z = s*0.4; }); },
+    tortue:function(){ S(0.6, 0, 0, 0, 0x4a7a3a, 1, 0.45, 1.2); S(0.22, 0, 0, -0.85, 0x8aa070); [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(function(p){ B(0.5, 0.06, 0.25, p[0]*0.6, -0.05, p[1]*0.4, 0x8aa070); }); },
+    pieuvre:function(){ S(0.5, 0, 0.4, 0, 0xd85a6a, 1, 1.3, 1); for(var i=0;i<8;i++){ var a = i/8*Math.PI*2, t = B(0.12, 0.9, 0.12, Math.cos(a)*0.35, -0.3, Math.sin(a)*0.35, 0xd85a6a); t.rotation.x = Math.sin(a)*0.5; t.rotation.z = -Math.cos(a)*0.5; } },
+    poisson_clown:function(){ S(0.3, 0, 0, 0, 0xf28a2a, 0.6, 1, 1.4); [-0.15, 0.2].forEach(function(z){ B(0.38, 0.62, 0.08, 0, 0, z, 0xffffff); }); B(0.05, 0.4, 0.3, 0, 0, 0.5, 0xf28a2a); },
+    ours:function(){ legs(0x6b4a32, 0.8, 0.45, 0.8, 0.4); B(1.2, 1.1, 2, 0, 1.3, 0, 0x6b4a32); S(0.5, 0, 1.7, -1.15, 0x6b4a32); [-1, 1].forEach(function(s){ S(0.14, s*0.3, 2.15, -1.15, 0x6b4a32); }); },
+    castor:function(){ S(0.4, 0, 0.4, 0, 0x7a5232, 1, 0.9, 1.4); S(0.28, 0, 0.55, -0.6, 0x7a5232); B(0.45, 0.08, 0.6, 0, 0.12, 0.75, 0x3a2a1a); B(0.12, 0.12, 0.05, 0, 0.42, -0.86, 0xf4f0d0); },
+    orignal:function(){ legs(0x4a3424, 2, 0.4, 0.8, 0.25); B(1.1, 1.2, 2.3, 0, 2.5, 0, 0x4a3424); B(0.5, 0.6, 0.9, 0, 2.8, -1.5, 0x4a3424); [-1, 1].forEach(function(s){ B(1, 0.08, 0.6, s*0.6, 3.3, -1.35, 0xc8b88a); }); },
+    loup:function(){ legs(0x8a8f98, 0.7, 0.3, 0.6, 0.18); B(0.6, 0.6, 1.5, 0, 1, 0, 0x8a8f98); B(0.4, 0.4, 0.6, 0, 1.3, -0.9, 0x8a8f98); [-1, 1].forEach(function(s){ B(0.1, 0.25, 0.1, s*0.13, 1.6, -0.85, 0x8a8f98); }); var t = B(0.15, 0.15, 0.7, 0, 1, 0.95, 0x8a8f98); t.rotation.x = 0.5; },
+    vache:function(){ legs(0xf4f4f0, 1, 0.4, 0.75, 0.28); B(1, 1, 2, 0, 1.5, 0, 0xf4f4f0); [[0.3, -0.3], [-0.2, 0.5]].forEach(function(p){ B(1.02, 0.5, 0.5, 0, 1.6 + p[0]*0.3, p[1], 0x1b1b1d); }); B(0.6, 0.6, 0.7, 0, 1.8, -1.2, 0xf4f4f0); B(0.5, 0.3, 0.2, 0, 1.6, -1.6, 0xe8a0a0); },
+    cochon:function(){ legs(0xf2b8c0, 0.45, 0.3, 0.45, 0.2); S(0.55, 0, 0.8, 0, 0xf2b8c0, 1, 0.9, 1.4); S(0.32, 0, 0.9, -0.75, 0xf2b8c0); B(0.25, 0.2, 0.1, 0, 0.85, -1.05, 0xe898a8); },
+    mouton:function(){ legs(0x2a2a2a, 0.55, 0.3, 0.45, 0.18); S(0.6, 0, 1, 0, 0xf8f6f0, 1.1, 0.9, 1.4); B(0.35, 0.4, 0.45, 0, 1.15, -0.8, 0x2a2a2a); },
+    poule:function(){ S(0.3, 0, 0.5, 0, 0xf4f0e8, 1, 0.9, 1.2); S(0.17, 0, 0.85, -0.25, 0xf4f0e8); B(0.08, 0.15, 0.15, 0, 1.05, -0.25, 0xc8382f); B(0.06, 0.05, 0.12, 0, 0.83, -0.42, 0xe3b52c); B(0.05, 0.3, 0.05, -0.1, 0.15, 0, 0xe3b52c); B(0.05, 0.3, 0.05, 0.1, 0.15, 0, 0xe3b52c); },
+    cheval:function(){ legs(0x7a4a2a, 1.3, 0.3, 0.7, 0.2); B(0.8, 0.9, 2, 0, 1.75, 0, 0x7a4a2a); var n = B(0.35, 1, 0.4, 0, 2.4, -0.95, 0x7a4a2a); n.rotation.x = 0.45; B(0.35, 0.35, 0.8, 0, 2.8, -1.35, 0x7a4a2a); B(0.08, 0.8, 0.5, 0, 2.6, -0.9, 0x2a1a10); },
+    chevre:function(){ legs(0xe8e0d0, 0.7, 0.25, 0.45, 0.15); B(0.55, 0.6, 1.2, 0, 1, 0, 0xe8e0d0); B(0.3, 0.4, 0.5, 0, 1.35, -0.7, 0xe8e0d0); [-1, 1].forEach(function(s){ var h = B(0.06, 0.35, 0.06, s*0.1, 1.65, -0.62, 0x8a7a6a); h.rotation.x = 0.4; }); },
+    chien:function(){ legs(0xc8904a, 0.45, 0.2, 0.35, 0.13); B(0.45, 0.42, 0.95, 0, 0.62, 0, 0xc8904a); B(0.34, 0.34, 0.42, 0, 0.88, -0.55, 0xc8904a); [-1, 1].forEach(function(s){ B(0.08, 0.2, 0.14, s*0.18, 0.9, -0.5, 0x7a5232); }); var t = B(0.08, 0.08, 0.4, 0, 0.75, 0.6, 0xc8904a); t.rotation.x = -0.6; },
+    chat:function(){ legs(0x8a8f98, 0.32, 0.14, 0.26, 0.1); B(0.32, 0.32, 0.7, 0, 0.46, 0, 0x8a8f98); B(0.28, 0.26, 0.28, 0, 0.66, -0.42, 0x8a8f98); [-1, 1].forEach(function(s){ B(0.06, 0.12, 0.06, s*0.09, 0.84, -0.42, 0x8a8f98); }); var t = B(0.06, 0.06, 0.6, 0, 0.7, 0.5, 0x8a8f98); t.rotation.x = -0.9; },
+    lapin:function(){ S(0.25, 0, 0.3, 0, 0xf4f0e8, 1, 0.9, 1.2); S(0.17, 0, 0.5, -0.22, 0xf4f0e8); [-1, 1].forEach(function(s){ B(0.06, 0.35, 0.1, s*0.07, 0.8, -0.2, 0xf4f0e8); }); S(0.08, 0, 0.35, 0.3, 0xffffff); },
+    hamster:function(){ S(0.18, 0, 0.18, 0, 0xe0a060, 1, 0.85, 1.2); S(0.05, -0.08, 0.32, -0.12, 0xe0a060); S(0.05, 0.08, 0.32, -0.12, 0xe0a060); },
+    poisson_rouge:function(){ S(0.18, 0, 0.9, 0, 0xf28a2a, 0.6, 1, 1.3); B(0.03, 0.25, 0.2, 0, 0.9, 0.28, 0xf2a04a); var bowl = new THREE.Mesh(new THREE.SphereGeometry(0.5, 14, 10), new THREE.MeshLambertMaterial({color:0xbfe6ff, transparent:true, opacity:0.4})); bowl.position.y = 0.9; body.add(bowl); B(0.6, 0.4, 0.6, 0, 0.2, 0, 0x8a5a32); }
+  };
+  (A[k] || A.chien)();
+  g.traverse(function(o){ if(o.isMesh) o.castShadow = false; });
+  root.add(g); return g;
+}
+var HABITATS = [
+  {id:'savane', fr:'La savane africaine', en:'The African savanna', icon:'🦁', x:-400, z:700, w:90, d:70, ground:0xd8c07a, animals:['lion', 'girafe', 'elephant', 'zebre', 'zebre']},
+  {id:'jungle', fr:'La forêt tropicale', en:'The tropical rainforest', icon:'🐒', x:-290, z:700, w:90, d:70, ground:0x4f7a3a, animals:['singe', 'singe', 'tigre', 'perroquet', 'perroquet']},
+  {id:'banquise', fr:'La banquise', en:'The polar ice', icon:'🐧', x:-180, z:700, w:90, d:70, ground:0xeef4fa, animals:['ours_polaire', 'manchot', 'manchot', 'manchot', 'phoque']},
+  {id:'ocean', fr:'L\'océan (l\'aquarium)', en:'The ocean (the aquarium)', icon:'🐬', x:-400, z:800, w:90, d:60, ground:0x2a6a9a, water:true, animals:['dauphin', 'requin', 'tortue', 'pieuvre', 'poisson_clown', 'poisson_clown']},
+  {id:'foret', fr:'La forêt canadienne', en:'The Canadian forest', icon:'🦫', x:-290, z:800, w:90, d:60, ground:0x5f7a4a, animals:['ours', 'castor', 'orignal', 'loup']},
+  {id:'ferme', fr:'La ferme', en:'The farm', icon:'🐄', x:-180, z:800, w:90, d:60, ground:0x8aa04a, animals:['vache', 'cochon', 'mouton', 'poule', 'poule', 'cheval', 'chevre']},
+  {id:'maison', fr:'Les animaux domestiques', en:'Pets (domestic animals)', icon:'🐶', x:-80, z:760, w:70, d:110, ground:0xa8c07a, animals:['chien', 'chat', 'lapin', 'hamster', 'poisson_rouge', 'chien', 'chat']}
+];
+var ANIMAL_INFO = {
+  lion:['le lion', 'the lion', 'Il vit en groupe (une troupe). Le mâle a une crinière. Le lion dort jusqu\'à 20 heures par jour !', 'It lives in a group (a pride). The male has a mane. Lions sleep up to 20 hours a day!', 'carnivore'],
+  girafe:['la girafe', 'the giraffe', 'C\'est l\'animal le plus grand du monde : jusqu\'à 5,5 mètres. Sa langue est bleu-noir et mesure 45 cm.', 'It is the tallest animal in the world: up to 5.5 m. Its tongue is blue-black and 45 cm long.', 'herbivore'],
+  elephant:['l\'éléphant', 'the elephant', 'C\'est le plus gros animal terrestre. Il utilise sa trompe pour boire, manger et se laver.', 'It is the biggest land animal. It uses its trunk to drink, eat and wash.', 'herbivore'],
+  zebre:['le zèbre', 'the zebra', 'Chaque zèbre a des rayures uniques, comme une empreinte digitale.', 'Every zebra has unique stripes, like a fingerprint.', 'herbivore'],
+  singe:['le singe', 'the monkey', 'Les singes vivent dans les arbres et utilisent leur queue et leurs mains pour grimper.', 'Monkeys live in trees and use their tails and hands to climb.', 'omnivore'],
+  tigre:['le tigre', 'the tiger', 'C\'est le plus grand des félins. Contrairement aux chats, il aime l\'eau et nage très bien !', 'It is the biggest of the big cats. Unlike cats, it loves water and swims very well!', 'carnivore'],
+  perroquet:['le perroquet', 'the parrot', 'Certains perroquets peuvent imiter la voix humaine et vivre plus de 50 ans.', 'Some parrots can copy the human voice and live more than 50 years.', 'herbivore'],
+  ours_polaire:['l\'ours polaire', 'the polar bear', 'Sa peau est noire sous sa fourrure blanche pour garder la chaleur du soleil.', 'Its skin is black under its white fur to keep the sun\'s warmth.', 'carnivore'],
+  manchot:['le manchot', 'the penguin', 'Il ne vole pas, mais il nage très vite. En français, les « pingouins » volent, les « manchots » non !', 'It cannot fly but swims very fast. In French, a "pingouin" (auk) flies, a "manchot" (penguin) doesn\'t!', 'carnivore'],
+  phoque:['le phoque', 'the seal', 'Le phoque peut rester sous l\'eau plus de 20 minutes.', 'A seal can stay underwater for more than 20 minutes.', 'carnivore'],
+  dauphin:['le dauphin', 'the dolphin', 'Le dauphin est un mammifère, pas un poisson : il respire de l\'air.', 'The dolphin is a mammal, not a fish: it breathes air.', 'carnivore'],
+  requin:['le requin', 'the shark', 'Les requins existent depuis plus longtemps que les dinosaures et ont plusieurs rangées de dents.', 'Sharks have existed for longer than dinosaurs and have several rows of teeth.', 'carnivore'],
+  tortue:['la tortue de mer', 'the sea turtle', 'Elle pond ses œufs sur la plage où elle est née.', 'It lays its eggs on the beach where it was born.', 'omnivore'],
+  pieuvre:['la pieuvre', 'the octopus', 'Elle a huit bras, trois cœurs et du sang bleu !', 'It has eight arms, three hearts and blue blood!', 'carnivore'],
+  poisson_clown:['le poisson-clown', 'the clownfish', 'Il vit dans une anémone de mer qui le protège.', 'It lives in a sea anemone that protects it.', 'omnivore'],
+  ours:['l\'ours brun', 'the brown bear', 'L\'hiver, il hiberne : il dort dans une tanière pendant des mois.', 'In winter it hibernates: it sleeps in a den for months.', 'omnivore'],
+  castor:['le castor', 'the beaver', 'C\'est l\'animal symbole du Canada. Il construit des barrages avec des branches.', 'It is the symbol animal of Canada. It builds dams with branches.', 'herbivore'],
+  orignal:['l\'orignal', 'the moose', 'C\'est le plus grand cerf du monde. On l\'appelle « élan » en Europe.', 'It is the biggest deer in the world. In Europe it is called an "élan".', 'herbivore'],
+  loup:['le loup', 'the wolf', 'Le loup vit en meute et hurle pour communiquer.', 'The wolf lives in a pack and howls to communicate.', 'carnivore'],
+  vache:['la vache', 'the cow', 'Elle nous donne du lait. Une vache peut boire 100 litres d\'eau par jour !', 'It gives us milk. A cow can drink 100 litres of water a day!', 'herbivore'],
+  cochon:['le cochon', 'the pig', 'Le cochon est très intelligent. Il se roule dans la boue pour se rafraîchir.', 'The pig is very clever. It rolls in mud to cool down.', 'omnivore'],
+  mouton:['le mouton', 'the sheep', 'On fait de la laine avec sa toison.', 'Its fleece is made into wool.', 'herbivore'],
+  poule:['la poule', 'the hen', 'Elle pond des œufs. Le mâle s\'appelle le coq : « cocorico ! »', 'It lays eggs. The male is the rooster: "cocorico!"', 'omnivore'],
+  cheval:['le cheval', 'the horse', 'Le cheval peut dormir debout.', 'A horse can sleep standing up.', 'herbivore'],
+  chevre:['la chèvre', 'the goat', 'Son lait sert à faire du fromage de chèvre.', 'Its milk is made into goat cheese.', 'herbivore'],
+  chien:['le chien', 'the dog', 'Le chien a un odorat 10 000 fois meilleur que le nôtre.', 'A dog\'s sense of smell is 10,000 times better than ours.', 'omnivore'],
+  chat:['le chat', 'the cat', 'Le chat dort environ 15 heures par jour et ronronne quand il est content.', 'A cat sleeps about 15 hours a day and purrs when it is happy.', 'carnivore'],
+  lapin:['le lapin', 'the rabbit', 'Ses dents ne s\'arrêtent jamais de pousser : il doit ronger !', 'Its teeth never stop growing: it has to gnaw!', 'herbivore'],
+  hamster:['le hamster', 'the hamster', 'Il garde sa nourriture dans ses joues.', 'It keeps its food in its cheeks.', 'omnivore'],
+  poisson_rouge:['le poisson rouge', 'the goldfish', 'Il peut vivre plus de 10 ans s\'il est bien soigné.', 'It can live more than 10 years if well looked after.', 'omnivore']
+};
+var ZOO = {animals:[]};
+(function buildZoo(){
+  var B = new MeshBatch(), L = new Lot(B, 0, 0, 0);
+  flat(420, 8, -250, 750, 0xb8a888, 0.03); flat(8, 250, -40, 725, 0xb8a888, 0.03);
+  airSign('🦁 ZOO DE PARIS', -250, 9, 612, Math.PI, 26, '#2f6a3a');
+  [-268, -232].forEach(function(x){ L.box(1.4, 10, 1.4, x, 5, 612, 0x6b4a32); });
+  HABITATS.forEach(function(h){
+    if(h.water){
+      var tank = new THREE.Mesh(new THREE.BoxGeometry(h.w - 4, 6, h.d - 4), new THREE.MeshLambertMaterial({color:0x2a8ac8, transparent:true, opacity:0.45})); tank.position.set(h.x, 3, h.z); root.add(tank);
+      flat(h.w - 4, h.d - 4, h.x, h.z, 0x1a4a7a, 0.05);
+      addSolid(h.x - h.w/2 + 2, h.x + h.w/2 - 2, h.z - h.d/2 + 2, h.z + h.d/2 - 2, 'zoo', -1, 6);
+    } else {
+      flat(h.w, h.d, h.x, h.z, h.ground, 0.04);
+      for(var fx = -h.w/2; fx <= h.w/2; fx += 3){ L.box(0.15, 1.6, 0.15, h.x + fx, 0.8, h.z - h.d/2, 0x6b4a32); L.box(0.15, 1.6, 0.15, h.x + fx, 0.8, h.z + h.d/2, 0x6b4a32); }
+      for(var fz = -h.d/2; fz <= h.d/2; fz += 3){ L.box(0.15, 1.6, 0.15, h.x - h.w/2, 0.8, h.z + fz, 0x6b4a32); L.box(0.15, 1.6, 0.15, h.x + h.w/2, 0.8, h.z + fz, 0x6b4a32); }
+      [[h.w, 0.1, h.x, h.z - h.d/2], [h.w, 0.1, h.x, h.z + h.d/2]].forEach(function(r){ L.box(r[0], 0.12, 0.12, r[2], 1.5, r[3], 0x8a6a4a); });
+      L.box(0.12, 0.12, h.d, h.x - h.w/2, 1.5, h.z, 0x8a6a4a); L.box(0.12, 0.12, h.d, h.x + h.w/2, 1.5, h.z, 0x8a6a4a);
+      addSolid(h.x - h.w/2, h.x + h.w/2, h.z - h.d/2 - 0.3, h.z - h.d/2 + 0.3, 'zoo', -1, 2); addSolid(h.x - h.w/2, h.x + h.w/2, h.z + h.d/2 - 0.3, h.z + h.d/2 + 0.3, 'zoo', -1, 2);
+      addSolid(h.x - h.w/2 - 0.3, h.x - h.w/2 + 0.3, h.z - h.d/2, h.z + h.d/2, 'zoo', -1, 2); addSolid(h.x + h.w/2 - 0.3, h.x + h.w/2 + 0.3, h.z - h.d/2, h.z + h.d/2, 'zoo', -1, 2);
+      // props: acacias, jungle trees, ice blocks, pines, a barn, a little house
+      for(var p = 0; p < 6; p++){ var px = h.x - h.w/2 + 8 + (p*29 % (h.w - 16)), pz = h.z - h.d/2 + 8 + (p*17 % (h.d - 16)), P = new Lot(B, px, pz, 0);
+        if(h.id === 'savane'){ P.box(0.5, 4, 0.5, 0, 2, 0, 0x6b4a32); P.box(6, 0.8, 6, 0, 4.4, 0, 0x6a8a3a); }
+        if(h.id === 'jungle'){ P.box(0.7, 7, 0.7, 0, 3.5, 0, 0x5a3a22); P.part(new THREE.SphereGeometry(3, 8, 6), 0, 7.5, 0, 0x2f7a2a); }
+        if(h.id === 'banquise'){ P.box(4, 2 + p % 3, 3, 0, 1, 0, 0xdff0fa); }
+        if(h.id === 'foret'){ P.box(0.5, 2, 0.5, 0, 1, 0, 0x6b4a32); P.part(new THREE.ConeGeometry(2.2, 6, 8), 0, 5, 0, 0x2f5a3a); }
+      }
+      if(h.id === 'ferme'){ var F = new Lot(B, h.x + 30, h.z - 15, 0); F.box(14, 7, 10, 0, 3.5, 0, 0xa8322a); F.part(new THREE.CylinderGeometry(0.01, 8, 4, 4), 0, 9, 0, 0x6b2a2a, 0, Math.PI/4); }
+      if(h.id === 'maison'){ var M2 = new Lot(B, h.x, h.z - 40, 0); M2.box(14, 6, 10, 0, 3, 0, 0xf4e0c0); M2.part(new THREE.CylinderGeometry(0.01, 9, 4, 4), 0, 8, 0, 0xc8382f, 0, Math.PI/4); }
+      if(h.id === 'banquise') flat(30, 18, h.x + 20, h.z + 15, 0x6ab0d8, 0.05);
+    }
+    // the learning centre sign at the path side
+    var sx = h.x, sz = h.z < 750 ? h.z + h.d/2 + 3 : h.z - h.d/2 - 3;
+    if(h.id === 'maison'){ sx = h.x + h.w/2 + 3; sz = h.z; }
+    L.box(4.6, 2.6, 0.3, sx, 2.3, sz, 0x2f5a3a); L.box(0.3, 3.6, 0.3, sx - 2.2, 1.8, sz, 0x4a3422); L.box(0.3, 3.6, 0.3, sx + 2.2, 1.8, sz, 0x4a3422);
+    airSign(h.icon + ' ' + h.fr, sx, 2.5, sz + (h.z < 750 ? 0.2 : -0.2), h.z < 750 ? 0 : Math.PI, 4.4, '#2f5a3a');
+    addSpot({x:sx, z:sz + (h.id === 'maison' ? 0 : (h.z < 750 ? 2.5 : -2.5)), r:3.5, label:function(){ return h.icon + ' ' + h.fr + ' - ' + L2('learning centre', 'centre d\'apprentissage'); }, act:function(){ openHabitat(h); }});
+    h.animals.forEach(function(k, i){
+      var m = animalModel(k), ax = h.x - h.w/4 + (i*13 % (h.w/2)), az = h.z - h.d/4 + (i*7 % (h.d/2));
+      m.position.set(ax, h.water ? 2 + (i % 3) : 0, az);
+      ZOO.animals.push({m:m, h:h, k:k, tx:ax, tz:az, t:i, swim:!!h.water});
+    });
+  });
+  B.build();
+})();
+function openHabitat(h, q){
+  var kinds = h.animals.filter(function(k, i, a){ return a.indexOf(k) === i; });
+  var html = '<h3>' + h.icon + ' ' + esc(h.fr) + '</h3><div class="gc-sub">' + esc(h.en) + '</div>';
+  kinds.forEach(function(k){ var a = ANIMAL_INFO[k]; html += '<div class="gc-text"><b>' + esc(a[0]) + '</b>' + (LANG === 'en' ? ' (' + esc(a[1]) + ')' : '') + ' · <i>' + a[4] + '</i><br>' + esc(a[2]) + (LANG === 'en' ? '<br><span class="lf-soft">' + esc(a[3]) + '</span>' : '') + '</div>'; });
+  if(!q) html += '<div class="gc-row">' + gBtn('zooq', HABITATS.indexOf(h), L2('QUESTION (+🪙)', 'QUESTION (+🪙)'), 'go', ' data-enter="1"') + (h.id === 'maison' ? gBtn('adopt', null, L2('🏠 ADOPTION CENTRE', '🏠 CENTRE D\'ADOPTION')) : '') + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>';
+  else {
+    html += '<div class="gc-big">' + esc(q.say) + '</div><div class="gc-grid">' + q.opts.map(function(o, k){ return gOpt('zooans', k, esc(o), q.picked == null ? '' : k === q.ans ? 'right' : k === q.picked ? 'wrongpick' : '', q.picked != null); }).join('') + '</div>';
+    if(q.picked != null) html += '<div class="gc-big">' + (q.picked === q.ans ? '<span class="good">✓ Bravo !</span>' + (q.got ? ' +1 🪙' : '') : '<span class="bad">✗ ' + esc(q.opts[q.ans]) + '</span>') + '</div>' + noCharLine() + '<div class="gc-row">' + gBtn('zooq', HABITATS.indexOf(h), L2('ANOTHER QUESTION', 'UNE AUTRE QUESTION')) + gBtn('close', null, L2('CLOSE', 'FERMER'), 'go', ' data-enter="1"') + '</div>';
+  }
+  showCard(html);
+}
+GACT.zooq = function(v){
+  var h = HABITATS[v|0], r = lifeRand('zoo' + Date.now()), kinds = h.animals.filter(function(k, i, a){ return a.indexOf(k) === i; }), k = pickR(r, kinds), a = ANIMAL_INFO[k], q;
+  var kind = Math.floor(r()*3), all = Object.keys(ANIMAL_INFO);
+  if(kind === 0){ var m = mc(r, a[0], all.filter(function(x){ return x !== k; }).map(function(x){ return ANIMAL_INFO[x][0]; })); q = {say:L2('What is "' + a[1] + '" in French?', 'Comment dit-on « ' + a[1] + ' » en français ?'), opts:m.opts, ans:m.ans}; }
+  else if(kind === 1){ var m2 = mc(r, a[4], ['carnivore', 'herbivore', 'omnivore'].filter(function(x){ return x !== a[4]; })); q = {say:a[0].charAt(0).toUpperCase() + a[0].slice(1) + ' est...', opts:m2.opts, ans:m2.ans}; }
+  else { var hs = HABITATS.filter(function(x){ return x !== h; }); var m3 = mc(r, h.fr, hs.map(function(x){ return x.fr; })); q = {say:L2('Where does ' + a[1] + ' live in our zoo?', 'Où vit ' + a[0] + ' dans notre zoo ?'), opts:m3.opts, ans:m3.ans}; }
+  gcard.cur = {kind:'zoo', h:h, q:q}; openHabitat(h, q);
+};
+GACT.zooans = function(v){ var c = gcard.cur, q = c.q; if(q.picked != null) return; q.picked = v|0; if(q.picked === q.ans) q.got = addJeton(1); openHabitat(c.h, q); };
+/* the animals wander about (and swim in the aquarium) */
+function zooTick(dt){
+  if(camera.position.z < 520) return;
+  var t = performance.now()/1000;
+  ZOO.animals.forEach(function(a, i){
+    var m = a.m, dx = a.tx - m.position.x, dz = a.tz - m.position.z, d = Math.hypot(dx, dz);
+    if(d < 0.5 || a.wait > 0){ a.wait = (a.wait || 0) - dt; if(a.wait <= 0 && d < 0.5){ a.wait = 2 + (i % 5); a.tx = a.h.x + (Math.random() - 0.5)*(a.h.w - 14); a.tz = a.h.z + (Math.random() - 0.5)*(a.h.d - 14); } }
+    else { var sp = (a.swim ? 2.2 : 1) * dt; m.position.x += dx/d*sp; m.position.z += dz/d*sp; m.rotation.y = Math.atan2(-dx, -dz); }
+    m.children[0].position.y = a.swim ? Math.sin(t*2 + i)*0.3 : Math.abs(Math.sin(t*4 + i))*0.05;
+  });
+}
+
+/* ---------- LE CENTRE D'ADOPTION: adopt a pet; it follows you and everyone sees it ---------- */
+var PET_KINDS = [['chien', 'un chien', 'a dog', '🐶'], ['chat', 'un chat', 'a cat', '🐱'], ['lapin', 'un lapin', 'a rabbit', '🐰'], ['hamster', 'un hamster', 'a hamster', '🐹']];
+var PET_COLS = [['marron', 'brown', 0xc8904a], ['noir', 'black', 0x2a2a2a], ['blanc', 'white', 0xf4f0e8], ['gris', 'grey', 0x8a8f98], ['roux', 'ginger', 0xe07b2c]];
+var ADOPT_Q = [
+  ['Pour garder ton animal en bonne santé, tu dois...', 'l\'emmener chez le vétérinaire', ['lui donner du chocolat', 'le laisser seul une semaine', 'ne jamais le laver']],
+  ['Un chien a besoin de...', 'promenades tous les jours', ['regarder la télé', 'dormir dans le frigo', 'manger des bonbons']],
+  ['Que faut-il donner à ton animal chaque jour ?', 'de l\'eau fraîche et de la nourriture', ['du café', 'de la soupe piquante', 'rien du tout']],
+  ['Pour garder son poil propre, on peut le...', 'brosser', ['peindre', 'congeler', 'plier']],
+  ['Adopter un animal, c\'est...', 'une grande responsabilité', ['un jeu d\'une journée', 'un cadeau à rendre demain', 'une course de vitesse']]
+];
+addSpot({x:-80 + 35 + 3, z:820, r:4, label:function(){ return '🏠 ' + L2('Adoption centre - adopt a pet!', 'Centre d\'adoption - adopte un animal !'); }, act:function(){ GACT.adopt(); }});
+(function(){ var L = new Lot(new MeshBatch(), 0, 0, 0); bx(10, 5, 8, -80 + 35 + 9, 2.5, 820, 0xf4e8d0, true); airSign('🏠 CENTRE D\'ADOPTION', -80 + 35 + 4.9, 4, 820, Math.PI/2, 8, '#c8382f'); })();
+GACT.adopt = function(){
+  if(!hasChar()){ showCard('<h3>🏠 ' + L2('ADOPTION CENTRE', 'CENTRE D\'ADOPTION') + '</h3>' + noCharLine() + '<div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); return; }
+  var e = life.eco;
+  if(e.pet){ showCard('<h3>🏠 ' + L2('ADOPTION CENTRE', 'CENTRE D\'ADOPTION') + '</h3><div class="gc-text">' + L2('You already have ', 'Tu as déjà ') + esc(e.pet.nm) + ' ' + PET_KINDS.filter(function(p){ return p[0] === e.pet.k; })[0][3] + '. ' + L2('Take good care of them!', 'Prends-en bien soin !') + '</div><div class="gc-row">' + gBtn('petcare', null, L2('🦴 FEED / 🧸 PLAY', '🦴 NOURRIR / 🧸 JOUER'), 'go') + gBtn('petrehome', null, L2('Give back to the centre', 'Rendre au centre')) + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>'); return; }
+  gcard.cur = {kind:'adoptq', n:0, right:0, r:lifeRand('ad' + Date.now())}; adoptQ();
+};
+function adoptQ(msg){
+  var c = gcard.cur;
+  if(c.n >= 3){
+    if(c.right < 2){ showCard('<h3>🏠</h3><div class="gc-text">' + L2('You got ' + c.right + '/3. Learn a bit more about caring for pets and try again!', 'Tu as ' + c.right + '/3. Apprends encore un peu comment soigner un animal et réessaie !') + '</div><div class="gc-row">' + gBtn('adopt', null, L2('TRY AGAIN', 'RÉESSAYER'), 'go') + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>'); return; }
+    gcard.cur = {kind:'adoptpick', k:'chien', c:0}; adoptPick(); return;
+  }
+  var it = ADOPT_Q[(c.n + Math.floor(c.r()*5)) % ADOPT_Q.length], m = mc(c.r, it[1], it[2]); c.q = m;
+  showCard('<h3>🏠 ' + L2('ADOPTION CENTRE', 'CENTRE D\'ADOPTION') + ' · ' + (c.n + 1) + '/3</h3><div class="gc-sub">' + L2('Before adopting, show you know how to look after a pet!', 'Avant d\'adopter, montre que tu sais t\'occuper d\'un animal !') + '</div>' + (msg || '') + '<div class="gc-big">' + esc(it[0]) + '</div><div class="gc-grid">' + m.opts.map(function(o, k){ return gOpt('adoptans', k, esc(o)); }).join('') + '</div>');
+}
+GACT.adoptans = function(v){ var c = gcard.cur, ok = (v|0) === c.q.ans; if(ok) c.right++; c.n++; adoptQ(ok ? '<div class="good">✓ Bravo !</div>' : '<div class="bad">✗ ' + esc(c.q.opts[c.q.ans]) + '</div>'); };
+function adoptPick(){
+  var c = gcard.cur;
+  showCard('<h3>🏠 ' + L2('CHOOSE YOUR PET', 'CHOISIS TON ANIMAL') + '</h3><div class="gc-row">' + PET_KINDS.map(function(p){ return gBtn('petk', p[0], p[3] + ' ' + L2(p[2], p[1]), c.k === p[0] ? 'go' : ''); }).join('') + '</div>' +
+    '<div class="gc-sub" style="margin-top:8px">' + L2('Colour', 'Couleur') + '</div><div class="gc-row" style="margin-top:2px">' + PET_COLS.map(function(p, i){ return gBtn('petc', i, L2(p[1], p[0]), c.c === i ? 'go' : ''); }).join('') + '</div>' +
+    '<div class="gc-sub" style="margin-top:8px">' + L2('Give it a French name', 'Donne-lui un nom') + '</div><input class="gc-in" id="pet-nm" maxlength="16" placeholder="Biscuit, Plume, Croissant...">' +
+    '<div class="gc-row">' + gBtn('petok', null, L2('ADOPT!', 'ADOPTER !'), 'go', ' data-enter="1"') + gBtn('close', null, L2('CANCEL', 'ANNULER')) + '</div>');
+}
+GACT.petk = function(v){ gcard.cur.k = v; adoptPick(); };
+GACT.petc = function(v){ gcard.cur.c = v|0; adoptPick(); };
+GACT.petok = function(){
+  var c = gcard.cur, nm = cleanName((document.getElementById('pet-nm') || {}).value || '').slice(0, 16);
+  if(!nm || hasBadWord(nm)) nm = pickR(Math.random, ['Biscuit', 'Plume', 'Croissant', 'Caramel', 'Noisette', 'Praline']);
+  life.eco.pet = {k:c.k, c:c.c, nm:nm}; lifeSave(true); sendPresence(true);
+  showCard('<h3>🎉 ' + L2('WELCOME HOME, ', 'BIENVENUE, ') + esc(nm).toUpperCase() + ' !</h3><div class="gc-emoji">' + PET_KINDS.filter(function(p){ return p[0] === c.k; })[0][3] + '❤</div><div class="gc-text">' + L2('Your pet follows you everywhere in Paris. Everyone can see it!', 'Ton animal te suit partout dans Paris. Tout le monde peut le voir !') + '</div><div class="gc-row">' + gBtn('close', null, 'SUPER !', 'go', ' data-enter="1"') + '</div>');
+};
+GACT.petcare = function(){ var e = life.eco; e.pet.love = Math.min(100, (e.pet.love || 50) + 10); lifeSave(); showCard('<h3>❤ ' + esc(e.pet.nm) + '</h3><div class="gc-emoji">🦴😊</div><div class="gc-text">' + esc(e.pet.nm) + L2(' is happy! Happiness: ', ' est content(e) ! Bonheur : ') + e.pet.love + '%</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go', ' data-enter="1"') + '</div>'); };
+GACT.petrehome = function(){ delete life.eco.pet; lifeSave(true); sendPresence(true); closeCard(); };
+/* drawing pets: yours walks beside you, and other players' pets walk beside them */
+var PETS = {mine:null, mineKey:'', others:{}};
+function petModel(code){ var kv = String(code).split('|'), m = animalModel(kv[0] || 'chien'), col = (PET_COLS[kv[1]|0] || PET_COLS[0])[2], first = true;
+  m.traverse(function(o){ if(o.isMesh && o.material && o.material.color){ var hex = o.material.color.getHex(); if(hex !== 0x1b1b1d && hex !== 0xe3b52c && hex !== 0xffffff) { o.material = o.material.clone(); o.material.color.setHex(col); } } }); m.scale.setScalar(0.9); return m; }
+function petFollow(m, x, z, yawv, dt, side){
+  var tx = x + Math.cos(yawv)*1.3*side - Math.sin(yawv)*0.4, tz = z - Math.sin(yawv)*1.3*side - Math.cos(yawv)*0.4, dx = tx - m.position.x, dz = tz - m.position.z, d = Math.hypot(dx, dz);
+  if(d > 25){ m.position.set(tx, 0, tz); return; }
+  if(d > 0.3){ var sp = Math.min(d, Math.max(2, d*3)*dt); m.position.x += dx/d*sp; m.position.z += dz/d*sp; m.rotation.y = Math.atan2(-dx, -dz); m.children[0].position.y = Math.abs(Math.sin(performance.now()/90))*0.06; }
+  m.position.y = surfaceAt(m.position.x, m.position.z, 0);
+}
+function petsTick(dt){
+  var e = life.eco, want = e && e.pet && flying && !driving && !ride.on ? e.pet.k + '|' + e.pet.c : '';
+  if(want !== PETS.mineKey){ if(PETS.mine) root.remove(PETS.mine); PETS.mine = want ? petModel(want) : null; PETS.mineKey = want; if(PETS.mine) PETS.mine.position.set(camera.position.x + 1, 0, camera.position.z); }
+  if(PETS.mine) petFollow(PETS.mine, camera.position.x, camera.position.z, yaw, dt, 1);
+  var seen = {};
+  (mp.others || []).forEach(function(p){
+    var s = p.presence || {}, a = mp.avatars[p.peer]; if(!s.pet || !a || !a.model || s.mode !== 'walk') return;
+    seen[p.peer] = 1; var o = PETS.others[p.peer];
+    if(!o || o.key !== s.pet){ if(o) root.remove(o.m); o = PETS.others[p.peer] = {key:s.pet, m:petModel(s.pet)}; o.m.position.set(a.pos.x, 0, a.pos.z); }
+    petFollow(o.m, a.pos.x, a.pos.z, a.yaw || 0, dt, 1);
+  });
+  Object.keys(PETS.others).forEach(function(k){ if(!seen[k]){ root.remove(PETS.others[k].m); delete PETS.others[k]; } });
+}
+
+/* ---------- LE SUPERMARCHÉ (zoo district): aisles of foods and world specialities ----------
+   Every product shows where it comes from and its nutrition facts (per 100 g, approximate). Fill your basket, take a
+   shopping-list mission, and pay at the till (add up in French) for 🪙. */
+// [id, fr, en, emoji, origin fr, origin en, price €, kcal, protéines, glucides, dont sucres, lipides, fibres]
+var AISLES = [
+  {fr:'Fruits et légumes', en:'Fruit & vegetables', icon:'🍎', items:[
+    ['pomme', 'une pomme', 'an apple', '🍎', 'France (Normandie) et Canada', 'France (Normandy) and Canada', 0.5, 52, 0.3, 14, 10, 0.2, 2.4],
+    ['banane', 'une banane', 'a banana', '🍌', 'Équateur', 'Ecuador', 0.3, 89, 1.1, 23, 12, 0.3, 2.6],
+    ['orange', 'une orange', 'an orange', '🍊', 'Espagne', 'Spain', 0.6, 47, 0.9, 12, 9, 0.1, 2.4],
+    ['tomate', 'des tomates', 'tomatoes', '🍅', 'France (Provence)', 'France (Provence)', 2.9, 18, 0.9, 3.9, 2.6, 0.2, 1.2],
+    ['carotte', 'des carottes', 'carrots', '🥕', 'France', 'France', 1.5, 41, 0.9, 10, 4.7, 0.2, 2.8],
+    ['brocoli', 'un brocoli', 'a broccoli', '🥦', 'France (Bretagne)', 'France (Brittany)', 1.8, 34, 2.8, 7, 1.7, 0.4, 2.6],
+    ['fraise', 'des fraises', 'strawberries', '🍓', 'France et Espagne', 'France and Spain', 3.5, 32, 0.7, 7.7, 4.9, 0.3, 2],
+    ['oignon', 'des oignons', 'onions', '🧅', 'France', 'France', 1.2, 40, 1.1, 9, 4.2, 0.1, 1.7],
+    ['pdt', 'des pommes de terre', 'potatoes', '🥔', 'France (Picardie)', 'France (Picardy)', 1.6, 77, 2, 17, 0.8, 0.1, 2.2]]},
+  {fr:'Boulangerie', en:'Bakery', icon:'🥖', items:[
+    ['baguette', 'une baguette', 'a baguette', '🥖', 'France', 'France', 1.3, 270, 9, 55, 3, 1.5, 3],
+    ['croissant', 'un croissant', 'a croissant', '🥐', 'France (inspiré de Vienne, Autriche)', 'France (inspired by Vienna, Austria)', 1.2, 406, 8, 46, 11, 21, 2.6],
+    ['paincomplet', 'du pain complet', 'wholemeal bread', '🍞', 'France', 'France', 2.5, 250, 9, 43, 4, 3.5, 7],
+    ['brioche', 'une brioche', 'a brioche', '🍞', 'France (Normandie)', 'France (Normandy)', 3, 360, 8, 50, 14, 13, 2]]},
+  {fr:'Produits laitiers et œufs', en:'Dairy & eggs', icon:'🥛', items:[
+    ['lait', 'du lait', 'milk', '🥛', 'France', 'France', 1.1, 64, 3.3, 4.8, 4.8, 3.6, 0],
+    ['yaourt', 'un yaourt nature', 'a plain yoghurt', '🥣', 'France', 'France', 0.5, 61, 3.5, 4.7, 4.7, 3.3, 0],
+    ['beurre', 'du beurre', 'butter', '🧈', 'France (Bretagne)', 'France (Brittany)', 2.4, 717, 0.9, 0.1, 0.1, 81, 0],
+    ['camembert', 'un camembert', 'a camembert', '🧀', 'France (Normandie)', 'France (Normandy)', 3.2, 300, 20, 0.5, 0.5, 24, 0],
+    ['comte', 'du comté', 'comté cheese', '🧀', 'France (Jura)', 'France (Jura)', 4.5, 410, 27, 0, 0, 34, 0],
+    ['oeufs', 'des œufs', 'eggs', '🥚', 'France', 'France', 2.6, 143, 13, 0.7, 0.4, 9.5, 0],
+    ['creme', 'de la crème fraîche', 'crème fraîche', '🥛', 'France (Normandie)', 'France (Normandy)', 1.9, 292, 2.4, 2.8, 2.8, 30, 0]]},
+  {fr:'Viandes et poissons', en:'Meat & fish', icon:'🐟', items:[
+    ['poulet', 'du poulet', 'chicken', '🍗', 'France (Bresse)', 'France (Bresse)', 9, 165, 31, 0, 0, 3.6, 0],
+    ['saumon', 'du saumon', 'salmon', '🐟', 'Norvège', 'Norway', 22, 208, 20, 0, 0, 13, 0],
+    ['thon', 'du thon en boîte', 'tinned tuna', '🥫', 'Océan Indien', 'Indian Ocean', 3, 116, 26, 0, 0, 1, 0],
+    ['jambon', 'du jambon', 'ham', '🥓', 'France (Paris)', 'France (Paris)', 3.5, 145, 21, 1, 1, 6, 0],
+    ['boeuf', 'du bœuf haché', 'minced beef', '🥩', 'France (Charolais)', 'France (Charolais)', 11, 250, 26, 0, 0, 15, 0]]},
+  {fr:'Épicerie', en:'Pantry', icon:'🍝', items:[
+    ['pates', 'des pâtes', 'pasta', '🍝', 'Italie', 'Italy', 1.4, 371, 13, 75, 2.7, 1.5, 3.2],
+    ['riz', 'du riz', 'rice', '🍚', 'Thaïlande', 'Thailand', 2, 365, 7, 80, 0.1, 0.7, 1.3],
+    ['lentilles', 'des lentilles vertes', 'green lentils', '🫘', 'Canada (Saskatchewan) - 1er producteur mondial', 'Canada (Saskatchewan) - world\'s top grower', 2.2, 353, 25, 60, 2, 1, 11],
+    ['farine', 'de la farine', 'flour', '🌾', 'France (Beauce)', 'France (Beauce)', 1.1, 364, 10, 76, 0.3, 1, 2.7],
+    ['sucre', 'du sucre', 'sugar', '🍬', 'France (betterave)', 'France (sugar beet)', 1.3, 400, 0, 100, 100, 0, 0],
+    ['chocolat', 'du chocolat noir 70 %', 'dark chocolate 70%', '🍫', 'Cacao de Côte d\'Ivoire', 'Cocoa from Côte d\'Ivoire', 2.5, 598, 7.8, 46, 24, 43, 11],
+    ['confiture', 'de la confiture de fraises', 'strawberry jam', '🍓', 'France', 'France', 2.8, 250, 0.4, 62, 50, 0.1, 1]]},
+  {fr:'Boissons', en:'Drinks', icon:'🧃', items:[
+    ['eau', 'de l\'eau minérale', 'mineral water', '💧', 'France (Alpes)', 'France (Alps)', 0.6, 0, 0, 0, 0, 0, 0],
+    ['jusorange', 'du jus d\'orange', 'orange juice', '🧃', 'Brésil', 'Brazil', 2.2, 45, 0.7, 10, 8.4, 0.2, 0.2],
+    ['laitsoja', 'du lait de soja', 'soy milk', '🥛', 'France (soja du Sud-Ouest)', 'France (soy from the South-West)', 1.8, 54, 3.3, 6, 4, 1.8, 0.6],
+    ['the', 'du thé', 'tea', '🍵', 'Inde (Darjeeling)', 'India (Darjeeling)', 3, 1, 0, 0.2, 0, 0, 0]]},
+  {fr:'🇬🇷 Spécialités de Grèce', en:'Greek specialities', icon:'🇬🇷', world:true, items:[
+    ['olives', 'des olives de Kalamata', 'Kalamata olives', '🫒', 'Grèce (Kalamata, Péloponnèse)', 'Greece (Kalamata, Peloponnese)', 3.9, 115, 0.8, 6, 0, 11, 3.2],
+    ['feta', 'de la feta', 'feta cheese', '🧀', 'Grèce (lait de brebis)', 'Greece (sheep\'s milk)', 3.6, 264, 14, 4, 4, 21, 0],
+    ['huileolive', 'de l\'huile d\'olive', 'olive oil', '🫒', 'Grèce (Crète)', 'Greece (Crete)', 8, 884, 0, 0, 0, 100, 0],
+    ['yaourtgrec', 'du yaourt grec', 'Greek yoghurt', '🥣', 'Grèce', 'Greece', 2.5, 97, 9, 4, 4, 5, 0],
+    ['miel', 'du miel de thym', 'thyme honey', '🍯', 'Grèce', 'Greece', 7, 304, 0.3, 82, 82, 0, 0.2]]},
+  {fr:'🇮🇹 Spécialités d\'Italie', en:'Italian specialities', icon:'🇮🇹', world:true, items:[
+    ['parmesan', 'du parmesan', 'parmesan', '🧀', 'Italie (Émilie-Romagne)', 'Italy (Emilia-Romagna)', 5, 392, 36, 3.2, 0.8, 26, 0],
+    ['mozzarella', 'de la mozzarella', 'mozzarella', '🧀', 'Italie (Campanie)', 'Italy (Campania)', 2, 254, 18, 2.2, 1, 19, 0],
+    ['tomatespelees', 'des tomates pelées', 'peeled tomatoes', '🥫', 'Italie (Naples)', 'Italy (Naples)', 1.5, 21, 1, 4, 2.5, 0.2, 1.3],
+    ['arborio', 'du riz arborio (risotto)', 'arborio rice', '🍚', 'Italie (Piémont)', 'Italy (Piedmont)', 3, 350, 7, 79, 0, 0.6, 1]]},
+  {fr:'🇯🇵 Spécialités du Japon', en:'Japanese specialities', icon:'🇯🇵', world:true, items:[
+    ['miso', 'de la pâte miso', 'miso paste', '🍲', 'Japon', 'Japan', 4.5, 199, 12, 26, 6, 6, 5],
+    ['soja', 'de la sauce soja', 'soy sauce', '🍶', 'Japon', 'Japan', 2.5, 53, 8, 5, 0.4, 0.6, 0.8],
+    ['tofu', 'du tofu', 'tofu', '⬜', 'Japon et Chine', 'Japan and China', 2.2, 76, 8, 1.9, 0.6, 4.8, 0.3],
+    ['edamame', 'des edamame', 'edamame beans', '🫛', 'Japon', 'Japan', 3, 121, 12, 9, 2.2, 5, 5]]},
+  {fr:'🇲🇽 Spécialités du Mexique', en:'Mexican specialities', icon:'🇲🇽', world:true, items:[
+    ['tortillas', 'des tortillas de maïs', 'corn tortillas', '🫓', 'Mexique', 'Mexico', 2.5, 218, 5.7, 45, 0.9, 2.9, 6.3],
+    ['haricots', 'des haricots noirs', 'black beans', '🫘', 'Mexique', 'Mexico', 1.8, 132, 8.9, 24, 0.3, 0.5, 8.7],
+    ['avocat', 'un avocat', 'an avocado', '🥑', 'Mexique (Michoacán)', 'Mexico (Michoacán)', 1.2, 160, 2, 9, 0.7, 15, 7],
+    ['jalapeno', 'des piments jalapeños', 'jalapeño peppers', '🌶', 'Mexique (Veracruz)', 'Mexico (Veracruz)', 2.4, 29, 0.9, 6.5, 4, 0.4, 2.8]]},
+  {fr:'🇮🇳 Spécialités d\'Inde', en:'Indian specialities', icon:'🇮🇳', world:true, items:[
+    ['basmati', 'du riz basmati', 'basmati rice', '🍚', 'Inde (Pendjab)', 'India (Punjab)', 3, 350, 8, 78, 0, 1, 1.5],
+    ['poischiches', 'des pois chiches', 'chickpeas', '🫘', 'Inde', 'India', 2, 364, 19, 61, 11, 6, 17],
+    ['curcuma', 'du curcuma', 'turmeric', '🟡', 'Inde (Kerala)', 'India (Kerala)', 3, 312, 9.7, 67, 3.2, 3.3, 22],
+    ['mangue', 'une mangue', 'a mango', '🥭', 'Inde', 'India', 2, 60, 0.8, 15, 14, 0.4, 1.6]]},
+  {fr:'🇲🇦 Spécialités du Maroc', en:'Moroccan specialities', icon:'🇲🇦', world:true, items:[
+    ['couscous', 'de la semoule de couscous', 'couscous', '🍚', 'Maroc', 'Morocco', 1.8, 376, 13, 77, 0, 0.6, 5],
+    ['dattes', 'des dattes', 'dates', '🌴', 'Maroc (Tafilalet)', 'Morocco (Tafilalet)', 4, 277, 1.8, 75, 66, 0.2, 6.7],
+    ['amandes', 'des amandes', 'almonds', '🌰', 'Maroc', 'Morocco', 5, 579, 21, 22, 4.4, 50, 12.5],
+    ['menthe', 'de la menthe fraîche', 'fresh mint', '🌿', 'Maroc (Meknès)', 'Morocco (Meknes)', 1, 44, 3.3, 8, 0, 0.7, 6.8]]},
+  {fr:'🇨🇳 Spécialités de Chine', en:'Chinese specialities', icon:'🇨🇳', world:true, items:[
+    ['nouilles', 'des nouilles de riz', 'rice noodles', '🍜', 'Chine', 'China', 2, 364, 6, 80, 0, 0.6, 1.6],
+    ['paksoi', 'du pak-choï', 'bok choy', '🥬', 'Chine', 'China', 2.5, 13, 1.5, 2.2, 1.2, 0.2, 1],
+    ['litchi', 'des litchis', 'lychees', '🍒', 'Chine (Guangdong)', 'China (Guangdong)', 5, 66, 0.8, 16.5, 15, 0.4, 1.3],
+    ['theVert', 'du thé vert', 'green tea', '🍵', 'Chine (Zhejiang)', 'China (Zhejiang)', 4, 1, 0, 0, 0, 0, 0]]},
+  {fr:'🇨🇦 Spécialités du Canada et du Québec', en:'Canadian & Québec specialities', icon:'🇨🇦', world:true, items:[
+    ['erable', 'du sirop d\'érable', 'maple syrup', '🍁', 'Québec (Canada) - 70 % de la production mondiale', 'Québec (Canada) - 70% of the world\'s production', 9, 260, 0, 67, 60, 0.1, 0],
+    ['cheddar', 'du cheddar', 'cheddar cheese', '🧀', 'Canada (Ontario et Québec)', 'Canada (Ontario and Québec)', 4, 403, 25, 1.3, 0.5, 33, 0],
+    ['grains', 'du fromage en grains', 'cheese curds', '🧀', 'Québec (Canada)', 'Québec (Canada)', 5, 370, 25, 1.5, 0.5, 30, 0],
+    ['bleuets', 'des bleuets sauvages', 'wild blueberries', '🫐', 'Québec (Lac-Saint-Jean)', 'Québec (Lac-Saint-Jean)', 5, 57, 0.7, 14, 10, 0.3, 2.4],
+    ['canneberges', 'des canneberges', 'cranberries', '🍒', 'Québec (Centre-du-Québec)', 'Québec (Centre-du-Québec)', 4, 46, 0.5, 12, 4, 0.1, 4.6]]},
+  {fr:'🇱🇧 Spécialités du Liban', en:'Lebanese specialities', icon:'🇱🇧', world:true, items:[
+    ['houmous', 'du houmous', 'hummus', '🥣', 'Liban', 'Lebanon', 2.8, 166, 8, 14, 0.3, 9.6, 6],
+    ['pita', 'du pain pita', 'pitta bread', '🫓', 'Liban', 'Lebanon', 1.6, 275, 9, 56, 1.3, 1.2, 2.2],
+    ['taboule', 'du taboulé', 'tabbouleh', '🥗', 'Liban', 'Lebanon', 3, 140, 3, 15, 2, 7, 3]]}
+];
+var FOOD = {};
+AISLES.forEach(function(a){ a.items.forEach(function(it){ FOOD[it[0]] = it; it.aisle = a; }); });
+var GROC = {x:150, z:700, basket:[], list:null};
+(function buildGrocery(){
+  var X = GROC.x, Z = GROC.z, B = new MeshBatch(), L = new Lot(B, 0, 0, 0);
+  flat(84, 64, X, Z, 0xe8ecef, 0.04);
+  L.box(84, 8, 1, X, 4, Z + 32, 0xf4f4f0); L.box(1, 8, 64, X - 42, 4, Z, 0xf4f4f0); L.box(1, 8, 64, X + 42, 4, Z, 0xf4f4f0);
+  L.box(35, 8, 1, X - 24.5, 4, Z - 32, 0xf4f4f0); L.box(35, 8, 1, X + 24.5, 4, Z - 32, 0xf4f4f0); L.box(14, 2, 1, X, 7, Z - 32, 0xf4f4f0);
+  addSolid(X - 42, X + 42, Z + 31.5, Z + 32.5, 'zoo', -1, 8); addSolid(X - 42.5, X - 41.5, Z - 32, Z + 32, 'zoo', -1, 8); addSolid(X + 41.5, X + 42.5, Z - 32, Z + 32, 'zoo', -1, 8);
+  addSolid(X - 42, X - 7, Z - 32.5, Z - 31.5, 'zoo', -1, 8); addSolid(X + 7, X + 42, Z - 32.5, Z - 31.5, 'zoo', -1, 8);
+  var roof = new THREE.Mesh(new THREE.BoxGeometry(86, 0.4, 66), new THREE.MeshLambertMaterial({color:0xdfe6ea, transparent:true, opacity:0.4})); roof.position.set(X, 8.2, Z); root.add(roof);
+  airSign('🛒 SUPERMARCHÉ DU MONDE', X, 10, Z - 32.6, Math.PI, 26, '#2f9a4a');
+  // 15 aisles: shelves in 3 rows of 5, each a spot
+  AISLES.forEach(function(a, i){
+    var col = i % 5, row = Math.floor(i/5), ax = X - 30 + col*15, az = Z - 14 + row*14;
+    L.box(10, 2.6, 2, ax, 1.3, az, 0x8a8f98);
+    for(var sh = 0; sh < 3; sh++) for(var pr = 0; pr < 8; pr++) L.box(1, 0.55, 0.5, ax - 4.4 + pr*1.25, 0.5 + sh*0.8, az - 1.1, [0xc8382f, 0xe3b52c, 0x2f9a4a, 0x1f6fb8, 0xe07b2c, 0x8a3ad6][(pr + sh + i) % 6]);
+    addSolid(ax - 5, ax + 5, az - 1, az + 1, 'zoo', -1, 3);
+    airSign(a.icon + ' ' + a.fr, ax, 3.4, az - 1.05, Math.PI, 9, a.world ? '#6a2aa8' : '#2f6a3a');
+    addSpot({x:ax, z:az - 3, r:3, label:function(){ return a.icon + ' ' + L2(a.en, a.fr) + ' - ' + L2('look at the products', 'voir les produits'); }, act:function(){ openAisle(i); }});
+  });
+  L.box(6, 1.1, 2, X + 20, 0.55, Z + 26, 0x2a2d36); L.box(6, 1.1, 2, X + 30, 0.55, Z + 26, 0x2a2d36); airSign('CAISSES · CHECKOUT', X + 25, 3.5, Z + 24.6, Math.PI, 10, '#c8382f');
+  addSpot({x:X + 25, z:Z + 22.5, r:4, label:function(){ return '💳 ' + L2('Checkout - pay for your basket (', 'Caisse - payer ton panier (') + GROC.basket.length + ')'; }, act:function(){ openCheckout(); }});
+  L.box(3, 2, 0.3, X - 20, 1.5, Z - 29, 0xf2d22a); airSign('📝 LISTE DE COURSES', X - 20, 2.9, Z - 28.8, Math.PI, 6, '#b8822e');
+  addSpot({x:X - 20, z:Z - 27, r:3, label:function(){ return '📝 ' + L2('Shopping-list mission (+5 🪙)', 'Mission liste de courses (+5 🪙)'); }, act:function(){ openList(); }});
+  B.build();
+})();
+function nutriTable(it, grams){
+  var g = (grams || 100)/100, row = function(l, v, u){ return '<div class="lf-row"><span>' + l + '</span><b>' + (Math.round(v*g*10)/10).toString().replace('.', ',') + ' ' + u + '</b></div>'; };
+  return '<div class="lf-card">' + row(L2('Energy', 'Énergie'), it[7], 'kcal') + row(L2('Protein', 'Protéines'), it[8], 'g') + row(L2('Carbohydrates', 'Glucides'), it[9], 'g') + row(L2('of which sugars', 'dont sucres'), it[10], 'g') + row(L2('Fat', 'Lipides'), it[11], 'g') + row(L2('Fibre', 'Fibres'), it[12], 'g') +
+    '<div class="lf-soft">' + L2('Approximate values for ', 'Valeurs approximatives pour ') + (grams || 100) + ' g</div></div>';
+}
+function openAisle(i){
+  var a = AISLES[i];
+  showCard('<h3>' + a.icon + ' ' + esc(a.fr) + '</h3><div class="gc-sub">' + esc(a.en) + ' · 🧺 ' + GROC.basket.length + '</div><div class="gc-grid">' + a.items.map(function(it){ return gOpt('food', it[0], it[3] + ' <b>' + esc(it[1]) + '</b><br><span class="lf-soft">' + esc(L2(it[5], it[4])) + ' · ' + money2(it[6]) + ' €</span>'); }).join('') + '</div><div class="gc-row">' + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>');
+  gcard.cur = {kind:'aisle', i:i};
+}
+GACT.food = function(id, msg){
+  var it = FOOD[id], ai = AISLES.indexOf(it.aisle);
+  showCard('<h3>' + it[3] + ' ' + esc(it[1]) + '</h3><div class="gc-sub">' + esc(it[2]) + '</div>' + (typeof msg === 'string' ? msg : '') +
+    '<div class="gc-text">🌍 <b>' + L2('Origin', 'Origine') + ' :</b> ' + esc(L2(it[5], it[4])) + '</div><div class="gc-text">💶 <b>' + L2('Price', 'Prix') + ' :</b> ' + money2(it[6]) + ' €</div>' +
+    '<div class="gc-text">📊 <b>' + L2('Nutrition facts', 'Valeurs nutritionnelles') + '</b></div>' + nutriTable(it) +
+    '<div class="gc-row">' + gBtn('addbasket', id, L2('🧺 ADD TO BASKET', '🧺 AJOUTER AU PANIER'), 'go', ' data-enter="1"') + gBtn('aisle', ai, L2('BACK TO THE AISLE', 'RETOUR AU RAYON')) + '</div>');
+};
+GACT.aisle = function(v){ openAisle(v|0); };
+GACT.addbasket = function(id){ GROC.basket.push(id); GACT.food(id, '<div class="good gc-big">✓ ' + L2('In your basket!', 'Dans ton panier !') + ' (🧺 ' + GROC.basket.length + ')</div>'); };
+function openList(){
+  if(!GROC.list){ var r = lifeRand('list' + Date.now()), ids = Object.keys(FOOD), l = []; while(l.length < 4){ var id = pickR(r, ids); if(l.indexOf(id) < 0) l.push(id); } GROC.list = l; }
+  showCard('<h3>📝 ' + L2('YOUR SHOPPING LIST', 'TA LISTE DE COURSES') + '</h3><div class="gc-sub">' + L2('Find these in the aisles (they\'re written in French!), put them in your basket, then pay at the checkout.', 'Trouve ces produits dans les rayons, mets-les dans ton panier, puis paie à la caisse.') + '</div>' +
+    GROC.list.map(function(id){ var got = GROC.basket.indexOf(id) >= 0; return '<div class="gc-big">' + (got ? '✅' : '⬜') + ' ' + esc(FOOD[id][1]) + '</div>'; }).join('') +
+    '<div class="gc-row">' + gBtn('newlist', null, L2('NEW LIST', 'NOUVELLE LISTE')) + gBtn('close', null, 'OK', 'go', ' data-enter="1"') + '</div>');
+}
+GACT.newlist = function(){ GROC.list = null; GROC.basket = []; openList(); };
+function openCheckout(){
+  if(!GROC.basket.length){ showCard('<h3>💳 ' + L2('CHECKOUT', 'CAISSE') + '</h3><div class="gc-text">' + L2('Your basket is empty! Visit the aisles first.', 'Ton panier est vide ! Va d\'abord dans les rayons.') + '</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); return; }
+  var tot = Math.round(GROC.basket.reduce(function(s, id){ return s + FOOD[id][6]; }, 0)*100)/100, r = lifeRand('pay' + Date.now()), w = [];
+  [1, -1, 0.5, 10, -0.5, 2].forEach(function(d){ var v = Math.round((tot + d)*100)/100; if(v > 0) w.push(money2(v) + ' €'); });
+  var m = mc(r, money2(tot) + ' €', w); gcard.cur = {kind:'pay', q:m, tot:tot};
+  showCard('<h3>💳 ' + L2('CHECKOUT', 'CAISSE') + '</h3><div class="gc-text">' + GROC.basket.map(function(id){ return FOOD[id][3] + ' ' + esc(FOOD[id][1]) + ' - ' + money2(FOOD[id][6]) + ' €'; }).join('<br>') + '</div><div class="gc-big">« ' + L2('That comes to...', 'Ça fait...') + ' » ' + L2('Add it up! How much in total?', 'Additionne ! Combien en tout ?') + '</div><div class="gc-grid">' + m.opts.map(function(o, k){ return gOpt('payans', k, esc(o)); }).join('') + '</div>');
+}
+GACT.payans = function(v){
+  var c = gcard.cur, ok = (v|0) === c.q.ans, got = 0, listDone = false;
+  if(ok){ got = addJeton(1); if(GROC.list && GROC.list.every(function(id){ return GROC.basket.indexOf(id) >= 0; })){ got += addJeton(5); listDone = true; GROC.list = null; } GROC.basket = []; }
+  showCard('<h3>💳 ' + L2('CHECKOUT', 'CAISSE') + '</h3><div class="gc-big">' + (ok ? '<span class="good">✓ ' + L2('Right! « Merci, bonne journée ! »', 'Juste ! « Merci, bonne journée ! »') + '</span>' + (got ? ' +' + got + ' 🪙' : '') + (listDone ? '<br>📝 ' + L2('Shopping list complete!', 'Liste de courses terminée !') : '') : '<span class="bad">✗ ' + L2('Not quite - the total is ', 'Pas tout à fait - le total est ') + money2(c.tot) + ' €</span>') + '</div>' + noCharLine() + '<div class="gc-row">' + (ok ? '' : gBtn('checkout', null, L2('TRY AGAIN', 'RÉESSAYER'))) + gBtn('close', null, 'OK', 'go', ' data-enter="1"') + '</div>');
+};
+GACT.checkout = openCheckout;
+
+/* ---------- LE CENTRE DES CHEFS (zoo district, next to the supermarket) ----------
+   RECETTES: French and francophone recipes (ingredients and steps in French, English help).
+   COURS DE CUISINE: follow a recipe in the right order and answer the quantities - pass to get the recipe's 🎓 diploma.
+   CRÉATEUR DE RECETTES: make your own recipe from the supermarket's ingredients; the nutrition is added up for you,
+   and it goes in the class recipe book that everyone can read. */
+var RECIPES = [
+  {id:'crepes', nm:'Les crêpes', en:'Crêpes', icon:'🥞', from:'Bretagne, France', serves:4, time:'30 min',
+   ing:[['farine', 250, '250 g de farine'], ['oeufs', 200, '4 œufs'], ['lait', 500, '50 cl de lait'], ['beurre', 30, '30 g de beurre fondu'], ['sucre', 20, '1 cuillère de sucre']],
+   steps:[['Verse la farine et le sucre dans un saladier.', 'Put the flour and sugar in a bowl.'], ['Ajoute les œufs et mélange.', 'Add the eggs and mix.'], ['Verse le lait petit à petit en fouettant.', 'Pour in the milk little by little, whisking.'], ['Ajoute le beurre fondu et laisse reposer 1 heure.', 'Add the melted butter and let it rest 1 hour.'], ['Fais cuire chaque crêpe 1 minute de chaque côté dans une poêle chaude.', 'Cook each crêpe 1 minute on each side in a hot pan.']]},
+  {id:'croque', nm:'Le croque-monsieur', en:'Croque-monsieur', icon:'🥪', from:'Paris, France', serves:2, time:'20 min',
+   ing:[['paincomplet', 160, '4 tranches de pain de mie'], ['jambon', 80, '2 tranches de jambon'], ['comte', 80, '80 g de comté râpé'], ['beurre', 20, '20 g de beurre']],
+   steps:[['Beurre les tranches de pain.', 'Butter the slices of bread.'], ['Mets une tranche de jambon et du fromage sur deux tranches.', 'Put ham and cheese on two slices.'], ['Ferme avec les autres tranches de pain.', 'Close with the other slices.'], ['Ajoute du fromage râpé sur le dessus.', 'Add grated cheese on top.'], ['Fais cuire au four 10 minutes à 200 °C.', 'Bake 10 minutes at 200 °C.']]},
+  {id:'ratatouille', nm:'La ratatouille', en:'Ratatouille', icon:'🍆', from:'Nice, Provence (France)', serves:4, time:'1 h',
+   ing:[['tomate', 400, '4 tomates'], ['oignon', 150, '1 oignon'], ['huileolive', 30, '3 cuillères d\'huile d\'olive'], ['brocoli', 0, '1 courgette, 1 aubergine, 1 poivron']],
+   steps:[['Lave et coupe les légumes en dés.', 'Wash and dice the vegetables.'], ['Fais revenir l\'oignon dans l\'huile d\'olive.', 'Fry the onion in the olive oil.'], ['Ajoute le poivron, l\'aubergine et la courgette.', 'Add the pepper, aubergine and courgette.'], ['Ajoute les tomates et les herbes de Provence.', 'Add the tomatoes and herbes de Provence.'], ['Laisse mijoter 40 minutes à feu doux.', 'Simmer 40 minutes on a low heat.']]},
+  {id:'quiche', nm:'La quiche lorraine', en:'Quiche lorraine', icon:'🥧', from:'Lorraine, France', serves:6, time:'50 min',
+   ing:[['farine', 200, '1 pâte brisée'], ['oeufs', 150, '3 œufs'], ['creme', 200, '20 cl de crème fraîche'], ['jambon', 150, '150 g de lardons']],
+   steps:[['Préchauffe le four à 180 °C.', 'Preheat the oven to 180 °C.'], ['Mets la pâte dans un moule.', 'Put the pastry in a tin.'], ['Fais dorer les lardons à la poêle.', 'Brown the lardons in a pan.'], ['Bats les œufs avec la crème, du sel et du poivre.', 'Beat the eggs with the cream, salt and pepper.'], ['Verse sur la pâte avec les lardons et fais cuire 35 minutes.', 'Pour onto the pastry with the lardons and bake 35 minutes.']]},
+  {id:'mousse', nm:'La mousse au chocolat', en:'Chocolate mousse', icon:'🍫', from:'France', serves:4, time:'20 min + 3 h',
+   ing:[['chocolat', 200, '200 g de chocolat noir'], ['oeufs', 300, '6 œufs'], ['sucre', 30, '30 g de sucre']],
+   steps:[['Fais fondre le chocolat au bain-marie.', 'Melt the chocolate in a bain-marie.'], ['Sépare les blancs des jaunes.', 'Separate the whites from the yolks.'], ['Mélange les jaunes avec le chocolat fondu.', 'Mix the yolks with the melted chocolate.'], ['Monte les blancs en neige avec le sucre.', 'Whisk the whites into stiff peaks with the sugar.'], ['Incorpore délicatement les blancs et mets au frigo 3 heures.', 'Gently fold in the whites and chill 3 hours.']]},
+  {id:'nicoise', nm:'La salade niçoise', en:'Salade niçoise', icon:'🥗', from:'Nice, France', serves:4, time:'25 min',
+   ing:[['tomate', 300, '4 tomates'], ['oeufs', 150, '3 œufs durs'], ['thon', 150, '150 g de thon'], ['olives', 60, 'des olives noires'], ['huileolive', 30, '3 cuillères d\'huile d\'olive']],
+   steps:[['Fais cuire les œufs 10 minutes pour qu\'ils soient durs.', 'Boil the eggs 10 minutes until hard.'], ['Coupe les tomates en quartiers.', 'Cut the tomatoes into quarters.'], ['Écale les œufs et coupe-les en deux.', 'Peel the eggs and cut them in half.'], ['Dispose les tomates, le thon, les œufs et les olives.', 'Arrange the tomatoes, tuna, eggs and olives.'], ['Arrose d\'huile d\'olive et sers.', 'Drizzle with olive oil and serve.']]},
+  {id:'poutine', nm:'La poutine', en:'Poutine', icon:'🍟', from:'Québec, Canada', serves:2, time:'40 min',
+   ing:[['pdt', 600, '4 pommes de terre'], ['grains', 200, '200 g de fromage en grains'], ['beurre', 20, '20 g de beurre (pour la sauce)']],
+   steps:[['Épluche et coupe les pommes de terre en frites.', 'Peel and cut the potatoes into fries.'], ['Fais cuire les frites jusqu\'à ce qu\'elles soient dorées.', 'Cook the fries until golden.'], ['Prépare une sauce brune bien chaude.', 'Make a hot brown gravy.'], ['Mets le fromage en grains sur les frites chaudes.', 'Put the cheese curds on the hot fries.'], ['Verse la sauce brune sur le dessus et mange tout de suite !', 'Pour the gravy on top and eat right away!']]},
+  {id:'painperdu', nm:'Le pain perdu', en:'French toast (pain perdu)', icon:'🍞', from:'France', serves:4, time:'15 min',
+   ing:[['baguette', 250, '1 vieille baguette'], ['oeufs', 100, '2 œufs'], ['lait', 250, '25 cl de lait'], ['sucre', 30, '30 g de sucre'], ['beurre', 20, '20 g de beurre']],
+   steps:[['Coupe le pain rassis en tranches.', 'Slice the stale bread.'], ['Bats les œufs avec le lait et le sucre.', 'Beat the eggs with the milk and sugar.'], ['Trempe les tranches dans le mélange.', 'Dip the slices in the mixture.'], ['Fais-les dorer dans le beurre à la poêle.', 'Fry them golden in butter.'], ['Saupoudre de sucre ou de cannelle et sers.', 'Sprinkle with sugar or cinnamon and serve.']]}
+];
+var CHEF = {x:320, z:700};
+(function buildChef(){
+  var X = CHEF.x, Z = CHEF.z, B = new MeshBatch(), L = new Lot(B, 0, 0, 0);
+  flat(60, 50, X, Z, 0xf4f0e8, 0.04);
+  L.box(60, 8, 1, X, 4, Z + 25, 0xf2f2f2); L.box(1, 8, 50, X - 30, 4, Z, 0xf2f2f2); L.box(1, 8, 50, X + 30, 4, Z, 0xf2f2f2);
+  L.box(23, 8, 1, X - 18.5, 4, Z - 25, 0xf2f2f2); L.box(23, 8, 1, X + 18.5, 4, Z - 25, 0xf2f2f2);
+  addSolid(X - 30, X + 30, Z + 24.5, Z + 25.5, 'zoo', -1, 8); addSolid(X - 30.5, X - 29.5, Z - 25, Z + 25, 'zoo', -1, 8); addSolid(X + 29.5, X + 30.5, Z - 25, Z + 25, 'zoo', -1, 8);
+  addSolid(X - 30, X - 7, Z - 25.5, Z - 24.5, 'zoo', -1, 8); addSolid(X + 7, X + 30, Z - 25.5, Z - 24.5, 'zoo', -1, 8);
+  var roof = new THREE.Mesh(new THREE.BoxGeometry(62, 0.4, 52), solidMat(0x2a2d36)); roof.position.set(X, 8.2, Z); root.add(roof);
+  var hat = new THREE.Group(); hat.position.set(X, 8.4, Z); var hb = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 5, 20), solidMat(0xffffff)); hb.position.y = 2.5; hat.add(hb); var ht = new THREE.Mesh(new THREE.SphereGeometry(7.5, 16, 10), solidMat(0xffffff)); ht.scale.y = 0.6; ht.position.y = 6; hat.add(ht); root.add(hat);
+  airSign('👨‍🍳 LE CENTRE DES CHEFS', X, 11, Z - 25.6, Math.PI, 20, '#c8382f');
+  // kitchen islands
+  [[-14, -8], [0, -8], [14, -8], [-14, 8], [0, 8], [14, 8]].forEach(function(p, i){
+    L.box(8, 1, 3.5, X + p[0], 0.5, Z + p[1], 0xd8d2c4); L.box(8.2, 0.12, 3.7, X + p[0], 1.06, Z + p[1], 0x2a2d36); L.box(1.2, 0.2, 1.2, X + p[0] - 2, 1.2, Z + p[1], 0x1b1b1d); L.box(1.2, 0.2, 1.2, X + p[0] + 2, 1.2, Z + p[1], 0x1b1b1d);
+    addSolid(X + p[0] - 4, X + p[0] + 4, Z + p[1] - 1.75, Z + p[1] + 1.75, 'zoo', -1, 1.2);
+  });
+  B.build();
+  [['📖', 'recipes', -14, 'Recipes', 'Recettes'], ['🎓', 'class', 0, 'Cooking class', 'Cours de cuisine'], ['✏', 'create', 14, 'Recipe creator', 'Créateur de recettes']].forEach(function(s){
+    airSign(s[0] + ' ' + s[4].toUpperCase(), X + s[2], 3, Z - 10.2, Math.PI, 6, '#c8382f');
+    addSpot({x:X + s[2], z:Z - 12, r:3.5, label:function(){ return s[0] + ' ' + L2(s[3], s[4]); }, act:function(){ ({recipes:openRecipes, 'class':openClass, create:function(){ openCreator(); }})[s[1]](); }});
+  });
+  addSpot({x:X, z:Z + 4.5, r:3, label:function(){ return '📚 ' + L2('The class recipe book', 'Le livre de recettes de la classe'); }, act:function(){ openRecipeBook(); }});
+})();
+function recipeNutri(ing){ var t = [0, 0, 0, 0, 0, 0]; ing.forEach(function(x){ var f = FOOD[x[0]]; if(!f || !x[1]) return; for(var k = 0; k < 6; k++) t[k] += f[7 + k]*x[1]/100; }); return t; }
+function nutriSum(t, serves){ var s = serves || 1, r = function(l, v, u){ return '<div class="lf-row"><span>' + l + '</span><b>' + Math.round(v/s) + ' ' + u + '</b></div>'; };
+  return '<div class="lf-card">' + r(L2('Energy', 'Énergie'), t[0], 'kcal') + r(L2('Protein', 'Protéines'), t[1], 'g') + r(L2('Carbohydrates', 'Glucides'), t[2], 'g') + r(L2('of which sugars', 'dont sucres'), t[3], 'g') + r(L2('Fat', 'Lipides'), t[4], 'g') + r(L2('Fibre', 'Fibres'), t[5], 'g') + '<div class="lf-soft">' + L2('Per serving, approximate', 'Par portion, valeurs approximatives') + '</div></div>'; }
+function openRecipes(){ showCard('<h3>📖 ' + L2('RECIPES', 'RECETTES') + '</h3><div class="gc-grid">' + RECIPES.map(function(r, i){ var done = life.eco && life.eco.chef && life.eco.chef[r.id]; return gOpt('recipe', i, r.icon + ' <b>' + esc(r.nm) + '</b>' + (done ? ' 🎓' : '') + '<br><span class="lf-soft">' + esc(r.from) + ' · ' + r.time + '</span>'); }).join('') + '</div><div class="gc-row">' + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>'); }
+GACT.recipe = function(v){
+  var r = RECIPES[v|0];
+  showCard('<h3>' + r.icon + ' ' + esc(r.nm) + '</h3><div class="gc-sub">' + esc(r.en) + ' · ' + esc(r.from) + ' · ' + r.serves + L2(' servings', ' personnes') + ' · ⏱ ' + r.time + '</div>' +
+    '<div class="gc-text"><b>' + L2('Ingredients', 'Ingrédients') + ' :</b><br>' + r.ing.map(function(x){ return '• ' + esc(x[2]); }).join('<br>') + '</div>' +
+    '<div class="gc-text"><b>' + L2('Steps', 'Étapes') + ' :</b><br>' + r.steps.map(function(s, k){ return (k + 1) + '. ' + esc(s[0]) + (LANG === 'en' ? ' <span class="lf-soft">(' + esc(s[1]) + ')</span>' : ''); }).join('<br>') + '</div>' +
+    '<div class="gc-text"><b>' + L2('Nutrition', 'Valeurs nutritionnelles') + '</b></div>' + nutriSum(recipeNutri(r.ing), r.serves) +
+    '<div class="gc-row">' + gBtn('classgo', v, L2('🎓 TAKE THE COOKING CLASS', '🎓 SUIVRE LE COURS'), 'go') + gBtn('recipes', null, L2('ALL RECIPES', 'TOUTES LES RECETTES')) + '</div>');
+};
+GACT.recipes = openRecipes;
+function openClass(){ showCard('<h3>🎓 ' + L2('COOKING CLASS', 'COURS DE CUISINE') + '</h3><div class="gc-sub">' + L2('Cook the recipe in the right order, then answer the quantities. Pass to earn the diploma 🎓 and 3 🪙.', 'Cuisine la recette dans le bon ordre, puis réponds aux quantités. Réussis pour gagner le diplôme 🎓 et 3 🪙.') + '</div><div class="gc-grid">' + RECIPES.map(function(r, i){ var done = life.eco && life.eco.chef && life.eco.chef[r.id]; return gOpt('classgo', i, r.icon + ' ' + esc(r.nm) + (done ? ' 🎓' : '')); }).join('') + '</div><div class="gc-row">' + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>'); }
+GACT.classgo = function(v){ gcard.cur = {kind:'class', r:RECIPES[v|0], step:0, mistakes:0, rnd:lifeRand('cl' + Date.now())}; classStep(); };
+function classStep(msg){
+  var c = gcard.cur, r = c.r;
+  if(c.step < r.steps.length){
+    var right = r.steps[c.step], others = r.steps.slice(c.step + 1).concat(RECIPES.filter(function(x){ return x !== r; }).map(function(x){ return pickR(c.rnd, x.steps); })).map(function(s){ return s[0]; });
+    var m = mc(c.rnd, right[0], others.slice(0, 6)); c.q = m;
+    showCard('<h3>🎓 ' + r.icon + ' ' + esc(r.nm) + '<span class="gc-score">' + L2('step ', 'étape ') + (c.step + 1) + '/' + r.steps.length + '</span></h3>' + (msg || '') + '<div class="gc-big">' + L2('What do you do next?', 'Qu\'est-ce qu\'on fait maintenant ?') + '</div>' +
+      '<div class="gc-sub">' + r.steps.slice(0, c.step).map(function(s, k){ return '✓ ' + (k + 1) + '. ' + esc(s[0]); }).join('<br>') + '</div><div class="gc-grid">' + m.opts.map(function(o, k){ return gOpt('classans', k, esc(o)); }).join('') + '</div>');
+    return;
+  }
+  if(c.step === r.steps.length){
+    var ing = pickR(c.rnd, r.ing), wr = r.ing.filter(function(x){ return x !== ing; }).map(function(x){ return x[2]; }).concat(['3 kilos de sel', '1 litre de ketchup']);
+    var m2 = mc(c.rnd, ing[2], wr); c.q = m2;
+    showCard('<h3>🎓 ' + r.icon + ' ' + esc(r.nm) + '</h3>' + (msg || '') + '<div class="gc-big">' + L2('Which of these is in the recipe?', 'Lequel de ces ingrédients est dans la recette ?') + '</div><div class="gc-grid">' + m2.opts.map(function(o, k){ return gOpt('classans', k, esc(o)); }).join('') + '</div>');
+    return;
+  }
+  var pass = c.mistakes <= 2, got = 0;
+  if(pass && hasChar()){ life.eco.chef = life.eco.chef || {}; if(!life.eco.chef[r.id]){ life.eco.chef[r.id] = 1; got = addJeton(3); } lifeSave(); }
+  showCard('<h3>🎓 ' + r.icon + ' ' + esc(r.nm) + '</h3><div class="gc-emoji">' + (pass ? '👨‍🍳🎓' : '🍳') + '</div><div class="gc-big">' + (pass ? L2('Bravo, chef! You earned the diploma.', 'Bravo, chef ! Tu as gagné le diplôme.') + (got ? ' +' + got + ' 🪙' : '') : L2('Almost! ' + c.mistakes + ' mistakes - try again to earn the diploma.', 'Presque ! ' + c.mistakes + ' erreurs - recommence pour gagner le diplôme.')) + '</div>' + noCharLine() + '<div class="gc-row">' + gBtn('classgo', RECIPES.indexOf(r), L2('AGAIN', 'ENCORE')) + gBtn('close', null, 'OK', 'go', ' data-enter="1"') + '</div>');
+}
+GACT.classans = function(v){ var c = gcard.cur, ok = (v|0) === c.q.ans; if(!ok) c.mistakes++; var msg = ok ? '<div class="good">✓ ' + L2('Yes!', 'Oui !') + '</div>' : '<div class="bad">✗ ' + L2('Not yet. The right step was: ', 'Pas encore. La bonne étape : ') + esc(c.q.opts[c.q.ans]) + '</div>'; c.step++; classStep(msg); };
+/* the recipe creator */
+var COOK_VERBS = [['Coupe', 'Cut'], ['Mélange', 'Mix'], ['Fais cuire', 'Cook'], ['Fais bouillir', 'Boil'], ['Fais griller', 'Grill'], ['Épluche', 'Peel'], ['Verse', 'Pour'], ['Ajoute', 'Add'], ['Fais fondre', 'Melt'], ['Laisse reposer', 'Let rest']];
+function openCreator(d){
+  var c = gcard.cur && gcard.cur.kind === 'create' ? gcard.cur : (gcard.cur = {kind:'create', d:d || {nm:'', ing:[], steps:[], serves:2}, aisle:0});
+  var R = c.d, h = '<h3>✏ ' + L2('RECIPE CREATOR', 'CRÉATEUR DE RECETTES') + '</h3>';
+  h += '<div class="gc-sub">' + L2('1. Name your recipe', '1. Donne un nom à ta recette') + '</div><input class="gc-in" id="rc-nm" maxlength="40" value="' + esc(R.nm) + '" placeholder="La salade de ' + esc((life.eco && life.eco.ch && life.eco.ch.fn) || 'Léa') + '">';
+  h += '<div class="gc-sub" style="margin-top:8px">' + L2('2. Add ingredients (100 g each click)', '2. Ajoute des ingrédients (100 g par clic)') + '</div><div class="gc-row" style="margin-top:2px">' + AISLES.map(function(a, i){ return gBtn('rcaisle', i, a.icon, c.aisle === i ? 'go' : ''); }).join('') + '</div>';
+  h += '<div class="gc-row">' + AISLES[c.aisle].items.map(function(it){ return gBtn('rcadd', it[0], it[3] + ' ' + it[1].replace(/^(un|une|des|du|de la|de l'|le|la) /, '')); }).join('') + '</div>';
+  h += '<div class="gc-text">' + (R.ing.length ? R.ing.map(function(x, k){ var f = FOOD[x[0]]; return f[3] + ' ' + x[1] + ' g ' + esc(f[1].replace(/^(un|une|des|du|de la|de l'|le|la) /, '')) + ' ' + gBtn('rcdel', k, '✕'); }).join('<br>') : '<span class="lf-soft">' + L2('No ingredients yet.', 'Pas encore d\'ingrédients.') + '</span>') + '</div>';
+  h += '<div class="gc-sub">' + L2('3. Add steps: pick an action, it uses your last ingredient', '3. Ajoute des étapes : choisis une action (avec ton dernier ingrédient)') + '</div><div class="gc-row" style="margin-top:2px">' + COOK_VERBS.map(function(v, i){ return gBtn('rcstep', i, v[0]); }).join('') + '</div>';
+  h += '<div class="gc-text">' + R.steps.map(function(s, k){ return (k + 1) + '. ' + esc(s) + ' ' + gBtn('rcsdel', k, '✕'); }).join('<br>') + '</div>';
+  h += '<div class="gc-sub">' + L2('4. Servings', '4. Nombre de personnes') + ' : ' + [1, 2, 4, 6].map(function(n){ return gBtn('rcserv', n, String(n), R.serves === n ? 'go' : ''); }).join(' ') + '</div>';
+  if(R.ing.length) h += '<div class="gc-text"><b>' + L2('Nutrition (calculated)', 'Valeurs nutritionnelles (calculées)') + '</b></div>' + nutriSum(recipeNutri(R.ing), R.serves);
+  h += '<div class="gc-row">' + gBtn('rcsave', null, L2('💾 SAVE TO THE CLASS RECIPE BOOK', '💾 ENREGISTRER DANS LE LIVRE DE LA CLASSE'), 'go') + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>';
+  showCard(h);
+}
+function rcName(){ var el = document.getElementById('rc-nm'); if(el && gcard.cur) gcard.cur.d.nm = el.value; }
+GACT.rcaisle = function(v){ rcName(); gcard.cur.aisle = v|0; openCreator(); };
+GACT.rcadd = function(id){ rcName(); var R = gcard.cur.d, x = R.ing.filter(function(i){ return i[0] === id; })[0]; if(x) x[1] += 100; else if(R.ing.length < 10) R.ing.push([id, 100]); openCreator(); };
+GACT.rcdel = function(k){ rcName(); gcard.cur.d.ing.splice(k|0, 1); openCreator(); };
+GACT.rcstep = function(v){ rcName(); var R = gcard.cur.d, last = R.ing[R.ing.length - 1], verb = COOK_VERBS[v|0][0]; if(R.steps.length < 10) R.steps.push(verb + (last ? ' ' + FOOD[last[0]][1].replace(/^(un|une) /, 'le/la ').replace(/^(des|du|de la|de l')\s?/, 'les ') : '') + '.'); openCreator(); };
+GACT.rcsdel = function(k){ rcName(); gcard.cur.d.steps.splice(k|0, 1); openCreator(); };
+GACT.rcserv = function(n){ rcName(); gcard.cur.d.serves = n|0; openCreator(); };
+GACT.rcsave = function(){
+  rcName(); var R = gcard.cur.d;
+  if(!hasChar()){ openCreator(); showToast(L2('Create your character first!', 'Crée d\'abord ton personnage !')); return; }
+  R.nm = cleanName(R.nm).slice(0, 40); if(!R.nm || hasBadWord(R.nm)){ showToast(L2('Give your recipe a name.', 'Donne un nom à ta recette.')); return; }
+  if(R.ing.length < 2 || R.steps.length < 2){ showToast(L2('Add at least 2 ingredients and 2 steps.', 'Ajoute au moins 2 ingrédients et 2 étapes.')); return; }
+  var e = life.eco; e.recipes = (e.recipes || []).filter(function(x){ return x.nm !== R.nm; }); e.recipes.unshift({nm:R.nm, ing:R.ing, steps:R.steps, serves:R.serves, at:Date.now()}); e.recipes = e.recipes.slice(0, 8);
+  var got = e.recipes.length === 1 ? addJeton(2) : 0; lifeSave(true);
+  showCard('<h3>💾 ' + esc(R.nm) + '</h3><div class="gc-big good">' + L2('Saved in the class recipe book!', 'Enregistrée dans le livre de recettes de la classe !') + (got ? ' +' + got + ' 🪙' : '') + '</div><div class="gc-row">' + gBtn('book', null, L2('OPEN THE BOOK', 'OUVRIR LE LIVRE'), 'go') + gBtn('close', null, 'OK') + '</div>');
+  gcard.cur = null;
+};
+function openRecipeBook(){
+  if(signedIn()) listenAllEco();
+  var all = []; Object.keys(life.all || {}).forEach(function(u){ var e = life.all[u]; (e && e.recipes || []).forEach(function(r){ all.push({u:u, r:r, who:(e.ch && e.ch.fn) || memberName(u)}); }); });
+  if(life.eco && life.eco.recipes && !(life.all || {})[net.uid]) life.eco.recipes.forEach(function(r){ all.push({u:net.uid, r:r, who:life.eco.ch.fn}); });
+  all.sort(function(a, b){ return (b.r.at || 0) - (a.r.at || 0); }); gcard.book = all;
+  showCard('<h3>📚 ' + L2('THE CLASS RECIPE BOOK', 'LE LIVRE DE RECETTES DE LA CLASSE') + '</h3>' + (all.length ? '<div class="gc-grid">' + all.slice(0, 30).map(function(x, i){ return gOpt('bookone', i, '<b>' + esc(x.r.nm) + '</b><br><span class="lf-soft">' + L2('by ', 'par ') + esc(x.who) + '</span>'); }).join('') + '</div>' : '<div class="gc-text">' + L2('No recipes yet - be the first with the recipe creator!', 'Pas encore de recettes - sois le premier avec le créateur de recettes !') + '</div>') + '<div class="gc-row">' + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>');
+}
+GACT.book = openRecipeBook;
+GACT.bookone = function(v){ var x = gcard.book[v|0], R = x.r; showCard('<h3>📗 ' + esc(R.nm) + '</h3><div class="gc-sub">' + L2('by ', 'par ') + esc(x.who) + ' · ' + R.serves + L2(' servings', ' personnes') + '</div><div class="gc-text"><b>' + L2('Ingredients', 'Ingrédients') + ' :</b><br>' + R.ing.map(function(i){ var f = FOOD[i[0]]; return f ? f[3] + ' ' + i[1] + ' g · ' + esc(f[1]) : ''; }).join('<br>') + '</div><div class="gc-text"><b>' + L2('Steps', 'Étapes') + ' :</b><br>' + R.steps.map(function(s, k){ return (k + 1) + '. ' + esc(s); }).join('<br>') + '</div>' + nutriSum(recipeNutri(R.ing), R.serves) + '<div class="gc-row">' + gBtn('book', null, L2('BACK', 'RETOUR')) + gBtn('close', null, 'OK', 'go') + '</div>'); };
+
+/* ---------- 📻 RADIO PARIS: request a song for everyone, vote 👍 / 👎 ----------
+   Pick a song from the French singers' list. Requests play one after the other (3 minutes each) for everybody who is
+   online: the bar at the bottom shows what's on and who asked for it, and it's on the stadium's giant screen too.
+   Everyone can vote 👍 or 👎. (The game shows the song - it doesn't play the music: ask your teacher to put it on!)
+   It works through the players' presence, so no new database rules are needed: a request lasts while its player is on. */
+var SONGS = []; SINGERS.forEach(function(s, si){ s.songs.forEach(function(t){ SONGS.push({t:t.replace(/ \(.*\)$/, ''), a:s.nm, si:si}); }); });
+var radio = {req:null, vote:{}, bar:null, SLOT:180000};
+function radioQueue(){
+  var list = [];
+  function add(rq, who, me){ if(typeof rq !== 'string') return; var kv = rq.split('|'), i = kv[0]|0, at = +kv[1]; if(!SONGS[i] || !isFinite(at)) return; list.push({i:i, at:at, who:who, me:me}); }
+  if(radio.req) add(radio.req, (life.eco && life.eco.ch && life.eco.ch.fn) || net.name || L2('you', 'toi'), true);
+  (mp.others || []).forEach(function(p){ var s = p.presence || {}; if(s.rq) add(s.rq, playerName(p), false); });
+  list.sort(function(a, b){ return a.at - b.at; });
+  var t = 0; list.forEach(function(r){ r.start = Math.max(r.at, t); r.end = r.start + radio.SLOT; t = r.end; });
+  return list;
+}
+function radioNow(){ var now = Date.now(), q = radioQueue(); for(var i=0;i<q.length;i++) if(q[i].start <= now && now < q[i].end) return q[i]; return null; }
+function radioVotes(cur){
+  var key = cur.i + '|' + cur.at, up = 0, down = 0, tally = function(v){ if(typeof v !== 'string') return; var kv = v.split('#'); if(kv[0] !== key) return; if(kv[1] === '1') up++; else if(kv[1] === '-1') down++; };
+  tally(radio.vote[key] ? key + '#' + radio.vote[key] : null);
+  (mp.others || []).forEach(function(p){ tally((p.presence || {}).vt); });
+  return {up:up, down:down, key:key};
+}
+(function(){
+  var el = document.createElement('div'); el.id = 'radio-bar'; el.className = 'card';
+  var st = document.createElement('style');
+  st.textContent = '#radio-bar{position:fixed; right:12px; bottom:calc(64px + env(safe-area-inset-bottom,0px)); z-index:30; max-width:min(420px, 70vw); padding:6px 10px; font-family:"VT323", monospace; font-size:18px; display:flex; align-items:center; gap:8px;} #radio-bar.hidden{display:none;}' +
+    '#radio-bar .rb-t{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;} #radio-bar button{font-family:inherit; font-size:18px; border:2px solid var(--panel-border); background:var(--panel); color:var(--ink); cursor:pointer; padding:0 6px;} #radio-bar button.on{background:var(--accent); color:#fff;}';
+  document.head.appendChild(st); document.body.appendChild(el); radio.bar = el;
+  el.addEventListener('click', function(e){ var b = e.target.closest('[data-r]'); if(!b) return; var a = b.getAttribute('data-r');
+    if(a === 'req') openRadio(); else if(a === 'play'){ var c0 = radioNow(); if(c0) playSong(SONGS[c0.i].t, SONGS[c0.i].a); } else { var cur = radioNow(); if(!cur) return; var key = cur.i + '|' + cur.at; radio.vote = {}; radio.vote[key] = a; sendPresence(true); radioTick(true); } });
+})();
+function radioTick(force){
+  if(!radio.t || force || performance.now() - radio.t > 1000){
+    radio.t = performance.now();
+    if(radio.req){ var mine = radioQueue().filter(function(r){ return r.me; })[0]; if(mine && mine.end < Date.now()){ radio.req = null; sendPresence(true); } }
+    var cur = radioNow(), bar = radio.bar, show = titleScreen.classList.contains('hidden') && signedIn();
+    bar.classList.toggle('hidden', !show);
+    if(!show) return;
+    if(!cur){ bar.innerHTML = '<span class="rb-t">📻 Radio Paris · ' + esc(L2('no song requested', 'aucune chanson demandée')) + '</span><button data-r="req">' + esc(L2('REQUEST', 'DEMANDER')) + '</button>'; return; }
+    var s = SONGS[cur.i], v = radioVotes(cur), my = radio.vote[v.key];
+    var html = '<span class="rb-t">📻 ♪ ' + esc(s.t) + ' - ' + esc(s.a) + ' · ' + esc(L2('asked by ', 'demandée par ') + cur.who) + '</span><button data-r="1"' + (my === '1' ? ' class="on"' : '') + '>👍 ' + v.up + '</button><button data-r="-1"' + (my === '-1' ? ' class="on"' : '') + '>👎 ' + v.down + '</button><button data-r="play" title="▶">▶</button><button data-r="req">+</button>';
+    if(bar.innerHTML !== html) bar.innerHTML = html;
+  }
+}
+function openRadio(filter){
+  var q = radioQueue(), now = Date.now();
+  var h = '<h3>📻 RADIO PARIS</h3><div class="gc-sub">' + L2('Request a song for everyone online (one at a time). Each song is on for 3 minutes. The game shows the song - ask your teacher to play it!', 'Demande une chanson pour tout le monde (une à la fois). Chaque chanson passe 3 minutes. Le jeu affiche la chanson - demande à ton enseignant(e) de la mettre !') + '</div>';
+  if(q.length) h += '<div class="gc-text"><b>' + L2('Up next', 'À suivre') + ' :</b><br>' + q.filter(function(r){ return r.end > now; }).map(function(r){ var s = SONGS[r.i]; return (r.start <= now ? '▶ ' : '• ') + esc(s.t) + ' - ' + esc(s.a) + ' <span class="lf-soft">(' + esc(r.who) + ')</span>'; }).join('<br>') + '</div>';
+  if(radio.req) h += '<div class="gc-row">' + gBtn('radiocancel', null, L2('CANCEL MY REQUEST', 'ANNULER MA DEMANDE')) + '</div>';
+  h += '<input class="gc-in" id="radio-q" placeholder="' + esc(L2('Search a song or singer...', 'Cherche une chanson ou un chanteur...')) + '" value="' + esc(filter || '') + '"><div class="gc-grid" id="radio-list">' + radioList(filter) + '</div><div class="gc-row">' + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>';
+  showCard(h);
+  var inp = document.getElementById('radio-q'); inp.addEventListener('input', function(){ document.getElementById('radio-list').innerHTML = radioList(inp.value); });
+}
+function radioList(f){ var w = nameKeyWords(f); return SONGS.map(function(s, i){ var hay = nameKeyWords(s.t + ' ' + s.a).join(' '); return w.every(function(x){ return hay.indexOf(x) >= 0; }) ? gOpt('radioreq', i, '♪ <b>' + esc(s.t) + '</b><br><span class="lf-soft">' + esc(s.a) + '</span>', '', !!radio.req) : ''; }).join(''); }
+GACT.radioreq = function(v){ if(radio.req) return; radio.req = (v|0) + '|' + Date.now(); sendPresence(true); radioTick(true); showToast('📻 ' + SONGS[v|0].t + ' - ' + L2('requested!', 'demandée !')); closeCard(); };
+GACT.radiocancel = function(){ radio.req = null; sendPresence(true); radioTick(true); openRadio(); };
+/* ---- ▶ the music player: official videos through YouTube's own player (songs whose official video we checked play
+   right in the game; the others open the official video search on YouTube) ---- */
+var VIDS = {'Papaoutai':'oiKj0Z_Xnjc', 'Dernière danse':'K5KAc5CoCuk', 'Balance ton quoi':'Hi7Rx3En7-k', 'Jour 1':'yleB8fUXudw'};
+var player = {el:null};
+(function(){
+  var el = document.createElement('div'); el.id = 'yt-player'; el.className = 'card hidden';
+  var st = document.createElement('style');
+  st.textContent = '#yt-player{position:fixed; left:12px; bottom:calc(64px + env(safe-area-inset-bottom,0px)); z-index:31; width:min(380px, 80vw); padding:6px;} #yt-player.hidden{display:none;} #yt-player .yp-h{display:flex; justify-content:space-between; align-items:center; font-family:"VT323", monospace; font-size:17px; margin-bottom:4px;} #yt-player iframe{width:100%; aspect-ratio:16/9; border:0; display:block;} #yt-player button{font-family:inherit; font-size:16px; border:2px solid var(--panel-border); background:var(--panel); color:var(--ink); cursor:pointer;}';
+  document.head.appendChild(st); document.body.appendChild(el); player.el = el;
+  el.addEventListener('click', function(e){ if(e.target.closest('[data-yp="x"]')){ el.innerHTML = ''; el.classList.add('hidden'); } });
+})();
+function playSong(title, artist){
+  var id = VIDS[title];
+  if(!id){ window.open('https://www.youtube.com/results?search_query=' + encodeURIComponent(artist + ' ' + title + ' clip officiel'), '_blank', 'noopener'); return; }
+  player.el.innerHTML = '<div class="yp-h"><span>▶ ' + esc(title) + ' - ' + esc(artist) + '</span><button data-yp="x">✕</button></div><iframe src="https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="' + esc(title) + '"></iframe>';
+  player.el.classList.remove('hidden');
+}
+GACT.playsong = function(v){ var kv = String(v).split('§'); playSong(kv[0], kv[1]); };
+
 /* ---------- 🔍 SEARCH: find any place and go straight there ---------- */
 function searchIndex(){
   var L = [];
@@ -11961,6 +12573,13 @@ function searchIndex(){
   if(typeof STAD !== 'undefined') add('🎤', STAD.name, L2('Concerts of French singers', 'Concerts de chanteurs français'), STAD.door.x, STAD.door.z, STAD.door.yaw);
   if(typeof MALL !== 'undefined') add('🛒', MALL.name, L2('Clothes shops and games', 'Magasins de vêtements et jeux'), MALL.door.x, MALL.door.z, MALL.door.yaw);
   add('🚔', L2('Public Shame Chamber', 'Chambre de la honte publique'), '', JAIL.x, JAIL.z + 8, 0);
+  add('🦁', 'Zoo de Paris', L2('Habitats and animals', 'Habitats et animaux'), -250, 606, Math.PI);
+  HABITATS.forEach(function(h){ add(h.icon, h.fr, 'Zoo', h.x, h.z < 750 ? h.z + h.d/2 + 6 : h.z - h.d/2 - 6, h.z < 750 ? Math.PI : 0); });
+  add('🏠', L2('Adoption centre', 'Centre d\'adoption'), 'Zoo', -40, 820, -Math.PI/2);
+  add('🛒', 'Supermarché du Monde', L2('Foods from everywhere', 'Des aliments du monde entier'), GROC.x, GROC.z - 36, Math.PI);
+  AISLES.forEach(function(a){ a.items.forEach(function(it){ add(it[3], it[1].replace(/^(un|une|des|du|de la|de l'|le|la) /, ''), a.fr + ' · Supermarché', GROC.x, GROC.z - 28, Math.PI); }); });
+  add('👨‍🍳', 'Le Centre des Chefs', L2('Recipes and cooking classes', 'Recettes et cours de cuisine'), CHEF.x, CHEF.z - 29, Math.PI);
+  RECIPES.forEach(function(r){ add(r.icon, r.nm, L2('Recipe · Chef centre', 'Recette · Centre des chefs'), CHEF.x, CHEF.z - 29, Math.PI); });
   // Québec
   var Q = [['❄', 'Québec - Carnaval', L2('The Carnaval de Québec', 'Le Carnaval de Québec'), -30, 200, -0.25], ['🏰', 'Palais de glace', 'Québec', 0, -100, 0], ['🦉', 'Givre', L2('The Carnaval host', 'L\'hôte du Carnaval'), -12, -86, 0],
     ['🛷', 'Glissades', L2('Ice slide', 'Glissade sur glace'), 64, -48, 0], ['🎿', 'Ski · télésiège', 'Québec', 160, -100, 0], ['🐕', 'Traîneau à chiens', L2('Dogsled', 'Traîneau'), -132, 60, Math.PI/2],
@@ -11996,7 +12615,7 @@ function renderSearch(q){
     var hay = nameKeyWords(it.name + ' ' + it.sub).join(' ');
     if(words.every(function(w){ return hay.indexOf(w) >= 0; })) out.push(i);
   });
-  if(!q) out = out.filter(function(i){ var ic = srch.list[i].icon; return ic === '🏛' || ic === '🏘' || ic === '🥖' || ic === '✈' || ic === '❄' || ic === '🕹' || ic === '🎤' || ic === '🛒'; });
+  if(!q) out = out.filter(function(i){ var it = srch.list[i], ic = it.icon; return (ic === '🏛' || ic === '🏘' || ic === '🥖' || ic === '✈' || ic === '❄' || ic === '🕹' || ic === '🎤' || ic === '🦁' || ic === '👨‍🍳') || (ic === '🛒' && it.sub.indexOf('·') < 0); });
   var res = document.getElementById('srch-res');
   res.innerHTML = out.slice(0, 14).map(function(i){ var it = srch.list[i]; return gOpt('srchgo', i, it.icon + ' <b>' + esc(it.name) + '</b>' + (it.sub ? '<br><span class="lf-soft">' + esc(it.sub) + '</span>' : '')); }).join('') ||
     '<div class="gc-sub">' + L2('Nothing found - try another word.', 'Rien trouvé - essaie un autre mot.') + '</div>';
@@ -12424,7 +13043,7 @@ function animate(){
   updateSpeedo();
   lifeTick(dt);
   jailTick();
-  qcTick(dt); stadiumTick();
+  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick();
   if(!ICE.t || performance.now() - ICE.t > 1000){ ICE.t = performance.now(); if(Math.hypot(camera.position.x - QC.x, camera.position.z - QC.z) < 800) iceSync(); }
   villageTick();
   sendPresence(false);
