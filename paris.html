@@ -861,15 +861,17 @@ function box(w,h,d,mat){ return new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat
 
 /* Flat things on the ground (roads, curbs, paint, lawns) sit in fixed thin layers, each drawn on top of the one below */
 var FLAT = {lawn:0, road:1, curb:2, paint:3, plot:4};
-function flatY(layer){ return 0.02 + 0.006*layer; }
+function flatY(layer){ return 0.02 + 0.025*layer; }
 function onLayer(mat, layer){ mat.polygonOffset = true; mat.polygonOffsetFactor = -(layer + 1); mat.polygonOffsetUnits = -4*(layer + 1); return mat; }
-function FlatBatch(layer){ this.layer = layer; this.pos = []; this.col = []; }
+function FlatBatch(layer){ this.layer = layer; this.pos = []; this.col = []; this.rects = []; }
+/* a shape that overlaps an earlier one in the same layer sits a hair above it (no flicker where they overlap) */
+FlatBatch.prototype.lift = function(x0, x1, z0, z1){ var y = flatY(this.layer), top = y - 0.002; for(var i=0;i<this.rects.length;i++){ var r = this.rects[i]; if(x0 < r[1] && x1 > r[0] && z0 < r[3] && z1 > r[2] && r[4] > top) top = r[4]; } var ny = Math.min(y + 0.022, top + 0.0025); if(ny < y) ny = y; this.rects.push([x0, x1, z0, z1, ny]); return ny; };
 FlatBatch.prototype.rect = function(cx, cz, w, d, hex){
-  var y = flatY(this.layer), c = new THREE.Color(hex), x0 = cx-w/2, x1 = cx+w/2, z0 = cz-d/2, z1 = cz+d/2, self = this;
+  var c = new THREE.Color(hex), x0 = cx-w/2, x1 = cx+w/2, z0 = cz-d/2, z1 = cz+d/2, self = this, y = this.lift(x0, x1, z0, z1);
   [[x0,z1],[x1,z1],[x1,z0],[x0,z1],[x1,z0],[x0,z0]].forEach(function(p){ self.pos.push(p[0], y, p[1]); self.col.push(c.r, c.g, c.b); });
 };
 FlatBatch.prototype.disc = function(cx, cz, r, hex, segs){
-  var y = flatY(this.layer), c = new THREE.Color(hex);
+  var y = this.lift(cx - r, cx + r, cz - r, cz + r), c = new THREE.Color(hex);
   segs = segs || 24;
   for(var i=0;i<segs;i++){
     var a0 = i/segs*Math.PI*2, a1 = (i+1)/segs*Math.PI*2;
@@ -1838,7 +1840,8 @@ function personShape(look){
     add(new THREE.BoxGeometry(0.18, 0.18, 0.2), 0.35, 0.45, -1.17, look.dogCol);
     [[-0.08, -0.15], [0.08, -0.15], [-0.08, 0.15], [0.08, 0.15]].forEach(function(o){ add(new THREE.BoxGeometry(0.06, 0.2, 0.06), 0.35 + o[0], 0.1, -0.9 + o[1], look.dogCol); });
   }
-  return {pos:Float32Array.from(B.pos), nor:Float32Array.from(B.nor), col:Float32Array.from(B.col), tag:tags};
+  var P = Float32Array.from(B.pos); for(var q=0;q<P.length;q++) P[q] *= 0.95;   // ~1.8 m tall, to scale with the buildings
+  return {pos:P, nor:Float32Array.from(B.nor), col:Float32Array.from(B.col), tag:tags};
 }
 (function makePeople(){
   var HATS = [0x22336e, 0xc8382f, 0x1a1a1c, 0x6b4a32], COATS = [0x6b4a32, 0x2f4f6e, 0x7a2a3a, 0x3a5a3a, 0x8a7a6a], DOGS = [0xf4f1ea, 0x6b4a32, 0x1a1a1c];
@@ -1851,6 +1854,7 @@ function personShape(look){
   [[-24, 26, 24, 26], [-24, -26, 24, -26], [26, -24, 26, 24], [-26, -24, -26, 24]].forEach(function(s){
     paths.push({ax:s[0], az:s[1], bx:s[2], bz:s[3], tourist:true}); paths.push({ax:s[0], az:s[1], bx:s[2], bz:s[3], tourist:true});
   });
+  paths = paths.filter(function(pt, i){ return i % 2 === 0; });   // fewer people on the pavements
   paths.forEach(function(pt, i){
     var look = pt.tourist ? {tourist:true, skin:i % 4, hat:[0xe3b52c, 0xc8382f, 0x2b4c9b, 0xf4f1ea][i % 4], coat:[0xe07b2c, 0x2f7d46, 0xe86aa0, 0x2b4c9b][i % 4]}
       : {skin:i % 4, hat:HATS[i % 4], stripes:i % 3 !== 1, coat:COATS[i % 5], baguette:i % 4 === 0, dog:i % 7 === 3, dogCol:DOGS[i % 3]};
@@ -2014,6 +2018,7 @@ function updatePeople(dt){
       else if(Math.random() < 0.0015) p.pause = 1.5 + Math.random()*3;   // stops to look in a shop window
     }
     p.x = pt.ax + ux*p.s; p.z = pt.az + uz*p.s;
+    if(typeof dodgeOffset === 'function') dodgeOffset(p, dt);
     // a car driving into them?
     if(carHits){
       var hx = p.x - carPos.x, hz = p.z - carPos.z;
@@ -10341,10 +10346,14 @@ function makePlane(s){
 function airSign(text, x, y, z, ry, w, bg){
   var c = document.createElement('canvas'); c.width = 1024; c.height = 160; var k = c.getContext('2d');
   k.fillStyle = bg || '#2b4c9b'; k.fillRect(0, 0, 1024, 160); k.fillStyle = '#fff'; k.font = 'bold 84px sans-serif'; k.textAlign = 'center'; k.textBaseline = 'middle'; k.fillText(text, 512, 84, 980);
-  var m = new THREE.Mesh(new THREE.PlaneGeometry(w || 6, (w || 6)*160/1024), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c), side:THREE.DoubleSide}));
+  var mat = new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c), side:THREE.FrontSide}), geo = new THREE.PlaneGeometry(w || 6, (w || 6)*160/1024);
+  var m = new THREE.Mesh(geo, mat), back = new THREE.Mesh(geo, mat); back.rotation.y = Math.PI; back.position.z = -0.01; m.add(back);   // readable from both sides (never mirrored)
   m.position.set(x, y, z); m.rotation.y = ry || 0; root.add(m); return m;
 }
-function flat(w, d, x, z, col, y){ var m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), solidMat(col)); m.rotation.x = -Math.PI/2; m.position.set(x, y || 0.02, z); root.add(m); return m; }
+var FLATS = [];
+function flat(w, d, x, z, col, y){ var m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), solidMat(col)); m.rotation.x = -Math.PI/2; y = y || 0.02;
+  var x0 = x - w/2, x1 = x + w/2, z0 = z - d/2, z1 = z + d/2, area = w*d; FLATS.forEach(function(f){ if(x0 < f.x1 && x1 > f.x0 && z0 < f.z1 && z1 > f.z0 && Math.abs(f.y - y) < 0.02){ if(area <= f.a) y = Math.max(y, f.y + 0.02); else { f.y = y + 0.02; f.m.position.y = f.y; } } });
+  FLATS.push({x0:x0, x1:x1, z0:z0, z1:z1, y:y, a:area, m:m}); m.position.set(x, y, z); m.material.polygonOffset = true; m.material.polygonOffsetFactor = -1 - Math.min(20, Math.round(y*50)); m.material.polygonOffsetUnits = -2; root.add(m); return m; }
 function bx(w, h, d, x, y, z, col, solid){ var m = box(w, h, d, solidMat(col)); m.position.set(x, y, z); root.add(m); if(solid) addSolid(x - w/2, x + w/2, z - d/2, z + d/2, 'airport', y - h/2 - 0.5, y + h/2); return m; }
 (function buildCDG(){
   var X = CDG.x, Z = CDG.z;
@@ -20151,18 +20160,28 @@ var BL = {
 var BUSST = {}; Object.keys(BL).forEach(function(l){ BL[l].s.forEach(function(k){ (BUSST[k] = BUSST[k] || []).push(l); }); });
 function busBadge(l){ return '<span style="display:inline-block;padding:2px 7px;border-radius:4px;background:' + BL[l].c + ';color:#fff;font:700 13px Arial,sans-serif;margin:0 2px">' + l + '</span>'; }
 var BSTOP = {};
-Object.keys(BUSST).forEach(function(k){ var s = MS[k], f = freeAt(s.x + 9, s.z + 5), x = f[0], z = f[1], B = new MeshBatch(), L = new Lot(B, x, z, 0); BSTOP[k] = {x:x, z:z};
-  L.box(4, 0.12, 1.8, 0, 2.5, 0, 0x5a6670); L.box(0.08, 2.5, 1.8, -2, 1.25, 0, 0x8a8f98); L.box(4, 2, 0.04, 0, 1.4, 0.9, 0xbfe0ea); L.box(3.6, 0.1, 0.4, 0, 0.5, 0.6, 0x6a6a6a); L.box(1.4, 2.1, 0.08, 1.2, 1.4, 0.86, 0xffffff);
-  L.cyl(0.05, 0.05, 3, 2.6, 1.5, -0.8, 0x6a6a6a, 6); L.box(0.6, 0.6, 0.06, 2.6, 2.9, -0.8, 0x00A88F); B.build();
-  airSign('🚌 ' + s.n.toUpperCase() + ' · ' + BUSST[k].join(' · '), x, 2.85, z - 0.95, 0, 3.8, '#00634f');
-  addSpot({x:x, z:z - 1.4, r:2.6, label:function(){ return '🚌 ' + L2('Bus stop ', 'Arrêt de bus ') + s.n + ' · ' + BUSST[k].join(' · '); }, act:function(){ GACT.bstop(k); }});
-  tag(x, 1.5, z, 'l\'arrêt de bus', 'the bus stop', 1); });
+/* a stop goes on the pavement of the nearest street (never on the road, never on a crossroads), open side facing the road */
+function busSpot(sx, sz){ var best = null, bd = 60; STREETS.forEach(function(st){ var along = st.v === 1 ? sz : sx, u = Math.max(st.a + 10, Math.min(st.b - 10, along)), px = st.v === 1 ? st.at : u, pz = st.v === 1 ? u : st.at, d = Math.hypot(px - sx, pz - sz); if(d < bd){ bd = d; best = {st:st, u:u}; } }); if(!best) return null;
+  var st = best.st, u = best.u, nodes = st.nodes || []; for(var tries=0;tries<12;tries++){ var clash = nodes.some(function(n){ return Math.abs(n - u) < ROAD_HALF + 8; }); if(!clash) break; u += (u > (st.a + st.b)/2 ? -6 : 6); } u = Math.max(st.a + 8, Math.min(st.b - 8, u));
+  var side = st.v === 1 ? (sx >= st.at ? 1 : -1) : (sz >= st.at ? 1 : -1), off = ROAD_HALF + 2.6, x = st.v === 1 ? st.at + side*off : u, z = st.v === 1 ? u : st.at + side*off, r = st.v === 1 ? (side > 0 ? Math.PI/2 : -Math.PI/2) : (side > 0 ? 0 : Math.PI); return {x:x, z:z, r:r}; }
+function bsW(b, lx, lz){ var c = Math.cos(b.r), sn = Math.sin(b.r); return {x:b.x + lx*c + lz*sn, z:b.z - lx*sn + lz*c}; }
+Object.keys(BUSST).forEach(function(k){ var s = MS[k], sp = busSpot(s.x, s.z); if(!sp){ var f = freeAt(s.x + 9, s.z + 5); sp = {x:f[0], z:f[1], r:0}; } var x = sp.x, z = sp.z, R = sp.r, B = new MeshBatch(), L = new Lot(B, x, z, R); var w = function(lx, lz){ return bsW(sp, lx, lz); };
+  var cop = w(-3, -1.3), arrive = w(0, -1.8); BSTOP[k] = {x:x, z:z, r:R, cx:cop.x, cz:cop.z, ax:arrive.x, az:arrive.z};
+  L.box(4.2, 0.14, 2, 0, 2.55, 0.1, 0x3a4048); L.box(4.2, 0.04, 2.1, 0, 2.63, 0.1, 0x00a88f);
+  [-2, 2].forEach(function(px){ L.box(0.09, 2.5, 0.09, px, 1.25, 1, 0x3a4048); L.box(0.09, 2.5, 0.09, px, 1.25, -0.8, 0x3a4048); });
+  L.box(3.6, 0.08, 0.45, 0, 0.5, 0.65, 0x8a8f98); L.box(3.6, 0.35, 0.06, 0, 0.75, 0.86, 0x8a8f98); L.box(0.06, 0.5, 0.06, -1.6, 0.25, 0.65, 0x3a4048); L.box(0.06, 0.5, 0.06, 1.6, 0.25, 0.65, 0x3a4048);
+  L.box(1.3, 1.9, 0.12, 1.35, 1.35, 0.95, 0xfff8e0); L.cyl(0.05, 0.05, 3.1, -2.6, 1.55, -0.9, 0x3a4048, 10); L.box(0.7, 0.7, 0.06, -2.6, 3.1, -0.9, 0x00a88f);
+  B.build(); var b1 = w(-2.1, 0.95), b2 = w(2.1, 1.05); addSolid(Math.min(b1.x, b2.x) - 0.05, Math.max(b1.x, b2.x) + 0.05, Math.min(b1.z, b2.z) - 0.05, Math.max(b1.z, b2.z) + 0.05, 'static', -1, 2.6);
+  var glass = new THREE.MeshLambertMaterial({color:0xcfe8f0, transparent:true, opacity:0.35}); [[4.0, 2.2, 0.03, 0, 1.0], [0.03, 2.2, 1.7, -2, 0.1], [0.03, 2.2, 1.7, 2, 0.1]].forEach(function(g){ var gm = new THREE.Mesh(new THREE.BoxGeometry(g[0], g[1], g[2]), glass), wp = w(g[3], g[4]); gm.position.set(wp.x, 1.25, wp.z); gm.rotation.y = R; root.add(gm); });
+  var sg = w(0, -0.9), pl = w(-2.6, -0.94); airSign('🚌 ' + s.n.toUpperCase(), sg.x, 2.95, sg.z, R + Math.PI, 3.6, '#00634f'); airSign(BUSST[k].join(' · '), pl.x, 3.1, pl.z, R + Math.PI, 0.66, '#00a88f');
+  addSpot({x:arrive.x, z:arrive.z, r:2.6, label:function(){ return '🚌 ' + L2('Bus stop ', 'Arrêt de bus ') + s.n + ' · ' + BUSST[k].join(' · '); }, act:function(){ GACT.bstop(k); }});
+  tag(x, 1.5, z, 'l\'arrêt de bus (l\'abribus)', 'the bus stop (shelter)', 1); var mp2 = w(1.35, 0.9); tag(mp2.x, 1.4, mp2.z, 'le plan du quartier', 'the neighbourhood map', 0.6); tag(pl.x, 3.1, pl.z, 'le poteau de l\'arrêt', 'the bus stop pole', 0.5); });
 GACT.bstop = function(k){ var h = '<h3>🚌 ' + L2('BUS STOP', 'ARRÊT DE BUS') + ' · ' + esc(MS[k].n) + '</h3><div class="gc-sub">' + L2('Bus-Tram ticket (2 €) or Navigo · buy tickets in any metro station', 'Ticket Bus-Tram (2 €) ou Navigo · tickets dans toutes les stations') + '</div>';
   BUSST[k].forEach(function(l){ var L = BL[l]; h += '<div style="margin:6px 0 2px">' + busBadge(l) + ' <span class="lf-soft" style="font-size:13px">' + esc(L.a) + ' ⟷ ' + esc(L.b) + '</span></div><div class="gc-grid">' + L.s.filter(function(x){ return x !== k; }).map(function(x){ return gOpt('bgo', k + '|' + l + '|' + x, esc(MS[x].n)); }).join('') + '</div>'; });
   showCard(h + '<div class="gc-row">' + gBtn('close', null, 'OK') + '</div>'); };
 GACT.bgo = function(v){ var p = String(v).split('|'), from = p[0], l = p[1], to = p[2], L = BL[l]; var u = useTicket('tb'); if(!u){ showToast('🚌 ' + L2('You need a Bus-Tram ticket (2 €) - buy it in a metro station', 'Il te faut un ticket Bus-Tram (2 €) - achète-le dans une station de métro')); return; }
   var i = L.s.indexOf(from), j = L.s.indexOf(to), dir = j > i ? L.b : L.a, stops = j > i ? L.s.slice(i + 1, j + 1) : L.s.slice(j, i).reverse(); closeCard(); say('Bonjour ! Bus ' + l + ', direction ' + dir + '.');
-  var fade = flyCard.fade; fade.style.opacity = 1; var n = 0; (function next(){ if(n < stops.length){ var s2 = MS[stops[n]]; hudMsg('🚌 ' + busBadge(l).replace(/<[^>]+>/g, '') + ' · ' + L2('Next stop: ', 'Prochain arrêt : ') + s2.n); say('Prochain arrêt : ' + s2.n + '.'); n++; setTimeout(next, 2200); } else { var b = BSTOP[to]; goTo({x:b.x, z:b.z - 2.5, yaw:0}); setTimeout(function(){ fade.style.opacity = 0; showToast('🚌 ' + MS[to].n); addJeton(1); }, 300); } })(); };
+  var fade = flyCard.fade; fade.style.opacity = 1; var n = 0; (function next(){ if(n < stops.length){ var s2 = MS[stops[n]]; hudMsg('🚌 ' + busBadge(l).replace(/<[^>]+>/g, '') + ' · ' + L2('Next stop: ', 'Prochain arrêt : ') + s2.n); say('Prochain arrêt : ' + s2.n + '.'); n++; setTimeout(next, 2200); } else { var b = BSTOP[to]; goTo({x:b.ax, z:b.az, yaw:b.r + Math.PI}); setTimeout(function(){ fade.style.opacity = 0; showToast('🚌 ' + MS[to].n); addJeton(1); }, 300); } })(); };
 /* ---------- ⭐ WANTED LEVEL (top right, 0-5 stars) ---------- */
 var WANT = {lvl:0, last:0, el:null};
 try { WANT.lvl = Math.min(5, parseInt(localStorage.getItem('paris.want'), 10) || 0); WANT.last = Date.now(); } catch(e){}
@@ -20178,7 +20197,7 @@ var _hitPersonW = hitPerson; hitPerson = function(){ runStrike('person'); return
 GACT.mvalid0 = GACT.mvalid;
 /* ---------- 👮 POLICE NATIONALE: officers at the bus stops. With stars they come for you: 1-2 stars = a fine, 3+ = jail ---------- */
 var COP = {list:[], chase:null};
-Object.keys(BSTOP).forEach(function(k, i){ var b = BSTOP[k], x = b.x - 3, z = b.z - 2.2, g = person({x:x, z:z, ry:Math.PI, shirt:0x1b2a4a, pants:0x141c33, hair:0x2a1d14, hat:0x141c33, h:1.8}); var c = {g:g, hx:x, hz:z, k:k, st:'post'}; COP.list.push(c);
+Object.keys(BSTOP).forEach(function(k, i){ var b = BSTOP[k], x = b.cx, z = b.cz, g = person({x:x, z:z, ry:Math.PI, shirt:0x1b2a4a, pants:0x141c33, hair:0x2a1d14, hat:0x141c33, h:1.8}); var c = {g:g, hx:x, hz:z, k:k, st:'post'}; COP.list.push(c);
   LBL.dyn.push({m:g, fr:'le policier / la policière', en:'the police officer', dy:2.3, r:0.7, act:function(){ say(WANT.lvl ? 'Police ! Ne bougez pas !' : pickR(Math.random, ['Bonjour ! Tout va bien ?', 'Bonne journée !', 'Soyez prudent sur la route.', 'Respectez le code de la route !'])); }}); });
 function copTick(dt){ if(!COP.list.length) return; var cp = camera.position, me = !INT.cur && flying && net.uid && !isStaff() && !amJailed();
   COP.list.forEach(function(c){ var g = c.g, dx = cp.x - g.position.x, dz = cp.z - g.position.z, d = Math.hypot(dx, dz), hd = Math.hypot(g.position.x - c.hx, g.position.z - c.hz);
@@ -20804,10 +20823,32 @@ function tlTick(dt){ var ph = tlPhase(), key = ph.join(''); if(key !== TL.phase)
   var inNode = null; for(var i=0;i<TL.nodes.length;i++){ var n = TL.nodes[i]; if(Math.abs(x - n.x) < ROAD_HALF && Math.abs(z - n.z) < ROAD_HALF){ inNode = n; break; } }
   if(inNode && TL.inNode !== inNode && v > 4 && !(F1 && F1.mode)){ var alongZ = Math.abs(Math.cos(h)) > Math.abs(Math.sin(h)), light = ph[alongZ ? 0 : 1]; if(light === 'r'){ if(typeof WANT_add === 'function') WANT_add(1, L2('ran a red light', 'feu rouge grillé')); say('Attention ! Le feu est rouge !'); showToast('🚦 ' + L2('RED LIGHT! You must stop and wait for green.', 'FEU ROUGE ! Il faut s\'arrêter et attendre le vert.')); } }
   TL.inNode = inNode; }
+
+/* a proper little city car: sloped bonnet, glass cabin, wheel arches cut into the body, tyres with silver rims and hub caps */
+function tcarModel(col, seed){ var g = new THREE.Group(), paint = new THREE.MeshPhongMaterial({color:col, shininess:60}), dark = solidMat(0x16181c), glass = new THREE.MeshPhongMaterial({color:0x2a3a4a, shininess:90}), chrome = new THREE.MeshPhongMaterial({color:0xc8ccd2, shininess:100}), add = function(geo, m, x, y, z, rx){ var o = new THREE.Mesh(geo, m); o.position.set(x, y, z); if(rx) o.rotation.x = rx; g.add(o); return o; };
+  var long = seed % 3 === 0;   // some are estates, some hatchbacks
+  add(new THREE.BoxGeometry(1.86, 0.5, 4.2), paint, 0, 0.62, 0);                       // lower body
+  add(new THREE.BoxGeometry(1.8, 0.16, 1.25), paint, 0, 0.93, -1.45, 0.1);              // bonnet, sloping down to the front
+  add(new THREE.BoxGeometry(1.8, 0.16, 0.8), paint, 0, 0.93, 1.7, -0.08);               // boot
+  add(new THREE.BoxGeometry(1.68, 0.56, long ? 2.5 : 2.0), glass, 0, 1.2, long ? 0.45 : 0.15);   // cabin glass
+  add(new THREE.BoxGeometry(1.72, 0.1, long ? 2.3 : 1.8), paint, 0, 1.52, long ? 0.5 : 0.2);     // roof
+  add(new THREE.BoxGeometry(1.7, 0.5, 0.08), glass, 0, 1.18, long ? -0.85 : -0.88, -0.55);       // windscreen, raked back
+  [-0.86, 0.86].forEach(function(x){ add(new THREE.BoxGeometry(0.06, 0.48, 0.08), paint, x, 1.2, -0.25); });   // door pillars
+  // wheel arches (dark recesses cut into the sides) + wheels with rims
+  [[-0.94, -1.35], [0.94, -1.35], [-0.94, 1.35], [0.94, 1.35]].forEach(function(w){ var arch = new THREE.Mesh(new THREE.CylinderGeometry(0.47, 0.47, 0.06, 20, 1, false, Math.PI/2, Math.PI), dark); arch.rotation.z = Math.PI/2; arch.rotation.y = 0; arch.position.set(w[0] + (w[0] > 0 ? 0.005 : -0.005), 0.42, w[1]); g.add(arch);
+    var tyre = add(new THREE.CylinderGeometry(0.38, 0.38, 0.26, 22), solidMat(0x1b1b1d), w[0]*0.93, 0.38, w[1]); tyre.rotation.z = Math.PI/2;
+    var rim = add(new THREE.CylinderGeometry(0.24, 0.24, 0.28, 18), chrome, w[0]*0.93, 0.38, w[1]); rim.rotation.z = Math.PI/2;
+    for(var sp=0;sp<5;sp++){ var spoke = add(new THREE.BoxGeometry(0.29, 0.04, 0.05), solidMat(0x8a8f98), w[0]*0.93, 0.38, w[1]); spoke.rotation.set(sp/5*Math.PI*2, 0, Math.PI/2); }
+    var cap = add(new THREE.CylinderGeometry(0.07, 0.07, 0.3, 12), solidMat(0x2a2d32), w[0]*0.93, 0.38, w[1]); cap.rotation.z = Math.PI/2; });
+  // lights, grille, bumpers, mirrors, number plates
+  [-0.62, 0.62].forEach(function(x){ add(new THREE.BoxGeometry(0.42, 0.14, 0.06), new THREE.MeshBasicMaterial({color:0xfff4d0}), x, 0.74, -2.11); add(new THREE.BoxGeometry(0.4, 0.14, 0.06), new THREE.MeshBasicMaterial({color:0xd8202a}), x, 0.8, 2.11); add(new THREE.BoxGeometry(0.14, 0.1, 0.2), paint, x*1.55, 1.12, -0.82); });
+  add(new THREE.BoxGeometry(0.7, 0.16, 0.05), dark, 0, 0.72, -2.11); add(new THREE.BoxGeometry(1.9, 0.18, 0.18), solidMat(0x2a2d32), 0, 0.42, -2.14); add(new THREE.BoxGeometry(1.9, 0.18, 0.18), solidMat(0x2a2d32), 0, 0.42, 2.14);
+  add(new THREE.BoxGeometry(0.52, 0.12, 0.03), solidMat(0xf4f4f0), 0, 0.42, -2.24); add(new THREE.BoxGeometry(0.52, 0.12, 0.03), solidMat(0xf4f4f0), 0, 0.42, 2.24);
+  return g; }
 /* city traffic: little cars that obey the lights */
 var TCARS = [];
-(function(){ var cols = [0xc8382f, 0x1f6fb8, 0xf4f4f0, 0x2a2d36, 0xffd23a, 0x2f8a3a, 0x8a3ad6, 0xb0b8c0], main = STREETS.filter(function(s){ return Math.abs(s.at) < 200 && s.b - s.a > 200; }).slice(0, 10);
-  main.forEach(function(s, i){ [1, -1].forEach(function(dir, j){ var g = new THREE.Group(), body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.7, 3.8), solidMat(cols[(i*2 + j) % cols.length])); body.position.y = 0.6; g.add(body); var top = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.6, 2), solidMat(0x2a3a4a)); top.position.set(0, 1.2, 0.2); g.add(top); [[-0.8, -1.2], [0.8, -1.2], [-0.8, 1.2], [0.8, 1.2]].forEach(function(w){ var wh = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.2, 14), solidMat(0x1b1b1d)); wh.rotation.z = Math.PI/2; wh.position.set(w[0], 0.32, w[1]); g.add(wh); }); root.add(g);
+(function(){ var cols = [0xc8382f, 0x1f6fb8, 0xf4f4f0, 0x2a2d36, 0xffd23a, 0x2f8a3a, 0x8a3ad6, 0xb0b8c0], main = STREETS.filter(function(s){ return Math.abs(s.at) < 200 && s.b - s.a > 200; }).slice(0, 6);
+  main.forEach(function(s, i){ [1, -1].forEach(function(dir, j){ var g = tcarModel(cols[(i*2 + j) % cols.length], i*2 + j); root.add(g);
       TCARS.push({g:g, s:s, dir:dir, u:s.a + (s.b - s.a)*((i*0.37 + j*0.5) % 1), v:0, lane:dir*1.9}); }); }); })();
 function tcarsTick(dt){ var ph = tlPhase(), cp = camera.position, me = flying ? (driving ? carPos : cp) : null;
   TCARS.forEach(function(c){ var s = c.s, along = s.v === 1, want = 9, ahead = c.u + c.dir*0.1;
@@ -20970,6 +21011,60 @@ function hoverEdgeTick(dt){ if(!HOVERLOOK.on || !FREECUR || touchPlay || !flying
   var w = window.innerWidth, edge = Math.max(30, w*0.07), x = HOVERLOOK.x, turn = 0; if(x < edge) turn = (edge - x)/edge; else if(x > w - edge) turn = -(x - (w - edge))/edge; if(!turn) return; yaw += turn*1.6*dt; camera.rotation.set(pitch, yaw, 0); lastMouseMove = performance.now(); }
 GACT.hoverlook = function(){ HOVERLOOK.on = !HOVERLOOK.on; try { localStorage.setItem('paris.hoverlook', HOVERLOOK.on ? '1' : '0'); } catch(e){} showToast('🖱 ' + (HOVERLOOK.on ? L2('The view follows your mouse (no clicking)', 'La vue suit ta souris (sans cliquer)') : L2('Hold and drag to look around', 'Maintiens et glisse pour regarder'))); };
 (function(){ var G = BAR_GROUPS.filter(function(g){ return g.id === 'snd'; })[0]; if(!G || !G.d) return; var x = document.createElement('button'); x.className = 'bar-btn'; x.innerHTML = '<span>🖱</span><span class="dl">' + esc(L2('Mouse: follow (no click) / drag', 'Souris : suivre (sans clic) / glisser')) + '</span>'; x.addEventListener('click', function(){ closeDrops(); GACT.hoverlook(); }); G.d.insertBefore(x, G.d.firstChild); })();
+
+/* ---------- ⚖ FAIR RULES: jail only for bad / mean chat, or deliberately running over people or Mika several times.
+   Crashing into things never counts. The police only give fines. ---------- */
+var NEG_W = atob('aWRpb3Qsc3R1cGlkLGR1bWIsbW9yb24sbG9zZXIsdWdseSxpbWJlY2lsZSxjcmV0aW4sZGViaWxlLGFicnV0aQ==').split(','), NEG_P = atob('aSBoYXRlIHlvdXxqZSB0ZSBkZXRlc3RlfGplIHRlIGhhaXN8c2h1dCB1cHx0YWlzIHRvaXxmZXJtZSBsYXx5b3Ugc3Vja3x0ZXMgbnVsfHR1IGVzIG51bHx0ZXMgbnVsbGV8dHUgZXMgbnVsbGV8bm9ib2R5IGxpa2VzIHlvdXxwZXJzb25uZSBuZSB0YWltZXxnbyBhd2F5fHZhIHRlbnxkw6lnYWdlfGRlZ2FnZQ==').split('|');
+var _hasBadWordN = hasBadWord; hasBadWord = function(text){ if(_hasBadWordN(text)) return true; var n = String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[’']/g, '').replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim(), w = n.split(' ');
+  if(w.some(function(x){ return NEG_W.indexOf(x) >= 0; })) return true; return NEG_P.some(function(ph){ return (' ' + n + ' ').indexOf(' ' + ph + ' ') >= 0; }); };
+var _filterChatN = filterChat; filterChat = function(text){ var r = _filterChatN(text); return r === text && hasBadWord(text) ? '****' : r; };
+var _runStrikeFair = runStrike; runStrike = function(what){ if(what !== 'person') return; var key = 'paris.runT.' + net.uid, last = 0; try { last = parseInt(localStorage.getItem(key), 10) || 0; if(Date.now() - last > 600000) localStorage.setItem('paris.runHits.' + net.uid, '0'); localStorage.setItem(key, String(Date.now())); } catch(e){} return _runStrikeFair.apply(this, arguments); };
+copCatch = function(c){ var lv = WANT.lvl; COP.chase = null; c.st = 'back'; try { if(driving){ exitDriveMode(); driving = false; applyModeUI(); } if(ride && ride.on) endRide(); } catch(e){} var fine = 35*Math.max(1, lv), e = hasChar() ? life.eco : null; if(e){ e.cash = Math.round(((+e.cash || 0) - fine)*100)/100; if(typeof finRec === 'function') finRec(-fine, 'amende'); e.fines = (e.fines || 0) + 1; lifeSave(true); } WANT.lvl = 0; try { localStorage.setItem('paris.want', 0); } catch(e2){} wantDraw(); say('Vous avez une amende de ' + fine + ' euros. Soyez plus prudent !');
+  showCard('<h3>👮 ' + L2('A FINE!', 'UNE AMENDE !') + '</h3><div class="gc-emoji">🧾</div><div class="gc-big">−' + fine + ' €</div><div class="gc-text gc-say">« Vous avez une amende de ' + fine + ' euros. Soyez plus prudent ! »</div><div class="gc-row">' + gBtn('close', null, L2('SORRY', 'PARDON'), 'go') + '</div>'); };
+/* pedestrians see vehicles coming and step out of the way */
+function dodgeOffset(p, dt){ p.ox = p.ox || 0; p.oz = p.oz || 0; var vx, vz, h, v; if(flying && driving){ vx = carPos.x; vz = carPos.z; h = carYaw; v = driveSpeed; } else if(ride && ride.on){ vx = ride.px; vz = ride.pz; h = ride.h; v = ride.v; } else v = 0;
+  var tx = 0, tz = 0; if(Math.abs(v) > 2.5){ var fx = -Math.sin(h)*Math.sign(v), fz = -Math.cos(h)*Math.sign(v), rx = p.x - vx, rz = p.z - vz, ahead = rx*fx + rz*fz, lat = rx*(-fz) + rz*fx; if(ahead > -1 && ahead < 16 + Math.abs(v)*0.6 && Math.abs(lat) < 4){ var push = 4.2 - Math.abs(lat), sd = lat >= 0 ? 1 : -1; tx = -fz*sd*push; tz = fx*sd*push; if(!p.saw || moveTime - p.saw > 4){ p.saw = moveTime; } } }
+  var k = Math.min(1, dt*(tx || tz ? 7 : 1.2)); p.ox += (tx - p.ox)*k; p.oz += (tz - p.oz)*k; p.x += p.ox; p.z += p.oz; }
+/* =====================================================================================================================
+   ⚖ RULES v3 (Madame's latest): jail ONLY for swearing / saying something bad to other students. Crashes and running into
+   people or Mika = a fine. Traffic lights work but are only advice. Refreshing the page never gets you out of jail.
+   ===================================================================================================================== */
+/* 1. refresh can't free you: your own jail record and this device's memory stay until you finish the quiz or Madame frees you */
+(function(){ var saw = false; try { saw = localStorage.getItem('paris.jail') === '1'; } catch(e){}
+  setInterval(function(){ if(!net.uid || isStaff() || performance.now() > 30000) return; var recNow = !!(jail.all[net.uid] || (mod.jail && mod.jail[net.uid] && !jfVoid(net.uid, mod.jail[net.uid])) || (net.members[net.uid] && net.members[net.uid].jail && typeof net.members[net.uid].jail === 'object' && !jfVoid(net.uid, net.members[net.uid].jail))); if(recNow || jail.local) saw = true;
+    if(saw && !jail.local && !recNow && !JF.justFreed && !jail.freedByQuiz){ var e = hasChar() ? life.eco : null, freeAt = Math.max((e && e.jfree) || 0, jail.jfree || 0); if(Date.now() - freeAt > 15000){ jail.local = true; try { localStorage.setItem('paris.jail', '1'); } catch(x){} if(net.db) try { net.db.ref('paris/owners/' + net.uid + '/jail').set({at:parseInt(localStorage.getItem('paris.jailAt'), 10) || Date.now(), why:'refresh'}).catch(function(){}); } catch(x){} } else saw = false; }
+    if(!jail.local && !recNow) saw = false; }, 1500); })();
+var _jfFreeMeR = jfFreeMe; jfFreeMe = function(f){ JF.justFreed = true; setTimeout(function(){ JF.justFreed = false; }, 20000); return _jfFreeMeR.apply(this, arguments); };
+var _jailFreeSelfR = jailFreeSelf; jailFreeSelf = function(){ jail.freedByQuiz = true; setTimeout(function(){ jail.freedByQuiz = false; }, 20000); return _jailFreeSelfR.apply(this, arguments); };
+/* 2. fines instead of jail for everything that isn't bad words */
+var FINE = {last:0};
+function fineMe(amt, why){ if(!net.uid || isStaff() || !hasChar()) return; if(Date.now() - FINE.last < 4000) return; FINE.last = Date.now(); var e = life.eco; e.cash = Math.round(((+e.cash || 0) - amt)*100)/100; if(typeof finRec === 'function') finRec(-amt, 'amende'); e.fines = (e.fines || 0) + 1; lifeSave(true); showToast('🧾 ' + L2('Fine: ', 'Amende : ') + '−' + amt + ' € · ' + why); say('Amende de ' + amt + ' euros : ' + why + '.'); }
+runStrike = function(what){ var x = camera.position.x, z = camera.position.z; if(typeof MC !== 'undefined' && Math.abs(x - MC.x - 130) < 520 && Math.abs(z - MC.z + 90) < 520) return; if(typeof SKP !== 'undefined' && x > SKP.x - 190 && x < SKP.x + 370 && z > SKP.z - 140 && z < SKP.z + 160) return; if(typeof F1 !== 'undefined' && F1.mode) return; if(typeof BUMP !== 'undefined' && BUMP.on) return;
+  if(what === 'person') fineMe(50, L2('you hit someone - drive carefully!', 'tu as heurté quelqu\'un - conduis prudemment !')); else fineMe(15, L2('crash', 'accident')); };
+mikaStrike = function(){ fineMe(40, L2('you hit Mika the dog!', 'tu as heurté Mika le chien !')); };
+WANT_add = function(n, why){ if(!net.uid || isStaff()) return; if(n > 0 && /mots|words/i.test(String(why || ''))){ WANT.lvl = Math.min(5, WANT.lvl + n); WANT.last = Date.now(); try { localStorage.setItem('paris.want', WANT.lvl); } catch(e){} wantDraw(); } };
+/* traffic lights: still change colour, cars still stop; for you it's advice, not a rule */
+tlTick = (function(orig){ return function(dt){ var keep = WANT_add; WANT_add = function(){}; var keepSay = say, keepToast = showToast, warned = false; showToast = function(t){ if(/RED LIGHT|FEU ROUGE/.test(t)){ if(!warned){ warned = true; keepToast('🚦 ' + L2('Red light! (advice: it\'s safer to stop)', 'Feu rouge ! (conseil : c\'est plus sûr de s\'arrêter)')); } return; } return keepToast.apply(this, arguments); }; say = function(t){ if(/Le feu est rouge/.test(t)) return; return keepSay.apply(this, arguments); }; try { orig(dt); } finally { WANT_add = keep; say = keepSay; showToast = keepToast; } }; })(tlTick);
+/* anti-cheat no longer jails (it still undoes the change and tells Madame) */
+var _jailUidR = jailUid; jailUid = function(uid, why){ if(uid === net.uid && !isStaff() && /TRICHE|CHEAT|RENVERS|RAN OVER|MIKA|ARREST/i.test(String(why || ''))) return Promise.resolve(); return _jailUidR.apply(this, arguments); };
+/* ---------- ⛶ FULLSCREEN ---------- */
+GACT.fullscreen = function(){ var d = document, el = d.documentElement, on = d.fullscreenElement || d.webkitFullscreenElement; try { if(on){ (d.exitFullscreen || d.webkitExitFullscreen).call(d); } else { var p = (el.requestFullscreen || el.webkitRequestFullscreen).call(el); if(p && p.catch) p.catch(function(){ showToast('⛶ ' + L2('Fullscreen is blocked here - press F11, or open the game in its own tab', 'Le plein écran est bloqué ici - appuie sur F11 ou ouvre le jeu dans son propre onglet')); }); } } catch(e){ showToast('⛶ ' + L2('Press F11 for fullscreen', 'Appuie sur F11 pour le plein écran')); } };
+(function(){ var bar = document.getElementById('top-bar'); if(bar){ var b = document.createElement('button'); b.className = 'bar-btn'; b.id = 'fs-btn'; b.textContent = '⛶'; b.title = L2('Fullscreen (F)', 'Plein écran (F)'); b.addEventListener('click', GACT.fullscreen); bar.appendChild(b); }
+  window.addEventListener('keydown', function(e){ if(e.code !== 'KeyF' || e.repeat || e.ctrlKey || e.metaKey) return; var t = e.target; if(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return; if(typeof gcard !== 'undefined' && gcard.el && !gcard.el.classList.contains('hidden')) return; GACT.fullscreen(); }); })();
+/* ---------- 🚗 CAR INTERIORS: seats, door panels, centre console + gear stick, floor, roof lining, back seats ---------- */
+Object.keys(cars).forEach(function(k){ var m = cars[k], ck = m.cockpit; if(!ck || ck.extra) return; ck.extra = true; var g = ck.group, e = ck.eye, f1 = k === 'f1', two = k === 'coupe' || k === 'roadster';
+  var leather = new THREE.MeshPhongMaterial({color:k === 'roadster' ? 0xc8a070 : 0x2a2b30, shininess:30}), stitch = solidMat(k === 'roadster' ? 0x8a5a32 : 0x8a1a1a), carpet = solidMat(0x1b1c20), trim = new THREE.MeshPhongMaterial({color:0x3a3b42, shininess:60}), alu = new THREE.MeshPhongMaterial({color:0xb8bcc4, shininess:120});
+  function add(geo, mat, x, y, z, rx){ var o = new THREE.Mesh(geo, mat); o.position.set(x, y, z); if(rx) o.rotation.x = rx; g.add(o); return o; }
+  if(f1){ add(new THREE.BoxGeometry(0.5, 0.08, 0.7), leather, 0, e.y - 0.62, e.z + 0.2); add(new THREE.BoxGeometry(0.5, 0.6, 0.08), leather, 0, e.y - 0.32, e.z + 0.5, -0.3); return; }
+  var seats = two ? [e.x, -e.x] : [e.x, -e.x];
+  seats.forEach(function(sx){ add(new THREE.BoxGeometry(0.52, 0.14, 0.55), leather, sx, e.y - 0.78, e.z + 0.18); var back = add(new THREE.BoxGeometry(0.52, 0.75, 0.12), leather, sx, e.y - 0.32, e.z + 0.5, -0.18); add(new THREE.BoxGeometry(0.3, 0.2, 0.1), leather, sx, e.y + 0.14, e.z + 0.56, -0.18); add(new THREE.BoxGeometry(0.04, 0.7, 0.01), stitch, sx, e.y - 0.32, e.z + 0.435, -0.18); });
+  add(new THREE.BoxGeometry(0.22, 0.32, 0.9), trim, 0, e.y - 0.7, e.z - 0.15); var stick = add(new THREE.CylinderGeometry(0.018, 0.018, 0.22, 10), alu, 0, e.y - 0.46, e.z - 0.25); var knob = add(new THREE.SphereGeometry(0.05, 14, 10), trim, 0, e.y - 0.34, e.z - 0.25); add(new THREE.BoxGeometry(0.16, 0.05, 0.12), alu, 0, e.y - 0.53, e.z + 0.1);
+  [-1, 1].forEach(function(sd){ var dx = sd*(Math.abs(e.x) + 0.42); add(new THREE.BoxGeometry(0.06, 0.55, 1.5), trim, dx, e.y - 0.55, e.z - 0.1); add(new THREE.BoxGeometry(0.07, 0.05, 1.3), alu, dx, e.y - 0.32, e.z - 0.1); add(new THREE.BoxGeometry(0.08, 0.06, 0.3), leather, dx, e.y - 0.42, e.z + 0.1); });
+  add(new THREE.BoxGeometry(Math.abs(e.x)*2 + 0.8, 0.03, 2.2), carpet, 0, e.y - 0.9, e.z - 0.2);
+  if(k === 'sedan'){ add(new THREE.BoxGeometry(1.3, 0.14, 0.5), leather, 0, e.y - 0.78, e.z + 1.15); add(new THREE.BoxGeometry(1.3, 0.62, 0.12), leather, 0, e.y - 0.36, e.z + 1.42, -0.12); add(new THREE.BoxGeometry(1.5, 0.03, 2.0), solidMat(0xd8d4cc), 0, e.y + 0.42, e.z + 0.3); }
+  if(k !== 'roadster'){ var mir = add(new THREE.BoxGeometry(0.22, 0.07, 0.03), trim, 0, e.y + 0.3, e.z - 0.75); } });
+/* ---------- 🧍 PEOPLE TO SCALE: every person in the city is ~1.8 m tall next to buildings (3 m floors, 3 m doors) ---------- */
+var _buildWalkerS = buildWalker; buildWalker = function(){ var w = _buildWalkerS.apply(this, arguments); w.group.scale.setScalar(0.91); return w; };
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
