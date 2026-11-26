@@ -6625,7 +6625,7 @@ function renderBlocks(){
     ITEMS.forEach(function(it){
       if(it.who.indexOf('h') < 0) return;
       var b = document.createElement('button');
-      b.className = 'item-btn' + (blk.item === it.id ? ' on' : '');
+      b.className = 'item-btn' + (blk.item === it.id ? ' on' : ''); b.setAttribute('data-item', it.id);
       var sw = document.createElement('i'); sw.style.background = hexCss(ITEM_COLORS[it.c]); b.appendChild(sw);
       b.appendChild(document.createTextNode(tx(it)));
       b.addEventListener('click', function(){ blk.item = it.id; blk.itemColor = it.c; blk.tool = 'place'; blk.hoverKey = ''; renderBlocks(); });
@@ -6920,7 +6920,7 @@ function renderDecor(){
   ITEMS.forEach(function(it){
     if(it.who.indexOf(kindKey) < 0) return;
     var b = document.createElement('button');
-    b.className = 'item-btn' + (decor.placing && decor.placing.id === it.id ? ' on' : '');
+    b.className = 'item-btn' + (decor.placing && decor.placing.id === it.id ? ' on' : ''); b.setAttribute('data-item', it.id);
     var sw = document.createElement('i'); sw.style.background = hexCss(ITEM_COLORS[it.c]); b.appendChild(sw);
     b.appendChild(document.createTextNode(tx(it)));
     b.addEventListener('click', function(){
@@ -20615,6 +20615,41 @@ var _gfxCardRD = gfxCard; gfxCard = function(){ _gfxCardRD(); var c = gcard.el; 
 function rdTick(){ if(RD.v && scene.fog && scene.fog.far > RD.v){ scene.fog.far = RD.v; if(scene.fog.near > RD.v*0.35) scene.fog.near = RD.v*0.35; } }
 /* new players start on MEDIUM (lighter); anyone can raise it */
 try { if(!localStorage.getItem('paris.gfx')){ GFX.mode = 'fast'; setTimeout(gfxApply, 600); } } catch(e){}
+/* ---------- 🛋 MEUBLES & CIE: the furniture store. Buy furniture, then place it in BUILD/DECORATE mode in your home or shop.
+   A starter set is free; everything else is unlocked by buying it once (then you can place as many as you like). ---------- */
+var FURN_FREE = {}; ITEMS.slice(0, 6).forEach(function(it){ FURN_FREE[it.id] = 1; });
+function furnPrice(it){ return Math.round(12 + (it.w|0)*(it.d|0)*6 + (it.id.length % 5)*4); }
+function furnOwned(id){ if(FURN_FREE[id] || isStaff()) return true; var e = hasChar() ? life.eco : null; return !!(e && e.furn && e.furn[id]); }
+function furnLock(){ [].forEach.call(document.querySelectorAll('.item-btn[data-item]'), function(b){ var id = b.getAttribute('data-item'), it = ITEM_BY_ID[id]; if(!it || furnOwned(id)) return; if(b.getAttribute('data-locked')) return; b.setAttribute('data-locked', '1'); b.style.opacity = 0.55; b.title = L2('Buy it at Meubles & Cie', 'Achète-le chez Meubles & Cie'); b.appendChild(document.createTextNode(' 🔒 ' + furnPrice(it) + ' €'));
+  b.addEventListener('click', function(e){ e.stopImmediatePropagation(); e.preventDefault(); showCard('<h3>🔒 ' + esc(tx(it)) + '</h3><div class="gc-text">' + L2('This piece of furniture is sold at <b>Meubles & Cie</b> (the furniture store): ', 'Ce meuble est vendu chez <b>Meubles & Cie</b> (le magasin de meubles) : ') + furnPrice(it) + ' €</div><div class="gc-row">' + gBtn('furnbuy', id, '🛒 ' + L2('BUY NOW', 'ACHETER') + ' (' + furnPrice(it) + ' €)', 'go') + gBtn('furngo', null, '🚶 ' + L2('GO TO THE STORE', 'ALLER AU MAGASIN')) + gBtn('close', null, 'OK') + '</div>'); }, true); }); }
+['renderBlocks', 'renderDecor'].forEach(function(fn){ var f = window[fn]; if(typeof f !== 'function') return; window[fn] = function(){ var r = f.apply(this, arguments); try { furnLock(); } catch(e){} return r; }; });
+GACT.furnbuy = function(id){ var it = ITEM_BY_ID[id], e = hasChar() ? life.eco : null; if(!it || !e) return; var pr = furnPrice(it); if((+e.cash || 0) < pr){ showToast(L2('Not enough money!', 'Pas assez d\'argent !')); return; } e.cash = +e.cash - pr; if(typeof finRec === 'function') finRec(-pr, 'meubles'); e.furn = e.furn || {}; e.furn[id] = 1; lifeSave(true); say('J\'achète ' + (ITEM_ART && ITEM_ART[id] || tx(it).toLowerCase()) + '. Merci !'); showToast('🛋 ' + tx(it) + ' · −' + pr + ' € · ' + L2('now place it in DECORATE / BUILD mode!', 'place-le en mode DÉCORER / CONSTRUIRE !')); closeCard(); try { if(typeof renderDecor === 'function' && document.getElementById('dc-items') && document.getElementById('dc-items').offsetParent) renderDecor(); if(typeof renderBlocks === 'function' && blk && blk.on) renderBlocks(); } catch(x){} if(FS.cat) GACT.furncat(FS.cat); };
+var FS = {cat:null, pos:null};
+GACT.furncat = function(page){ FS.cat = page || 1; var e = hasChar() ? life.eco : null, all = ITEMS.filter(function(it){ return !FURN_FREE[it.id] && !it.gift; }), per = 12, pages = Math.max(1, Math.ceil(all.length/per)), p = Math.min(pages, Math.max(1, page|0)), L = all.slice((p - 1)*per, p*per);
+  showCard('<h3>🛋 MEUBLES & CIE · ' + L2('CATALOGUE', 'LE CATALOGUE') + ' ' + p + '/' + pages + '</h3><div class="gc-sub">' + (e ? Math.round(+e.cash || 0) + ' € · ' : '') + L2('Buy once, place as many as you like (DECORATE / BUILD mode at home or in your shop).', 'Achète une fois, place-en autant que tu veux (mode DÉCORER / CONSTRUIRE).') + '</div><div class="gc-grid">' + L.map(function(it){ var own = furnOwned(it.id); return own ? '<div class="gc-text">✅ <b>' + esc(tx(it)) + '</b><br><span class="lf-soft">' + L2('owned', 'acheté') + '</span></div>' : gOpt('furnbuy', it.id, '<b>' + esc(tx(it)) + '</b><br><span class="lf-soft">' + furnPrice(it) + ' € · ' + esc((typeof ITEM_ART !== 'undefined' && ITEM_ART[it.id]) || it.fr || '') + '</span>'); }).join('') + '</div><div class="gc-row">' + (p > 1 ? gBtn('furncat', p - 1, '◀') : '') + (p < pages ? gBtn('furncat', p + 1, '▶') : '') + gBtn('close', null, 'OK') + '</div><div class="gc-text">📚 le meuble · le canapé · le fauteuil · l\'armoire · l\'étagère · la commode · le tapis · la lampe · le lit · le bureau</div>'); };
+GACT.furngo = function(){ closeCard(); if(FS.pos) goTo({x:FS.pos.x, z:FS.pos.z + 12, yaw:0}); };
+(function(){ var p = freeAt(-150, -470), X = p[0], Z = p[1], B = new MeshBatch(), L = new Lot(B, X, Z, 0); FS.pos = {x:X, z:Z};
+  L.box(22, 8, 14, 0, 4, 0, 0xf2e8d8); L.box(22.4, 0.6, 14.4, 0, 8.2, 0, 0x2b4c9b); L.box(14, 3.2, 0.1, 0, 2.2, 7.02, 0x9fd8ff); L.box(3, 3, 0.12, 0, 1.5, 7.05, 0x5a3a22);
+  [-7, 7].forEach(function(x){ L.box(3.2, 0.9, 1.6, x, 0.45, 8.5, 0xd8a24a); L.box(3.2, 0.9, 0.3, x, 1.1, 7.8, 0xd8a24a); L.box(1, 1.3, 1, x + 2.6, 0.65, 8.6, 0xf4f4f0); }); B.build(); addSolid(X - 11, X + 11, Z - 7, Z + 7, 'static', -1, 8.5);
+  airSign('🛋 MEUBLES & CIE · ' + L2('FURNITURE STORE', 'MAGASIN DE MEUBLES'), X, 6.6, Z + 7.1, 0, 15, '#2b4c9b');
+  var sl = person({x:X + 4, z:Z + 9.5, ry:Math.PI, shirt:0xffd23a, pants:0x2b4c9b, hair:0x6b3a1a, h:1.7}); LBL.dyn.push({m:sl, fr:'la vendeuse de meubles', en:'the furniture seller', dy:2.3, r:0.7, act:function(){ say('Bienvenue chez Meubles & Cie ! Un canapé ? Une armoire ?'); GACT.furncat(1); }});
+  addSpot({x:X, z:Z + 9, r:4, label:function(){ return '🛋 ' + L2('Meubles & Cie: furniture catalogue', 'Meubles & Cie : le catalogue de meubles'); }, act:function(){ GACT.furncat(1); }});
+  tag(X - 7, 1, Z + 8.5, 'le canapé', 'the sofa', 1); tag(X + 9.6, 1, Z + 8.6, 'la commode', 'the dresser', 0.8);
+  EXTRA_PLACES.push(['🛋', 'Meubles & Cie (magasin de meubles)', L2('Buy furniture, then place it in your home in DECORATE / BUILD mode', 'Achète des meubles, puis place-les chez toi en mode DÉCORER / CONSTRUIRE'), X, Z + 13, Math.PI]); })();
+/* ---------- 🚗 CARPOOL (covoiturage): drivers open their car, other players hop in (as many as the car has seats) ---------- */
+var SEATS = {sedan:4, coupe:2, roadster:2, f1:1}, POOL = {open:false, ride:null, seat:0, btn:null, dbtn:null};
+var _presenceStateP = presenceState; presenceState = function(){ var s = _presenceStateP(); if(flying && driving && POOL.open && (SEATS[carName] || 1) > 1) s.po = SEATS[carName] - 1; if(POOL.ride){ s.pool = POOL.ride; s.mode = 'menu'; s.x = s.y = s.z = s.yaw = null; } return s; };
+function poolRiders(uid){ return mp.others.filter(function(p){ return p.presence && p.presence.pool === uid; }); }
+(function(){ var b = document.createElement('button'); b.className = 'bar-btn'; b.style.cssText = 'position:fixed;left:50%;bottom:calc(196px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:30;font-size:14px;padding:10px 14px;display:none'; document.body.appendChild(b); POOL.btn = b; b.addEventListener('click', function(){ if(POOL.ride) poolLeave(); else if(POOL.cand) poolJoin(POOL.cand); });
+  var d = document.createElement('button'); d.className = 'bar-btn'; d.style.cssText = 'position:fixed;right:12px;bottom:calc(240px + env(safe-area-inset-bottom,0px));z-index:30;font-size:13px;padding:8px 10px;display:none'; document.body.appendChild(d); POOL.dbtn = d; d.addEventListener('click', function(){ POOL.open = !POOL.open; showToast(POOL.open ? '🚗 ' + L2('Carpool open: friends can hop in! (', 'Covoiturage ouvert : tes amis peuvent monter ! (') + ((SEATS[carName] || 1) - 1) + L2(' seats)', ' places)') : '🚗 ' + L2('Carpool closed', 'Covoiturage fermé')); if(typeof sendPresence === 'function') sendPresence(true); }); })();
+function poolJoin(p){ var s = p.presence || {}, used = poolRiders(p.peer).length; if(!(s.po > used)){ showToast('🚗 ' + L2('The car is full!', 'La voiture est pleine !')); return; } POOL.ride = p.peer; POOL.seat = used + 1; say('Bonjour ! Merci pour le covoiturage !'); showToast('🚗 ' + L2('You are riding with ', 'Tu voyages avec ') + playerName(p)); if(typeof ghAdd === 'function') ghAdd(1, 'carpool'); if(typeof sendPresence === 'function') sendPresence(true); }
+function poolLeave(){ var a = POOL.ride && mp.avatars[POOL.ride]; if(!a || !a.pos){ var pp = mp.others.filter(function(x){ return x.peer === POOL.ride; })[0]; if(pp && pp.presence && finite(pp.presence.x)) a = {pos:new THREE.Vector3(pp.presence.x, 0, pp.presence.z), yaw:pp.presence.yaw || 0}; } POOL.ride = null; if(a){ var yw = a.yaw || 0; goTo({x:a.pos.x + Math.cos(yw)*3, z:a.pos.z - Math.sin(yw)*3, yaw:yaw}); } say('Merci, au revoir !'); if(typeof sendPresence === 'function') sendPresence(true); }
+function poolTick(){ if(!mp || !mp.others) return; var cp = camera.position;
+  POOL.dbtn.style.display = flying && driving && (SEATS[carName] || 1) > 1 ? '' : 'none'; if(POOL.dbtn.style.display === ''){ var R = poolRiders(net.uid); POOL.dbtn.textContent = (POOL.open ? '🚗 ' + L2('Carpool ON', 'Covoiturage ON') : '🚗 ' + L2('Carpool OFF', 'Covoiturage OFF')) + (R.length ? ' · 👥 ' + R.map(playerName).join(', ') : ''); }
+  if(POOL.ride){ var p = mp.others.filter(function(x){ return x.peer === POOL.ride; })[0], a = mp.avatars[POOL.ride]; if(!a && p && p.presence && finite(p.presence.x)) a = {pos:new THREE.Vector3(p.presence.x, p.presence.y || 0, p.presence.z), yaw:p.presence.yaw || 0};
+    if(!p || !a || !p.presence || p.presence.mode !== 'drive' || !(p.presence.po > 0) || !flying){ showToast('🚗 ' + L2('The ride is over', 'Fin du trajet')); poolLeave(); POOL.btn.style.display = 'none'; return; }
+    var yw = a.yaw || 0, so = [[0.45, 0], [-0.45, 1.0], [0.45, 1.0]][Math.min(2, POOL.seat - 1)], c = Math.cos(yw), sn = Math.sin(yw); cp.set(a.pos.x + so[0]*c + so[1]*sn, a.pos.y + 1.3, a.pos.z - so[0]*sn + so[1]*c); vertVelocity = 0; POOL.btn.style.display = ''; POOL.btn.textContent = '🚪 ' + L2('Get out of ', 'Descendre de la voiture de ') + playerName(p); return; }
+  POOL.cand = null; if(flying && !driving){ var best = null, bd = 6; mp.others.forEach(function(p){ var s = p.presence || {}; if(s.mode === 'drive' && s.po > 0 && finite(s.x)){ var d = Math.hypot(s.x - cp.x, s.z - cp.z); if(d < bd && Math.abs(s.speed || 0) < 3){ bd = d; best = p; } } }); if(best){ POOL.cand = best; var used = poolRiders(best.peer).length; POOL.btn.style.display = ''; POOL.btn.textContent = '🚗 ' + L2('Carpool with ', 'Covoiturage avec ') + playerName(best) + ' (' + used + '/' + best.presence.po + ')'; return; } } POOL.btn.style.display = 'none'; }
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
@@ -21191,7 +21226,7 @@ function animate(){
   updateSpeedo();
   lifeTick(dt);
   jailTick();
-  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt); ambTrainTick(dt); wearOthersTick(); jamTick(); pkTick(dt); bumpTick(dt); cullTick(dt); rigTick(dt); crouchTick(dt); metroTick(dt); copTick(dt); specTick(); msprTick(dt); haloTick(dt); nitroTick(dt); f1Tick(dt); shadowTick(); rdTick();
+  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt); ambTrainTick(dt); wearOthersTick(); jamTick(); pkTick(dt); bumpTick(dt); cullTick(dt); rigTick(dt); crouchTick(dt); metroTick(dt); copTick(dt); specTick(); msprTick(dt); haloTick(dt); nitroTick(dt); f1Tick(dt); shadowTick(); rdTick(); poolTick();
   if(!ICE.t || performance.now() - ICE.t > 1000){ ICE.t = performance.now(); if(Math.hypot(camera.position.x - QC.x, camera.position.z - QC.z) < 800) iceSync(); }
   villageTick();
   sendPresence(false);
