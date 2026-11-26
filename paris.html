@@ -18734,7 +18734,7 @@ GACT.bmopen = function(){ openMap(); };
    the 🙋 card still shows anyone waiting, with ACCEPT / DECLINE. Needs a database rule letting Madame read paris/pending and add members. */
 var MDP = {list:{}, on:false, err:false, seen:{}};
 function mdListen(){ if(MDP.on || (typeof CLAUDE_MODE !== 'undefined' && CLAUDE_MODE) || !net.db || !net.uid || net.isOwner || !amMadame()) return; MDP.on = true;
-  net.db.ref('paris/pending').on('value', function(s){ MDP.err = false; var v = s.val() || {}, fresh = Object.keys(v).filter(function(k){ return !MDP.seen[k]; }); MDP.list = v; fresh.forEach(function(k){ MDP.seen[k] = 1; }); mdBtn(); if(Object.keys(v).length) processPending(v);
+  net.db.ref('paris/pending').on('value', function(s){ MDP.err = false; var v = s.val() || {}, fresh = Object.keys(v).filter(function(k){ return !MDP.seen[k]; }); MDP.list = v; fresh.forEach(function(k){ MDP.seen[k] = 1; }); mdBtn(); if(Object.keys(v).length && MT.auto) processPending(v);
     if(fresh.length && MDP.ready){ var n = fresh.map(function(k){ return cleanNick((v[k] || {}).name) || '?'; }).join(', '); showToast('🙋 ' + L2('Wants to join: ', 'Veut jouer : ') + n); try { playNotes([[79, 0.5], [84, 1]], 'sine', 0.15, 240); } catch(e){} }
     MDP.ready = true; if(gcard.el && !gcard.el.classList.contains('hidden') && gcard.el.querySelector('[data-g="mdacc"],[data-g="mdall"],.md-wait')) mdCard(); },
   function(){ MDP.on = false; MDP.err = true; mdBtn(); }); }
@@ -18917,6 +18917,37 @@ RM.act.ideas = function(){ ideasCard(); };
   airSign('📮 LE CENTRE DES IDÉES', X, 6.2, Z + 5.4, 0, 11, '#c8382f'); tag(X + 5, 2.8, Z + 6.4, 'la boîte à idées', 'the idea box', 1); tag(X - 4.5, 11, Z, 'une idée lumineuse !', 'a bright idea!', 2);
   addSpot({x:X, z:Z + 7.5, r:4, label:function(){ return '📮 ' + L2('Ideas Centre: send a request to improve the game', 'Centre des idées : envoie une demande pour améliorer le jeu'); }, act:ideasCard});
   EXTRA_PLACES.push(['📮', 'Le Centre des Idées (demandes pour améliorer le jeu)', L2('Send requests to improve the game', 'Envoie des demandes pour améliorer le jeu'), X, Z + 9, Math.PI]); })();
+/* ---------- 👩‍🏫 THE MADAME TAB (in the menu): free prisoners from the Shame Chamber, let new players in ---------- */
+var MT = {auto:true}; try { MT.auto = localStorage.getItem('paris.mdauto') !== '0'; } catch(e){}
+(function makeMadameTab(){
+  var help = document.getElementById('tab-btn-help'), btn = document.createElement('button'); btn.className = 'tab-btn hidden'; btn.id = 'tab-btn-madame'; btn.textContent = '👩‍🏫 MADAME'; help.parentNode.insertBefore(btn, help);
+  var panel = document.createElement('div'); panel.className = 'tab-panel hidden'; panel.id = 'tab-madame'; document.getElementById('tab-play').parentNode.insertBefore(panel, document.getElementById('tab-play').nextSibling);
+  titleTabs.push({name:'madame', btn:btn, panel:panel}); btn.addEventListener('click', function(){ showTitleTab('madame'); renderMadameTab(); });
+  var st = document.createElement('style'); st.textContent = '#tab-madame .mt-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--ink-soft);font-size:17px}#tab-madame .mt-row small{color:var(--ink-soft);font-size:14px}#tab-madame .btn{font-size:8px;padding:8px 7px;white-space:nowrap;margin:0}#tab-madame .mt-h{margin-top:14px}'; document.head.appendChild(st);
+  panel.addEventListener('click', function(e){ var b = e.target.closest('[data-mt]'); if(!b) return; var a = b.dataset.mt, v = b.dataset.v;
+    if(a === 'free'){ b.disabled = true; releaseUid(v).then(function(){ if(typeof sendChat === 'function') sendChat('🔓 ' + t('jailFree', {name:cleanNick(memberName(v))})); renderMadameTab(); }).catch(function(){ showToast(t('etNeedRules')); b.disabled = false; }); }
+    else if(a === 'freeall'){ var L = jailedList(); Promise.all(L.map(function(u){ return releaseUid(u).catch(function(){}); })).then(function(){ if(L.length && typeof sendChat === 'function') sendChat('🔓 ' + L2('Everyone is out of the Shame Chamber.', 'Tout le monde est sorti de la chambre de la honte.')); renderMadameTab(); }); }
+    else if(a === 'acc'){ b.disabled = true; mdAccept(v).then(function(m){ if(m) showToast(m); renderMadameTab(); }); }
+    else if(a === 'dec'){ net.db.ref('paris/pending/' + v).remove().then(renderMadameTab).catch(function(){ showToast(t('etNeedRules')); }); }
+    else if(a === 'accall'){ var ids = Object.keys(MDP.list || {}); (function next(i){ if(i >= ids.length){ renderMadameTab(); return; } mdAccept(ids[i]).then(function(m){ if(m) showToast(m); setTimeout(function(){ next(i + 1); }, 400); }); })(0); }
+    else if(a === 'auto'){ MT.auto = !MT.auto; try { localStorage.setItem('paris.mdauto', MT.auto ? '1' : '0'); } catch(err){} if(MT.auto && Object.keys(MDP.list || {}).length) processPending(MDP.list); renderMadameTab(); } });
+})();
+function mtCan(){ return !(typeof CLAUDE_MODE !== 'undefined' && CLAUDE_MODE) && signedIn() && (amMadame() || net.isOwner); }
+function renderMadameTab(){ var btn = document.getElementById('tab-btn-madame'), panel = document.getElementById('tab-madame'); if(!btn) return; var ok = mtCan(); btn.classList.toggle('hidden', !ok);
+  if(!ok){ if(!panel.classList.contains('hidden')) showTitleTab('play'); return; }
+  var J = jailedList(), P = MDP.list || {}, ids = Object.keys(P).sort(function(a, b){ return ((P[a] || {}).at || 0) - ((P[b] || {}).at || 0); }), owner = net.isOwner;
+  var h = '<div class="settings-block"><div class="settings-label">🚔 ' + L2('PUBLIC SHAME CHAMBER', 'CHAMBRE DE LA HONTE PUBLIQUE') + ' (' + J.length + ')</div>';
+  h += J.length ? J.map(function(u){ var r = jailRec(u), mins = r.at ? Math.max(0, Math.round((Date.now() - r.at)/60000)) : null; return '<div class="mt-row"><span>🧑 <b>' + esc(cleanNick(memberName(u)) || '?') + '</b><br><small>' + (mins != null ? (mins < 60 ? mins + ' min' : mins < 1440 ? Math.round(mins/60) + ' h' : Math.round(mins/1440) + ' ' + L2('days', 'jours')) : '') + (r.why ? ' · ' + esc(r.why) : '') + '</small></span><span></span><button class="btn go" data-mt="free" data-v="' + esc(u) + '">🔓 ' + L2('SET FREE', 'LIBÉRER') + '</button></div>'; }).join('') + (J.length > 1 ? '<div class="btn-row" style="margin-top:8px"><button class="btn" data-mt="freeall">🔓 ' + L2('SET EVERYONE FREE', 'LIBÉRER TOUT LE MONDE') + '</button></div>' : '') : '<div class="msg">' + L2('Nobody is in the Shame Chamber. 🎉', 'Personne n\'est dans la chambre de la honte. 🎉') + '</div>';
+  h += '<div class="settings-label mt-h">🙋 ' + L2('NEW PLAYERS ASKING TO JOIN', 'NOUVEAUX JOUEURS QUI DEMANDENT À ENTRER') + ' (' + ids.length + ')</div>';
+  if(owner) h += '<div class="msg">' + L2('Your account (Daniel) lets new players in by itself.', 'Ton compte (Daniel) fait entrer les nouveaux joueurs automatiquement.') + '</div>';
+  else { h += '<div class="btn-row"><button class="btn' + (MT.auto ? ' go' : '') + '" data-mt="auto">' + (MT.auto ? '✅ ' + L2('LET THEM IN AUTOMATICALLY: ON', 'LES FAIRE ENTRER AUTOMATIQUEMENT : OUI') : '⬜ ' + L2('LET THEM IN AUTOMATICALLY: OFF', 'LES FAIRE ENTRER AUTOMATIQUEMENT : NON')) + '</button></div>';
+    if(MDP.err) h += '<div class="msg bad">' + L2('Madame\'s account can\'t see the waiting list yet - Daniel needs to add the Madame rule in Firebase.', 'Le compte de Madame ne voit pas encore la liste d\'attente - Daniel doit ajouter la règle de Madame dans Firebase.') + '</div>';
+    else h += ids.length ? ids.map(function(id){ var r = P[id] || {}, V = r.cls && V_BY_ID[r.cls]; return '<div class="mt-row"><span>🧑 <b>' + esc(cleanNick(r.name) || '?') + '</b><br><small>' + (V ? esc(tx(V.t)) : L2('no class chosen', 'pas de classe')) + '</small></span><button class="btn go" data-mt="acc" data-v="' + esc(id) + '">✅ ' + L2('LET IN', 'ACCEPTER') + '</button><button class="btn" data-mt="dec" data-v="' + esc(id) + '">❌</button></div>'; }).join('') + (ids.length > 1 ? '<div class="btn-row" style="margin-top:8px"><button class="btn go" data-mt="accall">✅ ' + L2('LET EVERYONE IN', 'TOUT ACCEPTER') + '</button></div>' : '') : '<div class="msg">' + L2('Nobody is waiting.', 'Personne n\'attend.') + '</div>'; }
+  panel.innerHTML = h + '</div>'; }
+setInterval(function(){ var p = document.getElementById('tab-madame'); renderMadameTabBtn(); if(p && !p.classList.contains('hidden')) renderMadameTab(); }, 3000);
+function renderMadameTabBtn(){ var b = document.getElementById('tab-btn-madame'); if(!b) return; var ok = mtCan(); b.classList.toggle('hidden', !ok); var n = Object.keys(MDP.list || {}).length + jailedList().length; b.textContent = '👩‍🏫 MADAME' + (ok && n ? ' (' + n + ')' : ''); }
+/* "the person signed in as Madame": a teacher account called Madame counts as Madame even before Daniel taps 👑 */
+amMadame = function(){ var m = net && net.uid && net.members[net.uid]; return !!(m && (m.madame || (m.teacher && m.key === 'madame'))); };
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
