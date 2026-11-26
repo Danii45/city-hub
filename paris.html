@@ -15298,6 +15298,25 @@ EC.brig = roomOf('ecole-brig', 'La Brigade de Cuisine', 'The kitchen brigade', 3
   function(L, X, Z, B, F){ BRIGADE.forEach(function(b, i){ var row = i < 5 ? 0 : 1, x = -12 + (i % 5)*6, z = row ? 3 : -4; L.box(3.4, 0.9, 1.6, x, 0.45, z - 1.4, 0xb8c0c8); person({x:X + x, z:Z + z - 2.6, ry:0, shirt:0xffffff, pants:[0x1b1b1d, 0x2a3a5a][i % 2], hair:[0x4a2a1a, 0xe8c070, 0x1b1b1d, 0x8a4a1a][i % 4], hat:i === 0 ? 0xffffff : null, h:i === 8 ? 1.55 : 1.75}); F.tagAt(x, 1.7, z - 2.6, b[0], b[1], 0.5); airSign(b[0].toUpperCase(), X + x, 2.6, Z + z - 0.55, Math.PI, 4.2, '#1f3f8f'); }); },
   BRIGADE.map(function(b, i){ var row = i < 5 ? 0 : 1, x = -12 + (i % 5)*6, z = row ? 3 : -4; return {x:x, z:z - 0.6, r:1.6, label:function(){ return '💬 ' + b[0]; }, act:function(){ say('Bonjour ! Je suis ' + b[0] + '. ' + b[1]); infoCard('👨‍🍳 ' + b[0].toUpperCase(), '« Bonjour ! Je suis ' + b[0] + '. ' + b[1] + ' »', '', ['Qui ' + b[1].replace(/^Il |^L'apprenti : il /, '').replace(/\.$/, '').slice(0, 80) + ' ?', b[0], shuffleR(Math.random, BRIGADE.filter(function(o){ return o !== b; }).map(function(o){ return o[0]; })).slice(0, 3)], 'brig' + i); }}; }));
 EXTRA_PLACES.push(['🔪', 'L\'École de Cuisine Française (la Porte des Couteaux)', L2('Knife cuts, sauces, pastry, recipe maker', 'Les coupes, les sauces, la pâtisserie, le créateur de recettes'), ECOLE.x, ECOLE.z - 18, Math.PI]);
+/* ---------- 🎵 the Sourdough Academy's own song: starts when you go in, loops while you stay, stops when you leave ---------- */
+(function(){ var st = document.createElement('style'); st.textContent = '#yt-player.compact{width:216px;} #yt-player.compact .yp-v{width:200px; height:113px; aspect-ratio:auto;} #yt-player.compact [data-yp="prev"], #yt-player.compact [data-yp="next"], #yt-player.compact [data-yp="mini"]{display:none;}'; document.head.appendChild(st); })();
+var ROOM_SONG = {levain:{id:'n1Q7UJQlCJs', title:'Sourdough Bread'}};
+var _songStepR = songStep;
+songStep = function(d){
+  if(player.loopRoom && INT.cur && INT.cur.id === player.loopRoom){ try{ player.yt.seekTo(0); player.yt.playVideo(); }catch(e){} return; }
+  _songStepR(d);
+};
+function roomSongStart(o){
+  var rs = ROOM_SONG[o.id]; if(!rs) return;
+  player.loopRoom = o.id; player.el.classList.add('compact');
+  if(!player.mutedBox){ player.mutedBox = {on:music.on}; music.on = false; if(music.gain) try{ music.gain.gain.value = 0; }catch(e){} }
+  playClip(rs.id, '🍞 ' + rs.title);
+}
+function roomSongStop(){ if(!player.loopRoom) return; player.loopRoom = null; player.el.classList.remove('compact'); stopSong(); }
+var _enterIntR = enterInterior;
+enterInterior = function(o, at){ _enterIntR(o, at); if(ROOM_SONG[o.id]) setTimeout(function(){ if(INT.cur === o) roomSongStart(o); }, 900); };
+var _interiorTickR = interiorTick;
+interiorTick = function(dt){ _interiorTickR(dt); if(player.loopRoom && (!INT.cur || INT.cur.id !== player.loopRoom)) roomSongStop(); };
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
