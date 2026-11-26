@@ -1526,6 +1526,7 @@ VILLAGES.forEach(function(v){
   if(v.main) return;
   // (Madame's elite village is smaller and more exclusive: 12 shops and 12 houses on the south side)
   var n = v.elite ? 6 : ROW_N;
+  if(v.elite) return;   // (the Baguette Village has ready-built baguette houses instead of plots)
   (v.elite ? [19] : [-19, 19]).forEach(function(dz){ [-47, 47].forEach(function(dx){ [-1, 1].forEach(function(side){
     var bz = v.z + dz, inner = (dz < 0) === (side > 0);
     plotRows.push({bx:v.x + dx, bz:bz, side:side, x0:v.x + dx - n*5, n:n, cx:v.x + dx, cz:bz + side*6, plots:[], kind:inner ? 'store' : 'house', village:v.id});
@@ -3680,7 +3681,7 @@ var bigBaguette = null, farLand = null, madameCut = null;
     var L = new Lot(B, v.x, v.z, 0), PZ = v.z + 60;
     PLAY_AREAS.push({x0:v.x - 104, x1:v.x + 104, z0:v.z - 48, z1:v.z + 82});
     lawn.rect(v.x, PZ, 150, 34, GRAVEL);
-    if(v.elite) [-47, 47].forEach(function(dx){ lawn.rect(v.x + dx, v.z - 19, 80, 24, LAWN); });
+    if(v.elite) [-47, 47].forEach(function(dx){ lawn.rect(v.x + dx, v.z - 19, 80, 24, LAWN); lawn.rect(v.x + dx, v.z + 19, 80, 24, LAWN); });
     [-58, 58].forEach(function(dx){ lawn.rect(v.x + dx, PZ, 30, 26, LAWN); });
     // the fountain (Madame's village has her giant baguette instead)
     if(!v.elite){
@@ -3717,25 +3718,23 @@ var bigBaguette = null, farLand = null, madameCut = null;
   /* MADAME'S GIANT BAGUETTE: 90 m tall, golden, slowly turning, over the elite village (you can see it from Paris) */
   function buildBaguette(v, PZ){
     var g = new THREE.Group(), crust = solidMat(0xd99a45), dark = solidMat(0xb7782f), light = solidMat(0xf0cf8a);
-    var bodyH = 80, R = 7;
+    var bodyH = 30, R = 2.8;
     var body = new THREE.Mesh(new THREE.CylinderGeometry(R, R, bodyH, 24), crust); g.add(body);
     [1, -1].forEach(function(s){ var cap = new THREE.Mesh(new THREE.SphereGeometry(R, 24, 14), crust); cap.scale.set(1, 1.5, 1); cap.position.y = s*bodyH/2; g.add(cap); });
     for(var i = 0; i < 7; i++){   // the slashes along the top
       var cut = new THREE.Mesh(new THREE.BoxGeometry(5.5, 1.2, 1.6), light);
-      cut.position.set(0, -33 + i*11, R - 0.2); cut.rotation.z = 0.5; g.add(cut);
-      var cut2 = cut.clone(); cut2.position.z = -(R - 0.2); g.add(cut2);
+      cut.scale.set(0.4, 0.4, 0.4); cut.position.set(0, -12.5 + i*4.2, R - 0.1); cut.rotation.z = 0.5; g.add(cut);
+      var cut2 = cut.clone(); cut2.position.z = -(R - 0.1); g.add(cut2);
     }
-    var ring = new THREE.Mesh(new THREE.TorusGeometry(R + 0.4, 0.7, 8, 32), dark); ring.rotation.x = Math.PI/2; ring.position.y = -bodyH/2 + 4; g.add(ring);
-    g.position.set(v.x, bodyH/2 + 18, PZ); g.rotation.z = 0.18;
+    g.position.set(v.x, bodyH/2 + 5, PZ); g.rotation.z = 0.18;
     root.add(g); bigBaguette = g;
     // its golden pedestal on the plaza
-    var ped = new THREE.Mesh(new THREE.CylinderGeometry(7, 9.5, 8, 24), solidMat(0xe3b52c)); ped.position.set(v.x, 4, PZ); root.add(ped);
-    pushSegCollider(v.x, PZ, v.x, PZ, 9.6, -50, 9);
+    pushSegCollider(v.x, PZ, v.x, PZ, 3.4, -50, 40);
     // a golden glow at night-ish: a sprite halo
     var hc = document.createElement('canvas'); hc.width = hc.height = 128; var hk = hc.getContext('2d'), gr = hk.createRadialGradient(64, 64, 4, 64, 64, 64);
     gr.addColorStop(0, 'rgba(255,220,120,0.55)'); gr.addColorStop(1, 'rgba(255,220,120,0)'); hk.fillStyle = gr; hk.fillRect(0, 0, 128, 128);
     var halo = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(hc), depthWrite:false, transparent:true}));
-    halo.scale.set(70, 120, 1); halo.position.set(v.x, bodyH/2 + 18, PZ); root.add(halo);
+    halo.scale.set(26, 46, 1); halo.position.set(v.x, bodyH/2 + 5, PZ); root.add(halo);
   }
   /* MADAME herself: a big cut-out of her (holding a baguette, of course) on a golden stand beside the giant baguette,
      always turning to face you, with her name plate */
@@ -12631,6 +12630,337 @@ GACT.srchgo = function(v){
   var fade = flyCard.fade; fade.style.opacity = 1;
   setTimeout(function(){ goTo({x:it.x, z:it.z, yaw:it.yaw}); setTimeout(function(){ fade.style.opacity = 0; }, 300); }, 500);
   showToast('📍 ' + it.name);
+};
+/* ---------- INTERIORS: buildings you can walk into ----------
+   Each interior is a real room built far away (x 8000+, past the fog). Walk to the door of a monument and press E:
+   you step inside, walk around, press E at the points of interest, and E at the door to go back out. */
+var INTERIORS = [], INT_N = 0;
+function makeInterior(o){
+  // o: {id, name, w, d, h, wall, floor, ceil, out:{x,z,yaw}, door:{x,z,r}, build:function(L, X, Z), spots:[{x,z,r,label,act}]}
+  var X = 8000 + (INT_N % 6)*300, Z = 8000 + Math.floor(INT_N/6)*300; INT_N++;
+  o.X = X; o.Z = Z; INTERIORS.push(o);
+  var B = new MeshBatch(), L = new Lot(B, X, Z, 0), w = o.w, d = o.d, h = o.h;
+  PLAY_AREAS.push({x0:X - w/2 + 0.6, x1:X + w/2 - 0.6, z0:Z - d/2 + 0.6, z1:Z + d/2 - 0.6});
+  L.box(w, 0.3, d, 0, -0.15, 0, o.floor || 0xc8b89a);
+  L.box(w, h, 0.4, 0, h/2, -d/2, o.wall || 0xe8dcc0); L.box(w, h, 0.4, 0, h/2, d/2, o.wall || 0xe8dcc0);
+  L.box(0.4, h, d, -w/2, h/2, 0, o.wall || 0xe8dcc0); L.box(0.4, h, d, w/2, h/2, 0, o.wall || 0xe8dcc0);
+  if(o.ceil !== false) L.box(w, 0.4, d, 0, h, 0, o.ceil || 0xf2ece0);
+  L.box(3, 3.6, 0.2, 0, 1.8, d/2 - 0.25, 0x5a3a22);                                    // the way out
+  if(o.build) o.build(L, X, Z, B);
+  B.build();
+  var lamp = new THREE.PointLight(o.light || 0xfff2d8, 1.1, Math.max(w, d)*1.4); lamp.position.set(X, h - 1, Z); root.add(lamp);
+  airSign(L2('EXIT', 'SORTIE') + ' ⟶', X, 4.2, Z + d/2 - 0.3, Math.PI, 3, '#2f6a3a');
+  addSpot({x:X, z:Z + d/2 - 2, r:2.6, label:function(){ return '🚪 ' + L2('Go back outside', 'Ressortir'); }, act:function(){ leaveInterior(o); }});
+  (o.spots || []).forEach(function(sp){ addSpot({x:X + sp.x, z:Z + sp.z, r:sp.r || 3, label:sp.label, act:sp.act}); });
+  addSpot({x:o.door.x, z:o.door.z, r:o.door.r || 4, label:function(){ return '🚪 ' + L2('Go inside: ', 'Entrer : ') + L2(o.en || o.name, o.name); }, act:function(){ enterInterior(o); }});
+  return o;
+}
+function enterInterior(o){
+  if(driving){ exitDriveMode(); driving = false; applyModeUI(); }
+  var fade = flyCard.fade; fade.style.opacity = 1;
+  setTimeout(function(){ goTo({x:o.X, z:o.Z + o.d/2 - 4, yaw:0}); setTimeout(function(){ fade.style.opacity = 0; }, 250); showToast('🚪 ' + L2(o.en || o.name, o.name)); }, 450);
+}
+function leaveInterior(o){
+  var fade = flyCard.fade; fade.style.opacity = 1;
+  setTimeout(function(){ goTo(o.out); setTimeout(function(){ fade.style.opacity = 0; }, 250); }, 450);
+}
+/* a little "learn + question" card used by many interiors */
+function infoCard(title, fr, en, q, key){
+  var h = '<h3>' + esc(title) + '</h3><div class="gc-text">' + esc(fr) + '</div>' + (LANG === 'en' && en ? '<div class="gc-sub">' + esc(en) + '</div>' : '');
+  if(q){ var r = lifeRand(key + Date.now()), m = mc(r, q[1], q[2]); gcard.cur = {kind:'info', title:title, fr:fr, en:en, q:q, key:key, m:m};
+    h += '<div class="gc-big">' + esc(q[0]) + '</div><div class="gc-grid">' + m.opts.map(function(o, k){ return gOpt('infoans', k, esc(o)); }).join('') + '</div>'; }
+  h += '<div class="gc-row">' + gBtn('close', null, L2('CLOSE', 'FERMER'), q ? '' : 'go', q ? '' : ' data-enter="1"') + '</div>';
+  showCard(h);
+}
+GACT.infoans = function(v){
+  var c = gcard.cur, ok = (v|0) === c.m.ans, got = 0;
+  if(ok && !(chal.cool[c.key] > Date.now())){ got = addJeton(1); chal.cool[c.key] = Date.now() + 3*60000; }
+  showCard('<h3>' + esc(c.title) + '</h3><div class="gc-big">' + (ok ? '<span class="good">✓ Bravo !</span>' + (got ? ' +1 🪙' : '') : '<span class="bad">✗ ' + esc(c.m.opts[c.m.ans]) + '</span>') + '</div>' + noCharLine() + '<div class="gc-row">' + gBtn('close', null, 'OK', 'go', ' data-enter="1"') + '</div>');
+};
+/* ---------- THE BAGUETTE VILLAGE: baguette houses and L'ACADÉMIE DU LEVAIN (the sourdough monument) ---------- */
+(function buildBaguetteVillage(){
+  var v = V_BY_ID.baguette, B = new MeshBatch(), crust = 0xd99a45, light = 0xf0cf8a, n = 0;
+  [-47, 47].forEach(function(dx){ [-1, 1].forEach(function(side){ for(var k = 0; k < 6; k++){
+    var x = v.x + dx - 25 + k*10, z = v.z + 19 + side*6, front = side;   // the end of the baguette faces the street
+    var H = new Lot(B, x, z, 0); n++;
+    H.part(new THREE.CylinderGeometry(2.6, 2.6, 9, 16), 0, 2.6, 0, crust, Math.PI/2);
+    H.part(new THREE.SphereGeometry(2.6, 16, 10), 0, 2.6, 4.5*front, crust); H.part(new THREE.SphereGeometry(2.6, 16, 10), 0, 2.6, -4.5*front, crust);
+    for(var c = -1; c <= 1; c++) H.box(1.2, 0.25, 2.2, 0, 5.1, c*2.6, light, 0, 0.5);
+    H.box(1.3, 2.2, 0.3, 0, 1.1, (4.5 + 2.45)*front, 0x6b3a1a);                         // the door
+    [-1, 1].forEach(function(s){ H.part(new THREE.CylinderGeometry(0.55, 0.55, 0.2, 12).rotateZ(Math.PI/2), s*2.55, 2.9, 0, 0x9fc8e0); });
+    H.box(0.1, 1, 0.1, 1.6, 1.4, (4.5 + 2.6)*front, 0x2a2d36); H.box(0.8, 0.5, 0.06, 1.6, 2, (4.5 + 2.62)*front, 0x1f3f8f);
+    pushSegCollider(x, z - 6, x, z + 6, 2.7, -50, 5.4);
+  } }); });
+  B.build();
+  // the sourdough monument: a giant golden boule with its scores and flour, the door into the Academy
+  var MX = v.x, MZ = v.z - 18, g = new THREE.Group(); g.position.set(MX, 0, MZ);
+  var loaf = new THREE.Mesh(new THREE.SphereGeometry(14, 32, 20, 0, Math.PI*2, 0, Math.PI*0.62), solidMat(0xc8843a)); loaf.scale.y = 0.75; g.add(loaf);
+  var ear = new THREE.MeshLambertMaterial({color:0xf0d29a});
+  [[0, 0.5], [0, -0.5], [Math.PI/2, 0.5], [Math.PI/2, -0.5]].forEach(function(s){ var sc = new THREE.Mesh(new THREE.TorusGeometry(9, 0.7, 6, 20, Math.PI*0.7), ear); sc.rotation.set(-Math.PI/2 + s[1]*0.9, 0, s[0] + Math.PI*0.15); sc.position.y = 8.5; g.add(sc); });
+  for(var f = 0; f < 60; f++){ var a = f*2.39, rr = 3 + (f*7 % 9), sp = new THREE.Mesh(new THREE.SphereGeometry(0.35 + (f % 3)*0.15, 6, 4), solidMat(0xfaf6ee)); sp.position.set(Math.cos(a)*rr, 10.2 - rr*rr*0.03, Math.sin(a)*rr); g.add(sp); }
+  var arch = new THREE.Mesh(new THREE.BoxGeometry(5, 6, 1.5), solidMat(0x5a3a22)); arch.position.set(0, 3, 13.4); g.add(arch);
+  root.add(g); pushSegCollider(MX, MZ, MX, MZ, 14, -50, 11);
+  airSign('🍞 L\'ACADÉMIE DU LEVAIN', MX, 8, MZ + 14.6, 0, 14, '#8a4a1a');
+  addSpot({x:MX, z:MZ + 17, r:4, label:function(){ return '🍞 ' + L2('Go inside the Sourdough Academy', 'Entrer dans l\'Académie du Levain'); }, act:function(){ enterInterior(ACAD); }});
+})();
+var ACAD = makeInterior({id:'levain', name:'L\'Académie du Levain', en:'The Sourdough Academy', w:34, d:26, h:8, wall:0xe8c898, floor:0x8a5a32, ceil:0xd8b888, light:0xffd8a0,
+  out:{x:V_BY_ID.baguette.x, z:V_BY_ID.baguette.z + 2, yaw:Math.PI}, door:{x:-99999, z:-99999, r:0.1},
+  build:function(L){
+    L.part(new THREE.SphereGeometry(4, 16, 10, 0, Math.PI*2, 0, Math.PI/2), -11, 0, -9, 0xa8523a); L.box(2, 1.6, 0.6, -11, 1, -5.2, 0x1b1b1d); L.box(1.6, 1.2, 0.2, -11, 1, -4.85, 0xff8a2a);   // the wood oven
+    L.box(12, 1.1, 2.4, 4, 0.55, -10, 0x8a5a32); L.box(12.2, 0.12, 2.6, 4, 1.15, -10, 0xd8c8a8);
+    for(var j = 0; j < 5; j++){ L.cyl(0.35, 0.35, 0.9, -1 + j*2.2, 1.65, -10, 0xdfeef5, 12); L.cyl(0.3, 0.3, 0.4 + j*0.1, -1 + j*2.2, 1.4 + j*0.05, -10, 0xe8d8b0, 10); }
+    for(var s2 = 0; s2 < 3; s2++){ L.box(10, 0.15, 1.2, 10, 1.5 + s2*1.3, -12.2, 0x6b4a32); for(var l = 0; l < 4; l++) L.part(new THREE.SphereGeometry(0.6, 10, 6), 6.5 + l*2.3, 1.95 + s2*1.3, -12.2, 0xc8843a, 0, 0, 0); }
+    [[-14, 6], [-14, 3], [-12.5, 6]].forEach(function(p){ L.box(1.2, 1.4, 0.9, p[0], 0.7, p[1], 0xe8e0d0); });
+    L.box(6, 3, 0.15, 0, 4, -12.8, 0x1b2a22);
+  },
+  spots:[
+    {x:0, z:-10.8, r:3, label:function(){ return '📖 ' + L2('What is sourdough?', 'Qu\'est-ce que le levain ?'); }, act:function(){ levainLearn(); }},
+    {x:3, z:-8.6, r:3, label:function(){ return '🫙 ' + L2('Make and feed your starter', 'Faire et nourrir ton levain'); }, act:function(){ starterCard(); }},
+    {x:-11, z:-4, r:3.2, label:function(){ return '🍞 ' + L2('Bake a sourdough loaf', 'Faire un pain au levain'); }, act:function(){ loafStart(); }},
+    {x:10, z:-10.5, r:3, label:function(){ return '🧀 ' + L2('Bonus infusions', 'Pains garnis (bonus)'); }, act:function(){ infusionCard(); }},
+    {x:-12, z:4.5, r:3, label:function(){ return '🧺 ' + L2('My bakery (my loaves)', 'Ma boulangerie (mes pains)'); }, act:function(){ myBakery(); }}
+  ]});
+function levainLearn(){
+  infoCard('📖 ' + L2('WHAT IS SOURDOUGH?', 'QU\'EST-CE QUE LE LEVAIN ?'),
+    'Le levain, c\'est un mélange de farine et d\'eau qui fermente tout seul. Dedans vivent des levures sauvages et des bactéries lactiques qui viennent de la farine et de l\'air. Elles mangent les sucres de la farine et produisent du gaz (qui fait lever le pain) et des acides (qui donnent le petit goût acidulé). On fait du pain au levain depuis plus de 5 000 ans, depuis l\'Égypte ancienne ! Avant l\'invention de la levure de boulanger au XIXe siècle, tout le pain était au levain.',
+    'Sourdough starter is a mix of flour and water that ferments by itself. It is full of wild yeasts and lactic bacteria that come from the flour and the air. They eat the sugars in the flour and make gas (which makes the bread rise) and acids (which give the tangy taste). People have made sourdough bread for more than 5,000 years, since ancient Egypt! Before baker\'s yeast was invented in the 1800s, all bread was sourdough.',
+    pickR(Math.random, [['Qu\'est-ce qui fait lever le pain au levain ?', 'le gaz fait par les levures sauvages', ['le sel', 'le four à micro-ondes', 'le sucre glace']], ['Depuis combien de temps fait-on du pain au levain ?', 'plus de 5 000 ans', ['10 ans', '100 ans', 'depuis 2020']], ['Le levain est un mélange de...', 'farine et d\'eau', ['lait et de sucre', 'sel et de poivre', 'beurre et d\'œufs']]]), 'levainA');
+}
+/* the starter: one feed per "day" (a day here = 1 minute) - by day 7 it doubles and is ready */
+var FEED_Q = [
+  ['Jour 1 : pour commencer ton levain, tu mélanges...', '50 g de farine complète et 50 g d\'eau tiède', ['50 g de sucre et 50 g de lait', '1 kg de sel et un verre d\'eau', 'de la farine et du jus d\'orange']],
+  ['Avant de nourrir ton levain, tu dois...', 'jeter la moitié du levain', ['le mettre au congélateur', 'ajouter du chocolat', 'le faire bouillir']],
+  ['Pour nourrir ton levain, tu ajoutes...', '50 g de farine et 50 g d\'eau', ['50 g de beurre', 'un œuf', '50 g de sel']],
+  ['Où gardes-tu ton levain ?', 'dans un bocal, à température ambiante', ['au four', 'dans le congélateur', 'au soleil sur le balcon']],
+  ['Comment fermes-tu le bocal ?', 'avec un couvercle posé, pas serré (le gaz doit sortir)', ['avec de la colle', 'je ne le ferme jamais', 'avec un cadenas']],
+  ['Ton levain fait de petites bulles. C\'est...', 'bon signe : il est vivant !', ['grave : il faut le jeter', 'normal, il bout', 'à cause du savon']],
+  ['Jour 7 : ton levain double de volume en 4 à 8 heures après le repas. Il est...', 'prêt pour faire du pain !', ['trop vieux', 'malade', 'gelé']]
+];
+function starterCard(msg){
+  if(!hasChar()){ showCard('<h3>🫙</h3>' + noCharLine() + '<div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); return; }
+  var e = life.eco, L = e.levain || {day:0, t:0}, wait = Math.max(0, Math.ceil(((L.t || 0) + 60000 - Date.now())/1000));
+  var jar = L.day === 0 ? '🫙' : L.day < 3 ? '🫙·' : L.day < 5 ? '🫙•••' : L.day < 7 ? '🫙🫧🫧' : '🫙🫧🫧🫧⬆';
+  var h = '<h3>🫙 ' + L2('MY SOURDOUGH STARTER', 'MON LEVAIN') + '</h3><div class="gc-emoji">' + jar + '</div><div class="gc-big">' + (L.day >= 7 ? L2('Your starter is READY! Name it and bake bread.', 'Ton levain est PRÊT ! Fais du pain.') : L2('Day ', 'Jour ') + (L.day + 1) + ' / 7') + '</div>' + (msg || '');
+  h += '<div class="gc-sub">' + L2('A real starter needs to be fed every day for about a week. Here, one "day" lasts 1 minute.', 'Un vrai levain se nourrit chaque jour pendant environ une semaine. Ici, un « jour » dure 1 minute.') + '</div>';
+  if(L.day < 7){
+    if(wait > 0) h += '<div class="gc-text">⏳ ' + L2('Next feed in ', 'Prochain repas dans ') + wait + ' s</div><div class="gc-row">' + gBtn('starter', null, L2('REFRESH', 'ACTUALISER')) + gBtn('close', null, 'OK', 'go') + '</div>';
+    else { var it = FEED_Q[L.day], m = mc(lifeRand('f' + Date.now()), it[1], it[2]); gcard.cur = {kind:'feed', m:m};
+      h += '<div class="gc-big">' + esc(it[0]) + '</div><div class="gc-grid">' + m.opts.map(function(o, k){ return gOpt('feedans', k, esc(o)); }).join('') + '</div>'; }
+  } else h += '<div class="gc-row">' + gBtn('loaf', null, L2('🍞 BAKE A LOAF', '🍞 FAIRE UN PAIN'), 'go', ' data-enter="1"') + gBtn('close', null, 'OK') + '</div>';
+  showCard(h);
+}
+GACT.starter = function(){ starterCard(); };
+GACT.feedans = function(v){
+  var e = life.eco, L = e.levain = e.levain || {day:0, t:0}, ok = (v|0) === gcard.cur.m.ans;
+  if(!ok){ starterCard('<div class="bad">✗ ' + L2('Not quite: ', 'Pas tout à fait : ') + esc(gcard.cur.m.opts[gcard.cur.m.ans]) + '</div>'); return; }
+  L.day++; L.t = Date.now(); var got = L.day === 7 ? addJeton(3) : 0; lifeSave(true);
+  starterCard('<div class="good gc-big">✓ ' + (L.day === 7 ? L2('Your starter is alive and strong! ', 'Ton levain est vivant et fort ! ') + (got ? '+' + got + ' 🪙' : '') : L2('Fed! Come back tomorrow (in 1 minute).', 'Nourri ! Reviens demain (dans 1 minute).')) + '</div>');
+};
+/* baking a loaf: put the steps in order, then the baker's maths */
+var LOAF_STEPS = [
+  ['La veille : nourris ton levain pour qu\'il soit bien actif.', 'The day before: feed your starter so it is very active.'],
+  ['Mélange 500 g de farine et 350 g d\'eau, et laisse reposer 1 heure (l\'autolyse).', 'Mix 500 g flour and 350 g water and rest 1 hour (the autolyse).'],
+  ['Ajoute 100 g de levain et 10 g de sel, et mélange bien.', 'Add 100 g starter and 10 g salt and mix well.'],
+  ['Fais 4 séries de rabats, toutes les 30 minutes.', 'Do 4 sets of stretch-and-folds, every 30 minutes.'],
+  ['Laisse la pâte lever 4 à 6 heures (le pointage).', 'Let the dough rise 4 to 6 hours (bulk fermentation).'],
+  ['Façonne une boule bien serrée.', 'Shape a tight round loaf.'],
+  ['Laisse-la reposer toute la nuit au réfrigérateur (l\'apprêt).', 'Let it rest overnight in the fridge (proofing).'],
+  ['Grigne le pain avec une lame bien coupante.', 'Score the loaf with a very sharp blade.'],
+  ['Fais cuire en cocotte à 250 °C : 20 minutes avec le couvercle, puis 25 minutes sans.', 'Bake in a pot at 250 °C: 20 minutes with the lid, then 25 minutes without.'],
+  ['Laisse refroidir 1 heure avant de couper.', 'Let it cool 1 hour before cutting.']
+];
+var BAKER_Q = [['Pour 500 g de farine et 70 % d\'hydratation, combien d\'eau ?', '350 g', ['70 g', '500 g', '700 g']], ['Le sel, c\'est 2 % de la farine. Pour 500 g de farine ?', '10 g', ['2 g', '50 g', '100 g']], ['Le levain, c\'est 20 % de la farine. Pour 500 g de farine ?', '100 g', ['20 g', '250 g', '500 g']]];
+function loafStart(){
+  if(!hasChar()){ showCard('<h3>🍞</h3>' + noCharLine() + '<div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); return; }
+  var L = life.eco.levain;
+  if(!L || L.day < 7){ showCard('<h3>🍞 ' + L2('BAKE A LOAF', 'FAIRE UN PAIN') + '</h3><div class="gc-text">' + L2('You need an active starter first! Go to the jars and make your starter (7 days).', 'Il te faut d\'abord un levain actif ! Va aux bocaux et fais ton levain (7 jours).') + '</div><div class="gc-row">' + gBtn('starter', null, L2('MY STARTER', 'MON LEVAIN'), 'go') + gBtn('close', null, 'OK') + '</div>'); return; }
+  gcard.cur = {kind:'loaf', step:0, miss:0, inf:gcard.inf || null, r:lifeRand('loaf' + Date.now())}; gcard.inf = null; loafStep();
+}
+GACT.loaf = loafStart;
+function loafStep(msg){
+  var c = gcard.cur, inf = c.inf;
+  if(c.step < LOAF_STEPS.length){
+    var right = LOAF_STEPS[c.step][0], others = LOAF_STEPS.slice(c.step + 1).map(function(s){ return s[0]; }).concat(['Mets la pâte au micro-ondes 10 minutes.', 'Ajoute un litre de lait.']);
+    var m = mc(c.r, right, others.slice(0, 5)); c.m = m;
+    var h = '<h3>🍞 ' + (inf ? esc(inf.nm) : L2('SOURDOUGH LOAF', 'PAIN AU LEVAIN')) + '<span class="gc-score">' + (c.step + 1) + '/' + LOAF_STEPS.length + '</span></h3>' + (msg || '') + '<div class="gc-big">' + L2('What comes next?', 'Et ensuite ?') + '</div>';
+    if(inf && c.step === 4) h += '<div class="gc-sub">💡 ' + L2('Tip: for a ', 'Astuce : pour un ') + esc(inf.nm) + L2(', the extras go in during the folds (step 4).', ', les garnitures s\'ajoutent pendant les rabats (étape 4).') + '</div>';
+    h += '<div class="gc-grid">' + m.opts.map(function(o, k){ return gOpt('loafans', k, esc(o)); }).join('') + '</div>';
+    showCard(h); return;
+  }
+  var bi = c.step - LOAF_STEPS.length;
+  if(bi < BAKER_Q.length + (inf ? 1 : 0)){
+    var q = bi < BAKER_Q.length ? BAKER_Q[bi] : inf.q, m2 = mc(c.r, q[1], q[2]); c.m = m2;
+    showCard('<h3>🧮 ' + L2('BAKER\'S MATHS', 'LES MATHS DU BOULANGER') + '</h3>' + (msg || '') + '<div class="gc-big">' + esc(q[0]) + '</div><div class="gc-grid">' + m2.opts.map(function(o, k){ return gOpt('loafans', k, esc(o)); }).join('') + '</div>'); return;
+  }
+  var e = life.eco; e.breads = e.breads || {}; var key = inf ? inf.id : 'nature', first = !e.breads[key]; e.breads[key] = (e.breads[key] || 0) + 1;
+  var got = c.miss <= 3 ? addJeton(first ? 4 : 1) : 0; lifeSave(true);
+  showCard('<h3>🍞 ' + L2('IT\'S OUT OF THE OVEN!', 'IL SORT DU FOUR !') + '</h3><div class="gc-emoji">' + (inf ? inf.icon : '') + '🍞✨</div><div class="gc-big">' + esc(inf ? inf.nm : L2('A sourdough loaf', 'Un pain au levain')) + ' - ' + (c.miss <= 1 ? L2('perfect crust!', 'croûte parfaite !') : L2('a bit flat, but delicious!', 'un peu plat, mais délicieux !')) + (got ? ' +' + got + ' 🪙' : '') + '</div>' +
+    '<div class="gc-row">' + gBtn('infusions', null, L2('🧀 BONUS INFUSIONS', '🧀 PAINS GARNIS'), 'go') + gBtn('bakery', null, L2('MY BAKERY', 'MA BOULANGERIE')) + gBtn('close', null, 'OK') + '</div>');
+}
+GACT.loafans = function(v){ var c = gcard.cur, ok = (v|0) === c.m.ans; if(!ok) c.miss++; var msg = ok ? '<div class="good">✓</div>' : '<div class="bad">✗ ' + esc(c.m.opts[c.m.ans]) + '</div>'; c.step++; loafStep(msg); };
+var INFUSIONS = [
+  {id:'choco', icon:'🍫', nm:'Pain au levain aux pépites de chocolat', q:['Combien de pépites de chocolat pour 500 g de farine ?', '100 g', ['1 kg', '5 g', '500 g']]},
+  {id:'cheddar', icon:'🧀', nm:'Pain au cheddar et jalapeño', q:['On ajoute le cheddar...', 'en cubes, pendant les rabats', ['fondu, après la cuisson', 'dans l\'eau du levain', 'jamais']]},
+  {id:'ciboulette', icon:'🥓', nm:'Pain à la ciboulette et au bacon', q:['Le bacon doit être...', 'cuit et refroidi avant de l\'ajouter', ['cru et congelé', 'mis dans le levain', 'ajouté après la cuisson']]},
+  {id:'olives', icon:'🫒', nm:'Pain aux olives et au romarin', q:['Les olives viennent souvent de quel pays ?', 'la Grèce', ['la Norvège', 'le Canada', 'l\'Islande']]},
+  {id:'canneberges', icon:'🍒', nm:'Pain aux canneberges et aux noix', q:['Les canneberges sont cultivées au...', 'Québec', ['Sahara', 'pôle Sud', 'Japon']]},
+  {id:'ail', icon:'🧄', nm:'Pain à l\'ail rôti et au parmesan', q:['Le parmesan vient de quel pays ?', 'l\'Italie', ['la Chine', 'le Mexique', 'la Suède']]}
+];
+function infusionCard(){
+  var e = life.eco || {}, done = e.breads && e.breads.nature;
+  showCard('<h3>🧀 ' + L2('BONUS INFUSIONS', 'PAINS GARNIS (BONUS)') + '</h3><div class="gc-sub">' + (done ? L2('Pick a flavour, then bake it step by step.', 'Choisis un parfum, puis fais-le étape par étape.') : L2('Bake a plain sourdough loaf first to unlock the infusions!', 'Fais d\'abord un pain au levain nature pour débloquer les pains garnis !')) + '</div><div class="gc-grid">' +
+    INFUSIONS.map(function(f, i){ return gOpt('inf', i, f.icon + ' <b>' + esc(f.nm) + '</b>' + (e.breads && e.breads[f.id] ? ' ✓' : ''), '', !done); }).join('') + '</div><div class="gc-row">' + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>');
+}
+GACT.infusions = infusionCard;
+GACT.inf = function(v){ gcard.inf = INFUSIONS[v|0]; loafStart(); };
+function myBakery(){
+  var b = (life.eco && life.eco.breads) || {}, list = [['nature', '🍞', L2('Plain sourdough', 'Pain au levain nature')]].concat(INFUSIONS.map(function(f){ return [f.id, f.icon, f.nm]; }));
+  showCard('<h3>🧺 ' + L2('MY BAKERY', 'MA BOULANGERIE') + '</h3>' + list.map(function(x){ return '<div class="gc-text">' + x[1] + ' ' + esc(x[2]) + ' : <b>' + (b[x[0]] || 0) + '</b></div>'; }).join('') + '<div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>');
+}
+GACT.bakery = myBakery;
+/* ---------- 🗺 MAP: every place in the game, by area ---------- */
+function mapPlaces(){
+  var L = searchIndex(), pick = function(f){ return L.filter(f); };
+  return [
+    [L2('Paris - monuments', 'Paris - monuments'), pick(function(x){ return x.icon === '🏛'; })],
+    [L2('Paris - places to go', 'Paris - les sorties'), pick(function(x){ return ['🕹', '🎤', '🦁', '👨‍🍳', '✈', '🚔'].indexOf(x.icon) >= 0 || (x.icon === '🛒' && x.sub.indexOf('·') < 0) || x.name === L2('Champs-Élysées (avenue)', 'Avenue des Champs-Élysées') || x.name === L2('Adoption centre', 'Centre d\'adoption'); })],
+    [L2('The class villages', 'Les villages des classes'), pick(function(x){ return x.icon === '🏘' || x.icon === '🥖'; })],
+    [L2('Zoo habitats', 'Les habitats du zoo'), pick(function(x){ return x.sub === 'Zoo' && x.icon !== '🏠'; })],
+    [L2('Québec - the Carnaval', 'Québec - le Carnaval'), pick(function(x){ return x.sub && (x.sub.indexOf('Québec') >= 0 || /Carnaval|Glissade|Ski|Traîneau|Patinoire|Motoneige|Givre|Palais/.test(x.name)) && x.icon !== '📜'; })],
+    [L2('Around France', 'En France'), pick(function(x){ return x.cat === 'france'; })]
+  ];
+}
+(function(){
+  var s = document.getElementById('search-toggle'), b = document.createElement('button');
+  b.className = 'bar-btn'; b.id = 'map-toggle'; b.textContent = '🗺'; b.title = 'Carte / Map';
+  s.parentNode.insertBefore(b, s);
+  b.addEventListener('click', function(){ openMap(); });
+})();
+function openMap(){
+  srch.list = searchIndex();
+  var groups = mapPlaces(), h = '<h3>🗺 ' + L2('MAP - WHERE DO YOU WANT TO GO?', 'CARTE - OÙ VEUX-TU ALLER ?') + '</h3><div class="gc-sub">' + L2('Click a place to go there. (🔍 searches everything, even shops and foods.)', 'Clique sur un lieu pour y aller. (🔍 cherche tout, même les boutiques et les aliments.)') + '</div>';
+  groups.forEach(function(g){ if(!g[1].length) return; h += '<details' + (g === groups[0] ? ' open' : '') + ' style="margin:6px 0"><summary style="cursor:pointer;font-family:\'Press Start 2P\',monospace;font-size:9px;padding:6px 0">' + esc(g[0]) + ' (' + g[1].length + ')</summary><div class="gc-grid">' +
+    g[1].map(function(it){ return gOpt('srchgo', srch.list.indexOf(it), it.icon + ' <b>' + esc(it.name) + '</b>' + (it.sub ? '<br><span class="lf-soft">' + esc(it.sub) + '</span>' : '')); }).join('') + '</div></details>'; });
+  h += '<div class="gc-row">' + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>';
+  showCard(h);
+}
+/* ---------- 🇫🇷 LA MARSEILLAISE ---------- */
+var ANTHEM = {audio:null, src:'https://commons.wikimedia.org/wiki/Special:FilePath/La_Marseillaise_Rouget_de_Lisle_Musique_de_la_Garde_R%C3%A9publicaine.ogg'};
+(function(){
+  var s = document.getElementById('map-toggle'), b = document.createElement('button');
+  b.className = 'bar-btn'; b.id = 'anthem-toggle'; b.textContent = '🇫🇷'; b.title = 'La Marseillaise';
+  s.parentNode.insertBefore(b, s);
+  b.addEventListener('click', function(){ openAnthem(); });
+})();
+function openAnthem(){
+  var playing = ANTHEM.audio && !ANTHEM.audio.paused;
+  showCard('<h3>🇫🇷 LA MARSEILLAISE</h3><div class="gc-sub">' + L2('The national anthem of France · words and music: Claude Joseph Rouget de Lisle, 1792 · recording: Band of the Garde Républicaine (Wikimedia Commons)', 'L\'hymne national de la France · paroles et musique : Claude Joseph Rouget de Lisle, 1792 · enregistrement : Musique de la Garde républicaine (Wikimedia Commons)') + '</div>' +
+    '<div class="gc-row">' + gBtn('anthem', playing ? 'stop' : 'play', playing ? '⏹ STOP' : '▶ ' + L2('PLAY THE ANTHEM', 'JOUER L\'HYMNE'), 'go') + '</div>' +
+    '<div class="gc-text"><i>Allons enfants de la Patrie,<br>Le jour de gloire est arrivé !<br>Contre nous de la tyrannie<br>L\'étendard sanglant est levé,<br>Entendez-vous dans les campagnes<br>Mugir ces féroces soldats ?<br>Ils viennent jusque dans vos bras<br>Égorger vos fils, vos compagnes !</i><br><br><b>Aux armes, citoyens,<br>Formez vos bataillons,<br>Marchons, marchons !<br>Qu\'un sang impur<br>Abreuve nos sillons !</b></div>' +
+    (LANG === 'en' ? '<div class="gc-sub">Arise, children of the Fatherland, the day of glory has arrived! … To arms, citizens, form your battalions, let\'s march, let\'s march!</div>' : '') +
+    '<div class="gc-text">' + L2('It was written in Strasbourg in 1792 as a war song for the Army of the Rhine. Soldiers from Marseille sang it as they marched into Paris - that\'s why it is called « La Marseillaise ». It became the national anthem in 1795. The anthem is a war song from the French Revolution: its words are about defending the country.', 'Elle a été écrite à Strasbourg en 1792, comme chant de guerre pour l\'armée du Rhin. Des soldats venus de Marseille l\'ont chantée en arrivant à Paris : c\'est pour ça qu\'on l\'appelle « La Marseillaise ». Elle est devenue l\'hymne national en 1795. C\'est un chant de la Révolution française : ses paroles parlent de défendre le pays.') + '</div>' +
+    '<div class="gc-row">' + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>');
+}
+GACT.anthem = function(v){
+  if(v === 'stop'){ if(ANTHEM.audio) ANTHEM.audio.pause(); openAnthem(); return; }
+  if(!ANTHEM.audio){ ANTHEM.audio = new Audio(ANTHEM.src); ANTHEM.audio.addEventListener('ended', function(){ if(gcard.el.querySelector('[data-g="anthem"]')) openAnthem(); }); }
+  ANTHEM.audio.currentTime = 0;
+  ANTHEM.audio.play().catch(function(){ window.open('https://www.youtube.com/results?search_query=' + encodeURIComponent('La Marseillaise Garde républicaine'), '_blank', 'noopener'); });
+  setTimeout(openAnthem, 200);
+};
+/* ---------- 🎵 FRENCH MUSIC: pick and skip through French songs while you play ---------- */
+var MUSIC = {i:0};
+(function(){
+  var s = document.getElementById('anthem-toggle'), b = document.createElement('button');
+  b.className = 'bar-btn'; b.id = 'music-toggle'; b.textContent = '🎵'; b.title = 'Musique / Music';
+  s.parentNode.insertBefore(b, s.nextSibling);
+  b.addEventListener('click', function(){ openMusic(); });
+})();
+function openMusic(){
+  var cur = SONGS[MUSIC.i];
+  showCard('<h3>🎵 ' + L2('FRENCH MUSIC', 'MUSIQUE FRANÇAISE') + '</h3><div class="gc-sub">' + L2('Pick a song or skip with ⏮ ⏭. Songs marked ▶ play here in the official video; ↗ opens the official video on YouTube.', 'Choisis une chanson ou passe avec ⏮ ⏭. Les chansons ▶ jouent ici (clip officiel) ; ↗ ouvre le clip officiel sur YouTube.') + '</div>' +
+    '<div class="gc-big">♪ ' + esc(cur.t) + ' - ' + esc(cur.a) + '</div><div class="gc-row">' + gBtn('mus', 'prev', '⏮') + gBtn('mus', 'play', '▶ ' + L2('PLAY', 'JOUER'), 'go') + gBtn('mus', 'next', '⏭') + gBtn('mus', 'stop', '⏹') + '</div>' +
+    '<div class="gc-grid">' + SONGS.map(function(s, i){ return gOpt('mus', i, (VIDS[s.t] ? '▶ ' : '↗ ') + '<b>' + esc(s.t) + '</b><br><span class="lf-soft">' + esc(s.a) + '</span>', i === MUSIC.i ? 'sel' : ''); }).join('') + '</div><div class="gc-row">' + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>');
+}
+GACT.mus = function(v){
+  if(v === 'prev') MUSIC.i = (MUSIC.i + SONGS.length - 1) % SONGS.length;
+  else if(v === 'next') MUSIC.i = (MUSIC.i + 1) % SONGS.length;
+  else if(v === 'stop'){ player.el.innerHTML = ''; player.el.classList.add('hidden'); openMusic(); return; }
+  else if(v !== 'play') MUSIC.i = v|0;
+  var s = SONGS[MUSIC.i]; if(v !== 'prev' && v !== 'next') playSong(s.t, s.a); else if(VIDS[s.t]) playSong(s.t, s.a);
+  openMusic();
+};
+/* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
+   The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
+   bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
+   flies you to Québec. In Québec, 🏖 brings you home the same way. */
+var VAC = {dest:null};
+(function(){
+  var s = document.getElementById('search-toggle'), b = document.createElement('button');
+  b.className = 'bar-btn'; b.id = 'vac-toggle'; b.textContent = '🏖'; b.title = 'Vacances / Vacation';
+  s.parentNode.insertBefore(b, s.nextSibling);
+  b.addEventListener('click', function(){ openVacation(); });
+})();
+function inQuebec(){ return Math.hypot(camera.position.x - QC.x, camera.position.z - QC.z) < 900; }
+function openVacation(){
+  if(typeof amJailed === 'function' && amJailed()){ showToast(t('vgJail')); return; }
+  if(flight.active) return;
+  var home = inQuebec();
+  showCard('<h3>🏖 ' + (home ? L2('BACK TO PARIS?', 'RENTRER À PARIS ?') : L2('VACATION: THE CARNAVAL DE QUÉBEC', 'VACANCES : LE CARNAVAL DE QUÉBEC')) + '</h3><div class="gc-emoji">' + (home ? '🇫🇷✈' : '✈❄🏰') + '</div><div class="gc-text">' +
+    (home ? L2('Check in at the Québec airport and fly home to Paris.', 'Enregistre-toi à l\'aéroport de Québec et rentre à Paris en avion.') : L2('Go to Paris-CDG airport, check in (in French!), pass security and fly to Québec City for the Carnaval: the ice palace, sledding, skiing, maple taffy...', 'Va à l\'aéroport Paris-CDG, enregistre-toi (en français !), passe la sécurité et envole-toi pour Québec et son Carnaval : le palais de glace, les glissades, le ski, la tire d\'érable...')) +
+    '</div><div class="gc-row">' + gBtn('vacgo', home ? 'paris' : 'quebec', home ? L2('GO TO THE AIRPORT', 'ALLER À L\'AÉROPORT') : L2('LET\'S GO! ✈', 'C\'EST PARTI ! ✈'), 'go', ' data-enter="1"') + gBtn('close', null, L2('NOT NOW', 'PAS MAINTENANT')) + '</div>');
+}
+GACT.vacgo = function(dest){
+  VAC.dest = dest; gcard.resume = false; closeCard();
+  if(driving){ exitDriveMode(); driving = false; applyModeUI(); }
+  if(ride.on) endRide();
+  var fade = flyCard.fade; fade.style.opacity = 1;
+  setTimeout(function(){
+    if(dest === 'quebec') goTo({x:CDG.x + 23, z:CDG.z - 30, yaw:Math.PI});   // in front of a check-in counter
+    else goTo({x:qx(-36), z:qz(214), yaw:Math.PI});
+    setTimeout(function(){ fade.style.opacity = 0; checkIn(0); }, 600);
+  }, 600);
+};
+var CHECKIN = [
+  {who:'👩‍✈️', say:'Bonjour ! Votre passeport, s\'il vous plaît.', en:'The agent asks for your passport.', ok:['Voilà mon passeport.'], no:['Je n\'ai pas faim.', 'Il fait beau aujourd\'hui.', 'Mon chien s\'appelle Mika.']},
+  {who:'👩‍✈️', say:'Vous allez où ?', en:'Where are you going?', dest:true},
+  {who:'👩‍✈️', say:'Vous avez des bagages à enregistrer ?', en:'Do you have bags to check in?', ok:['Oui, une valise.'], no:['Oui, un éléphant.', 'Non, j\'ai douze ans.', 'Oui, à droite.']},
+  {who:'👩‍✈️', say:'Vous préférez côté hublot ou côté couloir ?', en:'Window seat or aisle seat? (both are fine!)', ok:['Côté hublot, s\'il vous plaît.', 'Côté couloir, s\'il vous plaît.'], no:['Côté cuisine, merci.', 'Côté piscine, s\'il vous plaît.'], seat:true},
+  {who:'👮', say:'Contrôle de sécurité. Vous avez des liquides de plus de 100 ml ?', en:'Security check: any liquids over 100 ml?', ok:['Non, je n\'en ai pas.'], no:['Oui, une piscine.', 'Je préfère le chocolat.', 'Il est midi.']},
+  {who:'👮', say:'Mettez votre sac et votre manteau sur le tapis, s\'il vous plaît.', en:'What must you do?', ok:[L2('Put my bag and coat on the belt', 'Mettre mon sac et mon manteau sur le tapis')], no:[L2('Dance on the belt', 'Danser sur le tapis'), L2('Give my coat to the pilot', 'Donner mon manteau au pilote'), L2('Leave the airport', 'Quitter l\'aéroport')]}
+];
+function checkIn(step, msg){
+  var home = VAC.dest === 'paris';
+  var steps = home ? [CHECKIN[0], CHECKIN[1], CHECKIN[4]] : CHECKIN;
+  if(step >= steps.length){ boardingPass(); return; }
+  var c = steps[step], r = lifeRand('ci' + Date.now()), right, wrongs;
+  if(c.dest){ right = home ? 'Je rentre à Paris, en France.' : 'Je vais à Québec, au Canada.'; wrongs = ['Je vais à la piscine.', 'Je suis fatigué.', home ? 'Je vais à Québec, au Canada.' : 'Je vais sur la Lune.']; }
+  else { right = pickR(r, c.ok); wrongs = c.no; }
+  var m = mc(r, right, wrongs);
+  gcard.cur = {kind:'checkin', step:step, q:m, c:c};
+  showCard('<h3>✈ ' + (step < (home ? 2 : 4) ? L2('CHECK-IN', 'ENREGISTREMENT') : L2('SECURITY', 'CONTRÔLE DE SÉCURITÉ')) + '<span class="gc-score">' + (step + 1) + '/' + steps.length + '</span></h3>' + (msg || '') +
+    '<div class="gc-emoji">' + c.who + '</div><div class="gc-big">« ' + esc(c.say) + ' »</div>' + (LANG === 'en' ? '<div class="gc-sub">' + esc(c.en) + '</div>' : '') +
+    '<div class="gc-grid">' + m.opts.map(function(o, k){ return gOpt('ciAns', k, esc(o)); }).join('') + '</div>');
+}
+GACT.ciAns = function(v){
+  var g = gcard.cur, pick = g.q.opts[v|0], ok = (v|0) === g.q.ans || (g.c.seat && g.c.ok.indexOf(pick) >= 0);
+  if(g.c.seat && ok) VAC.seat = /hublot/.test(pick) ? '14A' : '14C';
+  if(!ok){ checkIn(g.step, '<div class="bad">✗ ' + L2('The agent didn\'t understand. Try again!', 'L\'agent n\'a pas compris. Essaie encore !') + '</div>'); return; }
+  checkIn(g.step + 1, '<div class="good">✓ « Très bien, merci ! »</div>');
+};
+function boardingPass(){
+  var home = VAC.dest === 'paris', nm = ((life.eco && life.eco.ch) ? life.eco.ch.fn + ' ' + life.eco.ch.ln : (net.name || 'Passager')).toUpperCase();
+  var got = addJeton(2);
+  showCard('<h3>🎫 ' + L2('YOUR BOARDING PASS', 'TA CARTE D\'EMBARQUEMENT') + '</h3><div class="lf-card" style="font-family:monospace;font-size:17px;line-height:1.5">' +
+    'PASSAGER : <b>' + esc(nm) + '</b><br>VOL : <b>AF ' + (home ? '347' : '346') + '</b><br>' + (home ? 'QUÉBEC (YQB) ✈ PARIS-CDG (CDG)' : 'PARIS-CDG (CDG) ✈ QUÉBEC (YQB)') + '<br>PORTE : <b>' + (home ? '3' : 'B2') + '</b> · SIÈGE : <b>' + (VAC.seat || '14A') + '</b><br>EMBARQUEMENT : <b>' + new Date(Date.now() + 15*60000).toTimeString().slice(0, 5).replace(':', ' h ') + '</b></div>' +
+    '<div class="gc-big">📢 « ' + (home ? 'Embarquement immédiat, porte 3 !' : 'Embarquement immédiat, porte B2 !') + ' »</div>' + (got ? '<div class="gc-sub">+' + got + ' 🪙</div>' : '') +
+    '<div class="gc-row">' + gBtn('vacboard', null, L2('BOARD THE PLANE ✈', 'MONTER DANS L\'AVION ✈'), 'go', ' data-enter="1"') + '</div>');
+}
+GACT.vacboard = function(){
+  var home = VAC.dest === 'paris';
+  gcard.resume = false; closeCard();
+  flight.near = AIRPORTS.filter(function(a){ return a.id === (home ? 'quebec' : 'paris'); })[0];
+  startFlight(home ? 'paris' : 'quebec');
 };
 
 /* ---------- JAIL (for Madame's class) ----------
