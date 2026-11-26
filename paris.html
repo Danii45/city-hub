@@ -20692,6 +20692,149 @@ function runCmd(text){ var m = /^\/(\w+)\s*(.*)$/.exec(text.trim()); if(!m) retu
 var _runCommandCMD = runCommand; runCommand = function(text){ var c = (/^\/(\w+)/.exec(String(text).trim()) || [])[1]; c = c ? c.toLowerCase() : ''; if(['ban', 'unban', 'jail', 'free', 'tp', 'bring', 'who'].indexOf(c) >= 0){ if(isStaff()) runCmd(String(text)); else systemLine('👑 ' + L2('Only Madame can use /' + c + '.', 'Seule Madame peut utiliser /' + c + '.')); return; } _runCommandCMD.apply(this, arguments); if((c === 'help' || c === 'aide') && isStaff()) runCmd('/help'); };
 /* students: Madame's /bring moves them */
 (function(){ var hooked = null; setInterval(function(){ if(!net.db || !net.uid || hooked === net.uid) return; hooked = net.uid; try { net.db.ref('paris/mod/tp/' + net.uid).on('value', function(s){ var v = s.val(); if(!v || !(v.at > Date.now() - 60000)) return; if(driving){ exitDriveMode(); driving = false; applyModeUI(); } if(INT.cur){ INT.cur = null; INT.lamps.forEach(function(l){ l.intensity = 0; }); } goTo({x:v.x, z:v.z, yaw:v.yaw}); showToast('👑 ' + L2('Madame brought you to her.', 'Madame t\'a fait venir.')); net.db.ref('paris/mod/tp/' + net.uid).remove().catch(function(){}); }, function(){}); } catch(e){} }, 3000); })();
+/* =====================================================================================================================
+   🛹 LE SKATEPARK + 🏍 LA PISTE DE MOTOCROSS: ollies, flip tricks, grabs, grinds, manuals, combos, your own named combos,
+   dirt bikes with jumps and whips, leaderboards. Shared air physics for everything you ride (ramps, platforms, rails).
+   ===================================================================================================================== */
+var PLATS = [], RAILS = [], SKP = {x:2600, z:700};
+function platAt(x, z){ var h = -1e9; for(var i=0;i<PLATS.length;i++){ var p = PLATS[i]; if(x >= p.x0 && x <= p.x1 && z >= p.z0 && z <= p.z1 && p.h > h) h = p.h; } return h; }
+var _rampAtP = rampAt; rampAt = function(x, z){ var r = _rampAtP(x, z), ph = platAt(x, z); if(ph > -1e8 && (!r || ph > r.y)) return {y:ph, slope:0, plat:true}; return r; };
+/* tricks */
+var TRICKS = {
+  skate:[['ollie', 'Ollie', 'Space', 100, null], ['kick', 'Kickflip', '1', 300, [0, 0, 6.283]], ['heel', 'Heelflip', '2', 300, [0, 0, -6.283]], ['shove', 'Pop shove-it', '3', 250, [0, 3.1416, 0]], ['tre', '360 flip (tre flip)', '4', 600, [0, 6.283, 6.283]], ['indy', 'Indy grab', '5', 400, [0.5, 0, 0]], ['varial', 'Varial kickflip', '6', 450, [0, 3.1416, 6.283]], ['manual', 'Manual', '7', 150, null], ['grind', '50-50 grind', '—', 120, null]],
+  dirtbike:[['ollie', 'Bunny hop', 'Space', 100, null], ['super', 'Superman', '1', 500, [0.35, 0, 0]], ['nohand', 'No-hander', '2', 350, [0, 0, 0.3]], ['flip', 'Backflip', '3', 1200, [-6.283, 0, 0]], ['whip', 'Whip', '4', 400, [0, 0.9, 0.7]], ['heel', 'Heel clicker', '5', 450, [0.2, 0, -0.2]], ['manual', 'Wheelie', '7', 150, null]]
+};
+var SK = {y:0, vy:0, air:false, anim:null, combo:[], score:0, mult:0, comboT:0, grind:null, manualT:0, last:null, hud:null};
+function skKind(){ return ride && ride.on ? (ride.kind === 'dirtbike' ? 'dirtbike' : /skate|scooter|ebike|cheesescoot|macscoot/.test(ride.kind) ? 'skate' : null) : null; }
+function skTrick(id){ var L = TRICKS[skKind() === 'dirtbike' ? 'dirtbike' : 'skate']; for(var i=0;i<L.length;i++) if(L[i][0] === id) return L[i]; return null; }
+SK.hud = (function(){ var d = document.createElement('div'); d.style.cssText = 'position:fixed;left:50%;top:calc(96px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:32;background:rgba(15,20,40,.8);color:#fff;font:700 16px Arial,sans-serif;padding:8px 16px;border-radius:12px;display:none;text-align:center;max-width:80vw'; document.body.appendChild(d); return d; })();
+function skAdd(id){ var t = skTrick(id); if(!t) return; SK.combo.push(id); SK.score += t[3]; SK.mult = SK.combo.length; SK.comboT = 2.6; skShow(); try { playNotes([[76 + SK.combo.length*2, 0.08]], 'square', 0.06, 120); } catch(e){} }
+function skShow(){ if(!SK.combo.length){ SK.hud.style.display = 'none'; return; } var names = SK.combo.map(function(id){ var t = skTrick(id); return t ? t[1] : id; }); SK.hud.style.display = ''; SK.hud.innerHTML = names.join(' + ') + '<br><span style="color:#ffd23a">' + SK.score + ' × ' + SK.mult + ' = ' + SK.score*SK.mult + '</span>'; }
+function skEnd(bail){ if(!SK.combo.length) return; var e = hasChar() ? life.eco : null, total = SK.score*SK.mult, mine = null;
+  if(!bail && e && e.skc) e.skc.forEach(function(c){ var seq = SK.combo.join(','), want = c.t.join(','); if(seq.indexOf(want) >= 0 && !mine) mine = c; });
+  if(bail){ showToast('💥 ' + L2('Bail! Combo lost', 'Chute ! Combo perdu')); say('Aïe ! Je suis tombé !'); ride.v *= 0.2; }
+  else { if(mine){ total *= 2; showToast('⭐ ' + L2('YOUR COMBO: ', 'TON COMBO : ') + mine.n + ' ×2!'); say('Mon combo : ' + mine.n + ' !'); } else if(total >= 500) showToast('🛹 ' + total + ' pts'); if(e){ e.sk = e.sk || {}; var key = skKind() === 'dirtbike' ? 'db' : 'b'; if(!(e.sk[key] >= total)){ e.sk[key] = total; lifeSave(true); if(total >= 1000) showToast('🏆 ' + L2('New record: ', 'Nouveau record : ') + total); } if(total >= 3000 && !(chal.cool.skate > Date.now())){ chal.cool.skate = Date.now() + 120000; addJeton(1); } } }
+  SK.combo = []; SK.score = 0; SK.mult = 0; setTimeout(skShow, bail ? 0 : 1200); }
+window.addEventListener('keydown', function(e){ var k = skKind(); if(!k || !flying) return; var t = e.target; if(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+  if(e.code === 'Space'){ e.preventDefault(); if(!SK.air && !SK.grind){ SK.vy = k === 'dirtbike' ? 7.5 : 7; SK.air = true; skAdd('ollie'); try { playNotes([[60, 0.06]], 'square', 0.08, 80); } catch(x){} } else if(SK.grind){ SK.grind = null; SK.vy = 5; SK.air = true; } return; }
+  var m = /^Digit([1-7])$/.exec(e.code); if(!m) return; var L = TRICKS[k], tr = L.filter(function(x){ return x[2] === m[1]; })[0]; if(!tr) return;
+  if(tr[0] === 'manual'){ if(!SK.air){ SK.manual = true; } return; } if(!SK.air || SK.anim) return; SK.anim = {r:tr[4], t:0, dur:tr[0] === 'flip' ? 0.9 : 0.42}; skAdd(tr[0]); });
+window.addEventListener('keyup', function(e){ if(/^Digit7$/.test(e.code)) SK.manual = false; });
+var _driveTickSK = driveTick; driveTick = function(dt){ _driveTickSK(dt); if(!ride || !ride.on || DRIVE[ride.kind] && DRIVE[ride.kind].water) return; var m = ride.model, rp = rampAt(ride.px, ride.pz), ground = rp ? rp.y : 0, spd = Math.abs(ride.v);
+  // grinding a rail
+  if(SK.grind){ var g = SK.grind, dx = g.bx - g.ax, dz = g.bz - g.az, L = Math.hypot(dx, dz), u = ((ride.px - g.ax)*dx + (ride.pz - g.az)*dz)/(L*L); if(u < 0 || u > 1 || spd < 2){ SK.grind = null; SK.air = true; SK.vy = 1; } else { ride.px = g.ax + dx*u; ride.pz = g.az + dz*u; SK.y = g.h; SK.gt = (SK.gt || 0) + dt; if(SK.gt > 0.35){ SK.gt = 0; skAdd('grind'); } } }
+  else if(SK.air){ SK.vy -= 22*dt; SK.y += SK.vy*dt;
+    if(SK.vy < 0) RAILS.forEach(function(r){ if(SK.grind) return; var dx = r.bx - r.ax, dz = r.bz - r.az, L = Math.hypot(dx, dz), u = ((ride.px - r.ax)*dx + (ride.pz - r.az)*dz)/(L*L); if(u < 0.02 || u > 0.98) return; var cx = r.ax + dx*u, cz = r.az + dz*u, off = Math.hypot(ride.px - cx, ride.pz - cz), par = Math.abs((-Math.sin(ride.h))*dx/L + (-Math.cos(ride.h))*dz/L); if(off < 0.7 && par > 0.7 && SK.y >= r.h - 0.25 && SK.y <= r.h + 0.6 && skKind() === 'skate'){ SK.grind = r; SK.air = false; SK.anim = null; SK.gt = 0; skAdd('grind'); try { playNotes([[40, 0.3]], 'sawtooth', 0.05, 300); } catch(x){} } });
+    if(!SK.grind && SK.y <= ground){ SK.y = ground; SK.air = false; SK.vy = 0; if(SK.anim && SK.anim.t/SK.anim.dur < 0.7){ SK.anim = null; skEnd(true); } else { SK.anim = null; SK.comboT = 1.2; try { playNotes([[48, 0.08]], 'square', 0.08, 80); } catch(x){} } } }
+  else { if(SK.last && !rp && SK.last.y > 0.5 && spd > 5){ SK.air = true; SK.vy = spd*(SK.last.slope || 0)*1.05 + 1; } else SK.y = ground; }
+  SK.last = rp;
+  // manual (hold 7 on the ground)
+  if(SK.manual && !SK.air && !SK.grind && spd > 2){ SK.manualT = (SK.manualT || 0) + dt; if(SK.manualT > 0.6){ SK.manualT = 0; skAdd('manual'); } }
+  // combo timeout after landing
+  if(!SK.air && !SK.grind && SK.combo.length){ SK.comboT -= dt; if(SK.comboT <= 0) skEnd(false); }
+  // trick animation on the board / bike
+  var rx = 0, ry = 0, rz = 0; if(SK.anim){ SK.anim.t += dt; var f = Math.min(1, SK.anim.t/SK.anim.dur), r = SK.anim.r, s = Math.sin(f*Math.PI); if(Math.abs(r[0]) > 3 || Math.abs(r[2]) > 3 || Math.abs(r[1]) > 3){ rx = r[0]*f; ry = r[1]*f; rz = r[2]*f; } else { rx = r[0]*s; ry = r[1]*s; rz = r[2]*s; } if(f >= 1) SK.anim = null; }
+  else if(SK.air && rp == null){ rx = Math.max(-0.4, Math.min(0.4, -SK.vy*0.03)); } else if(rp && !rp.plat && rp.slope){ rx = Math.atan(rp.slope)*(ride.v >= 0 ? 1 : -1); }
+  if(SK.manual && !SK.air) rx = 0.3;
+  m.position.y = SK.y; m.rotation.set(rx, ride.h + ry, rz, 'YXZ'); camera.position.y += SK.y; };
+var _endRideSK = endRide; endRide = function(){ SK.y = 0; SK.air = false; SK.grind = null; SK.anim = null; if(SK.combo.length) skEnd(false); return _endRideSK.apply(this, arguments); };
+/* your own combos */
+GACT.skcombos = function(){ var e = hasChar() ? life.eco : null; if(!e) return; e.skc = e.skc || []; SK.ed = SK.ed || [];
+  var L = TRICKS.skate.filter(function(t){ return t[0] !== 'grind'; }).concat(TRICKS.dirtbike.filter(function(t){ return ['super', 'nohand', 'flip', 'whip', 'heel'].indexOf(t[0]) >= 0 && t[0] !== 'heel'; }));
+  var all = life.all || {}, board = function(key){ return Object.keys(all).map(function(k){ var x = all[k] && all[k].sk; return x && x[key] ? {n:(all[k].ch && all[k].ch.fn) || memberName(k), v:x[key]} : null; }).filter(Boolean).sort(function(a, b){ return b.v - a.v; }).slice(0, 5).map(function(r, i){ return (['🥇', '🥈', '🥉'][i] || (i + 1) + '.') + ' ' + esc(r.n) + ' · ' + r.v; }).join('<br>') || '—'; };
+  showCard('<h3>🛹 ' + L2('SKATE TRICKS & COMBOS', 'FIGURES ET COMBOS DE SKATE') + '</h3><div class="gc-text" style="text-align:left"><b>' + L2('Controls while riding', 'Les commandes') + '</b>: Space = ollie · 1 kickflip · 2 heelflip · 3 pop shove-it · 4 tre flip · 5 indy grab · 6 varial kickflip · ' + L2('hold 7 = manual · land on a rail after an ollie = grind', 'maintiens 7 = manual · retombe sur une barre après un ollie = grind') + '<br>🏍 ' + L2('Dirt bike', 'Moto-cross') + ': 1 Superman · 2 No-hander · 3 Backflip · 4 Whip · 5 Heel clicker · ' + L2('hold 7 = wheelie', 'maintiens 7 = wheelie') + '<br>' + L2('Chain tricks before you land: the more tricks, the bigger the multiplier. Land mid-flip = you fall!', 'Enchaîne les figures avant d\'atterrir : plus il y en a, plus le multiplicateur monte. Atterris pendant une figure = chute !') + '</div>' +
+    '<div class="gc-sub">✏ ' + L2('Create your own combo (2-5 tricks, ×2 points when you land it):', 'Crée ton combo (2 à 5 figures, ×2 points quand tu le réussis) :') + ' <b>' + (SK.ed.length ? SK.ed.map(function(id){ var t = L.filter(function(x){ return x[0] === id; })[0]; return t ? t[1] : id; }).join(' + ') : '…') + '</b></div><div style="display:flex;flex-wrap:wrap;gap:4px">' + L.map(function(t){ return '<button class="btn" data-g="skedadd" data-v="' + t[0] + '">' + esc(t[1]) + '</button>'; }).join('') + '</div><input id="skc-n" class="login-input" maxlength="20" placeholder="' + L2('Name your combo (in French!)', 'Nomme ton combo (en français !)') + '" style="width:100%;margin:6px 0"><div class="gc-row">' + gBtn('sksave', null, '💾 ' + L2('SAVE COMBO', 'ENREGISTRER'), 'go') + gBtn('skclear', null, '↺') + '</div>' +
+    (e.skc.length ? '<div class="gc-text" style="text-align:left"><b>' + L2('My combos', 'Mes combos') + '</b><br>' + e.skc.map(function(c, i){ return '⭐ <b>' + esc(c.n) + '</b>: ' + c.t.map(function(id){ var t = L.filter(function(x){ return x[0] === id; })[0]; return t ? t[1] + ' (' + t[2] + ')' : id; }).join(' → ') + ' <button class="btn" data-g="skdel" data-v="' + i + '">✗</button>'; }).join('<br>') + '</div>' : '') +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;text-align:left"><div class="gc-text"><b>🛹 ' + L2('Best skate combo', 'Meilleur combo skate') + '</b><br>' + board('b') + '</div><div class="gc-text"><b>🏍 ' + L2('Best dirt bike combo', 'Meilleur combo moto') + '</b><br>' + board('db') + '</div></div><div class="gc-text">📚 la planche · les roues · la rampe · la barre · sauter · tomber · une figure · un enchaînement</div><div class="gc-row">' + gBtn('close', null, 'OK') + '</div>'); };
+GACT.skedadd = function(id){ var n = document.getElementById('skc-n'), keep = n ? n.value : ''; SK.ed = SK.ed || []; if(SK.ed.length < 5) SK.ed.push(id); GACT.skcombos(); var n2 = document.getElementById('skc-n'); if(n2) n2.value = keep; };
+GACT.skclear = function(){ SK.ed = []; GACT.skcombos(); };
+GACT.sksave = function(){ var e = life.eco, n = document.getElementById('skc-n'), v = n ? n.value.replace(/[<>]/g, '').trim().slice(0, 20) : ''; if((SK.ed || []).length < 2){ showToast(L2('Pick at least 2 tricks', 'Choisis au moins 2 figures')); return; } if(v.length < 2){ showToast(L2('Give it a name!', 'Donne-lui un nom !')); return; } if(hasBadWord(v)){ badJail(v); return; } e.skc = (e.skc || []).concat([{n:v, t:SK.ed.slice()}]).slice(-10); lifeSave(true); SK.ed = []; say('Mon nouveau combo : ' + v + ' !'); GACT.skcombos(); };
+GACT.skdel = function(i){ life.eco.skc.splice(i|0, 1); lifeSave(true); GACT.skcombos(); };
+/* the dirt bike */
+DRIVE.dirtbike = {max:22, back:-4, acc:13, turn:2.2, eye:1.95, model:function(){ var m = new THREE.Group(), M = solidMat; var fr = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.4, 1.4), M(0xff7f00)); fr.position.y = 0.85; m.add(fr); var tank = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.6), M(0xff7f00)); tank.position.set(0, 1.1, -0.2); m.add(tank); var seat = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.12, 0.7), M(0x1b1b1d)); seat.position.set(0, 1.12, 0.35); m.add(seat); var plate = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.3, 0.04), M(0xf4f4f0)); plate.position.set(0, 1.05, -0.78); m.add(plate); var bar = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.8, 8), M(0x2a2a2e)); bar.rotation.z = Math.PI/2; bar.position.set(0, 1.35, -0.6); m.add(bar);
+  [-0.75, 0.75].forEach(function(z){ var w = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.1, 8, 16), M(0x1b1b1d)); w.rotation.y = Math.PI/2; w.position.set(0, 0.42, z); m.add(w); var hub = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.16, 8), M(0xb0b8c0)); hub.rotation.z = Math.PI/2; hub.position.set(0, 0.42, z); m.add(hub); }); m.visible = false; root.add(m); return m; }, off:function(){ return L2('Get off the dirt bike', 'Descendre de la moto-cross'); }, nm:function(){ return '🏍 ' + L2('Dirt bike! Space = jump, 1-5 = tricks in the air', 'Moto-cross ! Espace = saut, 1-5 = figures en l\'air'); }};
+/* the place: skatepark + motocross track side by side */
+(function(){ var X = SKP.x, Z = SKP.z; PLAY_AREAS.push({x0:X - 180, x1:X + 360, z0:Z - 130, z1:Z + 150}); BM_REG.skate = {fr:'Skatepark & motocross', en:'Skatepark & motocross', x0:X - 180, x1:X + 360, z0:Z - 130, z1:Z + 150};
+  flat(540, 280, X + 90, Z + 10, 0x7fb069, 0.01); flat(150, 120, X, Z, 0xb8b4ac, 0.03); flat(180, 220, X + 250, Z + 10, 0x8a6a42, 0.03);
+  var B = new MeshBatch(), L = new Lot(B, X, Z, 0);
+  // quarter pipes around the edges (steep ramps that launch you up)
+  [[-60, 0, Math.PI/2], [60, 0, -Math.PI/2], [0, -45, 0], [0, 45, Math.PI]].forEach(function(q){ for(var k=-2;k<=2;k++){ var along = q[2] === 0 || q[2] === Math.PI; addRamp(X + q[0] + (along ? k*7 : 0), Z + q[1] + (along ? 0 : k*7), q[2], 4, 2.8, 7); } });
+  // funbox: up-ramp, platform, down-ramp; a pyramid
+  addRamp(X - 20, Z + 6, 0, 5, 1.2, 8); PLATS.push({x0:X - 24, x1:X - 16, z0:Z - 6, z1:Z + 1, h:1.2}); L.box(8, 1.2, 7, -20, 0.6, -2.5, 0x9a968e); addRamp(X - 20, Z - 11, Math.PI, 5, 1.2, 8);
+  addRamp(X + 22, Z + 12, 0, 6, 1.6, 6); addRamp(X + 22, Z - 12, Math.PI, 6, 1.6, 6); PLATS.push({x0:X + 19, x1:X + 25, z0:Z - 6, z1:Z + 6, h:1.6}); L.box(6, 1.6, 12, 22, 0.8, 0, 0x9a968e);
+  // rails (grind them after an ollie)
+  [[-35, -20, -35, 20, 0.55], [35, -20, 35, 20, 0.55], [-10, 25, 10, 25, 0.7], [-20, -2.5, -20, -2.5, 0]].forEach(function(r){ if(r[4] === 0) return; RAILS.push({ax:X + r[0], az:Z + r[1], bx:X + r[2], bz:Z + r[3], h:r[4]}); var len = Math.hypot(r[2] - r[0], r[3] - r[1]), mx = (r[0] + r[2])/2, mz = (r[1] + r[3])/2, along = Math.abs(r[3] - r[1]) > Math.abs(r[2] - r[0]); L.box(along ? 0.1 : len, 0.1, along ? len : 0.1, mx, r[4], mz, 0xd8d8d8); for(var p=0;p<=4;p++){ L.box(0.08, r[4], 0.08, r[0] + (r[2] - r[0])*p/4, r[4]/2, r[1] + (r[3] - r[1])*p/4, 0x8a8f98); } });
+  // graffiti-style walls (original art: colour blocks), benches
+  [0xff2fa0, 0x00c8c8, 0xffd23a, 0x7cff4a].forEach(function(c, i){ L.box(10, 3, 0.4, -45 + i*30, 1.5, -62, c); });
+  B.build(); airSign('🛹 LE SKATEPARK', X, 5, Z - 58, 0, 12, '#1b1b1d');
+  // motocross: start, tabletops (jump + landing), whoops, a big double
+  var MX = X + 250, MZ = Z + 10; airSign('🏍 PISTE DE MOTOCROSS', MX, 5, MZ - 112, 0, 14, '#ff7f00');
+  for(var j=0;j<4;j++){ var zz = MZ - 80 + j*45; addRamp(MX - 40, zz, Math.PI/2, 7, 2.4, 9); addRamp(MX - 22, zz, -Math.PI/2, 9, 2.4, 9); }
+  for(var w=0;w<6;w++){ addRamp(MX + 30, MZ - 60 + w*8, Math.PI, 3, 0.8, 9); addRamp(MX + 30, MZ - 63 + w*8, 0, 3, 0.8, 9); }
+  addRamp(MX + 60, MZ + 40, Math.PI, 8, 3.5, 10); addRamp(MX + 60, MZ + 70, 0, 10, 3.5, 10);
+  // rentals + the combo board
+  [[X + 70, Z - 30, 'skate', '🛹 ' + L2('Take a skateboard', 'Prendre un skate')], [MX - 70, MZ - 90, 'dirtbike', '🏍 ' + L2('Take a dirt bike', 'Prendre une moto-cross')]].forEach(function(r){ var k = new MeshBatch(), K = new Lot(k, r[0], r[1], 0); K.box(4, 2.6, 2.4, 0, 1.3, 0, r[2] === 'skate' ? 0x2b4c9b : 0xff7f00); K.box(4.6, 0.3, 3, 0, 2.75, 0, 0xf4f4f0); k.build(); addSolid(r[0] - 2, r[0] + 2, r[1] - 1.2, r[1] + 1.2, 'static', -1, 3);
+    addSpot({x:r[0], z:r[1] + 3, r:3, label:function(){ return r[3]; }, act:function(){ startDrive(r[2], r[0], r[1] + 6, Math.PI); }}); });
+  addSpot({x:X + 76, z:Z - 26, r:3, label:function(){ return '⭐ ' + L2('Tricks, my combos & records', 'Figures, mes combos et records'); }, act:function(){ GACT.skcombos(); }});
+  airSign('⭐ COMBOS & RECORDS', X + 76, 3.4, Z - 28, 0, 6, '#8a3ad6');
+  tag(X - 60, 2, Z, 'la rampe (le quarter)', 'the quarter pipe', 2); tag(X - 35, 0.8, Z, 'la barre de slide', 'the grind rail', 1); tag(X + 22, 1.8, Z, 'le module', 'the funbox', 2); tag(MX - 30, 2.5, MZ - 80, 'la bosse', 'the jump', 2);
+  EXTRA_PLACES.push(['🛹', 'Le Skatepark (figures et combos)', L2('Ollies, flips, grinds, your own combos', 'Ollies, flips, grinds, tes propres combos'), X + 70, Z - 24, Math.PI]);
+  EXTRA_PLACES.push(['🏍', 'La piste de motocross', L2('Dirt bikes, jumps, backflips, whips', 'Motos-cross, sauts, backflips, whips'), MX - 70, MZ - 84, Math.PI]); })();
+/* motorsport-ish places aren't crimes */
+var _runStrikeSK = runStrike; runStrike = function(what){ var x = camera.position.x, z = camera.position.z; if(what !== 'person' && x > SKP.x - 190 && x < SKP.x + 370 && z > SKP.z - 140 && z < SKP.z + 160) return; return _runStrikeSK.apply(this, arguments); };
+/* =====================================================================================================================
+   🚦 TRAFFIC LIGHTS at every crossroads (everyone sees the same colours: they run on the clock). Driving through a red
+   light = a wanted star. Little city cars drive the streets and stop at red lights, at cars ahead, and for you.
+   ===================================================================================================================== */
+var TL = {nodes:[], mats:{}, phase:null, cyc:22000};
+function tlPhase(t){ var c = (t || Date.now()) % TL.cyc; return c < 9000 ? ['g', 'r'] : c < 11000 ? ['y', 'r'] : c < 20000 ? ['r', 'g'] : ['r', 'y']; }   // [north-south, east-west]
+(function(){ var seen = {}; STREETS.forEach(function(s){ if(s.v !== 1) return; STREETS.forEach(function(o){ if(o.v !== 0) return; if(o.at >= s.a && o.at <= s.b && s.at >= o.a && s.at <= o.b){ var k = s.at + ',' + o.at; if(!seen[k]){ seen[k] = 1; TL.nodes.push({x:s.at, z:o.at}); } } }); });
+  var B = new MeshBatch(), lamps = {ns:{r:[], y:[], g:[]}, ew:{r:[], y:[], g:[]}}, H = ROAD_HALF + 1.1;
+  TL.nodes.forEach(function(n){ [[-H, -H], [H, H]].forEach(function(c){ var x = n.x + c[0], z = n.z + c[1], L = new Lot(B, x, z, 0); L.cyl(0.08, 0.1, 3.4, 0, 1.7, 0, 0x2a2d32, 8); pushSegCollider(x, z, x, z, 0.15, -50, 4);
+      // head facing north-south traffic (along z) and head facing east-west traffic (along x)
+      L.box(0.34, 0.95, 0.3, 0, 3.0, c[1] > 0 ? 0.2 : -0.2, 0x1b1b1d); L.box(0.3, 0.95, 0.34, c[0] > 0 ? 0.2 : -0.2, 3.0, 0, 0x1b1b1d);
+      ['r', 'y', 'g'].forEach(function(col, i){ var yy = 3.3 - i*0.3; lamps.ns[col].push([x, yy, z + (c[1] > 0 ? 0.36 : -0.36)]); lamps.ew[col].push([x + (c[0] > 0 ? 0.36 : -0.36), yy, z]); }); }); });
+  B.build(); var geo = new THREE.SphereGeometry(0.11, 10, 8), m4 = new THREE.Matrix4();
+  ['ns', 'ew'].forEach(function(ax){ TL.mats[ax] = {}; ['r', 'y', 'g'].forEach(function(col){ var P = lamps[ax][col], mat = new THREE.MeshBasicMaterial({color:0x222222}), im = new THREE.InstancedMesh(geo, mat, P.length); P.forEach(function(p, i){ m4.makeTranslation(p[0], p[1], p[2]); im.setMatrixAt(i, m4); }); im.instanceMatrix.needsUpdate = true; im.frustumCulled = false; root.add(im); TL.mats[ax][col] = mat; }); }); })();
+var TL_ON = {r:0xff2a2a, y:0xffb21a, g:0x2aff6a};
+function tlTick(dt){ var ph = tlPhase(), key = ph.join(''); if(key !== TL.phase){ TL.phase = key; ['ns', 'ew'].forEach(function(ax, i){ ['r', 'y', 'g'].forEach(function(col){ TL.mats[ax][col].color.setHex(ph[i] === col ? TL_ON[col] : 0x222222); }); }); }
+  // running a red light (cars and anything you ride)
+  var drv = flying && driving, rd = ride && ride.on, x, z, v, h; if(drv){ x = carPos.x; z = carPos.z; v = Math.abs(driveSpeed); h = carYaw; } else if(rd){ x = ride.px; z = ride.pz; v = Math.abs(ride.v); h = ride.h; } else { TL.inNode = null; return; }
+  var inNode = null; for(var i=0;i<TL.nodes.length;i++){ var n = TL.nodes[i]; if(Math.abs(x - n.x) < ROAD_HALF && Math.abs(z - n.z) < ROAD_HALF){ inNode = n; break; } }
+  if(inNode && TL.inNode !== inNode && v > 4 && !(F1 && F1.mode)){ var alongZ = Math.abs(Math.cos(h)) > Math.abs(Math.sin(h)), light = ph[alongZ ? 0 : 1]; if(light === 'r'){ if(typeof WANT_add === 'function') WANT_add(1, L2('ran a red light', 'feu rouge grillé')); say('Attention ! Le feu est rouge !'); showToast('🚦 ' + L2('RED LIGHT! You must stop and wait for green.', 'FEU ROUGE ! Il faut s\'arrêter et attendre le vert.')); } }
+  TL.inNode = inNode; }
+/* city traffic: little cars that obey the lights */
+var TCARS = [];
+(function(){ var cols = [0xc8382f, 0x1f6fb8, 0xf4f4f0, 0x2a2d36, 0xffd23a, 0x2f8a3a, 0x8a3ad6, 0xb0b8c0], main = STREETS.filter(function(s){ return Math.abs(s.at) < 200 && s.b - s.a > 200; }).slice(0, 10);
+  main.forEach(function(s, i){ [1, -1].forEach(function(dir, j){ var g = new THREE.Group(), body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.7, 3.8), solidMat(cols[(i*2 + j) % cols.length])); body.position.y = 0.6; g.add(body); var top = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.6, 2), solidMat(0x2a3a4a)); top.position.set(0, 1.2, 0.2); g.add(top); [[-0.8, -1.2], [0.8, -1.2], [-0.8, 1.2], [0.8, 1.2]].forEach(function(w){ var wh = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.2, 14), solidMat(0x1b1b1d)); wh.rotation.z = Math.PI/2; wh.position.set(w[0], 0.32, w[1]); g.add(wh); }); root.add(g);
+      TCARS.push({g:g, s:s, dir:dir, u:s.a + (s.b - s.a)*((i*0.37 + j*0.5) % 1), v:0, lane:dir*1.9}); }); }); })();
+function tcarsTick(dt){ var ph = tlPhase(), cp = camera.position, me = flying ? (driving ? carPos : cp) : null;
+  TCARS.forEach(function(c){ var s = c.s, along = s.v === 1, want = 9, ahead = c.u + c.dir*0.1;
+    // red light ahead?
+    TL.nodes.forEach(function(n){ var nu = along ? n.z : n.x, na = along ? n.x : n.z; if(Math.abs(na - s.at) > 1) return; var d = (nu - c.u)*c.dir; if(d > ROAD_HALF + 1 && d < ROAD_HALF + 9){ var light = ph[along ? 0 : 1]; if(light !== 'g') want = Math.min(want, Math.max(0, (d - ROAD_HALF - 2)*1.5)); } });
+    // cars ahead + you
+    TCARS.forEach(function(o){ if(o === c || o.s !== s || o.dir !== c.dir) return; var d = (o.u - c.u)*c.dir; if(d > 0 && d < 9) want = Math.min(want, Math.max(0, (d - 5)*2)); });
+    var px = along ? s.at + c.lane : c.u, pz = along ? c.u : s.at + c.lane; if(me){ var dx = me.x - px, dz = me.z - pz, fwd = along ? dz*c.dir : dx*c.dir, side = along ? Math.abs(dx - 0) : Math.abs(dz); if(fwd > 0 && fwd < 10 && Math.abs(along ? me.x - px : me.z - pz) < 2.2) want = Math.min(want, Math.max(0, (fwd - 4)*2)); }
+    c.v += (want - c.v)*Math.min(1, dt*2.5); c.u += c.v*c.dir*dt; if(c.u > s.b) c.u = s.a; if(c.u < s.a) c.u = s.b;
+    var x = along ? s.at + c.lane : c.u, z = along ? c.u : s.at + c.lane; c.g.position.set(x, 0, z); c.g.rotation.y = along ? (c.dir > 0 ? Math.PI : 0) : (c.dir > 0 ? -Math.PI/2 : Math.PI/2); });
+  if(flying && driving) TCARS.forEach(function(c){ var dx = carPos.x - c.g.position.x, dz = carPos.z - c.g.position.z, d = Math.hypot(dx, dz); if(d < 2.8 && d > 0.01){ carPos.x += dx/d*(2.8 - d); carPos.z += dz/d*(2.8 - d); if(Math.abs(driveSpeed) > 6){ showToast('💥 ' + L2('You hit a car!', 'Tu as heurté une voiture !')); if(typeof runStrike === 'function') runStrike('thing'); } driveSpeed *= -0.3; } }); }
+/* ---------- 🔓 FREED MEANS FREED: when Madame frees a student, a "free" note (paris/mod/jfree/<uid>) cancels every jail
+   record that existed at that moment, wherever it was stored, and the student's game lets them out on the spot. ---------- */
+var JF = {all:{}, seen:0, on:false};
+try { JF.seen = parseInt(localStorage.getItem('paris.jfseen'), 10) || 0; } catch(e){}
+function jfVoid(uid, r){ var f = JF.all[uid]; return !!(f && r && ((r.at || 0) <= f.at || (f.v || []).indexOf(r.at || 0) >= 0)); }
+var _isJailedJF = isJailedUid; isJailedUid = function(uid){ if(!_isJailedJF(uid)) return false; var f = JF.all[uid]; if(!f) return true; var m = net.members && net.members[uid], recs = [m && m.jail, jail.all[uid], mod.jail && mod.jail[uid]].filter(function(r){ return r && typeof r === 'object'; }); if(!recs.length) return true; return recs.some(function(r){ return !jfVoid(uid, r); }); };
+var _releaseUidJF = releaseUid; releaseUid = function(uid){ var m = net.members && net.members[uid], voids = [m && m.jail, jail.all[uid], mod.jail && mod.jail[uid]].filter(function(r){ return r && typeof r === 'object'; }).map(function(r){ return r.at || 0; }), rec = {at:Date.now(), v:voids, by:net.uid}; JF.all[uid] = rec;
+  var p = _releaseUidJF.apply(this, arguments); try { if(net.db && isStaff()) net.db.ref('paris/mod/jfree/' + uid).set(rec).catch(function(){}); } catch(e){} if(typeof renderMadameTab === 'function') setTimeout(renderMadameTab, 200); return p; };
+function jfFreeMe(f){ var e = hasChar() ? life.eco : null; jail.local = false; delete jail.all[net.uid]; jail.reason = ''; jail.jfree = Math.max(Date.now(), f.at || 0);
+  try { ['paris.jail', 'paris.jailWhy', 'paris.jailStars', 'paris.jailAt'].forEach(function(k){ localStorage.removeItem(k); }); localStorage.setItem('paris.jfseen', String(f.at || Date.now())); } catch(x){}
+  if(e){ e.jfree = jail.jfree; lifeSave(true); } JF.seen = f.at || Date.now(); if(typeof WANT !== 'undefined'){ WANT.lvl = 0; try { localStorage.setItem('paris.want', 0); } catch(x){} if(typeof wantDraw === 'function') wantDraw(); }
+  if(typeof JQ !== 'undefined'){ JQ.ok = 0; } if(gcard && gcard.el && /RÉPONDS|ANSWER|CAUTION|BAIL|PURGE|SERVE/.test(gcard.el.textContent || '')) closeCard();
+  if(jail.banner) jail.banner.classList.add('hidden'); jail.me = false; if(flying && Math.hypot(camera.position.x - JAIL.x, camera.position.z - JAIL.z) < 30) goTo({x:0, z:40, yaw:0});
+  showCard('<h3>🔓 ' + L2('MADAME SET YOU FREE!', 'MADAME T\'A LIBÉRÉ(E) !') + '</h3><div class="gc-emoji">🎉</div><div class="gc-text">' + L2('Be kind in the game!', 'Sois gentil(le) dans le jeu !') + '</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); say('Tu es libre ! Sois gentil dans le jeu.'); if(typeof sendPresence === 'function') sendPresence(true); }
+(function(){ setInterval(function(){ if(JF.on || !net.db || !net.uid) return; JF.on = true; try { net.db.ref('paris/mod/jfree').on('value', function(s){ JF.all = s.val() || {}; var f = JF.all[net.uid]; if(f && !isStaff() && (f.at || 0) > JF.seen) jfFreeMe(f); }, function(){ JF.on = false; }); } catch(e){ JF.on = false; } }, 1500); })();
+/* freeing yourself with the quiz also walks you out of the cell */
+var _jailFreeSelfJF = jailFreeSelf; jailFreeSelf = function(){ var r = _jailFreeSelfJF.apply(this, arguments); setTimeout(function(){ if(flying && Math.hypot(camera.position.x - JAIL.x, camera.position.z - JAIL.z) < 30) goTo({x:0, z:40, yaw:0}); }, 600); return r; };
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
@@ -21268,7 +21411,7 @@ function animate(){
   updateSpeedo();
   lifeTick(dt);
   jailTick();
-  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt); ambTrainTick(dt); wearOthersTick(); jamTick(); pkTick(dt); bumpTick(dt); cullTick(dt); rigTick(dt); crouchTick(dt); metroTick(dt); copTick(dt); specTick(); msprTick(dt); haloTick(dt); nitroTick(dt); f1Tick(dt); shadowTick(); rdTick(); poolTick();
+  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt); ambTrainTick(dt); wearOthersTick(); jamTick(); pkTick(dt); bumpTick(dt); cullTick(dt); rigTick(dt); crouchTick(dt); metroTick(dt); copTick(dt); specTick(); msprTick(dt); haloTick(dt); nitroTick(dt); f1Tick(dt); shadowTick(); rdTick(); poolTick(); tlTick(dt); tcarsTick(dt);
   if(!ICE.t || performance.now() - ICE.t > 1000){ ICE.t = performance.now(); if(Math.hypot(camera.position.x - QC.x, camera.position.z - QC.z) < 800) iceSync(); }
   villageTick();
   sendPresence(false);
