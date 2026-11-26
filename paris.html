@@ -17303,6 +17303,73 @@ function picnicTick(dt){
     else { x = Math.cos(w.a*Math.PI*2)*w.r; z = Math.sin(w.a*Math.PI*2)*w.r*1.8; ox = -Math.sin(w.a*Math.PI*2)*w.sp; oz = Math.cos(w.a*Math.PI*2)*w.sp; }
     w.m.position.set(x, Math.abs(Math.sin(performance.now()*0.008 + w.r))*0.04, z); w.m.rotation.y = Math.atan2(-ox, -oz) + Math.PI; });
 }
+/* ---------- 🌾 THE WINDMILL, explained: every machine says what it is, what it's for, how it works - and you can try it. Posters on the walls. ---------- */
+var MILL_ITEMS = [
+  {k:'ailes', icon:'🌬', fr:'les ailes du moulin', en:'the sails', what:'Ce sont quatre grands bras en bois couverts de toile, dehors, sur le moulin.', why:'Elles attrapent le vent pour faire tourner le moulin.', how:'Le vent pousse sur la toile, les ailes tournent, et elles font tourner un gros axe en bois.', x:-10, z:-8.8, tryIt:'wind'},
+  {k:'engrenage', icon:'⚙', fr:'les engrenages', en:'the gears', what:'Ce sont des roues avec des dents en bois.', why:'Ils transmettent le mouvement des ailes jusqu\'à la meule.', how:'Une grande roue dentée fait tourner une petite roue : la petite roue tourne plus vite !', x:4.5, z:-8.8, tryIt:'gears'},
+  {k:'tremie', icon:'🔻', fr:'la trémie', en:'the hopper', what:'C\'est un grand entonnoir en bois au-dessus de la meule.', why:'On y verse le blé.', how:'Les grains tombent doucement, un peu à la fois, au centre de la meule.', x:-2.6, z:-5, tryIt:'hopper'},
+  {k:'meule', icon:'🪨', fr:'la meule', en:'the millstone', what:'Ce sont deux grosses pierres rondes, l\'une sur l\'autre.', why:'Elles écrasent les grains de blé pour faire la farine.', how:'La pierre du dessous ne bouge pas. La pierre du dessus tourne et écrase les grains.', x:0, z:-3, tryIt:'grind'},
+  {k:'tamis', icon:'🕸', fr:'le tamis', en:'the sieve', what:'C\'est une boîte avec un fond en toile très fine, pleine de petits trous.', why:'Il sépare la farine fine et le son (la peau du grain).', how:'On secoue : la farine passe par les petits trous, le son reste dessus.', x:8, z:-5, tryIt:'sift'},
+  {k:'balance', icon:'⚖', fr:'la balance', en:'the scales', what:'C\'est un appareil pour peser.', why:'Le meunier pèse les sacs de farine : un sac pèse 25 kilos.', how:'On pose le sac, l\'aiguille montre le poids.', x:10, z:3, tryIt:'weigh'},
+  {k:'epi', icon:'🌾', fr:'l\'épi de blé', en:'the ear of wheat', what:'C\'est le haut de la plante de blé, avec les grains.', why:'Les grains donnent la farine.', how:'Un grain a trois parties : le son (la peau), l\'amande (la farine blanche) et le germe (le bébé plante).', x:-10, z:-6.5, tryIt:'grain'}
+];
+var MILLP = [['DU CHAMP AU PAIN', ['🌱 semer le blé', '☀️ le blé pousse', '🚜 la moisson', '🏭 le moulin', '🥖 la boulangerie']], ['LE GRAIN DE BLÉ', ['le son = la peau', 'l\'amande = la farine', 'le germe = le bébé plante', '1 épi ≈ 40 grains']], ['COMMENT MARCHE UN MOULIN ?', ['le vent → les ailes', 'les ailes → l\'axe', 'l\'axe → les engrenages', 'les engrenages → la meule', 'la meule → la farine']], ['LES FARINES', ['T45 : pâtisserie', 'T65 : baguette', 'T80 : pain de campagne', 'T110 : semi-complète', 'T150 : complète']]];
+function millItem(it){ say(it.fr + '. ' + it.what + ' ' + it.why + ' ' + it.how);
+  showCard('<h3>' + it.icon + ' ' + esc(it.fr.toUpperCase()) + '</h3><div class="gc-sub">' + esc(it.en) + '</div><div class="gc-text gc-say" style="text-align:left"><b>C\'est quoi ?</b> ' + esc(it.what) + '</div><div class="gc-text gc-say" style="text-align:left"><b>À quoi ça sert ?</b> ' + esc(it.why) + '</div><div class="gc-text gc-say" style="text-align:left"><b>Comment ça marche ?</b> ' + esc(it.how) + '</div><div class="gc-row">' + gBtn('milltry', it.k, '👆 ' + L2('TRY IT!', 'ESSAIE !'), 'go') + gBtn('close', null, 'OK') + '</div>'); }
+var MT = {};
+GACT.milltry = function(k){ var it = MILL_ITEMS.filter(function(x){ return x.k === k; })[0]; MT = {k:k, n:0};
+  if(k === 'grind'){ millGame(); return; } if(k === 'grind' || it.tryIt === 'grind'){ millGame(); return; }
+  if(it.tryIt === 'wind'){ var m = mc(Math.random, 'vers l\'ouest', ['vers l\'est', 'vers le nord', 'vers le sud']); MT.m = m; showCard('<h3>🌬 ' + L2('TURN THE SAILS INTO THE WIND', 'TOURNE LES AILES FACE AU VENT') + '</h3><div class="gc-big gc-say">Le vent vient de l\'ouest. De quel côté tournes-tu les ailes ?</div><div class="gc-grid">' + m.opts.map(function(o, i){ return gOpt('milltans', i, '🧭 ' + esc(o)); }).join('') + '</div><div class="gc-text">📚 le nord · le sud · l\'est · l\'ouest · le vent souffle</div>'); return; }
+  if(it.tryIt === 'gears'){ showCard('<h3>⚙ ' + L2('THE GEARS', 'LES ENGRENAGES') + '</h3><canvas id="gear-c" width="420" height="200" style="width:100%"></canvas><div class="gc-big gc-say">La grande roue a 40 dents, la petite en a 10. Quand la grande fait 1 tour, la petite fait...</div><div class="gc-grid">' + ['4 tours', '1 tour', '10 tours', 'un demi-tour'].map(function(o, i){ return gOpt('millgear', i, esc(o)); }).join('') + '</div>'); var t0 = performance.now(); (function f(){ var c = document.getElementById('gear-c'); if(!c) return; var kx = c.getContext('2d'), t = (performance.now() - t0)/1000; kx.fillStyle = '#f6ecd8'; kx.fillRect(0, 0, 420, 200);
+      function gear(x, y, r, n, a, col){ kx.fillStyle = col; kx.beginPath(); for(var i=0;i<n*2;i++){ var an = a + i*Math.PI/n, rr = i % 2 ? r : r + 8; kx.lineTo(x + Math.cos(an)*rr, y + Math.sin(an)*rr); } kx.fill(); kx.fillStyle = '#5a3a22'; kx.beginPath(); kx.arc(x, y, 6, 0, 7); kx.fill(); }
+      gear(150, 100, 70, 40, t*0.5, '#b88a5a'); gear(150 + 70 + 8 + 30 + 4, 100, 30, 10, -t*2 + 0.3, '#8a5a32'); requestAnimationFrame(f); })(); return; }
+  if(it.tryIt === 'hopper'){ MT.g = 0; millHopper(); return; }
+  if(it.tryIt === 'sift'){ MT.items = shuffleR(Math.random, ['farine', 'son', 'farine', 'son', 'farine', 'son']); MT.n = 0; MT.ok = 0; millSift(); return; }
+  if(it.tryIt === 'weigh'){ var n = 2 + Math.floor(Math.random()*4), m2 = mc(Math.random, (n*25) + ' kilos', [(n*25 + 25) + ' kilos', (n*20) + ' kilos', (n*25 - 5) + ' kilos']); MT.m = m2; showCard('<h3>⚖ ' + L2('WEIGH THE FLOUR', 'PÈSE LA FARINE') + '</h3><div class="gc-big">' + Array(n + 1).join('🛍') + '</div><div class="gc-big gc-say">Un sac pèse 25 kilos. Combien pèsent ' + numFr(n) + ' sacs ?</div><div class="gc-grid">' + m2.opts.map(function(o, i){ return gOpt('milltans', i, esc(o)); }).join('') + '</div>'); return; }
+  if(it.tryIt === 'grain'){ var parts = [['le son', 'la peau du grain'], ['l\'amande', 'ce qui devient la farine blanche'], ['le germe', 'le bébé plante']], p = pickR(Math.random, parts), m3 = mc(Math.random, p[0], parts.filter(function(x){ return x !== p; }).map(function(x){ return x[0]; })); MT.m = m3; showCard('<h3>🌾 ' + L2('THE GRAIN OF WHEAT', 'LE GRAIN DE BLÉ') + '</h3><div class="gc-big" style="font-size:52px">🌾</div><div class="gc-big gc-say">Comment s\'appelle ' + esc(p[1]) + ' ?</div><div class="gc-grid">' + m3.opts.map(function(o, i){ return gOpt('milltans', i, esc(o)); }).join('') + '</div>'); return; }
+};
+GACT.milltans = function(v){ var ok = (v|0) === MT.m.ans; if(ok){ var g = !(chal.cool['mt' + MT.k] > Date.now()) ? addJeton(1) : 0; if(g) chal.cool['mt' + MT.k] = Date.now() + 3*60000; say('Bravo ! ' + MT.m.opts[MT.m.ans]); showCard('<h3>✓ ' + L2('Well done!', 'Bravo !') + '</h3><div class="gc-big gc-say">' + esc(MT.m.opts[MT.m.ans]) + '</div>' + (g ? '<div class="gc-big">+1 🪙</div>' : '') + '<div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); } else { say('Essaie encore !'); showToast('✗'); } };
+GACT.millgear = function(v){ MT.m = {ans:0, opts:['4 tours']}; GACT.milltans(v); };
+function millHopper(){ showCard('<h3>🔻 ' + L2('FILL THE HOPPER', 'REMPLIS LA TRÉMIE') + '</h3><div class="gc-big" style="font-size:44px">🔻' + Array(MT.g + 1).join('🌾') + '</div><div class="gc-big gc-say">Verse cinq seaux de blé dans la trémie !</div><div class="gc-row">' + gBtn('millpour', null, '🪣 ' + L2('POUR!', 'VERSE !'), 'go') + '</div>'); }
+GACT.millpour = function(){ MT.g++; say(numFr(MT.g) + (MT.g === 1 ? ' seau' : ' seaux')); if(MT.g < 5){ millHopper(); return; } MT.m = {ans:0, opts:['La trémie est pleine ! Les grains tombent dans la meule.']}; GACT.milltans(0); };
+function millSift(msg){ if(MT.n >= MT.items.length){ MT.m = {ans:0, opts:[MT.ok + ' / 6 : ' + L2('well sifted!', 'bien tamisé !')]}; GACT.milltans(MT.ok >= 5 ? 0 : 1); return; }
+  var it = MT.items[MT.n]; showCard('<h3>🕸 ' + L2('SIFT THE FLOUR', 'TAMISE LA FARINE') + ' ' + (MT.n + 1) + '/6</h3>' + (msg || '') + '<div class="gc-big" style="font-size:50px">' + (it === 'farine' ? '⚪' : '🟤') + '</div><div class="gc-sub gc-say">' + (it === 'farine' ? 'De la poudre très fine et blanche...' : 'Des petits morceaux bruns, plus gros...') + '</div><div class="gc-grid">' + gOpt('millsift', 'farine', '⬇ ' + L2('it goes through the holes (flour)', 'ça passe par les trous (la farine)')) + gOpt('millsift', 'son', '⏹ ' + L2('it stays on top (bran)', 'ça reste dessus (le son)')) + '</div>'); }
+GACT.millsift = function(v){ var ok = v === MT.items[MT.n]; if(ok) MT.ok++; MT.n++; millSift(ok ? '<div class="good">✓</div>' : '<div class="bad">✗</div>'); };
+(function(){ var o = INTERIORS.filter(function(x){ return x.id === 'moulin'; })[0]; if(!o) return;
+  MILL_ITEMS.forEach(function(it){ o.spots.push({x:it.x, z:it.z + 1.6, r:1.6, label:function(){ return it.icon + ' ' + it.fr + ' : ' + L2('what is it? try it!', 'c\'est quoi ? essaie !'); }, act:function(){ millItem(it); }}); });
+  var _b = o.build; o.build = function(L, X, Z, B, F){ _b.apply(this, arguments); var W = new Lot(B, X, Z, 0);
+    W.part(new THREE.CylinderGeometry(1.2, 1.2, 0.25, 24), 3.6, 3.2, -9.6, 0xb88a5a, Math.PI/2, 0, 0); W.part(new THREE.CylinderGeometry(0.55, 0.55, 0.25, 12), 5.6, 3.2, -9.6, 0x8a5a32, Math.PI/2, 0, 0); for(var t=0;t<16;t++){ var a = t/16*Math.PI*2; W.box(0.15, 0.15, 0.3, 3.6 + Math.cos(a)*1.25, 3.2 + Math.sin(a)*1.25, -9.6, 0x8a5a32); } F.tagAt(4.5, 3.2, -9.4, 'les engrenages', 'the gears', 1);
+    W.part(new THREE.ConeGeometry(0.9, 1.2, 4), -2.6, 2.2, -5, 0x8a5a32, Math.PI, Math.PI/4, 0); W.box(0.1, 1, 0.1, -2.6, 1.1, -5, 0x6b4a32); F.tagAt(-2.6, 2.6, -5, 'la trémie', 'the hopper', 0.6);
+    W.box(0.9, 1, 0.7, 10, 0.5, 3, 0x5a5a5a); W.cyl(0.4, 0.4, 0.04, 10, 1.05, 3, 0xd8d8d8, 16); W.box(0.6, 0.6, 0.05, 10, 1.4, 2.66, 0xf6f2ea); F.tagAt(10, 1.6, 3, 'la balance', 'the scales', 0.5);
+    W.box(1.2, 0.04, 0.6, 0, 0.6, 4, 0xd8c8a0); for(var i=0;i<4;i++) W.box(0.1, 0.6, 0.1, -0.5 + (i % 2), 0.3, 3.75 + Math.floor(i/2)*0.5, 0x8a5a32); F.tagAt(0, 0.9, 4, 'le banc de dégustation', 'the tasting bench', 0.4);
+    MILLP.forEach(function(P, i){ var c = document.createElement('canvas'); c.width = 512; c.height = 640; var k = c.getContext('2d'); k.fillStyle = '#fbf3e0'; k.fillRect(0, 0, 512, 640); k.fillStyle = ['#8a4a1a', '#2f6a3a', '#1f4fa0', '#8a1c3a'][i]; k.fillRect(0, 0, 512, 100); k.fillStyle = '#fff'; k.font = 'bold 34px serif'; k.textAlign = 'center'; k.fillText(P[0], 256, 64, 490); k.fillStyle = '#23243a'; k.font = '30px serif'; k.textAlign = 'left'; P[1].forEach(function(l, j){ k.fillText(l, 30, 170 + j*90, 460); });
+      var pm = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 3.25), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c)})), side = i < 2 ? -1 : 1; pm.position.set(X + side*11.75, 2.9, Z - 4 + (i % 2)*6.5); pm.rotation.y = side < 0 ? Math.PI/2 : -Math.PI/2; root.add(pm); F.tagAt(side*11.5, 1.2, -4 + (i % 2)*6.5, 'l\'affiche : ' + P[0].toLowerCase(), 'the poster', 1); });
+    for(var s2=0;s2<5;s2++){ W.box(0.06, 0.06, 0.8, -11.8, 0.7 + s2*0.15, 7, 0xd8b088); } F.tagAt(-11.5, 1.2, 7, 'la faucille', 'the sickle', 0.5); W.box(0.06, 1.5, 0.06, -11.8, 0.75, 8.6, 0x8a5a32); W.box(0.06, 0.06, 0.9, -11.8, 1.5, 8.9, 0x8a8f98);
+  };
+})();
+GROLES.forEach(function(r){ if(String(r[0]) === String(/moulin/i)) r[0] = /^moulin\b/i; });
+/* ---------- 🚆 QUÉBEC TRAINS YOU CAN SEE: a train always running round the loop; board right away ---------- */
+var AMBT = {m:null, d:0, hold:0};
+(function(){
+  var m = VEH_MODEL.train ? VEH_MODEL.train() : null; if(!m) return; m.visible = true; AMBT.m = m;
+  var pts = QLOOP.map(function(q){ return [qx(q[0]), qz(q[1])]; }); pts.push(pts[0]); AMBT.pts = pts; var L = 0; AMBT.seg = pts.slice(1).map(function(p, i){ var l = Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]); L += l; return L; }); AMBT.len = L;
+  AMBT.stops = QSTOPS.map(function(s){ var k = qStopIdx(QSTOPS.indexOf(s)); return k === 0 ? 0 : AMBT.seg[k - 1]; });
+  var cols = [0xc8382f, 0x1f6fb8, 0x2f8a3a, 0xe3b52c, 0x8a3ad6];
+  for(var c=0;c<2;c++) for(var r=0;r<4;r++) [-0.65, 0.65].forEach(function(x, j){ if((c + r + j) % 2) return; var p = person({x:0, z:0, ry:Math.PI, sit:true, shirt:cols[(c + r + j) % 5], pants:0x2a3a5a, h:1.0}); root.remove(p); p.position.set(x, 0.4, c*7.8 + 1.5 - 2.4 + r*1.6 + 4.4); m.add(p); });
+})();
+function ambTrainTick(dt){
+  var m = AMBT.m; if(!m) return; if(ride.on && ride.kind === 'qtrain'){ m.visible = false; return; } m.visible = true;
+  var cp = camera.position; if(Math.abs(cp.x - qx(40)) > 900 || Math.abs(cp.z - qz(340)) > 900) return;
+  var now = performance.now(); if(now < AMBT.hold) return;
+  var prev = AMBT.d; AMBT.d = (AMBT.d + (dt || 0.016)*14) % AMBT.len;
+  AMBT.stops.forEach(function(s){ if(prev < s && AMBT.d >= s){ AMBT.hold = now + 6000; AMBT.d = s + 0.01; } });
+  var d = AMBT.d, i = 0; while(i < AMBT.seg.length - 1 && AMBT.seg[i] < d) i++;
+  var a = AMBT.pts[i], b = AMBT.pts[i + 1], s0 = i ? AMBT.seg[i - 1] : 0, u = (d - s0)/(AMBT.seg[i] - s0), x = a[0] + (b[0] - a[0])*u, z = a[1] + (b[1] - a[1])*u;
+  m.position.set(x, 0, z); m.rotation.y = Math.atan2(-(b[0] - a[0]), -(b[1] - a[1]));
+}
+var _ticketCardQ2 = ticketCardQ;
+ticketCardQ = function(from){ _ticketCardQ2(from); var row = gcard.el.querySelector('.gc-grid'); if(row){ var b = document.createElement('div'); b.className = 'gc-row'; b.innerHTML = gBtn('qnow', from, '⚡ ' + L2('GET ON RIGHT AWAY (ticket bought for you)', 'MONTER TOUT DE SUITE (billet acheté pour toi)'), 'go'); row.parentNode.appendChild(b); } };
+GACT.qnow = function(v){ QV.ticket = true; say('Voici votre billet. Bon voyage !'); qTrainChoose(v|0); };
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
@@ -17879,7 +17946,7 @@ function animate(){
   updateSpeedo();
   lifeTick(dt);
   jailTick();
-  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt);
+  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt); ambTrainTick(dt);
   if(!ICE.t || performance.now() - ICE.t > 1000){ ICE.t = performance.now(); if(Math.hypot(camera.position.x - QC.x, camera.position.z - QC.z) < 800) iceSync(); }
   villageTick();
   sendPresence(false);
