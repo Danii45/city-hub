@@ -4645,7 +4645,8 @@ function updateDriveCamera(snap){
   var look = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
   var up = wreck.on ? wreck.y : 0, far = carSpec.chaseDist*(1 + Math.min(1.2, up/30));   // follow the car up when it's blown sky-high
   var desiredX = carPos.x - look.x*far, desiredY = carPos.y + up*0.8 + carSpec.chaseHeight - look.y*far*0.3, desiredZ = carPos.z - look.z*far;
-  var k = snap ? 1 : fly.on ? 0.3 : 0.14;
+  var nowT = performance.now(), cdt = Math.min(0.1, Math.max(0.001, ((nowT - (updateDriveCamera.t || nowT)) || 16)/1000)); updateDriveCamera.t = nowT;
+  var k = snap ? 1 : 1 - Math.exp(-(fly.on ? 21 : 10)*cdt);   // smooth whatever the frame rate (no jitter)
   camera.position.x += (desiredX - camera.position.x)*k;
   camera.position.y += (desiredY - camera.position.y)*k;
   camera.position.z += (desiredZ - camera.position.z)*k;
@@ -5290,6 +5291,37 @@ addCockpit(cars.sedan, 'sedan');
 addCockpit(cars.f1, 'f1');
 addCockpit(cars.coupe, 'coupe');
 addCockpit(cars.roadster, 'roadster');
+/* ---------- 🏎 LA BERLINE SPORT GT: an original high-performance sports saloon (wide arches, quad exhausts, multi-spoke rims,
+   carbon lip spoiler). Bought at the Garage & Concessionnaire. ---------- */
+function buildSportModel(){ var g = new THREE.Group(), paint = new THREE.MeshPhongMaterial({color:0x1f5fd0, shininess:90}), dark = solidMat(0x121316), glass = new THREE.MeshPhongMaterial({color:0x1e2a36, shininess:110}), carbon = new THREE.MeshPhongMaterial({color:0x1c1d21, shininess:90}), chrome = new THREE.MeshPhongMaterial({color:0xd0d4da, shininess:120}), wheels = [];
+  function add(geo, m, x, y, z, rx, ry, rz){ var o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.rotation.set(rx || 0, ry || 0, rz || 0); g.add(o); return o; }
+  add(new THREE.BoxGeometry(2.0, 0.52, 4.6), paint, 0, 0.6, 0);                                   // body
+  add(new THREE.BoxGeometry(2.12, 0.34, 1.2), paint, 0, 0.62, -1.45); add(new THREE.BoxGeometry(2.12, 0.34, 1.2), paint, 0, 0.62, 1.45);   // wide arches front/back
+  add(new THREE.BoxGeometry(1.94, 0.16, 1.4), paint, 0, 0.92, -1.55, 0.09);                       // bonnet + power bulge
+  add(new THREE.BoxGeometry(0.7, 0.06, 1.1), paint, 0, 1.01, -1.55, 0.09);
+  add(new THREE.BoxGeometry(1.94, 0.16, 0.95), paint, 0, 0.92, 1.8, -0.06);                       // boot
+  add(new THREE.BoxGeometry(1.74, 0.52, 2.05), glass, 0, 1.17, 0.2);                              // cabin glass
+  add(new THREE.BoxGeometry(1.78, 0.09, 1.85), carbon, 0, 1.47, 0.25);                            // carbon roof
+  add(new THREE.BoxGeometry(1.76, 0.48, 0.08), glass, 0, 1.15, -0.8, -0.6);                       // raked windscreen
+  add(new THREE.BoxGeometry(1.9, 0.06, 0.32), carbon, 0, 1.03, 2.2, -0.15);                       // boot lip spoiler
+  add(new THREE.BoxGeometry(2.08, 0.1, 3.0), carbon, 0, 0.32, 0);                                 // side skirts
+  add(new THREE.BoxGeometry(2.05, 0.12, 0.3), carbon, 0, 0.3, -2.35);                             // front splitter
+  add(new THREE.BoxGeometry(1.3, 0.22, 0.06), dark, 0, 0.62, -2.31); for(var i=0;i<6;i++) add(new THREE.BoxGeometry(0.02, 0.2, 0.07), chrome, -0.55 + i*0.22, 0.62, -2.32);   // wide mesh grille (original)
+  add(new THREE.BoxGeometry(1.95, 0.24, 0.12), carbon, 0, 0.36, 2.33);                            // diffuser
+  [-0.72, -0.5, 0.5, 0.72].forEach(function(x){ var ex = add(new THREE.CylinderGeometry(0.06, 0.06, 0.2, 14), chrome, x, 0.34, 2.38); ex.rotation.x = Math.PI/2; });   // quad exhausts
+  [-0.7, 0.7].forEach(function(x){ add(new THREE.BoxGeometry(0.46, 0.1, 0.06), new THREE.MeshBasicMaterial({color:0xeaf4ff}), x, 0.78, -2.31); add(new THREE.BoxGeometry(0.03, 0.03, 0.06), new THREE.MeshBasicMaterial({color:0x9fd0ff}), x, 0.72, -2.32); add(new THREE.BoxGeometry(0.5, 0.1, 0.06), new THREE.MeshBasicMaterial({color:0xd8202a}), x, 0.84, 2.31); add(new THREE.BoxGeometry(0.16, 0.1, 0.22), paint, x*1.4, 1.1, -0.72); });
+  [[-1.0, -1.45], [1.0, -1.45], [-1.0, 1.45], [1.0, 1.45]].forEach(function(w){ var arch = add(new THREE.CylinderGeometry(0.48, 0.48, 0.06, 22, 1, false, Math.PI/2, Math.PI), dark, w[0] + (w[0] > 0 ? 0.07 : -0.07), 0.4, w[1], 0, 0, Math.PI/2);
+    var wg = new THREE.Group(); wg.position.set(w[0], 0.38, w[1]); g.add(wg); var spin = new THREE.Group(); wg.add(spin); wg.spin = spin;
+    var tyre = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.3, 24), solidMat(0x161618)); tyre.rotation.z = Math.PI/2; spin.add(tyre);
+    var rim = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.32, 20), new THREE.MeshPhongMaterial({color:0x3a3d44, shininess:110})); rim.rotation.z = Math.PI/2; spin.add(rim);
+    for(var sp=0;sp<10;sp++){ var s = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.035, 0.05), chrome); s.rotation.set(sp/10*Math.PI*2, 0, Math.PI/2); s.position.x = w[0] > 0 ? 0.01 : -0.01; spin.add(s); }
+    var cal = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.16, 0.12), solidMat(0x1f5fd0)); cal.position.set(w[0] > 0 ? -0.12 : 0.12, 0.12, 0); wg.add(cal);   // brake calipers
+    wheels.push(wg); });
+  g.visible = false; root.add(g); return {group:g, wheels:wheels, wheelR:0.38, paint:paint}; }
+cars.sportgt = buildSportModel();
+CAR_SPECS.sportgt = {accel:42, topMul:2.3, turnRate:2.05, grip:80, steerResp:5.2, yawInertia:10, scrape:0.5, radius:1.7, chaseDist:9.5, chaseHeight:3.3};
+addCockpit(cars.sportgt, 'coupe');
+
 function insideView(){ return flying && driving && carView === 'inside'; }
 /* show or hide the inside of your car, and the bits of it you'd be looking through */
 function applyCarView(){
@@ -8007,7 +8039,7 @@ function updateRemotes(dt){
   var k = 1 - Math.exp(-dt*14);
   mp.others.forEach(function(p){
     var s = p.presence || {};
-    var want = s.mode === 'drive' ? (s.car === 'f1' ? 'f1' : s.car === 'coupe' ? 'coupe' : s.car === 'roadster' ? 'roadster' : 'sedan') : s.mode === 'walk' ? 'walker' : null;
+    var want = s.mode === 'drive' ? (s.car === 'f1' ? 'f1' : s.car === 'coupe' ? 'coupe' : s.car === 'roadster' ? 'roadster' : s.car === 'sportgt' ? 'sportgt' : 'sedan') : s.mode === 'walk' ? 'walker' : null;
     if(want && !(finite(s.x) && finite(s.y) && finite(s.z) && finite(s.yaw))) want = null;
     var a = mp.avatars[p.peer];
     if(!a) a = mp.avatars[p.peer] = {model:null, kind:null, color:null, tag:null, tagText:null, pos:new THREE.Vector3(), yaw:0, fresh:true};
@@ -8025,7 +8057,7 @@ function updateRemotes(dt){
     }
     if(a.kind !== want){
       if(a.model){ root.remove(a.model.group); disposeObject(a.model.group); }
-      a.model = want === 'sedan' ? buildCarModel() : want === 'f1' ? buildF1Model() : want === 'coupe' ? (requestCoupeGLB(), buildCoupeModel()) : want === 'roadster' ? buildRoadsterModel() : want === 'walker' ? buildWalker() : null;
+      a.model = want === 'sportgt' ? buildSportModel() : want === 'sedan' ? buildCarModel() : want === 'f1' ? buildF1Model() : want === 'coupe' ? (requestCoupeGLB(), buildCoupeModel()) : want === 'roadster' ? buildRoadsterModel() : want === 'walker' ? buildWalker() : null;
       a.kind = want; a.color = null; a.fresh = true;
     }
     if(!a.model){ if(a.tag) a.tag.visible = false; return; }
@@ -21010,7 +21042,7 @@ window.addEventListener('blur', function(){ HOVERLOOK.overCanvas = false; });
 function hoverEdgeTick(dt){ if(!HOVERLOOK.on || !FREECUR || touchPlay || !flying || !HOVERLOOK.overCanvas || document.pointerLockElement === canvasEl || driving) return; if(gcard && gcard.el && !gcard.el.classList.contains('hidden')) return; if(performance.now() - HOVERLOOK.t > 8000) return;
   var w = window.innerWidth, edge = Math.max(30, w*0.07), x = HOVERLOOK.x, turn = 0; if(x < edge) turn = (edge - x)/edge; else if(x > w - edge) turn = -(x - (w - edge))/edge; if(!turn) return; yaw += turn*1.6*dt; camera.rotation.set(pitch, yaw, 0); lastMouseMove = performance.now(); }
 GACT.hoverlook = function(){ HOVERLOOK.on = !HOVERLOOK.on; try { localStorage.setItem('paris.hoverlook', HOVERLOOK.on ? '1' : '0'); } catch(e){} showToast('🖱 ' + (HOVERLOOK.on ? L2('The view follows your mouse (no clicking)', 'La vue suit ta souris (sans cliquer)') : L2('Hold and drag to look around', 'Maintiens et glisse pour regarder'))); };
-(function(){ var G = BAR_GROUPS.filter(function(g){ return g.id === 'snd'; })[0]; if(!G || !G.d) return; var x = document.createElement('button'); x.className = 'bar-btn'; x.innerHTML = '<span>🖱</span><span class="dl">' + esc(L2('Mouse: follow (no click) / drag', 'Souris : suivre (sans clic) / glisser')) + '</span>'; x.addEventListener('click', function(){ closeDrops(); GACT.hoverlook(); }); G.d.insertBefore(x, G.d.firstChild); })();
+(function(){ var G = BAR_GROUPS.filter(function(g){ return g.id === 'snd'; })[0]; if(!G || !G.d) return; var x = document.createElement('button'); x.className = 'bar-btn'; x.innerHTML = '<span>🖱</span><span class="dl">' + esc(L2('Mouse: centred / follow / drag', 'Souris : centrée / suivre / glisser')) + '</span>'; x.addEventListener('click', function(){ closeDrops(); GACT.hoverlook(); }); G.d.insertBefore(x, G.d.firstChild); })();
 
 /* ---------- ⚖ FAIR RULES: jail only for bad / mean chat, or deliberately running over people or Mika several times.
    Crashing into things never counts. The police only give fines. ---------- */
@@ -21065,6 +21097,53 @@ Object.keys(cars).forEach(function(k){ var m = cars[k], ck = m.cockpit; if(!ck |
   if(k !== 'roadster'){ var mir = add(new THREE.BoxGeometry(0.22, 0.07, 0.03), trim, 0, e.y + 0.3, e.z - 0.75); } });
 /* ---------- 🧍 PEOPLE TO SCALE: every person in the city is ~1.8 m tall next to buildings (3 m floors, 3 m doors) ---------- */
 var _buildWalkerS = buildWalker; buildWalker = function(){ var w = _buildWalkerS.apply(this, arguments); w.group.scale.setScalar(0.91); return w; };
+/* the Berline Sport GT: buy it at the garage, pick it in the vehicle chooser, other players see it too */
+var GT_PRICE = 2500;
+function ownsGT(){ var e = hasChar() ? life.eco : null; return isStaff() || !!(e && e.cars && e.cars.sportgt); }
+if(typeof SPD !== 'undefined'){ SPD.base.sportgt = [CAR_SPECS.sportgt.topMul, CAR_SPECS.sportgt.accel]; spdApply(); }
+var _setCarModelGT = setCarModel; setCarModel = function(name){ if(name === 'sportgt' && !ownsGT()){ showToast('🏎 ' + L2('Buy the Berline Sport GT at the Garage & Concessionnaire (' + GT_PRICE + ' €)', 'Achète la Berline Sport GT au Garage & Concessionnaire (' + GT_PRICE + ' €)')); return; } return _setCarModelGT.apply(this, arguments); };
+(function(){ var chips = document.querySelector('[data-vehicle="roadster"]'); if(!chips) return; var b = document.createElement('button'); b.className = 'chip'; b.setAttribute('data-vehicle', 'sportgt'); b.textContent = '🏎 SPORT GT'; chips.parentNode.appendChild(b); b.addEventListener('click', function(){ if(!ownsGT()){ showToast('🏎 ' + L2('Buy it first at the Garage & Concessionnaire (' + GT_PRICE + ' €)', 'Achète-la d\'abord au Garage & Concessionnaire (' + GT_PRICE + ' €)')); return; } setCarModel('sportgt'); [].forEach.call(document.querySelectorAll('[data-vehicle]'), function(x){ x.classList.toggle('on', x === b); }); }); })();
+GACT.buygt = function(){ var e = hasChar() ? life.eco : null; if(!e) return; if(ownsGT()){ setCarModel('sportgt'); showToast('🏎 ' + L2('Your Sport GT is ready - press DRIVE MODE!', 'Ta Sport GT est prête - appuie sur MODE VOITURE !')); return; } if((+e.cash || 0) < GT_PRICE){ showToast(L2('Not enough money! You need ', 'Pas assez d\'argent ! Il te faut ') + GT_PRICE + ' €'); return; }
+  garAsk(function(){ e.cash = +e.cash - GT_PRICE; if(typeof finRec === 'function') finRec(-GT_PRICE, 'voiture'); e.cars = e.cars || {}; e.cars.sportgt = 1; lifeSave(true); setCarModel('sportgt'); say('Félicitations ! Voici les clés de ta Berline Sport GT !'); showCard('<h3>🏎 ' + L2('IT\'S YOURS!', 'ELLE EST À TOI !') + '</h3><div class="gc-emoji">🔑</div><div class="gc-text">' + L2('The Berline Sport GT: fastest saloon in Paris. Press DRIVE MODE. Upgrade it here too!', 'La Berline Sport GT : la berline la plus rapide de Paris. Appuie sur MODE VOITURE. Tu peux l\'améliorer ici aussi !') + '</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); }); };
+var _garageGT = GACT.garage; GACT.garage = function(k){ _garageGT.apply(this, arguments); var c = gcard.el; if(!c) return; var grid = c.querySelector('.gc-grid'); if(!grid) return; var d = document.createElement('div'); d.innerHTML = gOpt('buygt', null, '🏎 <b>Berline Sport GT</b><br><span class="lf-soft">' + (ownsGT() ? L2('owned ✓ - tap to drive it', 'achetée ✓ - touche pour la conduire') : L2('sports saloon, 0-100 in a flash · ', 'berline sportive, 0 à 100 en un éclair · ') + GT_PRICE + ' €') + '</span>'); grid.insertBefore(d.firstChild, grid.firstChild); };
+/* ---------- 🎯 CENTRED CURSOR (like a real first-person game): while you play, the mouse is locked in the middle and
+   moving it turns your view. ESC frees the cursor so you can click menus, cards and buttons (you stay in the game).
+   Click the game again to lock it. ⚙ Settings → Mouse lets you switch to "follow" or "drag". ---------- */
+var PLOCK = {mode:'lock', locked:false, unlockAt:0, failed:false};
+try { PLOCK.mode = localStorage.getItem('paris.mouse') || 'lock'; } catch(e){}
+HOVERLOOK.on = PLOCK.mode === 'follow';
+(function(){ var st = document.createElement('style'); st.textContent = 'body.freecur.plocked #crosshair{display:flex !important;visibility:visible !important}body.plocked canvas{cursor:none !important}#plock-tip{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:45;background:rgba(15,20,40,.78);color:#fff;font:700 15px Arial,sans-serif;padding:10px 16px;border-radius:12px;pointer-events:none;display:none;text-align:center}'; document.head.appendChild(st);
+  var tip = document.createElement('div'); tip.id = 'plock-tip'; document.body.appendChild(tip); PLOCK.tip = tip; })();
+function plockWanted(){ return PLOCK.mode === 'lock' && !PLOCK.failed && FREECUR && flying && !touchPlay && !IS_TOUCH && !PILOT && canvasEl.requestPointerLock; }
+function plockTry(){ if(!plockWanted() || document.pointerLockElement === canvasEl) return; if(gcard && gcard.el && !gcard.el.classList.contains('hidden')) return; try { var pr = canvasEl.requestPointerLock(); if(pr && pr.catch) pr.catch(plockFail); } catch(e){ plockFail(); } }
+function plockFail(){ if(PLOCK.failed) return; if(!(Date.now() - (PLOCK.userAt || 0) < 1500)) return; PLOCK.fails = (PLOCK.fails || 0) + 1; if(PLOCK.fails < 2) return; PLOCK.failed = true; HOVERLOOK.on = true; showToast('🖱 ' + L2('The browser blocked the centred cursor here - the view follows your mouse instead (open the game in its own tab for the centred cursor)', 'Le navigateur bloque le curseur centré ici - la vue suit ta souris (ouvre le jeu dans son propre onglet pour le curseur centré)')); }
+document.addEventListener('pointerlockerror', function(){ if(PLOCK.mode === 'lock') plockFail(); });
+document.addEventListener('pointerlockchange', function(){ var on = document.pointerLockElement === canvasEl; if(PLOCK.locked && !on) PLOCK.unlockAt = Date.now(); PLOCK.locked = on; document.body.classList.toggle('plocked', on); plockTipUpdate(); });
+function plockTipUpdate(){ var show = plockWanted() && !PLOCK.locked && !(gcard && gcard.el && !gcard.el.classList.contains('hidden')) && !document.querySelector('.bar-drop.open'); PLOCK.tip.style.display = show ? '' : 'none'; PLOCK.tip.innerHTML = '🖱 ' + L2('Click the game to play · ESC = free the cursor · ESC again = menu', 'Clique sur le jeu pour jouer · ÉCHAP = libérer le curseur · ÉCHAP encore = menu'); }
+setInterval(plockTipUpdate, 500);
+/* Esc while locked only frees the cursor: you stay in the game (a second Esc leaves, as before) */
+var _leaveFPL = leaveFirstPerson; leaveFirstPerson = function(){ if(PLOCK.mode === 'lock' && flying && !touchPlay && (PLOCK.locked || Date.now() - PLOCK.unlockAt < 500)){ applyModeUI(); return; } return _leaveFPL.apply(this, arguments); };
+/* re-locking after Esc doesn't reset where you were or what you were doing */
+var _enterFPL = enterFirstPerson; enterFirstPerson = function(){ if(flying && document.pointerLockElement === canvasEl && PLOCK.mode === 'lock'){ applyModeUI(); return; } return _enterFPL.apply(this, arguments); };
+/* clicking the game: first click locks the cursor; while locked, a click uses whatever is in the middle of the screen */
+canvasEl.addEventListener('mousedown', function(e){ PLOCK.userAt = Date.now(); if(!plockWanted() || e.button !== 0) return; if(document.pointerLockElement !== canvasEl){ e.stopImmediatePropagation(); MDRAG.on = false; PLOCK.justLocked = Date.now(); plockTry(); } }, true);
+var _freeClickL = freeClick; freeClick = function(e){ if(document.pointerLockElement === canvasEl) e = {clientX:innerWidth/2, clientY:innerHeight/2, button:0, target:canvasEl}; else if(PLOCK.justLocked && Date.now() - PLOCK.justLocked < 400) return; return _freeClickL.call(this, e); };
+/* cards and menus need the cursor: free it when one opens */
+var _showCardL = showCard; showCard = function(){ if(document.pointerLockElement === canvasEl && document.exitPointerLock){ PLOCK.unlockAt = Date.now(); document.exitPointerLock(); } return _showCardL.apply(this, arguments); };
+/* entering the game locks straight away (that click is a user gesture) */
+var _requestFPL = requestFirstPerson; requestFirstPerson = function(mode){ var r = _requestFPL.apply(this, arguments); setTimeout(plockTry, 30); return r; };
+/* the mouse setting: lock (centred) / follow / drag */
+GACT.hoverlook = function(){ var order = ['lock', 'follow', 'drag'], i = order.indexOf(PLOCK.mode); PLOCK.mode = order[(i + 1) % 3]; PLOCK.failed = false; try { localStorage.setItem('paris.mouse', PLOCK.mode); localStorage.setItem('paris.hoverlook', PLOCK.mode === 'follow' ? '1' : '0'); } catch(e){} HOVERLOOK.on = PLOCK.mode === 'follow'; if(PLOCK.mode !== 'lock' && document.pointerLockElement === canvasEl) document.exitPointerLock();
+  showToast('🖱 ' + (PLOCK.mode === 'lock' ? L2('Centred cursor: click the game to play, ESC to free the cursor', 'Curseur centré : clique sur le jeu pour jouer, ÉCHAP pour libérer le curseur') : PLOCK.mode === 'follow' ? L2('The view follows your mouse (no clicking)', 'La vue suit ta souris (sans cliquer)') : L2('Hold and drag to look around', 'Maintiens et glisse pour regarder'))); };
+
+/* ---------- 🚫 NO WANTED SYSTEM, NO FINES FOR CRASHES (Madame's rules): only bad words lead to jail ---------- */
+WANT.lvl = 0; try { localStorage.setItem('paris.want', '0'); } catch(e){}
+WANT_add = function(){}; wantDraw = function(){ if(WANT.el) WANT.el.style.display = 'none'; }; wantDraw();
+runStrike = function(){}; mikaStrike = function(){}; fineMe = function(){};
+copTick = function(dt){ if(!COP.list.length) return; COP.chase = null; COP.list.forEach(function(c){ var g = c.g, hd = Math.hypot(g.position.x - c.hx, g.position.z - c.hz); if(hd > 0.3){ var bx = c.hx - g.position.x, bz = c.hz - g.position.z; g.position.x += bx/hd*Math.min(hd, 3*dt); g.position.z += bz/hd*Math.min(hd, 3*dt); g.rotation.y = Math.atan2(-bx, -bz); } }); };
+try { localStorage.removeItem('paris.jailStars'); } catch(e){}
+/* driving: the view from inside the car (first person) is the default; V still changes the view */
+try { if(localStorage.getItem('paris.carView2') !== '1'){ localStorage.setItem('paris.carView2', '1'); localStorage.setItem('paris.carView', 'inside'); carView = 'inside'; } } catch(e){}
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
