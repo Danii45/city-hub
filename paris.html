@@ -4728,6 +4728,7 @@ function keyRight(){ return keys.KeyD || keys.ArrowRight; }
 
 function updateFlyMovement(dt){
   if(driving){ updateDriveMovement(dt); return; }
+  if(ride.on){ updateRide(dt); return; }
   var outside = boundsContact(camera.position.x, camera.position.z, 0.6);
   if(outside){ camera.position.x += outside.ex; camera.position.z += outside.ez; }
   var forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion); forward.y = 0; if(forward.lengthSq() > 0) forward.normalize();
@@ -4740,6 +4741,7 @@ function updateFlyMovement(dt){
   var pace = 1;
   if(move.lengthSq() === 0 && stickAmount() > STICK_DEAD){ move.addScaledVector(forward, stick.y).addScaledVector(right, stick.x); pace = stickAmount(); }
   if(move.lengthSq() > 0) move.normalize().multiplyScalar(walkSpeed*dt*pace);
+  move = skateMove(move, dt);
   var feet = camera.position.y - EYE_HEIGHT;
   // short hops, so you can't slip through a thin wall at high speed
   var steps = Math.max(1, Math.ceil(move.length()/0.25));
@@ -5515,6 +5517,7 @@ fr:'<h3>POUR ENTRER</h3><ul><li>Écris ton <b>nom</b> et le <b>mot de passe</b> 
 };
 var CHANGELOG = {
 en:'<h3>BETA 2 <span class="when">- Oct 14, 2026</span></h3><ul>' +
+  '<li><span class="when">Nov 25, 2026 · 10:30 PM</span><br>🔍 SEARCH any place. NEW: the Champs-Élysées with 28 shops and restaurants, the Concorde, Grand Palais, Opéra, Panthéon, Invalides and Pompidou; the ARCADE (verbs and vocabulary games); the CONCERT STADIUM; the MALL; and QUÉBEC\'s CARNAVAL (fly there!) with the ice palace, sledding, skiing, skating, dogsled, snowmobile, culture stations, food stands and your own vacation ice palace.</li>' +
   '<li><span class="when">Nov 25, 2026 · 5:45 PM</span><br>FRENCH CHALLENGES everywhere: talk to Parisians in the street (E), shop at your classmates\' shops (SHOP HERE), and answer questions at the monuments. Right answers earn 🪙 jetons.</li>' +
   '<li><span class="when">Nov 25, 2026 · 5:30 PM</span><br>(Preview) Create your character when you log in, earn 🪙 jetons at work for outfits, every job starts at a real place in the city, and the new SHOP ASSISTANT job at classmates\' shops.</li>' +
   '<li><span class="when">Nov 25, 2026 · 5:15 PM</span><br>Madame herself now stands in the Baguette Village, beside the giant baguette.</li>' +
@@ -6142,6 +6145,9 @@ function updatePrompt(){
   if(!flying || driving || panelPlot || builder.on || decor.on || blk.on || !titleScreen.classList.contains('hidden')){ setPrompt('', ''); return; }
   if(nearMika()){ setPrompt('<b>E</b>' + esc(t('petMika')), 'mika|' + LANG); return; }
   if(nearElevator()){ setPrompt('<b>E</b>' + esc(t('promptElevator')), 'elev|' + LANG); return; }
+  if(ride.on){ setPrompt(ride.kind === 'snowmobile' ? '<b>E</b>' + esc(L2('Get off the snowmobile', 'Descendre de la motoneige')) : '', 'ride|' + ride.kind); return; }
+  var sp = nearSpot(); if(sp){ setPrompt('<b>E</b>' + esc(sp.label()), 'spot' + SPOTS.indexOf(sp) + '|' + LANG); return; }
+  var il = nearIceLot(); if(il != null){ var io = iceLotOwner(il); setPrompt('<b>E</b>🏰 ' + esc(io === net.uid ? L2('Your ice palace - change it', 'Ton palais de glace - le modifier') : io ? L2('An ice palace (lot ', 'Un palais de glace (terrain ') + (il + 1) + ')' : L2('Lot ', 'Terrain ') + (il + 1) + L2(' - free: build your vacation ice palace!', ' - libre : construis ton palais de vacances !')), 'ice' + il + (io || '') + '|' + LANG); return; }
   if(typeof nearParisian === 'function' && !(chal.cur)){
     var np = nearParisian(); if(np){ setPrompt('<b>E</b>💬 ' + esc(t('chTalk')), 'chp' + np.i + '|' + LANG); return; }
     var nm = nearMonumentQ(); if(nm){ setPrompt('<b>E</b>🏛 ' + esc(t('chMonument', {name:L2(nm.en, nm.fr)})), 'chm' + nm.id + '|' + LANG); return; }
@@ -6165,6 +6171,9 @@ function interact(){
   if(!flying || driving) return;
   if(nearMika()){ petMika(); return; }
   if(nearElevator()){ useElevator(); return; }
+  if(ride.on){ if(ride.kind === 'snowmobile') endRide(); return; }
+  var sp = nearSpot(); if(sp){ sp.act(); return; }
+  var il = nearIceLot(); if(il != null){ openIceDesigner(il); return; }
   if(typeof nearParisian === 'function' && !chal.cur){
     var np = nearParisian(); if(np){ np.p.talk = 3; openChallenge('street', np.p, 'p' + np.i); return; }
     var nm = nearMonumentQ(); if(nm){ openChallenge('monument', nm, 'm' + nm.id); return; }
@@ -7946,7 +7955,7 @@ function updateRemotes(dt){
     if(!a.model){ if(a.tag) a.tag.visible = false; return; }
     var colorId = peerColor(p);
     if(a.color !== colorId){ paintModel(a.model, colorId); a.color = colorId; }
-    if(want === 'walker' && a.model.parts){ var lk = typeof s.look === 'string' && /^[0-9]{4,5}$/.test(s.look) ? s.look : '1000'; if(a.look !== lk){ a.look = lk; applyLook(a.model, lk); } }
+    if(want === 'walker' && a.model.parts){ var lk = typeof s.look === 'string' && /^[0-9]{4,6}$/.test(s.look) ? s.look : '1000'; if(a.look !== lk){ a.look = lk; applyLook(a.model, lk); } }
     var ahead = Math.min(0.15, Math.max(0, (Date.now() - p.updatedAt)/1000)), speed = finite(s.speed) ? s.speed : 0;
     _fwd.set(-Math.sin(s.yaw), 0, -Math.cos(s.yaw)).multiplyScalar(want === 'walker' ? 0 : speed*ahead);
     var tx2 = s.x + _fwd.x, ty = s.y, tz = s.z + _fwd.z;
@@ -9033,7 +9042,7 @@ function applyLook(model, code){
   var hat = LOOK.hats[v[3]] || 'beret';
   P.beret.visible = hat === 'beret'; P.cap.visible = hat === 'cap'; P.hairCap.visible = hat !== 'beret';
   P.hairCap.material.color.setHex(LOOK.hair[v[1]] || LOOK.hair[0]);
-  applyOutfit(model, v[4] || 0);
+  applyOutfit(model, parseInt(String(code).slice(4), 10) || 0);
 }
 var FIRST_NAMES = ['Camille', 'Léa', 'Chloé', 'Manon', 'Inès', 'Jade', 'Louise', 'Emma', 'Hugo', 'Lucas', 'Louis', 'Gabriel', 'Arthur', 'Jules', 'Nathan', 'Théo'];
 var LAST_NAMES = ['Martin', 'Bernard', 'Dubois', 'Thomas', 'Robert', 'Richard', 'Petit', 'Durand', 'Leroy', 'Moreau', 'Simon', 'Laurent', 'Lefebvre', 'Michel'];
@@ -9828,7 +9837,7 @@ function viewStyle(){
   h += lookPicker(e.ch).replace(/data-a="look"/g, 'data-a="melook"');
   h += H('Outfits (la boutique de mode)', 'Tenues (la boutique de mode)');
   OUTFITS.forEach(function(o, i){
-    var have = i === 0 || own.indexOf(String(i)) >= 0, wearing = (e.out|0) === i;
+    var have = ownsOut(i), wearing = (e.out|0) === i;
     h += '<div class="lf-card lf-outfit"><b>' + o.icon + ' ' + esc(L2(o.en, o.fr)) + '</b> ' + (o.cost ? '<span class="lf-soft">· ' + o.cost + ' 🪙</span>' : '') + '<br>' +
       (wearing ? '<span class="lf-chip ok">' + L2('wearing it', 'tu la portes') + '</span>' :
        have ? B('wear', 'WEAR IT', 'LA PORTER', i, 'go') :
@@ -9977,7 +9986,7 @@ function lifeClick(ev){
       break;
     case 'buyout':
       var o = OUTFITS[v|0]; if(!o || (e.tok|0) < o.cost) return;
-      e.tok -= o.cost; e.outs = String(e.outs || '0') + (v|0); e.out = v|0; lifeSave(true); sendPresence(true);
+      e.tok -= o.cost; addOut(v|0); e.out = v|0; lifeSave(true); sendPresence(true);
       showToast(o.icon + ' ' + L2('New outfit: ', 'Nouvelle tenue : ') + L2(o.en, o.fr));
       break;
     case 'wear': e.out = v|0; lifeSave(true); sendPresence(true); break;
@@ -10461,7 +10470,7 @@ function updateFlight(dt){
   if(f.leg === 'in' && done){
     var r2 = f.to.rest; pl.position.set(r2.x, r2.y, r2.z); pl.rotation.set(0, r2.ry, 0);
     controls.enabled = true;
-    var spot = f.to.id === 'paris' ? {x:CDG.x + 6, z:CDG.z - 25, yaw:0} : {x:f.to.x + 4, z:f.to.z + 4, yaw:Math.PI};
+    var spot = f.to.spot || (f.to.id === 'paris' ? {x:CDG.x + 6, z:CDG.z - 25, yaw:0} : {x:f.to.x + 4, z:f.to.z + 4, yaw:Math.PI});
     flight = {active:false, t:0, near:null, arrived:spot};
     camera.position.set(r2.x + 25, 14, r2.z - 25); controls.target.set(r2.x, 2, r2.z); controls.update();
     flyCard.el.innerHTML = '<h4>' + esc(L2('WELCOME TO ', 'BIENVENUE À ') + L2(f.to.en, f.to.fr).toUpperCase()) + '</h4><button class="btn go" data-fly="walk">' + esc(L2('WALK AROUND', 'SE PROMENER')) + '</button>';
@@ -10559,17 +10568,19 @@ function streetQuestion(r){
 }
 /* you're the customer in a classmate's shop */
 function shopQuestion(r, p){
-  var tp = shopOf(p), items = SHOP_ITEMS[tp.id] || SHOP_ITEMS.grocery, kind = Math.floor(r()*4), it = pickR(r, items);
+  var tp = shopOf(p), ty = (p && p.data && p.data.ty) || tp.id, items = SHOP_ITEMS[ty] || SHOP_ITEMS[tp.id] || SHOP_ITEMS.grocery, talk = SHOP_TALK[ty], kind = Math.floor(r()*(talk ? 7 : 4)), it = pickR(r, items);
+  var cur = (p && p.data && p.data.cur) || '€', money = function(v){ return money2(v) + ' ' + cur; }, say = function(v){ return cur === '$' ? frPrice(v).replace(/euros?/, function(w){ return w === 'euro' ? 'dollar' : 'dollars'; }) : frPrice(v); };
+  if(kind >= 4){ var T = pickR(r, talk), mt = mcq(r, T[2], T[3]); return {who:'🧑‍🍳', where:p && p.data && p.data.nm ? '« ' + p.data.nm + ' »' : L2(tp.en, tp.fr), say:T[0].replace(/^« | »$/g, ''), hint:'💬', en:T[1], opts:mt.opts, ans:mt.ans}; }
   var who = '🧑‍🍳', name = p && p.data && p.data.nm ? '« ' + p.data.nm + ' »' : L2(tp.en, tp.fr);
   if(kind === 0){
     var q = mcq(r, 'Je voudrais ' + it[0] + ', s\'il vous plaît.', items.filter(function(x){ return x !== it; }).map(function(x){ return 'Je voudrais ' + x[0] + ', s\'il vous plaît.'; }).concat(['Donne-moi ' + it[0] + ' !']));
     return {who:who, where:name, say:'Bonjour ! Vous désirez ?', hint:it[2], en:'You want ' + it[1] + '. How do you ask politely?', opts:q.opts, ans:q.ans};
   }
   if(kind === 1){
-    var ok = money2(it[3]) + ' €', w = [];
-    [0.5, -0.5, 1, 10, -0.2, 0.3].forEach(function(dv){ var v = Math.round((it[3] + dv)*100)/100; if(v > 0) w.push(money2(v) + ' €'); });
+    var ok = money(it[3]), w = [];
+    [0.5, -0.5, 1, 10, -0.2, 0.3].forEach(function(dv){ var v = Math.round((it[3] + dv)*100)/100; if(v > 0) w.push(money(v)); });
     var q1 = mcq(r, ok, w);
-    return {who:who, where:name, say:'Voilà ' + it[0] + '. Ça fait ' + frPrice(it[3]) + ', s\'il vous plaît.', hint:it[2], en:'How much do you pay?', opts:q1.opts, ans:q1.ans};
+    return {who:who, where:name, say:'Voilà ' + it[0] + '. Ça fait ' + say(it[3]) + ', s\'il vous plaît.', hint:it[2], en:'How much do you pay?', opts:q1.opts, ans:q1.ans};
   }
   if(kind === 2){
     var q2 = mcq(r, 'Par carte, s\'il vous plaît.', ['À droite, merci.', 'Il fait beau.', 'J\'ai quinze ans.']);
@@ -10664,6 +10675,1345 @@ function answerChallenge(i){
   }
   renderChallenge();
 }
+/* ---------- SPOTS: places you walk up to and press E (Champs-Élysées shops, Québec stands, rides...) ---------- */
+var SPOTS = [];
+function addSpot(sp){ SPOTS.push(sp); return sp; }
+function nearSpot(){
+  var x = camera.position.x, z = camera.position.z, best = null, bd = 1e9;
+  for(var i=0;i<SPOTS.length;i++){ var s = SPOTS[i], d = Math.hypot(s.x - x, s.z - z); if(d < (s.r || 4) && d < bd && !(s.when && !s.when())){ bd = d; best = s; } }
+  return best;
+}
+/* shops outside the plot system (fixed shops and stands): a plot-like object for the challenge cards */
+function fakeShop(nm, ty, cur){ return {fake:true, data:{nm:nm, ty:ty, cur:cur || '€'}}; }
+
+/* more shop items: Champs-Élysées shops (€) and the Québec Carnaval stands ($ CAD) */
+SHOP_ITEMS.crepes = [['une crêpe au sucre', 'a sugar crêpe', '🥞', 4], ['une crêpe au chocolat', 'a chocolate crêpe', '🍫', 5], ['une galette jambon-fromage', 'a ham and cheese galette', '🧀', 8.5], ['un jus de pomme', 'an apple juice', '🍎', 3]];
+SHOP_ITEMS.perfume = [['un parfum', 'a perfume', '🌸', 85], ['une eau de toilette', 'an eau de toilette', '💧', 45], ['un savon', 'a soap', '🧼', 6], ['une bougie parfumée', 'a scented candle', '🕯', 25]];
+SHOP_ITEMS.cinema = [['une place de cinéma', 'a cinema ticket', '🎟', 12], ['du pop-corn', 'some popcorn', '🍿', 6], ['une boisson', 'a drink', '🥤', 4], ['une affiche de film', 'a film poster', '🎬', 10]];
+SHOP_ITEMS.souvenirs = [['une petite tour Eiffel', 'a little Eiffel Tower', '🗼', 5], ['un béret', 'a beret', '🧢', 15], ['une carte postale', 'a postcard', '💌', 1], ['un porte-clés', 'a keyring', '🔑', 4]];
+SHOP_ITEMS.sport = [['un ballon de foot', 'a football', '⚽', 20], ['un maillot', 'a football shirt', '👕', 70], ['des baskets', 'some trainers', '👟', 90], ['une raquette de tennis', 'a tennis racket', '🎾', 45]];
+SHOP_ITEMS.taffy = [['de la tire d\'érable', 'some maple taffy', '🍁', 4], ['du sucre d\'érable', 'some maple sugar', '🍁', 3], ['des bonbons à l\'érable', 'some maple candies', '🍬', 2.5], ['du beurre d\'érable', 'some maple butter', '🧈', 8]];
+SHOP_ITEMS.cocoa = [['un chocolat chaud', 'a hot chocolate', '☕', 3.5], ['un café', 'a coffee', '☕', 2.75], ['un cidre de pomme chaud', 'a hot apple cider', '🍎', 4], ['une tisane', 'a herbal tea', '🍵', 2.5]];
+SHOP_ITEMS.poutine = [['une petite poutine', 'a small poutine', '🍟', 7.5], ['une grande poutine', 'a large poutine', '🍟', 11], ['une poutine italienne', 'an Italian poutine', '🍝', 12.5], ['des frites', 'some fries', '🍟', 5]];
+SHOP_ITEMS.beignes = [['un beigne à l\'érable', 'a maple doughnut', '🍩', 3.25], ['un beignet à la cannelle', 'a cinnamon fritter', '🍩', 3], ['une crêpe au sirop d\'érable', 'a crêpe with maple syrup', '🥞', 6], ['une pomme de tire', 'a taffy apple', '🍎', 4.5]];
+SHOP_ITEMS.qsouv = [['une tuque', 'a winter hat (tuque)', '🧶', 25], ['des mitaines', 'some mittens', '🧤', 18], ['une ceinture fléchée', 'a traditional arrow sash', '🎀', 45], ['un foulard', 'a scarf', '🧣', 20]];
+SHOP_ITEMS.qfood = [['une tourtière', 'a meat pie (tourtière)', '🥧', 9], ['des fèves au lard', 'some baked beans', '🫘', 6], ['un pouding chômeur', 'a pouding chômeur', '🍮', 5], ['une soupe aux pois', 'a pea soup', '🍲', 6]];
+
+/* every kind of shop has its own conversations (on top of ordering, prices and paying) */
+var SHOP_TALK = {
+  cafe:[['« Sur place ou à emporter ? »', 'Eat in or take away? Answer: eat in.', 'Sur place, s\'il vous plaît.', ['À droite, merci.', 'Il fait froid.', 'Je suis canadien.']], ['« Avec du sucre ? »', 'What do they ask?', L2('if you want sugar', 'si tu veux du sucre'), L2('if you want salt|if you are tired|if you have a dog', 'si tu veux du sel|si tu es fatigué|si tu as un chien').split('|')], ['« Un café crème, c\'est un café avec... »', 'Finish the sentence.', 'du lait', ['du jus d\'orange', 'de l\'eau gazeuse', 'du chocolat']]],
+  bakery:[['« Elle est bien cuite, la baguette ? »', 'How do you like your baguette? Answer: well done.', 'Oui, bien cuite, s\'il vous plaît.', ['Oui, bien froide, merci.', 'Non, je suis cuit.', 'Oui, en rose.']], ['« Une baguette « tradition », c\'est... »', 'What is it?', L2('a traditional baguette', 'une baguette traditionnelle'), L2('a croissant|a cake|a sandwich', 'un croissant|un gâteau|un sandwich').split('|')], ['« Il est tout chaud, il sort du four ! »', 'What do they mean?', L2('it is fresh from the oven', 'il vient d\'être cuit'), L2('it is broken|it is frozen|it is old', 'il est cassé|il est congelé|il est vieux').split('|')]],
+  pastry:[['« Vous voulez une boîte pour les macarons ? »', 'What are they offering?', L2('a box for the macarons', 'une boîte pour les macarons'), L2('a fork|a drink|a bag of chips', 'une fourchette|une boisson|un paquet de chips').split('|')], ['« Ce gâteau, c\'est pour un anniversaire ? »', 'Answer: yes, for my sister.', 'Oui, c\'est pour ma sœur.', ['Non, c\'est un chien.', 'Oui, il pleut.', 'Je fais du M.']], ['« Un éclair au café ou au chocolat ? »', 'Choose chocolate.', 'Au chocolat, s\'il vous plaît.', ['Au fromage, merci.', 'Au ketchup !', 'À gauche.']]],
+  books:[['« Vous cherchez un livre en particulier ? »', 'Answer: a comic book.', 'Oui, je cherche une bande dessinée.', ['Oui, je cherche mon chat.', 'Non, je mange.', 'Oui, il fait beau.']], ['« C\'est pour offrir ? »', 'What are they asking?', L2('if it is a gift', 'si c\'est un cadeau'), L2('if it is heavy|if it is new|if it is yours', 'si c\'est lourd|si c\'est neuf|si c\'est à toi').split('|')], ['« Astérix est une bande dessinée... »', 'Which country?', 'française', ['japonaise', 'américaine', 'chinoise']]],
+  fashion:[['« Quelle taille faites-vous ? »', 'Answer: medium.', 'Je fais du M.', ['Je fais du ski.', 'Je fais mes devoirs.', 'Il est midi.']], ['« La cabine d\'essayage est au fond. »', 'Where is the changing room?', L2('at the back', 'au fond du magasin'), L2('on the roof|outside|in the car', 'sur le toit|dehors|dans la voiture').split('|')], ['« Ça vous va très bien ! »', 'What does it mean?', L2('It suits you very well!', 'Ça te va bien !'), L2('It is too expensive!|It is too small!|Go away!', 'C\'est trop cher !|C\'est trop petit !|Partez !').split('|')]],
+  flowers:[['« C\'est pour une occasion spéciale ? »', 'Answer: for Mother\'s Day.', 'Oui, pour la fête des Mères.', ['Oui, pour mon vélo.', 'Non, j\'ai faim.', 'Oui, à droite.']], ['« Je vous fais un bouquet ? »', 'What are they offering?', L2('to make a bouquet', 'faire un bouquet'), L2('to sell a bike|to call a taxi|to make a cake', 'vendre un vélo|appeler un taxi|faire un gâteau').split('|')], ['Quelle fleur est rouge et symbole d\'amour ?', 'Which flower?', 'la rose', ['le tournesol', 'la tulipe jaune', 'la marguerite']]],
+  cheese:[['« Vous voulez goûter ? »', 'What are they offering?', L2('a taste', 'de goûter le fromage'), L2('a chair|a coffee|a map', 'une chaise|un café|un plan').split('|')], ['« Je vous en coupe combien ? »', 'Answer: 200 grams.', 'Deux cents grammes, s\'il vous plaît.', ['Deux heures, merci.', 'Deux euros, au revoir.', 'Deux chats.']], ['Le camembert vient de quelle région ?', 'Which region?', 'la Normandie', ['la Provence', 'l\'Alsace', 'la Bretagne']]],
+  restaurant:[['« Vous avez réservé ? »', 'Answer: yes, a table for two.', 'Oui, une table pour deux.', ['Oui, un vélo pour deux.', 'Non, je suis malade.', 'Oui, il est midi.']], ['« Vous avez choisi ? »', 'What do they ask?', L2('if you are ready to order', 'si tu es prêt(e) à commander'), L2('if you are lost|if you are cold|if you have a pen', 'si tu es perdu(e)|si tu as froid|si tu as un stylo').split('|')], ['« Et comme dessert ? »', 'Order a crème brûlée.', 'Une crème brûlée, s\'il vous plaît.', ['Une salade de pneus.', 'Un taxi, merci.', 'La facture du téléphone.']], ['Comment demande-t-on à payer ?', 'Ask for the bill.', 'L\'addition, s\'il vous plaît.', ['Le menu, au revoir.', 'Le dessert, merci.', 'La cuisine, s\'il vous plaît.']]],
+  toys:[['« C\'est pour quel âge ? »', 'Answer: for an 8-year-old child.', 'Pour un enfant de huit ans.', ['Pour mon chien de huit kilos.', 'Pour huit heures.', 'Pour la voiture.']], ['« Il faut des piles ? »', 'What do they ask?', L2('if it needs batteries', 's\'il faut des piles'), L2('if it needs water|if it needs a car|if it needs a book', 's\'il faut de l\'eau|s\'il faut une voiture|s\'il faut un livre').split('|')]],
+  art:[['« C\'est une peinture à l\'huile. »', 'What kind of painting?', L2('an oil painting', 'une peinture à l\'huile'), L2('a photo|a sculpture|a drawing in pencil', 'une photo|une sculpture|un dessin au crayon').split('|')], ['Quel peintre français a peint des nymphéas ?', 'Which painter?', 'Claude Monet', ['Gustave Eiffel', 'Victor Hugo', 'Napoléon']]],
+  icecream:[['« Cornet ou pot ? »', 'Cone or cup? Answer: a cone.', 'Un cornet, s\'il vous plaît.', ['Un pot de peinture.', 'Une cornemuse.', 'Un taxi.']], ['« Combien de boules ? »', 'Answer: two scoops.', 'Deux boules, s\'il vous plaît.', ['Deux ballons.', 'Deux heures.', 'Deux chiens.']], ['« Quel parfum ? »', 'What do they ask?', L2('which flavour', 'quel goût'), L2('which perfume to buy|which colour|which size', 'quel parfum acheter|quelle couleur|quelle taille').split('|')]],
+  chocolate:[['« Chocolat noir, au lait ou blanc ? »', 'Choose dark chocolate.', 'Noir, s\'il vous plaît.', ['Vert, merci.', 'Au fromage.', 'En voiture.']], ['« Le chocolat vient du cacao. Le cacao pousse... »', 'Where does cocoa grow?', 'dans les pays chauds', ['au pôle Nord', 'dans la mer', 'sur la Lune']]],
+  grocery:[['« Il vous faut un sac ? »', 'Answer: no thanks, I have one.', 'Non merci, j\'en ai un.', ['Oui, un sac de ciment.', 'Non, il fait beau.', 'Oui, je suis un sac.']], ['« Un kilo de pommes » : un kilo, c\'est...', 'How much is a kilo?', 'mille grammes', ['cent grammes', 'dix grammes', 'un litre']], ['« Les fruits et légumes sont au rayon... »', 'Which section?', 'fruits et légumes', ['boulangerie', 'jouets', 'vêtements']]],
+  music:[['« Vous jouez de quel instrument ? »', 'Answer: the guitar.', 'Je joue de la guitare.', ['Je joue au foot de la guitare.', 'Je mange de la guitare.', 'Je suis une guitare.']], ['« Vous voulez écouter avant d\'acheter ? »', 'What are they offering?', L2('to listen first', 'd\'écouter d\'abord'), L2('to dance|to sing|to pay twice', 'de danser|de chanter|de payer deux fois').split('|')]],
+  candy:[['« Un sachet de bonbons, c\'est... »', 'What is it?', L2('a bag of sweets', 'un petit sac de bonbons'), L2('a box of shoes|a bottle of water|a cake', 'une boîte de chaussures|une bouteille d\'eau|un gâteau').split('|')], ['« Attention, ils sont très acides ! »', 'What does it mean?', L2('they are very sour', 'ils sont très acides'), L2('they are very hot|they are very old|they are very big', 'ils sont très chauds|ils sont très vieux|ils sont très gros').split('|')]],
+  crepes:[['« Crêpe sucrée ou galette salée ? »', 'Choose a sweet crêpe.', 'Une crêpe sucrée, s\'il vous plaît.', ['Une galette en chocolat de pneu.', 'Une crêpe salée au sucre.', 'Un taxi salé.']], ['La crêpe vient de quelle région ?', 'Which region?', 'la Bretagne', ['la Provence', 'la Normandie', 'l\'Alsace']]],
+  perfume:[['« Vous voulez sentir ce parfum ? »', 'What are they offering?', L2('to smell the perfume', 'sentir le parfum'), L2('to eat the perfume|to buy a car|to paint', 'manger le parfum|acheter une voiture|peindre').split('|')], ['Quelle ville française est la capitale du parfum ?', 'Which town?', 'Grasse', ['Lille', 'Brest', 'Calais']]],
+  cinema:[['« Pour quelle séance ? »', 'Answer: the 8 o\'clock showing.', 'La séance de vingt heures, s\'il vous plaît.', ['La séance de vingt euros.', 'La salle de bains.', 'Le film de mon chien.']], ['« Le film est en version originale sous-titrée. »', 'What does it mean?', L2('original language with subtitles', 'en langue originale avec sous-titres'), L2('it is a silent film|it is in 3D|it is cancelled', 'c\'est un film muet|c\'est en 3D|c\'est annulé').split('|')]],
+  souvenirs:[['« C\'est un souvenir pour qui ? »', 'Answer: for my grandmother.', 'Pour ma grand-mère.', ['Pour mon vélo.', 'Pour demain matin.', 'Pour la tour Eiffel.']], ['« Une carte postale, et un timbre ? »', 'What else do they offer?', L2('a stamp', 'un timbre'), L2('a hat|a cake|a ticket', 'un chapeau|un gâteau|un billet').split('|')]],
+  sport:[['« Vous faites quel sport ? »', 'Answer: I play football.', 'Je joue au foot.', ['Je joue du foot.', 'Je mange au foot.', 'Je suis un ballon.']], ['« Vous faites quelle pointure ? »', 'What do they ask?', L2('your shoe size', 'ta pointure de chaussures'), L2('your age|your name|your address', 'ton âge|ton nom|ton adresse').split('|')]],
+  qsouv:[['« Il fait frette ! Une tuque ? »', 'What are they offering?', L2('a winter hat', 'un bonnet d\'hiver'), L2('a swimsuit|an ice cream|sunglasses', 'un maillot de bain|une glace|des lunettes de soleil').split('|')], ['« Des mitaines ou des gants ? »', 'Mittens or gloves? Answer: mittens.', 'Des mitaines, s\'il vous plaît.', ['Des moitiés, merci.', 'Des mites, s\'il vous plaît.', 'Des minutes.']]]
+};
+
+/* ---------- the GAME CARD: one window for stands, culture stations, the arcade, the mall, concerts ---------- */
+var gcard = {el:null, resume:false};
+var GACT = {};
+(function(){
+  var el = document.createElement('div'); el.id = 'g-card'; el.className = 'card hidden';
+  var st = document.createElement('style');
+  st.textContent = '#g-card{position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); z-index:47; width:min(640px, 94vw); max-height:90vh; overflow:auto; padding:14px 16px; font-family:"VT323", monospace; font-size:20px; line-height:1.2;}' +
+    '#g-card.hidden{display:none;} #g-card h3{margin:0 0 6px; font-family:"Press Start 2P", monospace; font-size:12px; color:var(--accent); line-height:1.5;}' +
+    '#g-card .gc-sub{color:var(--ink-soft); font-size:17px; margin-bottom:8px;} #g-card .gc-big{font-size:26px; margin:6px 0;} #g-card .gc-emoji{font-size:46px; text-align:center;}' +
+    '#g-card .gc-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;} #g-card .gc-grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:8px;} #g-card .lf-opt{margin:0; height:100%;}' +
+    '#g-card .lf-opt.sel{outline:3px solid var(--accent);} #g-card .gc-row{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;} #g-card .gc-row .btn{margin:0;}' +
+    '#g-card .gc-in{font-family:inherit; font-size:24px; padding:6px 8px; width:100%; box-sizing:border-box; border:3px solid var(--panel-border); background:var(--panel); color:var(--ink);}' +
+    '#g-card .good{color:var(--good);} #g-card .bad{color:var(--accent-2);} #g-card .gc-text{font-size:19px; margin:6px 0;} #g-card .gc-score{float:right; font-family:"Press Start 2P", monospace; font-size:9px;}' +
+    '@media (max-width:520px){ #g-card .gc-grid, #g-card .gc-grid3{grid-template-columns:1fr;} }';
+  document.head.appendChild(st); document.body.appendChild(el); gcard.el = el;
+  el.addEventListener('click', function(ev){
+    var b = ev.target.closest('[data-g]'); if(!b || b.disabled) return;
+    var f = GACT[b.getAttribute('data-g')]; if(f) f(b.getAttribute('data-v'), b);
+  });
+  el.addEventListener('keydown', function(e){
+    e.stopPropagation();
+    if(e.key === 'Enter'){ var go = el.querySelector('[data-enter]'); if(go) go.click(); }
+    if(e.key === 'Escape') closeCard();
+  });
+  el.addEventListener('keyup', function(e){ e.stopPropagation(); });
+})();
+function showCard(html){
+  if(gcard.el.classList.contains('hidden')){ gcard.resume = flying && !touchPlay && !ride.on; if(flying) exitFirstPerson(); }
+  gcard.el.innerHTML = html; gcard.el.classList.remove('hidden');
+  var inp = gcard.el.querySelector('input'); if(inp) setTimeout(function(){ inp.focus(); }, 30);
+}
+function closeCard(){ gcard.el.classList.add('hidden'); gcard.cur = null; if(gcard.resume) requestFirstPerson('walk'); gcard.resume = false; }
+GACT.close = closeCard;
+function gBtn(act, v, label, cls, extra){ return '<button class="btn' + (cls ? ' ' + cls : '') + '" data-g="' + act + '"' + (v != null ? ' data-v="' + esc(String(v)) + '"' : '') + (extra || '') + '>' + esc(label) + '</button>'; }
+function gOpt(act, v, label, cls, dis){ return '<button class="lf-opt' + (cls ? ' ' + cls : '') + '" data-g="' + act + '" data-v="' + esc(String(v)) + '"' + (dis ? ' disabled' : '') + '>' + label + '</button>'; }
+/* rewards: 🪙 jetons (Paris) and 🎟 Carnaval tickets (Québec) - you need a character to keep them */
+function hasChar(){ return !!(life.eco && life.eco.ch); }
+function addJeton(n){
+  if(!hasChar()) return 0;
+  var e = life.eco, day = todayKey(); if(e.qd !== day){ e.qd = day; e.qn = 0; }
+  if((e.qn|0) >= 30) return 0;
+  n = Math.min(n, 30 - (e.qn|0)); e.qn = (e.qn|0) + n; e.tok = (e.tok|0) + n; lifeSave(); return n;
+}
+function addTix(n){ if(!hasChar()) return 0; life.eco.tix = (life.eco.tix|0) + n; lifeSave(); return n; }
+function myTix(){ return hasChar() ? life.eco.tix|0 : 0; }
+function noCharLine(){ return hasChar() ? '' : '<div class="gc-sub bad">' + L2('Create your character (LIFE → MY CHARACTER) to collect rewards!', 'Crée ton personnage (VIE → MON PERSONNAGE) pour gagner des récompenses !') + '</div>'; }
+
+/* ---------- LES CHAMPS-ÉLYSÉES and the GREAT MONUMENTS ----------
+   A new district north of the Seine (taxi from the Champ de Mars, or the 🔍 search): the wide avenue of the
+   Champs-Élysées with 28 shops, cafés and restaurants (walk up to a door and press E to shop there, in French, +🪙),
+   the place de la Concorde (the obelisk, two fountains and the big wheel), the Grand Palais, and behind the avenue
+   the Opéra Garnier, the Panthéon, les Invalides and the Centre Pompidou (hover for their story, E for a question). */
+var CE = {x0:-440, x1:340, z:-540};
+var CE_SHOPS = [
+  ['Le Grand Café des Champs', 'cafe', 0x7a4a2a], ['Pâtisserie Étoile', 'pastry', 0xd27aa0], ['Parfumerie Élysée', 'perfume', 0x8a6ab8], ['Cinéma des Champs', 'cinema', 0x1b1b1d],
+  ['Chocolaterie de l\'Avenue', 'chocolate', 0x5a3424], ['Librairie du Rond-Point', 'books', 0x2f5a3a], ['Grand Magasin de Mode', 'fashion', 0x1f3f8f], ['Brasserie Le Parisien', 'restaurant', 0x8a1c1c],
+  ['Boulangerie de l\'Avenue', 'bakery', 0xb8822e], ['Glacier Napoléon', 'icecream', 0x5aa0c8], ['Fromagerie des Champs', 'cheese', 0xe3b52c], ['Jouets de Paris', 'toys', 0xe07b2c],
+  ['Disquaire Mélodie', 'music', 0x3a3a6a], ['Galerie d\'Art Lumière', 'art', 0x6b6f78],
+  ['Bistrot de l\'Étoile', 'restaurant', 0x6b2a2a], ['Crêperie Bretonne', 'crepes', 0x2b6fb8], ['Salon de Thé Macaron', 'pastry', 0xc86a9a], ['Fleuriste Concorde', 'flowers', 0x4a8a3a],
+  ['Épicerie Fine', 'grocery', 0x5f7a3a], ['Souvenirs de Paris', 'souvenirs', 0xc8382f], ['Café Lumière', 'cafe', 0x4a3424], ['Sport Paris', 'sport', 0x1f6fb8],
+  ['Confiserie des Champs', 'candy', 0xe86aa0], ['Maison du Fromage', 'cheese', 0xb8a02e], ['Restaurant Le Lido d\'Or', 'restaurant', 0x8a6a1c], ['Boutique Haute Couture', 'fashion', 0x2a2a2a],
+  ['Boulangerie Concorde', 'bakery', 0xa86a2e], ['Le Café de l\'Opéra', 'cafe', 0x6a3a5a]
+];
+(function buildChamps(){
+  var Z = CE.z, B = new MeshBatch(), L = new Lot(B, 0, 0, 0);
+  PLAY_AREAS.push({x0:CE.x0, x1:CE.x1, z0:-694, z1:-490});
+  // the avenue: 8 lanes, wide pavements, two rows of trees
+  flat(780, 30, (CE.x0 + CE.x1)/2, Z, 0x3a3c42, 0.03);
+  for(var lx = CE.x0 + 10; lx < CE.x1 - 10; lx += 12){ [-7.5, 0, 7.5].forEach(function(o){ flat(5, 0.35, lx, Z + o, o ? 0xdddddd : 0xf2c230, 0.04); }); }
+  flat(780, 16, (CE.x0 + CE.x1)/2, Z - 23, 0xcfc6b2, 0.035); flat(780, 16, (CE.x0 + CE.x1)/2, Z + 23, 0xcfc6b2, 0.035);
+  flat(780, 10, (CE.x0 + CE.x1)/2, -605, 0x3a3c42, 0.03);   // rue du Faubourg, behind the shops
+  for(var tx = CE.x0 + 8; tx < 200; tx += 12){ [-18, 18].forEach(function(o){ var T = new Lot(B, tx, Z + o, 0); T.box(0.4, 3, 0.4, 0, 1.5, 0, 0x6b4a32); T.part(new THREE.BoxGeometry(2.6, 2.4, 2.6), 0, 4.2, 0, 0x4f8a3a); pushSegCollider(tx, Z + o, tx, Z + o, 0.3, -50, 3); }); }
+  // the shops: Haussmann buildings with coloured awnings and their names
+  CE_SHOPS.forEach(function(s, i){
+    var north = i < 14, k = north ? i : i - 14, x = CE.x0 + 30 + k*26, fz = north ? Z - 31 : Z + 31, cz = north ? fz - 11 : fz + 11, face = north ? 1 : -1;
+    L.box(24, 20, 22, x, 10, cz, 0xe8dcc0); L.box(25, 1.2, 23, x, 20.6, cz, 0x6f7a86);      // stone and a zinc roof
+    L.box(24, 3, 22.5, x, 22, cz, 0x6f7a86);
+    for(var fl = 0; fl < 3; fl++) for(var w = -2; w <= 2; w++) L.box(2, 2.4, 0.2, x + w*4.5, 8 + fl*4, fz + face*0.05, 0x3a4250);
+    L.box(22, 0.4, 2.4, x, 4.2, fz + face*1.2, s[2]);                                       // awning
+    L.box(4, 3.6, 0.2, x, 1.8, fz + face*0.06, 0x2a2018);                                    // door
+    addSolid(x - 12, x + 12, cz - 11, cz + 11, 'champs', -1, 24);
+    var c = document.createElement('canvas'); c.width = 512; c.height = 96; var k2 = c.getContext('2d');
+    k2.fillStyle = '#' + ('00000' + s[2].toString(16)).slice(-6); k2.fillRect(0, 0, 512, 96); k2.fillStyle = '#fff'; k2.font = 'bold 44px Georgia, serif'; k2.textAlign = 'center'; k2.textBaseline = 'middle'; k2.fillText(s[0], 256, 50, 490);
+    var sg = new THREE.Mesh(new THREE.PlaneGeometry(14, 2.6), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c)})); sg.position.set(x, 5.8, fz + face*0.15); if(!north) sg.rotation.y = Math.PI; root.add(sg);
+    var shop = fakeShop(s[0], s[1]);
+    addSpot({x:x, z:fz + face*2.5, r:4.5, label:function(){ return '🛍 ' + s[0] + ' - ' + L2('shop here (+🪙)', 'faire ses courses (+🪙)'); }, act:function(){ openChallenge('shop', shop, 'ce' + i); }});
+  });
+  // PLACE DE LA CONCORDE: the obelisk of Luxor, two fountains and the big wheel
+  var CX = 270;
+  flat(140, 120, CX, Z, 0xd8cfbc, 0.033);
+  L.box(4, 3, 4, CX, 1.5, Z, 0x8a8278);
+  var ob = new THREE.Mesh(new THREE.CylinderGeometry(0.9*1.41, 1.3*1.41, 21, 4), solidMat(0xc9a77a)); ob.rotation.y = Math.PI/4; ob.position.set(CX, 13.5, Z); root.add(ob);
+  var py = new THREE.Mesh(new THREE.ConeGeometry(0.9*1.41, 2.2, 4), solidMat(0xe3b52c)); py.rotation.y = Math.PI/4; py.position.set(CX, 25.1, Z); root.add(py);
+  pushSegCollider(CX, Z, CX, Z, 3, -50, 26);
+  [-30, 30].forEach(function(o){
+    L.cyl(9, 9.5, 1, CX, 0.5, Z + o, 0xd8d2c4, 24); var wtr = new THREE.Mesh(new THREE.CylinderGeometry(8.6, 8.6, 0.2, 24), waterMat); wtr.position.set(CX, 0.95, Z + o); root.add(wtr);
+    L.cyl(1, 1.6, 4, CX, 3, Z + o, 0x5f8a6a, 10); L.cyl(4, 2.4, 0.6, CX, 5.2, Z + o, 0x5f8a6a, 16);
+    var jet = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.5, 2.4, 8), waterMat); jet.position.set(CX, 6.6, Z + o); root.add(jet); water.push({jet:jet, base:6.6});
+    pushSegCollider(CX, Z + o, CX, Z + o, 9.3, -50, 1.5);
+  });
+  var wheel = new THREE.Group(); wheel.position.set(CX + 50, 30, Z);
+  var rim = new THREE.Mesh(new THREE.TorusGeometry(26, 0.5, 6, 48), solidMat(0xf2f2f2)); wheel.add(rim);
+  for(var sp = 0; sp < 16; sp++){ var a = sp/16*Math.PI*2, spoke = new THREE.Mesh(new THREE.BoxGeometry(0.25, 26, 0.25), solidMat(0xdcdcdc)); spoke.position.set(Math.cos(a)*13, Math.sin(a)*13, 0); spoke.rotation.z = a - Math.PI/2; wheel.add(spoke);
+    var cab = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.2, 2.2), solidMat([0xc8382f, 0x1f3f8f, 0xe3b52c, 0x4a8a3a][sp % 4])); cab.position.set(Math.cos(a)*26, Math.sin(a)*26 - 1.6, 0); cab.userData.a = a; wheel.add(cab); }
+  wheel.rotation.y = Math.PI/2; root.add(wheel); CE.wheel = wheel;
+  [-1, 1].forEach(function(sd){ var leg = new THREE.Mesh(new THREE.BoxGeometry(0.8, 34, 0.8), solidMat(0xbfbfbf)); leg.position.set(CX + 50, 15, Z + sd*8); leg.rotation.x = sd*0.25; root.add(leg); });
+  pushSegCollider(CX + 50, Z - 9, CX + 50, Z + 9, 2, -50, 6);
+  airSign('PLACE DE LA CONCORDE', CX - 40, 4, Z + 26, 0, 16, '#1f3f8f');
+  // GRAND PALAIS (south of the avenue): stone and a huge glass roof
+  var GX = 120, GZ = -500;
+  L.box(70, 14, 18, GX, 7, GZ + 1, 0xe8dcc0); addSolid(GX - 35, GX + 35, GZ - 8, GZ + 10, 'champs', -1, 30);
+  var nave = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, 66, 20, 1, true, 0, Math.PI), new THREE.MeshLambertMaterial({color:0x9fc8c0, transparent:true, opacity:0.6, side:THREE.DoubleSide}));
+  nave.rotation.z = Math.PI/2; nave.rotation.x = Math.PI; nave.position.set(GX, 14, GZ + 1); nave.rotation.y = 0; root.add(nave);
+  var dome = new THREE.Mesh(new THREE.SphereGeometry(8, 16, 10, 0, Math.PI*2, 0, Math.PI/2), new THREE.MeshLambertMaterial({color:0x9fc8c0, transparent:true, opacity:0.7})); dome.position.set(GX, 21, GZ + 1); root.add(dome);
+  airSign('GRAND PALAIS', GX, 10, GZ - 8.2, 0, 14, '#2f5a3a');
+  // behind the avenue: the great monuments, on the rue du Faubourg
+  // L'OPÉRA GARNIER
+  var OX = -300, OZ = -650;
+  L.box(50, 22, 30, OX, 11, OZ, 0xe0d2b0); L.box(52, 2, 32, OX, 23, OZ, 0xc9b88a);
+  for(var col = -4; col <= 4; col++) L.cyl(0.9, 0.9, 12, OX + col*5, 11, OZ + 15.5, 0xf0e6cc, 10);
+  var od = new THREE.Mesh(new THREE.SphereGeometry(10, 16, 10, 0, Math.PI*2, 0, Math.PI/2), solidMat(0x5f8a7a)); od.position.set(OX, 24, OZ - 4); root.add(od);
+  [-22, 22].forEach(function(o){ var st = new THREE.Mesh(new THREE.ConeGeometry(1.4, 4, 8), solidMat(0xe3b52c)); st.position.set(OX + o, 26, OZ + 12); root.add(st); });
+  addSolid(OX - 25, OX + 25, OZ - 15, OZ + 16.5, 'champs', -1, 34);
+  // LE PANTHÉON
+  var PX = -120, PZ = -655;
+  L.box(40, 18, 40, PX, 9, PZ, 0xe8dcc0); for(var c2 = -3; c2 <= 3; c2++) L.cyl(1, 1, 16, PX + c2*5, 8, PZ + 22, 0xf0e6cc, 10);
+  var ped = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 18, 5, 3), solidMat(0xe8dcc0)); ped.rotation.y = Math.PI/2; ped.scale.set(1, 1, 0.3); ped.position.set(PX, 18.5, PZ + 22); root.add(ped);
+  L.cyl(9, 9, 12, PX, 24, PZ, 0xe8dcc0, 20); for(var cc = 0; cc < 16; cc++){ var aa = cc/16*Math.PI*2; L.cyl(0.5, 0.5, 10, PX + Math.cos(aa)*10, 24, PZ + Math.sin(aa)*10, 0xf0e6cc, 8); }
+  var pd = new THREE.Mesh(new THREE.SphereGeometry(9, 16, 10, 0, Math.PI*2, 0, Math.PI/2), solidMat(0xd8d2c4)); pd.position.set(PX, 30, PZ); root.add(pd);
+  L.cyl(1.4, 1.4, 5, PX, 41, PZ, 0xd8d2c4, 10);
+  addSolid(PX - 20, PX + 20, PZ - 20, PZ + 23, 'champs', -1, 45);
+  // LES INVALIDES: the golden dome
+  var IX = 70, IZ = -655;
+  L.box(46, 16, 34, IX, 8, IZ, 0xe0d4b8); L.cyl(11, 11, 14, IX, 23, IZ, 0xe0d4b8, 20);
+  for(var c3 = 0; c3 < 20; c3++){ var a3 = c3/20*Math.PI*2; L.cyl(0.5, 0.5, 12, IX + Math.cos(a3)*11.6, 23, IZ + Math.sin(a3)*11.6, 0xf0e6cc, 8); }
+  var gd = new THREE.Mesh(new THREE.SphereGeometry(11, 18, 12, 0, Math.PI*2, 0, Math.PI/2), solidMat(0xd9a92e)); gd.scale.y = 1.35; gd.position.set(IX, 30, IZ); root.add(gd);
+  var lan = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 2.4, 6, 10), solidMat(0xd9a92e)); lan.position.set(IX, 47, IZ); root.add(lan);
+  var spire = new THREE.Mesh(new THREE.ConeGeometry(1, 8, 8), solidMat(0xe3b52c)); spire.position.set(IX, 54, IZ); root.add(spire);
+  addSolid(IX - 23, IX + 23, IZ - 17, IZ + 17, 'champs', -1, 58);
+  // LE CENTRE POMPIDOU: the building with its pipes on the outside
+  var MX = 230, MZ = -650;
+  L.box(60, 26, 28, MX, 13, MZ, 0xd8dde3);
+  for(var g = -27; g <= 27; g += 6){ L.box(0.5, 26, 0.5, MX + g, 13, MZ + 14.5, 0xf2f2f2); }
+  for(var y2 = 4; y2 <= 24; y2 += 5) L.box(60, 0.5, 0.5, MX, y2, MZ + 14.5, 0xf2f2f2);
+  [[0x1f6fb8, -24], [0x2f9a4a, -16], [0xe3b52c, 18], [0xc8382f, 25]].forEach(function(p){ L.cyl(1.2, 1.2, 26, MX + p[1], 13, MZ + 16.2, p[0], 10); });
+  var esc2 = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 64, 10), new THREE.MeshLambertMaterial({color:0xc8e0f0, transparent:true, opacity:0.6})); esc2.rotation.z = Math.atan2(56, 22); esc2.position.set(MX, 14, MZ + 18); root.add(esc2);
+  addSolid(MX - 30, MX + 30, MZ - 14, MZ + 17, 'champs', -1, 30);
+  B.build();
+  airSign('AVENUE DES CHAMPS-ÉLYSÉES', CE.x0 + 14, 5, Z - 16, 0, 16, '#1f3f8f');
+  airSign('AVENUE DES CHAMPS-ÉLYSÉES', 200, 5, Z + 16, Math.PI, 16, '#1f3f8f');
+})();
+// the monuments join the hover guide (story in French and English) and the monument questions
+LANDMARK_INFO.push(
+  {id:'concorde', x:270, y:12, z:-540, r:14, fr:'La place de la Concorde', en:'Place de la Concorde', go:{x:255, z:-520, yaw:-0.8},
+   tfr:'C\'est la plus grande place de Paris. Au centre se dresse l\'obélisque de Louxor, vieux de plus de 3 000 ans, offert par l\'Égypte à la France en 1830. Pendant la Révolution française, la place s\'appelait « place de la Révolution ». La grande roue y revient souvent pour les fêtes.',
+   ten:'It is the biggest square in Paris. In the middle stands the Luxor Obelisk, more than 3,000 years old, a gift from Egypt to France in 1830. During the French Revolution it was called the "Place de la Révolution". A big Ferris wheel often comes back here for the holidays.'},
+  {id:'grandpalais', x:120, y:12, z:-500, r:36, fr:'Le Grand Palais', en:'The Grand Palais', go:{x:120, z:-516, yaw:Math.PI},
+   tfr:'Le Grand Palais a été construit pour l\'Exposition universelle de 1900. Sa verrière géante est la plus grande d\'Europe. On y organise des expositions d\'art, des défilés de mode et même des compétitions sportives : les épreuves d\'escrime des Jeux olympiques de Paris 2024 s\'y sont déroulées.',
+   ten:'The Grand Palais was built for the 1900 World\'s Fair. Its giant glass roof is the largest in Europe. It hosts art shows, fashion shows and even sports: the fencing events of the Paris 2024 Olympic Games took place here.'},
+  {id:'opera', x:-300, y:14, z:-650, r:26, fr:'L\'Opéra Garnier', en:'The Opéra Garnier', go:{x:-300, z:-625, yaw:0},
+   tfr:'L\'Opéra Garnier a été construit par l\'architecte Charles Garnier et inauguré en 1875. On y voit des ballets et des opéras. Son plafond a été peint par Marc Chagall, et son grand lustre pèse environ huit tonnes. C\'est ce bâtiment qui a inspiré l\'histoire du « Fantôme de l\'Opéra ».',
+   ten:'The Opéra Garnier was designed by the architect Charles Garnier and opened in 1875. Ballets and operas are performed there. Its ceiling was painted by Marc Chagall, and its great chandelier weighs about eight tonnes. This building inspired the story of "The Phantom of the Opera".'},
+  {id:'pantheon', x:-120, y:20, z:-655, r:22, fr:'Le Panthéon', en:'The Panthéon', go:{x:-120, z:-625, yaw:0},
+   tfr:'Le Panthéon est un monument où reposent de grands personnages de l\'histoire de France, comme Victor Hugo, Marie Curie, Voltaire et Joséphine Baker. Sur sa façade, on lit : « Aux grands hommes, la patrie reconnaissante ». En 1851, Léon Foucault y a montré que la Terre tourne avec son pendule.',
+   ten:'The Panthéon is a monument where great people of French history are buried, such as Victor Hugo, Marie Curie, Voltaire and Joséphine Baker. On its front you can read: "To the great men, the grateful homeland". In 1851, Léon Foucault used his pendulum here to show that the Earth turns.'},
+  {id:'invalides', x:70, y:25, z:-655, r:24, fr:'Les Invalides', en:'Les Invalides', go:{x:70, z:-630, yaw:0},
+   tfr:'Louis XIV a fait construire les Invalides en 1670 pour soigner les soldats blessés. Sous le dôme doré, recouvert de feuilles d\'or, se trouve le tombeau de Napoléon. On y visite aussi le musée de l\'Armée.',
+   ten:'Louis XIV had Les Invalides built in 1670 to care for wounded soldiers. Under the golden dome, covered in gold leaf, is the tomb of Napoleon. The Army Museum is also there.'},
+  {id:'pompidou', x:230, y:14, z:-650, r:32, fr:'Le Centre Pompidou', en:'The Centre Pompidou', go:{x:230, z:-622, yaw:0},
+   tfr:'Le Centre Pompidou a ouvert en 1977. C\'est un musée d\'art moderne très original : ses tuyaux sont à l\'extérieur et ils ont des couleurs ! Bleu pour l\'air, vert pour l\'eau, jaune pour l\'électricité et rouge pour les escaliers mécaniques et les ascenseurs.',
+   ten:'The Centre Pompidou opened in 1977. It is a very unusual modern art museum: its pipes are on the outside and they are colour-coded! Blue for air, green for water, yellow for electricity and red for the escalators and lifts.'},
+  {id:'champs', x:-80, y:5, z:-540, r:20, fr:'L\'avenue des Champs-Élysées', en:'The Champs-Élysées', go:{x:-80, z:-520, yaw:-Math.PI/2},
+   tfr:'On l\'appelle « la plus belle avenue du monde ». Elle mesure presque 2 km et va de l\'Arc de Triomphe à la place de la Concorde. Chaque année, le défilé du 14 Juillet y passe et le Tour de France s\'y termine.',
+   ten:'It is called "the most beautiful avenue in the world". It is almost 2 km long and goes from the Arc de Triomphe to the Place de la Concorde. Every year the Bastille Day parade on 14 July goes down it, and the Tour de France finishes there.'}
+);
+LANDMARK_BOXES.concorde = [[267, 0, -543, 273, 27, -537], [295, 0, -570, 345, 58, -510]];
+LANDMARK_BOXES.grandpalais = [[85, 0, -508, 155, 30, -490]];
+LANDMARK_BOXES.opera = [[-325, 0, -665, -275, 34, -634]];
+LANDMARK_BOXES.pantheon = [[-140, 0, -675, -100, 45, -632]];
+LANDMARK_BOXES.invalides = [[47, 0, -672, 93, 58, -638]];
+LANDMARK_BOXES.pompidou = [[200, 0, -664, 260, 28, -632]];
+MONUMENT_Q.concorde = [['L\'obélisque de la Concorde vient de quel pays ?', 'l\'Égypte', ['l\'Italie', 'le Japon', 'le Canada']], ['La place de la Concorde est la plus ... place de Paris.', 'grande', ['petite', 'vieille', 'froide']]];
+MONUMENT_Q.grandpalais = [['Le Grand Palais a été construit pour l\'Exposition universelle de...', '1900', ['1789', '1950', '2000']], ['Le toit du Grand Palais est fait de...', 'verre', ['paille', 'chocolat', 'bois']]];
+MONUMENT_Q.opera = [['Que voit-on à l\'Opéra Garnier ?', 'des ballets et des opéras', ['des matchs de foot', 'des courses de chevaux', 'des avions']], ['Quel peintre a peint le plafond de l\'Opéra ?', 'Marc Chagall', ['Claude Monet', 'Pablo Picasso', 'Gustave Eiffel']]];
+MONUMENT_Q.pantheon = [['Qui repose au Panthéon ?', 'Marie Curie', ['Astérix', 'le Petit Prince', 'Napoléon']], ['Quel scientifique a montré au Panthéon que la Terre tourne ?', 'Léon Foucault', ['Isaac Newton', 'Victor Hugo', 'Louis Pasteur']]];
+MONUMENT_Q.invalides = [['Le tombeau de qui se trouve sous le dôme des Invalides ?', 'Napoléon', ['Louis XIV', 'Victor Hugo', 'Marie Curie']], ['De quelle couleur est le dôme des Invalides ?', 'doré', ['vert', 'rose', 'noir']]];
+MONUMENT_Q.pompidou = [['Au Centre Pompidou, les tuyaux sont...', 'à l\'extérieur', ['sous la terre', 'en chocolat', 'invisibles']], ['Le Centre Pompidou est un musée d\'art...', 'moderne', ['préhistorique', 'égyptien', 'romain']]];
+MONUMENT_Q.champs = [['Quelle course cycliste se termine sur les Champs-Élysées ?', 'le Tour de France', ['le Giro', 'le marathon de Paris', 'les 24 Heures du Mans']], ['On appelle les Champs-Élysées « la plus belle ... du monde ».', 'avenue', ['montagne', 'plage', 'forêt']]];
+// a taxi there from the Champ de Mars, and one back
+TAXIS.push({x:-72, z:-46, to:{x:-420, z:-520, yaw:-Math.PI/2}, en:'TAXI TO THE CHAMPS-ÉLYSÉES', fr:'TAXI POUR LES CHAMPS-ÉLYSÉES'});
+TAXIS.push({x:-425, z:-512, to:{x:-62, z:-42, yaw:0}, en:'TAXI TO THE EIFFEL TOWER', fr:'TAXI POUR LA TOUR EIFFEL'});
+
+/* ---------- QUÉBEC: LE CARNAVAL ----------
+   A winter map far from Paris (fly there from the airport, or 🔍 search): Québec City during the Carnaval.
+   - the PALAIS DE GLACE (ice palace), GIVRE the snow-owl host (our own character) and the "Qui est Bonhomme Carnaval ?"
+     kiosk (credit: Carnaval de Québec, carnaval.qc.ca);
+   - the Grande Allée with food stands: buy poutine, maple taffy, hot chocolate... with 🎟 Carnaval tickets, ordering in
+     French; the maple taffy on snow and the maple milkshake are little make-it-yourself games;
+   - CULTURE STATIONS about French-Canadian culture: read, answer a question, earn 🎟 tickets;
+   - ACTIVITIES: sledding down the ice slide, skiing (chairlift up, slalom down), a dogsled ride, a snowmobile you drive,
+     and skating on the rink (you glide!);
+   - every day of the week a different EVENT in a different part of the Carnaval (the board shows the week);
+   - the vacation-home field, where every student can design their own ice palace. */
+var QC = {x:-2600, z:-2600};
+function qx(x){ return QC.x + x; } function qz(z){ return QC.z + z; }
+var QC_EVENTS = [
+  {d:0, en:'Family day: everyone on the ice slides', fr:'Journée des familles : tout le monde aux glissades', at:[70, -20], icon:'🛷'},
+  {d:1, en:'Snow sculpture contest', fr:'Concours de sculptures sur neige', at:[-105, 10], icon:'❄'},
+  {d:2, en:'Dogsled race', fr:'Course de traîneaux à chiens', at:[-200, 60], icon:'🐕'},
+  {d:3, en:'Snow bath (bain de neige)', fr:'Bain de neige', at:[-110, 125], icon:'🩱'},
+  {d:4, en:'Ice canoe race on the St. Lawrence', fr:'Course en canot sur glace sur le Saint-Laurent', at:[60, -250], icon:'🛶'},
+  {d:5, en:'Night parade on the Grande Allée', fr:'Défilé de nuit sur la Grande Allée', at:[0, 90], icon:'🎉'},
+  {d:6, en:'Fireworks over the Ice Palace', fr:'Feux d\'artifice au Palais de glace', at:[0, -130], icon:'🎆'}
+];
+function qcToday(){ return QC_EVENTS[new Date().getDay()]; }
+var QC_STANDS = [
+  {nm:'La Cabane à Sucre', z:175, side:-1, col:0x8a4a2a, menu:[['tire', 'de la tire d\'érable sur la neige', 'maple taffy on snow', '🍁', 2], ['sucre', 'du sucre à la crème', 'some sucre à la crème (fudge)', '🍬', 2], ['pouding', 'un pouding chômeur', 'a pouding chômeur', '🍮', 3]]},
+  {nm:'Chez Poutine', z:175, side:1, col:0xc8382f, menu:[['poutine', 'une poutine', 'a poutine', '🍟', 4], ['frites', 'des frites', 'some fries', '🍟', 2], ['hotdog', 'un hot-dog steamé', 'a steamed hot dog', '🌭', 3]]},
+  {nm:'Chocolat Chaud du Carnaval', z:140, side:-1, col:0x5a3424, menu:[['choco', 'un chocolat chaud', 'a hot chocolate', '☕', 2], ['cidre', 'un cidre de pomme chaud', 'a hot apple cider', '🍎', 2], ['shake', 'un lait frappé à l\'érable', 'a maple milkshake', '🥤', 3]]},
+  {nm:'Pâtisseries d\'Hiver', z:140, side:1, col:0xb8822e, menu:[['pate', 'une pâte frite à la cannelle', 'a fried cinnamon pastry', '🥐', 3], ['beigne', 'un beigne à l\'érable', 'a maple doughnut', '🍩', 2], ['crepe', 'une crêpe au sirop d\'érable', 'a crêpe with maple syrup', '🥞', 3]]},
+  {nm:'Cuisine de Grand-Maman', z:105, side:-1, col:0x4a6a3a, menu:[['tourtiere', 'une tourtière', 'a tourtière (meat pie)', '🥧', 4], ['soupe', 'une soupe aux pois', 'a pea soup', '🍲', 3], ['feves', 'des fèves au lard', 'some baked beans', '🫘', 3]]},
+  {nm:'Boutique du Carnaval', z:105, side:1, col:0x1f3f8f, shop:'qsouv'}
+];
+/* ---- the map ---- */
+(function buildQuebec(){
+  var B = new MeshBatch(), L = new Lot(B, QC.x, QC.z, 0);
+  PLAY_AREAS.push({x0:qx(-300), x1:qx(380), z0:qz(-215), z1:qz(230)});
+  var snow = solidMat(0xf4f7fb);
+  var gnd = new THREE.Mesh(new THREE.PlaneGeometry(2600, 2600), snow); gnd.rotation.x = -Math.PI/2; gnd.position.set(QC.x, 0, QC.z); root.add(gnd);
+  // the frozen St. Lawrence to the north, Old Québec's château on its cliff, mountains far away
+  flat(900, 70, qx(40), qz(-252), 0xc9dbe6, 0.02);
+  for(var fl = 0; fl < 40; fl++){ var fx = -380 + (fl*97 % 840), fz = -280 + (fl*37 % 55); L.box(4 + fl % 5, 0.6, 3 + fl % 4, fx, 0.3, fz, 0xe8f2f8); }
+  airSign('FLEUVE SAINT-LAURENT', qx(-120), 0.05, qz(-240), 0, 40, '#5a7a90').rotation.x = -Math.PI/2;
+  var CH = new Lot(B, qx(-230), qz(-200), 0);
+  CH.box(50, 24, 20, 0, 12, 0, 0x8a4a3a); CH.box(14, 44, 14, 0, 22, 0, 0x8a4a3a);
+  CH.part(new THREE.ConeGeometry(11, 18, 4), 0, 53, 0, 0x5f9a7a, 0, Math.PI/4);
+  [-20, 20].forEach(function(o){ CH.box(9, 30, 9, o, 15, 0, 0x8a4a3a); CH.part(new THREE.ConeGeometry(7, 12, 4), o, 36, 0, 0x5f9a7a, 0, Math.PI/4); });
+  for(var w = -22; w <= 22; w += 4) for(var f2 = 0; f2 < 4; f2++) CH.box(1.6, 2, 0.2, w, 5 + f2*5, 10.1, 0xf2d89a);
+  airSign('CHÂTEAU (VIEUX-QUÉBEC)', qx(-230), 3, qz(-189), 0, 18, '#5a2a1a');
+  for(var m = 0; m < 12; m++){ var ma = m/12*Math.PI*2, md = 900 + (m % 3)*150, P = new Lot(B, QC.x + Math.cos(ma)*md, QC.z + Math.sin(ma)*md, 0), ph = 180 + (m*53 % 140);
+    P.part(new THREE.ConeGeometry(260, ph, 7), 0, ph/2, 0, 0x7f8a96); P.part(new THREE.ConeGeometry(80, ph*0.32, 7), 0, ph*0.85, 0, 0xffffff); }
+  // pine trees all around
+  for(var t = 0; t < 150; t++){
+    var tx = -300 + (t*173 % 680), tz = -210 + (t*89 % 440);
+    if(Math.abs(tx) < 34 || (tz > 140 && tx > -60 && tx < 180) || (tz > 180 && tx < 40 && tx > -130) || (tx < -110 && tx > -230 && tz > 105 && tz < 150) || (tx > 170 && tx < 370 && tz > -110 && tz < 95) || (tx > 40 && tx < 160 && tz > -80 && tz < 110) || (tx > -270 && tx < -130 && tz > 5 && tz < 115) || (tx > 135 && tz < -110) || (tx < -150 && tz < -170) || (tz > 150 && tx < -150)) continue;
+    var T = new Lot(B, qx(tx), qz(tz), 0);
+    T.box(0.5, 2, 0.5, 0, 1, 0, 0x6b4a32); T.part(new THREE.ConeGeometry(2.4, 5, 8), 0, 4, 0, 0x2f5a3a); T.part(new THREE.ConeGeometry(1.7, 3.4, 8), 0, 6.6, 0, 0x3a6a46); T.part(new THREE.ConeGeometry(1, 1.4, 8), 0, 8.2, 0, 0xffffff);
+    pushSegCollider(qx(tx), qz(tz), qx(tx), qz(tz), 0.6, -50, 6);
+  }
+  // the Grande Allée, from the little airport up to the palace, with lamps and banners
+  flat(14, 300, qx(0), qz(65), 0xdfe6ee, 0.03);
+  for(var lz = -80; lz <= 210; lz += 20) [-9, 9].forEach(function(o){ L.box(0.25, 5, 0.25, o, 2.5, lz, 0x2a2d36); L.box(0.8, 0.8, 0.8, o, 5.2, lz, 0xffe8a0); L.box(0.1, 2.2, 1.4, o + Math.sign(o)*0.2, 3.6, lz, lz % 40 ? 0xc8382f : 0x1f3f8f); });
+  airSign('GRANDE ALLÉE · CARNAVAL DE QUÉBEC', qx(0), 9, qz(212), Math.PI, 22, '#c8382f');
+  [-9, 9].forEach(function(o){ L.box(0.8, 9, 0.8, o, 4.5, 212, 0xf4f7fb); });
+  // ---- LE PALAIS DE GLACE ----
+  var ice = new THREE.MeshLambertMaterial({color:0xbfe6ff, transparent:true, opacity:0.82, emissive:0x2a5a8a, emissiveIntensity:0.35});
+  var PG = new THREE.Group(); PG.position.set(qx(0), 0, qz(-130)); root.add(PG);
+  function ib(w, h, d, x, y, z){ var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), ice); m.position.set(x, y, z); PG.add(m); return m; }
+  function it(r, h, x, z){ var c = new THREE.Mesh(new THREE.CylinderGeometry(r, r*1.1, h, 12), ice); c.position.set(x, h/2, z); PG.add(c); var cn = new THREE.Mesh(new THREE.ConeGeometry(r*1.3, r*2.2, 12), ice); cn.position.set(x, h + r*1.1, z); PG.add(cn); }
+  ib(50, 12, 26, 0, 6, 0);                                     // main hall
+  for(var cr = -24; cr <= 24; cr += 3){ ib(1.6, 1.6, 1.6, cr, 12.8, 13); ib(1.6, 1.6, 1.6, cr, 12.8, -13); }
+  [[-25, -13], [25, -13], [-25, 13], [25, 13]].forEach(function(p){ it(4, 20, p[0], p[1]); });
+  it(6, 30, 0, -4);
+  var arch = ib(10, 9, 2, 0, 4.5, 13.5); arch.material = new THREE.MeshLambertMaterial({color:0x6aa8d8, transparent:true, opacity:0.5});
+  addSolid(qx(-29), qx(29), qz(-147), qz(-113), 'quebec', -1, 40);
+  var glow = new THREE.PointLight(0x8fd0ff, 1.2, 90); glow.position.set(qx(0), 18, qz(-110)); root.add(glow);
+  airSign('PALAIS DE GLACE', qx(0), 15, qz(-116.2), 0, 18, '#2a6fa8');
+  // ---- GIVRE, our snow-owl host ----
+  var G = new THREE.Group(); G.position.set(qx(-12), 0, qz(-96));
+  var white = solidMat(0xf6f8fb);
+  var body = new THREE.Mesh(new THREE.SphereGeometry(1.5, 16, 12), white); body.scale.set(1, 1.25, 1); body.position.y = 1.9; G.add(body);
+  var head = new THREE.Mesh(new THREE.SphereGeometry(1.1, 16, 12), white); head.position.y = 4; G.add(head);
+  [-0.45, 0.45].forEach(function(o){ var e = new THREE.Mesh(new THREE.SphereGeometry(0.36, 12, 10), solidMat(0xffd23f)); e.position.set(o, 4.15, 0.88); G.add(e); var pu = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 8), solidMat(0x1b1b1d)); pu.position.set(o, 4.15, 1.18); G.add(pu);
+    var ear = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.7, 6), white); ear.position.set(o*1.3, 5, 0); G.add(ear);
+    var wing = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 8), solidMat(0xdfe6ee)); wing.scale.set(0.5, 1.4, 0.9); wing.position.set(o*3.2, 2.1, 0); G.add(wing); });
+  var beak = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.5, 6), solidMat(0xe07b2c)); beak.rotation.x = Math.PI/2; beak.position.set(0, 3.8, 1.15); G.add(beak);
+  var scarf = new THREE.Mesh(new THREE.TorusGeometry(1.05, 0.28, 8, 20), solidMat(0x1f6fb8)); scarf.rotation.x = Math.PI/2; scarf.position.y = 3.15; G.add(scarf);
+  var tail2 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.2, 0.18), solidMat(0xc8382f)); tail2.position.set(0.7, 2.5, 1.2); tail2.rotation.z = 0.2; G.add(tail2);
+  [-0.5, 0.5].forEach(function(o){ var ft = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.7), solidMat(0xe07b2c)); ft.position.set(o, 0.1, 0.2); G.add(ft); });
+  root.add(G); QC.givre = G;
+  pushSegCollider(qx(-12), qz(-96), qx(-12), qz(-96), 1.8, -50, 5);
+  airSign('GIVRE', qx(-12), 6.4, qz(-96), 0, 3, '#1f6fb8');
+  // the Bonhomme kiosk (words only - credit to the Carnaval de Québec)
+  L.box(5, 3, 0.4, 12, 2.2, -96, 0x8a5a32); L.box(0.3, 3.6, 0.3, 10, 1.8, -96, 0x5a3a22); L.box(0.3, 3.6, 0.3, 14, 1.8, -96, 0x5a3a22);
+  airSign('QUI EST BONHOMME ?', qx(12), 2.6, qz(-95.75), 0, 4.6, '#c8382f');
+  // ---- the events board ----
+  var ev = document.createElement('canvas'); ev.width = 1024; ev.height = 640; var ek = ev.getContext('2d');
+  ek.fillStyle = '#12304f'; ek.fillRect(0, 0, 1024, 640); ek.fillStyle = '#ffd23f'; ek.font = 'bold 50px sans-serif'; ek.fillText('PROGRAMME DU CARNAVAL', 40, 70);
+  var today = new Date().getDay();
+  QC_EVENTS.slice(1).concat([QC_EVENTS[0]]).forEach(function(e, i){
+    ek.fillStyle = e.d === today ? '#ffd23f' : '#e8ecf2'; ek.font = (e.d === today ? 'bold ' : '') + '34px sans-serif';
+    ek.fillText((e.d === today ? '★ ' : '') + FR_DAYS[e.d].toUpperCase() + ' : ' + e.fr, 40, 140 + i*68, 950);
+  });
+  [[-14, 196], [16, -78]].forEach(function(p, i){
+    var bm = new THREE.Mesh(new THREE.PlaneGeometry(8, 5), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(ev), side:THREE.DoubleSide})); bm.position.set(qx(p[0]), 4, qz(p[1])); bm.rotation.y = i ? Math.PI : Math.PI; root.add(bm);
+    L.box(0.3, 3, 0.3, p[0] - 3.5, 1.5, p[1], 0x5a3a22); L.box(0.3, 3, 0.3, p[0] + 3.5, 1.5, p[1], 0x5a3a22);
+  });
+  // today's event: a big gold star floating over its part of the Carnaval
+  var te = qcToday(), star = new THREE.Mesh(new THREE.OctahedronGeometry(3, 0), new THREE.MeshBasicMaterial({color:0xffd23f})); star.position.set(qx(te.at[0]), 30, qz(te.at[1])); root.add(star); QC.star = star;
+  airSign('★ AUJOURD\'HUI : ' + te.fr.toUpperCase(), qx(te.at[0]), 25, qz(te.at[1]), 0, 30, '#b8822e');
+  // ---- food stands ----
+  QC_STANDS.forEach(function(s, i){
+    var x = s.side*17, z = s.z, S = new Lot(B, qx(x), qz(z), s.side > 0 ? -Math.PI/2 : Math.PI/2);
+    S.box(8, 3, 5, 0, 1.5, 0, 0x8a5a32); S.box(9, 0.3, 6, 0, 4.2, 0, s.col); S.box(8.4, 0.9, 0.2, 0, 3.3, 3, s.col);
+    S.box(8, 1.1, 1, 0, 1.4, 3, 0xd9c0a0); for(var p = -4; p <= 4; p += 8) S.box(0.3, 4, 0.3, p, 2, 3, 0x5a3a22);
+    S.part(new THREE.ConeGeometry(5.4, 1.8, 4), 0, 5.2, 0, 0xffffff, 0, Math.PI/4);
+    addSolid(qx(x) - 4, qx(x) + 4, qz(z) - 4, qz(z) + 4, 'quebec', -1, 5);
+    airSign(s.nm, qx(x) - s.side*3.25, 3.4, qz(z), s.side > 0 ? -Math.PI/2 : Math.PI/2, 7, '#' + ('00000' + s.col.toString(16)).slice(-6));
+    addSpot({x:qx(x - s.side*5.5), z:qz(z), r:4, label:function(){ return '🍽 ' + s.nm + ' - ' + (s.shop ? L2('shop here (+🪙)', 'faire ses courses (+🪙)') : L2('buy with 🎟 tickets', 'acheter avec des 🎟 billets')); },
+      act:function(){ if(s.shop) openChallenge('shop', fakeShop(s.nm, s.shop, '$'), 'qs' + i); else openStand(s); }});
+  });
+  B.build();
+})();
+
+/* ---- getting there: Québec's little airport (Paris-CDG flights go there now) ---- */
+(function(){
+  var a = {id:'quebec', x:qx(-40), z:qz(210), en:'Québec City - the Carnaval', fr:'Québec - le Carnaval', spot:{x:qx(-30), z:qz(200), yaw:-0.25}};
+  bx(3, 1.1, 1.2, a.x, 0.55, a.z, 0xdfe3ea, true); bx(0.15, 3, 0.15, a.x, 1.5, a.z - 0.4, 0x2a2d36);
+  airSign('✈ AÉROPORT JEAN-LESAGE', a.x, 3.4, a.z - 0.45, 0, 5);
+  flat(140, 10, a.x + 40, a.z - 8, 0x9aa3ad, 0.03);
+  a.plane = makePlane(1); a.plane.position.set(a.x + 2, 1.6, a.z - 8); a.rest = {x:a.x + 2, y:1.6, z:a.z - 8, ry:0};
+  AIRPORTS.push(a);
+})();
+/* ---- the activity sites ---- */
+var QC_SLIDE = [[70, 15.6, -58], [70, 11, -36], [70, 6, -14], [70, 2.4, 6], [70, 1.6, 22], [70, 1.6, 42]];
+var QC_SKI_UP = [[160, 1.7, -112], [160, 43.5, -204]];
+function skiY(z){ return Math.max(0, (-120 - z)/85*40) + 1.7; }
+var QC_SKI_DOWN = [[200, -200], [262, -188], [212, -170], [270, -152], [222, -136], [250, -122], [250, -104]].map(function(p){ return [p[0], skiY(p[1]), p[1]]; });
+function qcEllipse(cx, cz, rx, rz, n, y){ var p = []; for(var i=0;i<=n;i++){ var a = i/n*Math.PI*2; p.push([cx + Math.cos(a)*rx, y || 1.7, cz + Math.sin(a)*rz]); } return p; }
+var QC_DOG = qcEllipse(-200, 60, 60, 45, 64);
+(function buildActivities(){
+  var B = new MeshBatch(), L = new Lot(B, QC.x, QC.z, 0), iceM = 0xcfe8f8;
+  // LES GLISSADES: a tower with stairs and a long icy chute
+  L.box(8, 14, 8, 70, 7, -62, 0x8a6a4a); L.box(9, 0.6, 9, 70, 14.3, -62, 0x6b4a32);
+  for(var st = 0; st < 14; st++) L.box(3, 0.4, 1, 64.5, st + 0.4, -66 + st*0.55, 0x6b4a32);
+  for(var i=0;i<QC_SLIDE.length - 1;i++){
+    var a = QC_SLIDE[i], b = QC_SLIDE[i+1], len = Math.hypot(b[1] - a[1], b[2] - a[2]), ang = Math.atan2(a[1] - b[1], b[2] - a[2]);
+    var seg = new Lot(B, qx((a[0] + b[0])/2), qz((a[2] + b[2])/2), 0);
+    seg.box(4, 0.3, len + 0.4, 0, (a[1] + b[1])/2 - 1.4, 0, iceM, ang); seg.box(0.3, 0.9, len, -2, (a[1] + b[1])/2 - 1, 0, 0xc8382f, ang); seg.box(0.3, 0.9, len, 2, (a[1] + b[1])/2 - 1, 0, 0xc8382f, ang);
+  }
+  addSolid(qx(66), qx(74), qz(-66), qz(-58), 'quebec', -1, 15);
+  airSign('GLISSADES', qx(70), 17, qz(-57.6), 0, 8, '#c8382f');
+  // LE SKI: a slope, a chairlift and slalom flags
+  var hill = new Lot(B, qx(225), qz(-162.5), 0); hill.box(150, 3, 94, 0, 19.5, 0, 0xf4f7fb, Math.atan2(40, 85));
+  hill.box(150, 40, 6, 0, 20, -45, 0xe4ebf2);
+  addSolid(qx(150), qx(300), qz(-205), qz(-122), 'quebec', -1, 42);
+  for(var pz = -115; pz >= -205; pz -= 18){ var py = Math.max(0, (-120 - pz)/85*40); L.box(0.5, 10, 0.5, 160, py + 5, pz, 0x6b6f78); L.box(4, 0.4, 0.4, 160, py + 10, pz, 0x6b6f78); }
+  QC_SKI_DOWN.forEach(function(p, k){ if(k && k < QC_SKI_DOWN.length - 2){ var c2 = k % 2 ? 0xc8382f : 0x1f6fb8; L.box(0.2, 1.8, 0.2, p[0] - 3, p[1] + 0.2, p[2], c2); L.box(0.2, 1.8, 0.2, p[0] + 3, p[1] + 0.2, p[2], c2); } });
+  airSign('SKI · TÉLÉSIÈGE', qx(160), 4, qz(-106), 0, 8, '#1f6fb8');
+  // LE TRAÎNEAU À CHIENS: a packed-snow track
+  for(var d=0; d<QC_DOG.length - 1; d++){ var p1 = QC_DOG[d], p2 = QC_DOG[d+1], mx = (p1[0] + p2[0])/2, mz = (p1[2] + p2[2])/2, sl = Math.hypot(p2[0] - p1[0], p2[2] - p1[2]);
+    var tr = new Lot(B, qx(mx), qz(mz), Math.atan2(p2[0] - p1[0], p2[2] - p1[2])); tr.box(6, 0.05, sl + 0.6, 0, 0.03, 0, 0xdcd5c8); }
+  airSign('TRAÎNEAU À CHIENS', qx(-138), 3.5, qz(60), Math.PI/2, 9, '#5a3a22');
+  // LA PATINOIRE: an oval rink with boards
+  var rink = new THREE.Mesh(new THREE.CircleGeometry(1, 48), new THREE.MeshLambertMaterial({color:0xd8ecf8})); rink.scale.set(30, 18, 1); rink.rotation.x = -Math.PI/2; rink.position.set(qx(100), 0.04, qz(70)); root.add(rink);
+  for(var bd = 0; bd < 64; bd++){ var ba = bd/64*Math.PI*2; if(Math.abs(ba - Math.PI) < 0.12) continue; var BB = new Lot(B, qx(100 + Math.cos(ba)*30.5), qz(70 + Math.sin(ba)*18.5), -ba); BB.box(0.3, 1.1, 2.6, 0, 0.55, 0, bd % 2 ? 0xffffff : 0xc8382f); }
+  airSign('PATINOIRE', qx(100), 3.4, qz(48), 0, 7, '#1f6fb8');
+  // LA MOTONEIGE: the rental shed
+  L.box(10, 4, 6, 120, 2, 175, 0x8a5a32); L.box(11, 0.4, 7, 120, 4.2, 175, 0x1f3f8f); addSolid(qx(115), qx(125), qz(172), qz(178), 'quebec', -1, 5);
+  airSign('LOCATION DE MOTONEIGES', qx(120), 5.2, qz(178.6), 0, 9, '#1f3f8f');
+  // SCULPTURES SUR NEIGE
+  [[-130, -20, 'ours'], [-90, -20, 'chateau'], [-130, 30, 'feuille'], [-90, 30, 'hibou'], [-110, 5, 'igloo']].forEach(function(sc){
+    var S = new Lot(B, qx(sc[0]), qz(sc[1]), 0); S.box(8, 1, 8, 0, 0.5, 0, 0xe4ebf2);
+    if(sc[2] === 'ours'){ S.box(5, 3.6, 3, 0, 2.8, 0, 0xffffff); S.box(2.6, 2.4, 2.4, 0, 5.4, 1, 0xffffff); S.box(0.8, 0.8, 0.8, -1, 6.8, 1, 0xffffff); S.box(0.8, 0.8, 0.8, 1, 6.8, 1, 0xffffff); }
+    if(sc[2] === 'chateau'){ S.box(6, 3, 4, 0, 2.5, 0, 0xffffff); [-2.6, 2.6].forEach(function(o){ S.box(1.6, 5, 1.6, o, 3.5, 0, 0xffffff); S.part(new THREE.ConeGeometry(1.2, 2, 6), o, 7, 0, 0xffffff); }); }
+    if(sc[2] === 'feuille'){ S.part(new THREE.CylinderGeometry(3, 3, 0.8, 5), 0, 3.6, 0, 0xffffff, Math.PI/2); S.box(0.4, 2.5, 0.4, 0, 1.6, 0, 0xffffff); }
+    if(sc[2] === 'hibou'){ S.part(new THREE.SphereGeometry(2.2, 12, 10), 0, 3, 0, 0xffffff); S.part(new THREE.SphereGeometry(1.5, 12, 10), 0, 5.6, 0, 0xffffff); }
+    if(sc[2] === 'igloo'){ S.part(new THREE.SphereGeometry(3.4, 14, 8, 0, Math.PI*2, 0, Math.PI/2), 0, 1, 0, 0xffffff); }
+    addSolid(qx(sc[0]) - 3.5, qx(sc[0]) + 3.5, qz(sc[1]) - 3.5, qz(sc[1]) + 3.5, 'quebec', -1, 8);
+  });
+  airSign('SCULPTURES SUR NEIGE', qx(-110), 4, qz(48), 0, 11, '#2a6fa8');
+  // BAIN DE NEIGE
+  flat(30, 20, qx(-110), qz(125), 0xffffff, 0.05); airSign('BAIN DE NEIGE', qx(-110), 3, qz(137), Math.PI, 8, '#2a6fa8');
+  B.build();
+})();
+/* the models you ride on */
+function qcModel(kind){
+  var g = new THREE.Group(), red = solidMat(0xc8382f), dark = solidMat(0x2a2d36), wood = solidMat(0x8a5a32);
+  if(kind === 'sled'){ var s = box(0.8, 0.12, 1.6, red); s.position.y = 0.2; g.add(s); var c = box(0.8, 0.4, 0.1, red); c.position.set(0, 0.35, -0.8); g.add(c); }
+  if(kind === 'ski'){ [-0.25, 0.25].forEach(function(o){ var s = box(0.12, 0.05, 1.9, solidMat(0x1f6fb8)); s.position.set(o, 0.05, -0.2); g.add(s); var p = box(0.04, 1.1, 0.04, dark); p.position.set(o*2.6, 0.6, -0.5); p.rotation.x = 0.3; g.add(p); }); }
+  if(kind === 'chair'){ var seat = box(1.4, 0.15, 0.7, dark); seat.position.y = 0.4; g.add(seat); var bar = box(0.08, 3, 0.08, dark); bar.position.set(0, 1.9, 0.3); g.add(bar); }
+  if(kind === 'dogs'){
+    var sl = box(1, 0.15, 2.4, wood); sl.position.y = 0.3; g.add(sl); var bk = box(1, 0.9, 0.1, wood); bk.position.set(0, 0.75, 0.9); g.add(bk);
+    for(var dg = 0; dg < 6; dg++){ var dx = dg % 2 ? 0.45 : -0.45, dz = -2.2 - Math.floor(dg/2)*1.5, dog = box(0.35, 0.45, 1, solidMat(dg % 3 ? 0x8a8f98 : 0xe8e8e8)); dog.position.set(dx, 0.5, dz); g.add(dog); var hd = box(0.3, 0.3, 0.4, dog.material); hd.position.set(dx, 0.85, dz - 0.6); g.add(hd); dog.userData.leg = true; }
+    var rope = box(0.05, 0.05, 4.6, dark); rope.position.set(0, 0.55, -3.3); g.add(rope);
+  }
+  if(kind === 'snowmobile'){
+    var bd = box(1.1, 0.5, 2.6, solidMat(0xe3b52c)); bd.position.set(0, 0.55, 0.3); g.add(bd);
+    var sk = box(0.9, 0.1, 1.2, dark); sk.position.set(0, 0.15, -1.3); g.add(sk); var tr = box(0.8, 0.35, 1.6, dark); tr.position.set(0, 0.25, 0.9); g.add(tr);
+    var wind = box(0.9, 0.5, 0.06, new THREE.MeshLambertMaterial({color:0x9fc8e0, transparent:true, opacity:0.5})); wind.position.set(0, 1.05, -0.65); wind.rotation.x = -0.4; g.add(wind);
+    var hb = box(1, 0.08, 0.08, dark); hb.position.set(0, 1.0, -0.35); g.add(hb);
+  }
+  g.visible = false; root.add(g); return g;
+}
+/* ---- RIDES: the game drives you along a path (sled, chairlift + ski, dogsled), or you drive the snowmobile ---- */
+var ride = {on:false};
+function startRide(kind){
+  if(typeof amJailed === 'function' && amJailed()) return;
+  closeEditors(); if(!flying) requestFirstPerson('walk');
+  var legs = kind === 'sled' ? [{path:QC_SLIDE, sp:4, acc:14, max:20, m:'sled'}] :
+             kind === 'ski' ? [{path:QC_SKI_UP, sp:7, m:'chair'}, {path:QC_SKI_DOWN, sp:6, acc:8, max:17, m:'ski'}] :
+             kind === 'dogs' ? [{path:QC_DOG, sp:9, m:'dogs'}] : null;
+  if(kind === 'snowmobile'){
+    ride = {on:true, kind:kind, model:ride.models && ride.models.snowmobile || qcModel('snowmobile'), v:0, h:0};
+    ride.models = ride.models || {}; ride.models.snowmobile = ride.model;
+    ride.h = 0; camera.position.set(qx(120), EYE_HEIGHT, qz(165)); ride.model.visible = true;
+    showToast(L2('🛷 SNOWMOBILE: W/S to go, A/D to steer, E to get off', '🛷 MOTONEIGE : W/S avancer, A/D tourner, E pour descendre')); return;
+  }
+  ride = {on:true, kind:kind, legs:legs, leg:0, s:0, v:legs[0].sp, models:ride.models || {}};
+  ride.legs.forEach(function(l){ l.cum = [0]; for(var i=1;i<l.path.length;i++) l.cum.push(l.cum[i-1] + Math.hypot(l.path[i][0] - l.path[i-1][0], l.path[i][1] - l.path[i-1][1], l.path[i][2] - l.path[i-1][2])); l.len = l.cum[l.cum.length - 1]; });
+  showToast({sled:L2('🛷 Wheee! Down the ice slide!', '🛷 Youpi ! On descend la glissade !'), ski:L2('🎿 Up the chairlift, then ski down the slalom!', '🎿 On monte en télésiège, puis on descend en slalom !'), dogs:L2('🐕 Mush! The dogs are running!', '🐕 Allez les chiens ! En avant !')}[kind]);
+}
+function pathAt(l, s){
+  var P = l.path, i = 1; while(i < P.length - 1 && l.cum[i] < s) i++;
+  var a = P[i-1], b = P[i], u = Math.min(1, Math.max(0, (s - l.cum[i-1])/((l.cum[i] - l.cum[i-1]) || 1)));
+  return {x:a[0] + (b[0] - a[0])*u, y:a[1] + (b[1] - a[1])*u, z:a[2] + (b[2] - a[2])*u};
+}
+function endRide(){
+  if(ride.model) ride.model.visible = false;
+  Object.keys(ride.models || {}).forEach(function(k){ ride.models[k].visible = false; });
+  ride = {on:false, models:ride.models};
+  camera.position.y = surfaceAt(camera.position.x, camera.position.z, 0) + EYE_HEIGHT; vertVelocity = 0;
+}
+function updateRide(dt){
+  if(!flying){ endRide(); return; }
+  if(ride.kind === 'snowmobile'){
+    var acc = keyFwd() ? 14 : keyBack() ? -10 : 0;
+    if(!acc && stickAmount() > STICK_DEAD) acc = stick.y*14;
+    ride.v = Math.max(-6, Math.min(24, (ride.v + acc*dt)*(acc ? 1 : Math.pow(0.4, dt))));
+    var turn = (keyLeft() ? 1 : 0) - (keyRight() ? 1 : 0); if(!turn && stickAmount() > STICK_DEAD) turn = -stick.x;
+    ride.h += turn*dt*1.6*Math.min(1, Math.abs(ride.v)/4 + 0.2);
+    var nx = camera.position.x - Math.sin(ride.h)*ride.v*dt, nz = camera.position.z - Math.cos(ride.h)*ride.v*dt;
+    if(!hitSolid(nx, nz, 0.8, 0.3, 1.6)){ camera.position.x = nx; camera.position.z = nz; } else ride.v *= -0.3;
+    var out = boundsContact(camera.position.x, camera.position.z, 0.8); if(out){ camera.position.x += out.ex; camera.position.z += out.ez; ride.v *= 0.5; }
+    camera.position.y = 1.9 + Math.sin(performance.now()*0.02)*0.03*Math.abs(ride.v)/24;
+    yaw = ride.h; camera.rotation.set(pitch, yaw, 0);
+    var m = ride.model; m.position.set(camera.position.x - Math.sin(ride.h)*0.2, 0, camera.position.z - Math.cos(ride.h)*0.2); m.rotation.y = ride.h; m.visible = true;
+    return;
+  }
+  var l = ride.legs[ride.leg];
+  if(l.acc){ var p0 = pathAt(l, ride.s), p1 = pathAt(l, ride.s + 1), slope = Math.max(0, p0.y - p1.y); ride.v = Math.min(l.max, ride.v + (l.acc*slope - 1.5)*dt); ride.v = Math.max(3, ride.v); }
+  ride.s += ride.v*dt;
+  if(ride.s >= l.len){
+    if(ride.leg < ride.legs.length - 1){ ride.leg++; ride.s = 0; ride.v = ride.legs[ride.leg].sp; return; }
+    var end = pathAt(l, l.len); endRide(); camera.position.set(qx(end.x), surfaceAt(qx(end.x), qz(end.z), 0) + EYE_HEIGHT, qz(end.z));
+    showToast(ride.kind === 'dogs' ? L2('What a ride! Merci les chiens !', 'Quelle balade ! Merci les chiens !') : L2('Bravo ! Encore ? (press E at the start)', 'Bravo ! Encore ? (E au départ)'));
+    return;
+  }
+  var p = pathAt(l, ride.s), ahead = pathAt(l, Math.min(l.len, ride.s + 4));
+  camera.position.set(qx(p.x), p.y + (l.m === 'chair' ? 0.6 : 0.2), qz(p.z));
+  var dx = ahead.x - p.x, dz = ahead.z - p.z;
+  if(Math.abs(dx) + Math.abs(dz) > 0.01){ var want = Math.atan2(-dx, -dz); yaw += Math.atan2(Math.sin(want - yaw), Math.cos(want - yaw))*Math.min(1, dt*5); }
+  var tp = Math.atan2(ahead.y - p.y, Math.hypot(dx, dz) || 1)*0.7; pitch += (tp - pitch)*Math.min(1, dt*3);
+  camera.rotation.set(pitch, yaw, 0);
+  var mk = l.m; ride.models[mk] = ride.models[mk] || qcModel(mk);
+  Object.keys(ride.models).forEach(function(k){ ride.models[k].visible = k === mk; });
+  var M = ride.models[mk]; M.position.set(camera.position.x, camera.position.y - (mk === 'chair' ? 0.9 : 1.55), camera.position.z); M.rotation.y = yaw;
+}
+/* skating: on the rink you glide - let go of the keys and you keep sliding */
+var skate = {v:new THREE.Vector3(), on:false};
+function onRink(x, z){ var dx = (x - qx(100))/29, dz = (z - qz(70))/17; return dx*dx + dz*dz < 1; }
+function skateMove(move, dt){
+  var on = onRink(camera.position.x, camera.position.z);
+  if(on !== skate.on){ skate.on = on; if(on) showToast(L2('⛸ You\'re skating! Let go of the keys to glide.', '⛸ Tu patines ! Lâche les touches pour glisser.')); else skate.v.set(0, 0, 0); }
+  if(!on || dt <= 0) return move;
+  if(move.lengthSq() > 0){ var want = move.clone().multiplyScalar(1.5/dt); skate.v.lerp(want, Math.min(1, dt*1.6)); }
+  else skate.v.multiplyScalar(Math.pow(0.55, dt));
+  var nx = camera.position.x + skate.v.x*dt, nz = camera.position.z + skate.v.z*dt;
+  if(!onRink(nx, nz)){ skate.v.multiplyScalar(-0.4); return new THREE.Vector3(); }
+  return skate.v.clone().multiplyScalar(dt);
+}
+
+/* ---- CULTURE STATIONS: learn about French-Canadian culture, answer, earn 🎟 tickets ---- */
+var QC_CULTURE = [
+  {t:'La langue française au Québec', e:'French in Québec', icon:'⚜', x:-26, z:160,
+   fr:'Au Québec, la seule langue officielle est le français. Environ 8 millions de Québécois parlent français. La Charte de la langue française (la loi 101, 1977) protège le français au travail, à l\'école et dans les commerces. La devise du Québec est « Je me souviens ».',
+   en:'In Québec, the only official language is French. About 8 million Quebecers speak French. The Charter of the French Language (Bill 101, 1977) protects French at work, at school and in shops. Québec\'s motto is "Je me souviens" (I remember).',
+   q:[['Quelle est la langue officielle du Québec ?', 'le français', ['l\'anglais', 'l\'espagnol', 'l\'italien']], ['Quelle est la devise du Québec ?', '« Je me souviens »', ['« Liberté, égalité, fraternité »', '« Vive l\'hiver »', '« Bonjour la police »']]]},
+  {t:'Le sirop d\'érable', e:'Maple syrup', icon:'🍁', x:26, z:160,
+   fr:'Le Québec produit environ 70 % du sirop d\'érable du monde ! Au printemps, c\'est le « temps des sucres » : on récolte l\'eau d\'érable (la sève) et on la fait bouillir. Il faut environ 40 litres d\'eau d\'érable pour faire 1 litre de sirop. On fête ça à la cabane à sucre.',
+   en:'Québec makes about 70% of the world\'s maple syrup! In spring it is "sugaring time": people collect maple water (sap) and boil it. It takes about 40 litres of sap to make 1 litre of syrup. People celebrate at the sugar shack (cabane à sucre).',
+   q:[['Combien de litres d\'eau d\'érable faut-il pour 1 litre de sirop ?', 'environ 40 litres', ['1 litre', 'environ 4 litres', '1 000 litres']], ['Où fête-t-on le temps des sucres ?', 'à la cabane à sucre', ['à la plage', 'à la piscine', 'au cinéma']]]},
+  {t:'La poutine', e:'Poutine', icon:'🍟', x:-26, z:122,
+   fr:'La poutine est née dans les campagnes du Québec dans les années 1950. C\'est simple : des frites, du fromage en grains qui fait « squick squick » sous la dent, et une sauce brune chaude. Aujourd\'hui, on la mange partout au Canada !',
+   en:'Poutine was born in the Québec countryside in the 1950s. It is simple: fries, cheese curds that go "squeak squeak" when you bite them, and hot brown gravy. Today it is eaten all over Canada!',
+   q:[['Qu\'est-ce qu\'il y a dans une poutine ?', 'des frites, du fromage en grains et de la sauce', ['du riz et du poisson', 'des pâtes et des tomates', 'du pain et de la confiture']], ['Le fromage en grains fait quel bruit ?', '« squick squick »', ['« miaou »', '« boum »', '« cocorico »']]]},
+  {t:'La Nouvelle-France', e:'New France', icon:'⛵', x:26, z:122,
+   fr:'Samuel de Champlain a fondé la ville de Québec en 1608. C\'était la capitale de la Nouvelle-France. Le Vieux-Québec est la seule ville fortifiée au nord du Mexique et elle est classée au patrimoine mondial de l\'UNESCO. Le fleuve Saint-Laurent était la grande route des explorateurs.',
+   en:'Samuel de Champlain founded Québec City in 1608. It was the capital of New France. Old Québec is the only walled (fortified) city north of Mexico and is a UNESCO World Heritage Site. The St. Lawrence River was the explorers\' great highway.',
+   q:[['Qui a fondé la ville de Québec ?', 'Samuel de Champlain', ['Napoléon', 'Christophe Colomb', 'Jacques Brel']], ['En quelle année Québec a-t-elle été fondée ?', '1608', ['1789', '1867', '1955']]]},
+  {t:'La ceinture fléchée', e:'The arrow sash', icon:'🎀', x:-26, z:86,
+   fr:'La ceinture fléchée est une longue ceinture de laine tissée aux doigts, avec des motifs en forme de flèches. Les voyageurs (les canotiers du commerce des fourrures) la portaient pour se tenir chaud et se protéger le dos. C\'est un symbole du Québec et du Carnaval.',
+   en:'The ceinture fléchée is a long wool sash woven by hand (with the fingers), with arrow-shaped patterns. The voyageurs (canoe men of the fur trade) wore it to keep warm and protect their backs. It is a symbol of Québec and of the Carnaval.',
+   q:[['Comment fait-on une ceinture fléchée ?', 'on la tisse avec les doigts', ['on l\'imprime', 'on la coupe dans du papier', 'on la sculpte dans la glace']], ['Qui portait la ceinture fléchée autrefois ?', 'les voyageurs', ['les astronautes', 'les pirates', 'les chevaliers']]]},
+  {t:'Les expressions québécoises', e:'Québec expressions', icon:'💬', x:26, z:86,
+   fr:'Au Québec, on parle français avec de belles expressions ! « Il fait frette » = il fait très froid. « Une tuque » = un bonnet d\'hiver. « Magasiner » = faire du shopping. « Un char » = une voiture. « C\'est plate » = c\'est ennuyeux. « Bienvenue ! » = de rien.',
+   en:'In Québec, people speak French with great expressions! "Il fait frette" = it is very cold. "Une tuque" = a winter hat. "Magasiner" = to go shopping. "Un char" = a car. "C\'est plate" = it is boring. "Bienvenue !" = you\'re welcome.',
+   q:[['Que veut dire « Il fait frette » ?', 'Il fait très froid.', ['Il fait très chaud.', 'Il pleut.', 'Il est tard.']], ['Au Québec, « magasiner » veut dire...', 'faire du shopping', ['dormir', 'nager', 'cuisiner']]]},
+  {t:'Les fêtes et la musique', e:'Celebrations and music', icon:'🎻', x:-26, z:50,
+   fr:'Le 24 juin, c\'est la Fête nationale du Québec (la Saint-Jean-Baptiste), avec des feux de joie et de la musique. Dans le temps des Fêtes, on fait un grand repas, le réveillon, avec de la tourtière. La musique traditionnelle utilise le violon, l\'accordéon et les cuillères !',
+   en:'June 24 is Québec\'s national holiday (Saint-Jean-Baptiste Day), with bonfires and music. During the holiday season, families have a big meal, the réveillon, with tourtière (meat pie). Traditional music uses the fiddle, the accordion and spoons!',
+   q:[['Quand est la Fête nationale du Québec ?', 'le 24 juin', ['le 14 juillet', 'le 1er janvier', 'le 25 décembre']], ['Quel instrument joue-t-on dans la musique traditionnelle ?', 'les cuillères', ['la cornemuse', 'le didgeridoo', 'le gong']]]},
+  {t:'Le hockey et l\'hiver', e:'Hockey and winter', icon:'🏒', x:26, z:50,
+   fr:'Au Québec, l\'hiver est long et très froid (parfois -30 °C) ! On en profite : patin, ski, raquette, motoneige... Le hockey est le sport préféré : il y a des patinoires extérieures dans presque tous les quartiers. On porte une tuque, des mitaines et un gros manteau.',
+   en:'In Québec winter is long and very cold (sometimes -30 °C)! People make the most of it: skating, skiing, snowshoeing, snowmobiling... Hockey is the favourite sport: there are outdoor rinks in almost every neighbourhood. People wear a tuque, mittens and a big coat.',
+   q:[['Quel est le sport préféré au Québec ?', 'le hockey', ['le cricket', 'le surf', 'le golf']], ['Pour avoir chaud aux mains, on porte des...', 'mitaines', ['sandales', 'lunettes', 'chaussettes']]]}
+,
+  {t:'Les sculptures sur neige', e:'Snow sculptures', icon:'❄', x:-150, z:5,
+   fr:'Chaque année, des équipes d\'artistes du monde entier sculptent d\'énormes blocs de neige pendant le Carnaval. Ils utilisent des pelles, des scies et des grattoirs. Les sculptures peuvent mesurer plus de 3 mètres de haut ! Le froid les garde intactes pendant tout le Carnaval.',
+   en:'Every year, teams of artists from all over the world carve huge blocks of snow during the Carnaval. They use shovels, saws and scrapers. The sculptures can be more than 3 metres tall! The cold keeps them perfect for the whole Carnaval.',
+   q:[['Avec quoi sculpte-t-on la neige ?', 'des pelles, des scies et des grattoirs', ['des crayons', 'des fourchettes', 'un sèche-cheveux']], ['Pourquoi les sculptures ne fondent-elles pas ?', 'parce qu\'il fait très froid', ['parce qu\'elles sont en plastique', 'parce qu\'il pleut', 'parce qu\'elles sont dans un frigo']]]}
+];
+QC_CULTURE.forEach(function(c, i){
+  var B2 = new Lot(cultureBatch(), qx(c.x), qz(c.z), c.x < 0 ? Math.PI/2 : -Math.PI/2);
+  B2.box(6, 3.6, 0.3, 0, 2.6, 0, 0x6b4a32); B2.box(0.3, 4.4, 0.3, -3, 2.2, 0, 0x4a3422); B2.box(0.3, 4.4, 0.3, 3, 2.2, 0, 0x4a3422); B2.box(6.6, 0.4, 0.8, 0, 4.6, 0, 0xc8382f);
+  airSign(c.icon + ' ' + c.t, qx(c.x + (c.x < 0 ? 0.2 : -0.2)), 3.1, qz(c.z), c.x < 0 ? Math.PI/2 : -Math.PI/2, 5.6, '#12304f');
+  addSpot({x:qx(c.x + (c.x < 0 ? 2.5 : -2.5)), z:qz(c.z), r:3.5, label:function(){ return '📜 ' + c.t + ' - ' + L2('learn and earn 🎟', 'apprends et gagne des 🎟'); }, act:function(){ openCulture(i); }});
+});
+function cultureBatch(){ if(!QC.cb){ QC.cb = new MeshBatch(); setTimeout(function(){ QC.cb.build(); }, 0); } return QC.cb; }
+function openCulture(i, picked){
+  var c = QC_CULTURE[i], g = gcard.cur && gcard.cur.kind === 'cult' && gcard.cur.i === i ? gcard.cur : (gcard.cur = {kind:'cult', i:i, q:null});
+  var h = '<h3>' + c.icon + ' ' + esc(c.t) + '</h3><div class="gc-sub">' + esc(c.e) + ' · 🎟 ' + myTix() + '</div><div class="gc-text">' + esc(c.fr) + '</div>';
+  if(LANG === 'en') h += '<div class="gc-sub">' + esc(c.en) + '</div>';
+  if(!g.q){
+    h += '<div class="gc-row">' + gBtn('cultq', i, L2('ANSWER A QUESTION (+2 🎟)', 'RÉPONDRE À UNE QUESTION (+2 🎟)'), 'go', ' data-enter="1"') + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>';
+  } else {
+    var q = g.q;
+    h += '<div class="gc-big">' + esc(q.say) + '</div><div class="gc-grid">' + q.opts.map(function(o, k){ return gOpt('cultans', k, esc(o), g.picked == null ? '' : k === q.ans ? 'right' : k === g.picked ? 'wrongpick' : '', g.picked != null); }).join('') + '</div>';
+    if(g.picked != null){
+      h += '<div class="gc-big">' + (g.picked === q.ans ? '<span class="good">✓ ' + L2('Right!', 'Bravo !') + '</span>' + (g.got ? ' +' + g.got + ' 🎟' : g.cool ? ' ' + L2('(come back in a few minutes for more tickets)', '(reviens dans quelques minutes pour plus de billets)') : '') : '<span class="bad">✗ ' + L2('The answer: ', 'La réponse : ') + esc(q.opts[q.ans]) + '</span>') + '</div>' + noCharLine();
+      h += '<div class="gc-row">' + gBtn('cultq', i, L2('ANOTHER QUESTION', 'UNE AUTRE QUESTION'), '', '') + gBtn('close', null, L2('CLOSE', 'FERMER'), 'go', ' data-enter="1"') + '</div>';
+    }
+  }
+  showCard(h);
+}
+GACT.cultq = function(v){ var i = v|0, c = QC_CULTURE[i], r = lifeRand('cult' + Date.now()), it = pickR(r, c.q), m = mc(r, it[1], it[2]); gcard.cur = {kind:'cult', i:i, q:{say:it[0], opts:m.opts, ans:m.ans}}; openCulture(i); };
+GACT.cultans = function(v){
+  var g = gcard.cur; if(!g || g.picked != null) return; g.picked = v|0;
+  if(g.picked === g.q.ans){ var key = 'cult' + g.i; if(chal.cool[key] > Date.now()) g.cool = true; else { g.got = addTix(2); chal.cool[key] = Date.now() + 3*60000; } }
+  openCulture(g.i);
+};
+/* ---- FOOD STANDS: pay with 🎟, order in French ---- */
+var QC_FOOD_INFO = {
+  poutine:['Des frites, du fromage en grains et de la sauce brune : le plat le plus célèbre du Québec !', 'Fries, cheese curds and brown gravy: Québec\'s most famous dish!'],
+  frites:['Des frites bien chaudes, avec du sel et du vinaigre.', 'Hot fries with salt and vinegar.'],
+  hotdog:['Le hot-dog « steamé » (cuit à la vapeur) est un classique des cantines du Québec.', 'The steamed hot dog is a classic of Québec snack bars.'],
+  choco:['Rien de mieux qu\'un chocolat chaud quand il fait frette !', 'Nothing beats a hot chocolate when it is freezing!'],
+  cidre:['Du jus de pomme chaud avec de la cannelle - parfait en hiver.', 'Hot apple juice with cinnamon - perfect in winter.'],
+  pate:['Une pâte frite, plate et dorée, avec du sucre et de la cannelle.', 'A flat, golden fried pastry with sugar and cinnamon.'],
+  beigne:['Un beigne (un donut, en France on dit « beignet ») glacé à l\'érable.', 'A doughnut (in Québec: un beigne) with maple glaze.'],
+  crepe:['Une crêpe chaude arrosée de sirop d\'érable.', 'A hot crêpe drizzled with maple syrup.'],
+  tourtiere:['La tourtière est une tarte à la viande qu\'on mange surtout au réveillon de Noël.', 'Tourtière is a meat pie eaten especially at the Christmas réveillon.'],
+  soupe:['La soupe aux pois jaunes : la soupe des voyageurs et des bûcherons.', 'Yellow pea soup: the soup of voyageurs and lumberjacks.'],
+  feves:['Des fèves au lard cuites lentement avec de la mélasse, comme à la cabane à sucre.', 'Baked beans slow-cooked with molasses, like at the sugar shack.'],
+  sucre:['Le sucre à la crème est un fondant très sucré fait avec du sucre, de la crème et du beurre.', 'Sucre à la crème is a very sweet fudge made with sugar, cream and butter.'],
+  pouding:['Le pouding chômeur est un gâteau cuit dans un sirop de sucre (ou d\'érable). Il est né pendant la crise des années 1930.', 'Pouding chômeur is a cake baked in sugar (or maple) syrup. It was born during the Great Depression of the 1930s.']
+};
+function openStand(s, msg){
+  gcard.cur = {kind:'stand', s:s};
+  var h = '<h3>🍽 ' + esc(s.nm) + '</h3><div class="gc-sub">' + L2('Your tickets: ', 'Tes billets : ') + '🎟 ' + myTix() + ' · ' + L2('earn more at the culture stations 📜 and with Givre', 'gagnes-en aux stations culturelles 📜 et avec Givre') + '</div>';
+  if(msg) h += '<div class="gc-big">' + msg + '</div>';
+  h += '<div class="gc-grid">' + s.menu.map(function(m, k){ return gOpt('standpick', k, m[3] + ' <b>' + esc(L2(m[2], m[1])) + '</b><br><span class="lf-soft">' + m[4] + ' 🎟</span>', '', myTix() < m[4]); }).join('') + '</div>' + noCharLine();
+  h += '<div class="gc-row">' + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>';
+  showCard(h);
+}
+GACT.standpick = function(v){
+  var s = gcard.cur.s, m = s.menu[v|0], r = lifeRand('st' + Date.now());
+  var others = QC_STANDS.reduce(function(a, x){ return a.concat(x.menu || []); }, []).filter(function(x){ return x !== m; });
+  var wrong = [pickR(r, others), pickR(r, others)].map(function(x){ return 'Je voudrais ' + x[1] + ', s\'il vous plaît.'; }).concat(['Donne-moi ' + m[1] + ' !']);
+  var q = mc(r, 'Je voudrais ' + m[1] + ', s\'il vous plaît.', wrong);
+  gcard.cur = {kind:'order', s:s, m:m, q:q};
+  showCard('<h3>🍽 ' + esc(s.nm) + '</h3><div class="gc-emoji">' + m[3] + '</div><div class="gc-big">« Bonjour ! Qu\'est-ce que je vous sers ? »</div><div class="gc-sub">' + L2('You want ' + m[2] + '. Order politely in French:', 'Tu veux ' + m[1] + '. Commande poliment :') + '</div><div class="gc-grid">' +
+    q.opts.map(function(o, k){ return gOpt('orderans', k, esc(o)); }).join('') + '</div><div class="gc-row">' + gBtn('back', null, L2('BACK', 'RETOUR')) + '</div>');
+};
+GACT.back = function(){ if(gcard.cur && gcard.cur.s) openStand(gcard.cur.s); else closeCard(); };
+GACT.orderans = function(v){
+  var c = gcard.cur; if(!c || c.kind !== 'order') return;
+  if((v|0) !== c.q.ans){ openStand(c.s, '<span class="bad">✗ ' + L2('The vendor didn\'t understand... the right order was: ', 'Le vendeur n\'a pas compris... il fallait dire : ') + esc(c.q.opts[c.q.ans]) + '</span>'); return; }
+  if(myTix() < c.m[4]){ openStand(c.s); return; }
+  life.eco.tix -= c.m[4]; lifeSave();
+  if(c.m[0] === 'tire'){ taffyGame(0); return; }
+  if(c.m[0] === 'shake'){ shakeGame([]); return; }
+  var inf = QC_FOOD_INFO[c.m[0]] || ['', ''];
+  showCard('<h3>' + c.m[3] + ' ' + L2('Bon appétit !', 'Bon appétit !') + '</h3><div class="gc-emoji">' + c.m[3] + '😋</div><div class="gc-big">« Voilà ' + esc(c.m[1]) + '. Bon appétit ! »</div><div class="gc-text">' + esc(inf[0]) + '</div>' + (LANG === 'en' ? '<div class="gc-sub">' + esc(inf[1]) + '</div>' : '') +
+    '<div class="gc-row">' + gBtn('back', null, L2('ORDER SOMETHING ELSE', 'COMMANDER AUTRE CHOSE')) + gBtn('close', null, L2('MERCI !', 'MERCI !'), 'go', ' data-enter="1"') + '</div>');
+  gcard.cur = {kind:'ate', s:c.s};
+  showToast(c.m[3] + ' Miam !');
+};
+/* make your own MAPLE TAFFY on the snow */
+var TAFFY = [
+  ['D\'abord...', 'Je verse le sirop d\'érable bouillant sur la neige propre.', ['Je mets la neige dans le four.', 'Je bois le sirop froid.', 'Je lance la neige en l\'air.']],
+  ['Ensuite...', 'J\'attends quelques secondes : la tire refroidit et durcit un peu.', ['Je cours très vite.', 'Je mets le sirop au congélateur pendant une heure.', 'Je chante une chanson.']],
+  ['Enfin...', 'J\'enroule la tire autour d\'un bâton de bois.', ['Je coupe la tire avec des ciseaux.', 'Je mets la tire dans une soupe.', 'Je donne la tire à un pingouin.']]
+];
+function taffyGame(step, wrong){
+  var r = lifeRand('taffy' + step + Date.now()), T = TAFFY[step], m = mc(r, T[1], T[2]);
+  gcard.cur = {kind:'taffy', step:step, q:m};
+  showCard('<h3>🍁 ' + L2('MAKE YOUR MAPLE TAFFY', 'FAIS TA TIRE D\'ÉRABLE') + '</h3><div class="gc-emoji">' + ['🍯➡❄', '⏳', '🪵🍁'][step] + '</div><div class="gc-sub">' + L2('Step ', 'Étape ') + (step + 1) + ' / 3</div>' + (wrong ? '<div class="bad">' + L2('Oops, not that! Try again.', 'Oups, pas ça ! Essaie encore.') + '</div>' : '') +
+    '<div class="gc-big">' + esc(T[0]) + '</div><div class="gc-grid">' + m.opts.map(function(o, k){ return gOpt('taffyans', k, esc(o)); }).join('') + '</div>');
+}
+GACT.taffyans = function(v){
+  var c = gcard.cur;
+  if((v|0) !== c.q.ans){ taffyGame(c.step, true); return; }
+  if(c.step < 2){ taffyGame(c.step + 1); return; }
+  showCard('<h3>🍁 ' + L2('YOUR MAPLE TAFFY!', 'TA TIRE D\'ÉRABLE !') + '</h3><div class="gc-emoji">🍭😋</div><div class="gc-text">' + L2('Miam ! You made real tire sur la neige, like at the sugar shack.', 'Miam ! Tu as fait une vraie tire sur la neige, comme à la cabane à sucre.') + '</div><div class="gc-row">' + gBtn('close', null, 'MERCI !', 'go', ' data-enter="1"') + '</div>');
+  showToast('🍁 Miam !');
+};
+/* make your own MAPLE MILKSHAKE: pick the 3 right ingredients */
+var SHAKE = [['le lait', true, '🥛'], ['la crème glacée à la vanille', true, '🍨'], ['le sirop d\'érable', true, '🍁'], ['la moutarde', false, '🟡'], ['le sel', false, '🧂'], ['le ketchup', false, '🍅']];
+function shakeGame(sel, msg){
+  gcard.cur = {kind:'shake', sel:sel};
+  showCard('<h3>🥤 ' + L2('MAKE A MAPLE MILKSHAKE', 'FAIS UN LAIT FRAPPÉ À L\'ÉRABLE') + '</h3><div class="gc-text">' + L2('Pick the 3 right ingredients (in French!), then press MÉLANGER.', 'Choisis les 3 bons ingrédients, puis appuie sur MÉLANGER.') + '</div>' + (msg || '') +
+    '<div class="gc-grid3">' + SHAKE.map(function(s, k){ return gOpt('shakepick', k, s[2] + ' ' + esc(s[0]), sel.indexOf(k) >= 0 ? 'sel' : ''); }).join('') + '</div><div class="gc-row">' + gBtn('shakego', null, '🌀 MÉLANGER !', 'go', ' data-enter="1"') + '</div>');
+}
+GACT.shakepick = function(v){ var s = gcard.cur.sel, k = v|0, i = s.indexOf(k); if(i >= 0) s.splice(i, 1); else s.push(k); shakeGame(s); };
+GACT.shakego = function(){
+  var s = gcard.cur.sel, ok = s.length === 3 && s.every(function(k){ return SHAKE[k][1]; });
+  if(!ok){ shakeGame([], '<div class="bad gc-big">' + L2('Beurk! 🤢 That\'s not a milkshake. Try again!', 'Beurk ! 🤢 Ce n\'est pas un lait frappé. Recommence !') + '</div>'); return; }
+  showCard('<h3>🥤 ' + L2('YOUR MAPLE MILKSHAKE!', 'TON LAIT FRAPPÉ À L\'ÉRABLE !') + '</h3><div class="gc-emoji">🥤🍁😋</div><div class="gc-text">' + L2('Du lait, de la crème glacée à la vanille et du sirop d\'érable : délicieux !', 'Du lait, de la crème glacée à la vanille et du sirop d\'érable : délicieux !') + '</div><div class="gc-row">' + gBtn('close', null, 'MERCI !', 'go', ' data-enter="1"') + '</div>');
+};
+/* ---- GIVRE (our host) and the Bonhomme kiosk ---- */
+var GIVRE_Q = [
+  ['Le Carnaval de Québec a lieu en quelle saison ?', 'en hiver', ['en été', 'au printemps', 'en automne']],
+  ['En quelle année a eu lieu le premier Carnaval de Québec moderne ?', '1955', ['1608', '1889', '2010']],
+  ['Comment s\'appelle le château fait de glace ?', 'le palais de glace', ['la tour Eiffel', 'le château de sable', 'la cabane à sucre']],
+  ['Quel fleuve passe à Québec ?', 'le Saint-Laurent', ['la Seine', 'le Nil', 'le Mississippi']],
+  ['La tire d\'érable, c\'est du sirop chaud versé sur...', 'la neige', ['une pizza', 'le sable', 'la glace à la vanille']],
+  ['Qui est l\'ambassadeur officiel du Carnaval de Québec ?', 'Bonhomme Carnaval', ['Givre le hibou', 'le Père Noël', 'Astérix']],
+  ['Dans la course en canot, les équipes traversent le fleuve...', 'sur la glace et dans l\'eau glacée', ['en avion', 'à la nage', 'en métro']],
+  ['Que fait-on au bain de neige ?', 'on se roule dans la neige en maillot de bain', ['on se baigne dans une piscine chaude', 'on prend une douche', 'on mange de la neige']]
+];
+addSpot({x:qx(-12), z:qz(-91), r:4, label:function(){ return '🦉 ' + L2('Talk to Givre, the Carnaval host (+2 🎟)', 'Parler avec Givre, l\'hôte du Carnaval (+2 🎟)'); }, act:function(){ givreTalk(); }});
+function givreTalk(ans){
+  var c = gcard.cur && gcard.cur.kind === 'givre' ? gcard.cur : null;
+  if(ans == null || !c){ var r = lifeRand('givre' + Date.now()), it = pickR(r, GIVRE_Q), m = mc(r, it[1], it[2]); c = gcard.cur = {kind:'givre', say:it[0], q:m, picked:null}; }
+  else if(c.picked == null){ c.picked = ans; if(ans === c.q.ans){ if(chal.cool.givre > Date.now()) c.cool = true; else { c.got = addTix(2); chal.cool.givre = Date.now() + 2*60000; } } }
+  var h = '<h3>🦉 GIVRE</h3><div class="gc-text">' + L2('« Bienvenue au Carnaval de Québec ! I\'m Givre, the snow owl. Answer my question and I\'ll give you tickets for the food stands! »', '« Bienvenue au Carnaval de Québec ! Je suis Givre, le harfang des neiges. Réponds à ma question et je te donne des billets pour les kiosques ! »') + '</div>';
+  h += '<div class="gc-big">' + esc(c.say) + '</div><div class="gc-grid">' + c.q.opts.map(function(o, k){ return gOpt('givreans', k, esc(o), c.picked == null ? '' : k === c.q.ans ? 'right' : k === c.picked ? 'wrongpick' : '', c.picked != null); }).join('') + '</div>';
+  if(c.picked != null) h += '<div class="gc-big">' + (c.picked === c.q.ans ? '<span class="good">✓ Bravo !</span>' + (c.got ? ' +' + c.got + ' 🎟' : c.cool ? ' ' + L2('(more tickets in a minute or two)', '(d\'autres billets dans une minute ou deux)') : '') : '<span class="bad">✗ ' + esc(c.q.opts[c.q.ans]) + '</span>') + '</div>' + noCharLine() + '<div class="gc-row">' + gBtn('givremore', null, L2('ANOTHER QUESTION', 'UNE AUTRE QUESTION')) + gBtn('close', null, L2('BYE GIVRE!', 'SALUT GIVRE !'), 'go', ' data-enter="1"') + '</div>';
+  showCard(h);
+}
+GACT.givreans = function(v){ givreTalk(v|0); };
+GACT.givremore = function(){ gcard.cur = null; givreTalk(); };
+addSpot({x:qx(12), z:qz(-93), r:3.5, label:function(){ return '❓ ' + L2('Who is Bonhomme Carnaval?', 'Qui est Bonhomme Carnaval ?'); }, act:function(){
+  showCard('<h3>❓ QUI EST BONHOMME CARNAVAL ?</h3>' +
+    '<div class="gc-text">Bonhomme Carnaval est l\'ambassadeur officiel et le symbole du Carnaval de Québec depuis 1955. Chaque année, à l\'ouverture du Carnaval, le maire de Québec lui remet les clés de la ville : pendant le Carnaval, c\'est lui le « roi » de la fête ! Il habite dans son palais de glace, il accueille les visiteurs et il est présent aux défilés. Son cri de ralliement : « Bonne fête d\'hiver ! »</div>' +
+    (LANG === 'en' ? '<div class="gc-sub">Bonhomme Carnaval has been the official ambassador and symbol of the Québec Winter Carnival since 1955. Every year, at the opening of the Carnaval, the mayor of Québec City gives him the keys to the city: during the Carnaval, he is the "king" of the party! He lives in his ice palace, welcomes visitors and leads the parades.</div>' : '') +
+    '<div class="gc-sub">' + L2('To see Bonhomme and learn more, visit the official website: ', 'Pour voir Bonhomme et en savoir plus, visite le site officiel : ') + '<b>carnaval.qc.ca</b><br>' + L2('Bonhomme Carnaval and the Carnaval de Québec belong to the Carnaval de Québec. Givre, our host, is a character made for this game.', 'Bonhomme Carnaval et le Carnaval de Québec appartiennent au Carnaval de Québec. Givre, notre hôte, est un personnage créé pour ce jeu.') + '</div>' +
+    '<div class="gc-row">' + gBtn('close', null, L2('MERCI !', 'MERCI !'), 'go', ' data-enter="1"') + '</div>');
+}});
+/* ---- the events board, and the activity starts ---- */
+[[-14, 199], [16, -75]].forEach(function(p){ addSpot({x:qx(p[0]), z:qz(p[1]), r:4.5, label:function(){ return '📅 ' + L2('Carnaval programme - today: ', 'Programme du Carnaval - aujourd\'hui : ') + L2(qcToday().en, qcToday().fr); }, act:function(){ openProgramme(); }}); });
+function openProgramme(){
+  var d = new Date().getDay(), h = '<h3>📅 ' + L2('CARNAVAL PROGRAMME', 'PROGRAMME DU CARNAVAL') + '</h3><div class="gc-sub">' + L2('Every day there is a different event in a different part of the Carnaval. Follow the gold star ★!', 'Chaque jour, un événement différent dans un coin différent du Carnaval. Suis l\'étoile dorée ★ !') + '</div>';
+  QC_EVENTS.slice(1).concat([QC_EVENTS[0]]).forEach(function(e){ h += '<div class="gc-text' + (e.d === d ? ' good' : '') + '">' + (e.d === d ? '★ ' : '') + '<b>' + FR_DAYS[e.d] + '</b> - ' + e.icon + ' ' + esc(L2(e.en, e.fr)) + '</div>'; });
+  h += '<div class="gc-row">' + gBtn('qgo', 'event', L2('TAKE ME TO TODAY\'S EVENT', 'ALLER À L\'ÉVÉNEMENT DU JOUR'), 'go') + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>';
+  showCard(h);
+}
+GACT.qgo = function(){ var e = qcToday(); closeCard(); goTo({x:qx(e.at[0]), z:qz(e.at[1] + 14), yaw:0}); };
+addSpot({x:qx(64), z:qz(-52), r:4, label:function(){ return '🛷 ' + L2('Climb up and slide down the ice slide!', 'Monter et descendre la glissade !'); }, act:function(){ startRide('sled'); }});
+addSpot({x:qx(160), z:qz(-107), r:4, label:function(){ return '🎿 ' + L2('Chairlift up, then ski the slalom!', 'Télésiège, puis descente en slalom !'); }, act:function(){ startRide('ski'); }});
+addSpot({x:qx(-136), z:qz(60), r:5, label:function(){ return '🐕 ' + L2('Dogsled ride!', 'Tour en traîneau à chiens !'); }, act:function(){ startRide('dogs'); }});
+addSpot({x:qx(120), z:qz(170), r:5, label:function(){ return '🛷 ' + L2('Rent a snowmobile and drive!', 'Louer une motoneige et conduire !'); }, act:function(){ startRide('snowmobile'); }});
+/* ---- every day's event comes to life, plus the always-on fun (skaters, the chairlift, Givre) ---- */
+var qcAnim = {built:false};
+function qcBuildEvents(){
+  qcAnim.built = true;
+  var d = new Date().getDay(), g = new THREE.Group(); root.add(g); qcAnim.g = g; qcAnim.d = d; qcAnim.items = [];
+  function person(col){ var p = new THREE.Group(); var b = box(0.6, 0.9, 0.4, solidMat(col)); b.position.y = 1.2; p.add(b); var h = box(0.4, 0.4, 0.4, solidMat(0xf1c9a5)); h.position.y = 1.9; p.add(h); var l = box(0.5, 0.75, 0.3, solidMat(0x2a2d36)); l.position.y = 0.38; p.add(l); g.add(p); return p; }
+  // skaters on the rink (every day)
+  for(var s = 0; s < 8; s++) qcAnim.items.push({k:'skater', o:person([0xc8382f, 0x1f3f8f, 0xe3b52c, 0x4a8a3a][s % 4]), a:s/8*Math.PI*2, sp:0.25 + (s % 3)*0.07});
+  // chairs going round the chairlift
+  for(var c = 0; c < 8; c++){ var ch = qcModel('chair'); ch.visible = true; g.add(ch); qcAnim.items.push({k:'chair', o:ch, u:c/8}); }
+  if(d === 0) for(var k = 0; k < 4; k++){ var kid = person([0xe86aa0, 0x5aa0c8, 0xe3b52c, 0x8a6ab8][k]); kid.scale.setScalar(0.7); qcAnim.items.push({k:'slider', o:kid, u:k/4}); }
+  if(d === 1) [[-118, -10], [-82, -10], [-118, 40], [-82, 40], [-100, 14]].forEach(function(p, i){ var sc = person(0x2a6fa8); sc.position.set(qx(p[0]), 0, qz(p[1])); qcAnim.items.push({k:'sculptor', o:sc, ph:i}); });
+  if(d === 2) for(var r2 = 0; r2 < 3; r2++){ var sled = qcModel('dogs'); sled.visible = true; g.add(sled); qcAnim.items.push({k:'race', o:sled, u:r2*0.08, sp:0.012 + r2*0.0015}); }
+  if(d === 3) for(var b2 = 0; b2 < 8; b2++){ var bt = person([0xc8382f, 0x1f6fb8, 0xe3b52c, 0x2f9a4a][b2 % 4]); bt.position.set(qx(-122 + (b2 % 4)*8), 0, qz(120 + Math.floor(b2/4)*8)); qcAnim.items.push({k:'bather', o:bt, ph:b2}); }
+  if(d === 4) for(var cn = 0; cn < 4; cn++){ var can = new THREE.Group(); var hull = box(1.4, 0.6, 7, solidMat([0xc8382f, 0x1f3f8f, 0xe3b52c, 0x2f9a4a][cn])); hull.position.y = 0.3; can.add(hull);
+    for(var rw = -2; rw <= 2; rw++){ var rower = box(0.5, 0.8, 0.4, solidMat(0x2a2d36)); rower.position.set(0, 0.9, rw*1.2); can.add(rower); } g.add(can); qcAnim.items.push({k:'canoe', o:can, lane:cn, u:cn*0.1}); }
+  if(d === 5) for(var f = 0; f < 5; f++){ var fl = new THREE.Group(); var base = box(5, 1.2, 9, solidMat([0xc8382f, 0x1f3f8f, 0xe3b52c, 0x8a6ab8, 0x2f9a4a][f])); base.position.y = 1; fl.add(base);
+    var deco = new THREE.Mesh(f % 2 ? new THREE.ConeGeometry(2, 5, 6) : new THREE.SphereGeometry(2, 12, 10), solidMat(0xf4f7fb)); deco.position.y = 4; fl.add(deco);
+    var lt = new THREE.PointLight([0xff6a6a, 0x6aa8ff, 0xffd23f, 0xd08aff, 0x7aff9a][f], 1.4, 25); lt.position.y = 6; fl.add(lt); g.add(fl); qcAnim.items.push({k:'float', o:fl, u:f*0.06}); }
+  if(d === 6) qcAnim.fw = 0;
+}
+function qcTick(dt){
+  if(Math.hypot(camera.position.x - QC.x, camera.position.z - QC.z) > 700){ if(qcAnim.g) qcAnim.g.visible = false; return; }
+  if(!qcAnim.built) qcBuildEvents();
+  qcAnim.g.visible = true;
+  if(typeof listenAllEco === 'function' && signedIn()) listenAllEco();
+  var t = performance.now()/1000;
+  if(QC.star){ QC.star.rotation.y = t; QC.star.position.y = 30 + Math.sin(t*2)*1.5; }
+  if(QC.givre){ QC.givre.rotation.y = Math.atan2(camera.position.x - QC.givre.position.x, camera.position.z - QC.givre.position.z); QC.givre.position.y = Math.abs(Math.sin(t*2))*0.15; }
+  qcAnim.items.forEach(function(it){
+    var o = it.o;
+    if(it.k === 'skater'){ it.a += it.sp*dt; o.position.set(qx(100 + Math.cos(it.a)*22), 0.05, qz(70 + Math.sin(it.a)*12)); o.rotation.y = -it.a; o.rotation.z = Math.sin(t*3 + it.a)*0.12; }
+    if(it.k === 'chair'){ it.u = (it.u + dt*0.03) % 1; var up = it.u < 0.5, u = up ? it.u*2 : (1 - it.u)*2, z = -112 - u*92, y = Math.max(0, (-120 - z)/85*40); o.position.set(qx(160 + (up ? 0 : 3)), y + 7.6, qz(z)); }
+    if(it.k === 'slider'){ it.u = (it.u + dt*0.12) % 1; var L0 = {path:QC_SLIDE, cum:null}; var P = QC_SLIDE, s = it.u*(P.length - 1), i = Math.floor(s), f = s - i, a = P[i], b = P[Math.min(i+1, P.length - 1)];
+      o.position.set(qx(a[0]), a[1] + (b[1] - a[1])*f - 1.4, qz(a[2] + (b[2] - a[2])*f)); o.rotation.x = -0.4; }
+    if(it.k === 'sculptor'){ o.rotation.y = Math.sin(t + it.ph)*0.8; o.position.y = Math.abs(Math.sin(t*3 + it.ph))*0.2; }
+    if(it.k === 'race'){ it.u = (it.u + it.sp*dt*6) % 1; var n = QC_DOG.length - 1, ss = it.u*n, ii = Math.floor(ss), ff = ss - ii, p1 = QC_DOG[ii], p2 = QC_DOG[ii+1]; o.position.set(qx(p1[0] + (p2[0] - p1[0])*ff), 0, qz(p1[2] + (p2[2] - p1[2])*ff)); o.rotation.y = Math.atan2(-(p2[0] - p1[0]), -(p2[2] - p1[2])); }
+    if(it.k === 'bather'){ o.position.y = Math.max(0, Math.sin(t*3 + it.ph))*1.4; o.rotation.y = t + it.ph; }
+    if(it.k === 'canoe'){ it.u = (it.u + dt*0.03) % 1; var w = it.u < 0.5 ? it.u*2 : (1 - it.u)*2; o.position.set(qx(-60 + w*240), 0.1, qz(-262 + it.lane*7)); o.rotation.y = (it.u < 0.5 ? -1 : 1)*Math.PI/2; o.rotation.z = Math.sin(t*4 + it.lane)*0.05; }
+    if(it.k === 'float'){ it.u = (it.u + dt*0.015) % 1; o.position.set(qx(0), 0, qz(205 - it.u*280)); o.rotation.y = Math.sin(t + it.u*10)*0.1; }
+  });
+  if(qcAnim.d === 6){ qcAnim.fw -= dt; if(qcAnim.fw <= 0){ qcAnim.fw = 2.5 + Math.random()*2; var fx = qx(-25 + Math.random()*50), fz = qz(-140 + Math.random()*20), fy = 45 + Math.random()*25; explode(fx, fy, fz, 1.4); } }
+}
+
+/* ---------- ICE-PALACE VACATION HOMES (Québec) ----------
+   144 lots east of the Grande Allée. Walk up to a free lot, press E and design your own ice palace: its size, towers,
+   the colour of the ice, the lights, a flag and a name. It's saved with your character, and everyone sees it. */
+var ICE = {cols:12, rows:12, x0:187.5, z0:-87.5, step:15, built:{}, key:{}};
+var ICE_COLORS = [['bleu glacier', 'glacier blue', 0xbfe6ff], ['blanc neige', 'snow white', 0xf4f8fc], ['rose', 'pink', 0xf6c6dc], ['vert menthe', 'mint green', 0xc6f0dc], ['violet', 'purple', 0xd6c6f6], ['doré', 'golden', 0xf6e2a6]];
+var ICE_LIGHTS = [['aucune', 'none', null], ['bleues', 'blue', 0x5aa8ff], ['dorées', 'golden', 0xffc84a], ['roses', 'pink', 0xff6ab0], ['vertes', 'green', 0x6aff9a]];
+var ICE_FLAGS = [['aucun', 'none'], ['Québec', 'Québec'], ['France', 'France'], ['Canada', 'Canada']];
+function iceLotPos(n){ var c = n % ICE.cols, r = Math.floor(n/ICE.cols); return {x:qx(ICE.x0 + c*ICE.step), z:qz(ICE.z0 + r*ICE.step)}; }
+(function(){
+  var B = new MeshBatch();
+  for(var n = 0; n < ICE.cols*ICE.rows; n++){ var p = iceLotPos(n), L = new Lot(B, p.x, p.z, 0); L.box(12, 0.12, 12, 0, 0.06, 0, n % 2 ? 0xe9f1f8 : 0xe2ebf4); L.box(0.2, 1, 0.2, -6, 0.5, 6, 0x6b4a32); }
+  B.build();
+  airSign('PALAIS DE VACANCES · VACATION ICE PALACES', qx(270), 4, qz(-96), 0, 26, '#2a6fa8');
+})();
+function iceOwners(){
+  var all = {}, me = net.uid;
+  Object.keys(life.all || {}).forEach(function(u){ var e = life.all[u]; if(e && e.ice && e.ice.lot != null) all[u] = e.ice; });
+  if(me && life.eco && life.eco.ice) all[me] = life.eco.ice; else if(me) delete all[me];
+  return all;
+}
+function iceLotOwner(n){ var all = iceOwners(), who = null, at = Infinity; Object.keys(all).forEach(function(u){ if(all[u].lot === n && (all[u].at || 0) < at){ at = all[u].at || 0; who = u; } }); return who; }
+function iceMakePalace(d){
+  var g = new THREE.Group(), col = (ICE_COLORS[d.c|0] || ICE_COLORS[0])[2], lit = (ICE_LIGHTS[d.l|0] || ICE_LIGHTS[0])[2];
+  var mat = new THREE.MeshLambertMaterial({color:col, transparent:true, opacity:0.85, emissive:lit || 0x22405a, emissiveIntensity:lit ? 0.45 : 0.25});
+  var S = 1 + (d.s|0)*0.35, w = 5*S, h = 3.5*S;
+  var hall = new THREE.Mesh(new THREE.BoxGeometry(w, h, w*0.8), mat); hall.position.y = h/2; g.add(hall);
+  for(var c = -w/2; c <= w/2 + 0.01; c += w/6){ var cr = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), mat); cr.position.set(c, h + 0.25, w*0.4); g.add(cr); var cr2 = cr.clone(); cr2.position.z = -w*0.4; g.add(cr2); }
+  var door = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.2, 0.2), new THREE.MeshLambertMaterial({color:0x6aa8d8, transparent:true, opacity:0.6})); door.position.set(0, 1.1, w*0.4 + 0.05); g.add(door);
+  var spots = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+  for(var t = 0; t < Math.min(4, d.tw|0); t++){
+    var tw = new THREE.Mesh(new THREE.CylinderGeometry(0.8*S, 0.9*S, h*1.6, 10), mat); tw.position.set(spots[t][0]*w/2, h*0.8, spots[t][1]*w*0.4); g.add(tw);
+    var cn = new THREE.Mesh(new THREE.ConeGeometry(1.1*S, 2*S, 10), mat); cn.position.set(spots[t][0]*w/2, h*1.6 + S, spots[t][1]*w*0.4); g.add(cn);
+  }
+  var keep = new THREE.Mesh(new THREE.CylinderGeometry(1.1*S, 1.2*S, h*2.1, 10), mat); keep.position.set(0, h*1.05, -w*0.1); g.add(keep);
+  var kc = new THREE.Mesh(new THREE.ConeGeometry(1.5*S, 2.6*S, 10), mat); kc.position.set(0, h*2.1 + 1.3*S, -w*0.1); g.add(kc);
+  if((d.f|0) > 0){
+    var pole = box(0.08, 2.4, 0.08, solidMat(0x8a8f98)); pole.position.set(0, h*2.1 + 2.6*S + 1.2, -w*0.1); g.add(pole);
+    var fc = document.createElement('canvas'); fc.width = 96; fc.height = 64; var k = fc.getContext('2d');
+    if(d.f == 1){ k.fillStyle = '#1f4fa8'; k.fillRect(0, 0, 96, 64); k.fillStyle = '#fff'; k.fillRect(42, 0, 12, 64); k.fillRect(0, 26, 96, 12); }
+    if(d.f == 2){ ['#1f3f8f', '#fff', '#c8231a'].forEach(function(c2, i){ k.fillStyle = c2; k.fillRect(i*32, 0, 32, 64); }); }
+    if(d.f == 3){ k.fillStyle = '#d52b1e'; k.fillRect(0, 0, 96, 64); k.fillStyle = '#fff'; k.fillRect(24, 0, 48, 64); k.fillStyle = '#d52b1e'; k.beginPath(); k.moveTo(48, 14); k.lineTo(58, 44); k.lineTo(38, 44); k.closePath(); k.fill(); }
+    var fl = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(fc), side:THREE.DoubleSide})); fl.position.set(0.78, h*2.1 + 2.6*S + 2, -w*0.1); g.add(fl);
+  }
+  if(lit){ var pl = new THREE.PointLight(lit, 0.9, 18); pl.position.set(0, h + 2, 2); g.add(pl); }
+  if(d.nm){
+    var nc = document.createElement('canvas'); nc.width = 512; nc.height = 96; var nk = nc.getContext('2d'); nk.fillStyle = '#12304f'; nk.fillRect(0, 0, 512, 96); nk.fillStyle = '#fff'; nk.font = 'bold 44px Georgia, serif'; nk.textAlign = 'center'; nk.textBaseline = 'middle'; nk.fillText(String(d.nm).slice(0, 28), 256, 50, 490);
+    var sg = new THREE.Mesh(new THREE.PlaneGeometry(5, 0.95), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(nc), side:THREE.DoubleSide})); sg.position.set(0, 0.8, 6.3); g.add(sg);
+  }
+  return g;
+}
+/* redraw the palaces when anyone's design changes */
+function iceSync(){
+  var all = iceOwners(), want = {};
+  Object.keys(all).forEach(function(u){ var d = all[u]; if(iceLotOwner(d.lot) === u) want[d.lot] = {u:u, d:d, k:JSON.stringify(d)}; });
+  Object.keys(ICE.built).forEach(function(n){ if(!want[n] || want[n].k !== ICE.key[n]){ root.remove(ICE.built[n]); delete ICE.built[n]; delete ICE.key[n]; } });
+  Object.keys(want).forEach(function(n){ if(!ICE.built[n]){ var p = iceLotPos(n|0), g = iceMakePalace(want[n].d); g.position.set(p.x, 0, p.z); root.add(g); ICE.built[n] = g; ICE.key[n] = want[n].k; } });
+}
+function nearIceLot(){
+  var x = camera.position.x - qx(ICE.x0), z = camera.position.z - qz(ICE.z0), c = Math.round(x/ICE.step), r = Math.round(z/ICE.step);
+  if(c < 0 || r < 0 || c >= ICE.cols || r >= ICE.rows) return null;
+  var n = r*ICE.cols + c, p = iceLotPos(n);
+  return Math.hypot(p.x - camera.position.x, p.z - camera.position.z) < 6.5 ? n : null;
+}
+function openIceDesigner(n, draft){
+  var own = iceLotOwner(n), mine = own === net.uid, e = life.eco;
+  if(!hasChar()){ showCard('<h3>🏰 ' + L2('ICE PALACE LOT ', 'TERRAIN ') + (n + 1) + '</h3>' + noCharLine() + '<div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); return; }
+  if(own && !mine){ var oe = (life.all[own] || {}); showCard('<h3>🏰 ' + esc((oe.ice && oe.ice.nm) || L2('An ice palace', 'Un palais de glace')) + '</h3><div class="gc-text">' + L2('This is the vacation palace of ', 'C\'est le palais de vacances de ') + esc((oe.ch && oe.ch.fn) || memberName(own)) + '.</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go', ' data-enter="1"') + '</div>'); return; }
+  var d = draft || (gcard.cur && gcard.cur.kind === 'ice' && gcard.cur.n === n ? gcard.cur.d : null) || JSON.parse(JSON.stringify((mine && e.ice) || {lot:n, s:1, tw:2, c:0, l:1, f:1, nm:(e.ch.fn + L2('\'s ice palace', ' : mon palais'))}));
+  d.lot = n; gcard.cur = {kind:'ice', n:n, d:d};
+  var moving = e.ice && e.ice.lot !== n;
+  function row(lbl, key, list, fmt){ return '<div class="gc-sub" style="margin:8px 0 2px">' + lbl + '</div><div class="gc-row" style="margin-top:2px">' + list.map(function(it, i){ return gBtn('iceset', key + ':' + i, fmt(it, i), (d[key]|0) === i ? 'go' : ''); }).join('') + '</div>'; }
+  var h = '<h3>🏰 ' + L2('DESIGN YOUR ICE PALACE', 'CRÉE TON PALAIS DE GLACE') + ' · ' + L2('LOT ', 'TERRAIN ') + (n + 1) + '</h3>';
+  if(moving) h += '<div class="gc-sub">' + L2('You already have a palace on lot ', 'Tu as déjà un palais sur le terrain ') + (e.ice.lot + 1) + L2(' - saving here moves it.', ' - l\'enregistrer ici le déplace.') + '</div>';
+  h += row(L2('Size', 'Taille'), 's', ['petit', 'moyen', 'grand'], function(x){ return x; });
+  h += row(L2('Towers', 'Tours'), 'tw', [0, 1, 2, 3, 4], function(x){ return String(x); });
+  h += row(L2('Ice colour', 'Couleur de la glace'), 'c', ICE_COLORS, function(x){ return L2(x[1], x[0]); });
+  h += row(L2('Lights', 'Lumières'), 'l', ICE_LIGHTS, function(x){ return L2(x[1], x[0]); });
+  h += row(L2('Flag', 'Drapeau'), 'f', ICE_FLAGS, function(x){ return L2(x[1], x[0]); });
+  h += '<div class="gc-sub" style="margin:8px 0 2px">' + L2('Name', 'Nom') + '</div><input class="gc-in" id="ice-nm" maxlength="28" value="' + esc(d.nm || '') + '">';
+  h += '<div class="gc-row">' + gBtn('icesave', null, L2('SAVE MY PALACE', 'ENREGISTRER MON PALAIS'), 'go', ' data-enter="1"') + (mine ? gBtn('icedel', null, L2('REMOVE', 'SUPPRIMER'), 'danger') : '') + gBtn('close', null, L2('CANCEL', 'ANNULER')) + '</div>';
+  showCard(h);
+  iceSyncPreview(d);
+}
+function iceSyncPreview(d){
+  if(ICE.preview){ root.remove(ICE.preview); ICE.preview = null; }
+  if(!d) return;
+  var p = iceLotPos(d.lot); ICE.preview = iceMakePalace(d); ICE.preview.position.set(p.x, 0, p.z); root.add(ICE.preview);
+  if(ICE.built[d.lot]) ICE.built[d.lot].visible = false;
+}
+GACT.iceset = function(v){ var c = gcard.cur, kv = v.split(':'); var nm = document.getElementById('ice-nm'); if(nm) c.d.nm = nm.value; c.d[kv[0]] = kv[1]|0; openIceDesigner(c.n, c.d); };
+GACT.icesave = function(){
+  var c = gcard.cur, nm = document.getElementById('ice-nm'), d = c.d;
+  d.nm = cleanName(nm ? nm.value : d.nm).slice(0, 28) || ((life.eco.ch.fn || '') + ' - palais de glace');
+  if(hasBadWord(d.nm)) d.nm = L2('My ice palace', 'Mon palais de glace');
+  d.at = (life.eco.ice && life.eco.ice.lot === d.lot && life.eco.ice.at) || Date.now();
+  life.eco.ice = d; lifeSave(true); iceSyncPreview(null); ICE.key = {}; Object.keys(ICE.built).forEach(function(n){ root.remove(ICE.built[n]); }); ICE.built = {}; iceSync();
+  showCard('<h3>🏰 ' + L2('YOUR ICE PALACE IS READY!', 'TON PALAIS DE GLACE EST PRÊT !') + '</h3><div class="gc-text">' + L2('Everyone can see it at the Carnaval. Bonnes vacances !', 'Tout le monde peut le voir au Carnaval. Bonnes vacances !') + '</div><div class="gc-row">' + gBtn('close', null, 'SUPER !', 'go', ' data-enter="1"') + '</div>');
+  gcard.cur = null;
+};
+GACT.icedel = function(){ delete life.eco.ice; lifeSave(true); iceSyncPreview(null); closeCard(); iceSync(); };
+var _closeCard0 = closeCard;
+closeCard = function(){ if(ICE.preview){ iceSyncPreview(null); Object.keys(ICE.built).forEach(function(n){ ICE.built[n].visible = true; }); } _closeCard0(); };
+GACT.close = closeCard;
+addSpot({x:0, z:0, r:0, dyn:true, when:function(){ return false; }});   // (lots are found with nearIceLot)
+
+/* ---------- L'ARCADE DES VERBES (Champs-Élysées district) ----------
+   Walk up to a machine and press E. Every machine is a round of 10 questions, +1 🪙 per right answer (daily cap 30),
+   and keeps your best score:
+   - LES 4 FANTASTIQUES: avoir, être, faire, aller;   - -ER EXPRESS, -IR ISLAND, -RE RUSH: regular verbs in the present.
+     Each verb machine has 4 ways to play: CONJUGATE (pick the form), WRITE (type it), READ (French → English) and
+     MEANING (what does the verb mean?) - or MIXED;
+   - COULEURS, NOMBRES, FORMES, DIRECTIONS, PRÉPOSITIONS, MÉTÉO. */
+var PRON = [['je', 'I'], ['tu', 'you'], ['il', 'he'], ['elle', 'she'], ['nous', 'we'], ['vous', 'you (all)'], ['ils', 'they'], ['elles', 'they']];
+var PIDX = [0, 1, 2, 2, 3, 4, 5, 5];   // pronoun → person 0..5
+var IRREG = {
+  avoir:{f:['ai', 'as', 'a', 'avons', 'avez', 'ont'], en:['have', 'has', 'to have']},
+  'être':{f:['suis', 'es', 'est', 'sommes', 'êtes', 'sont'], en:['be', 'is', 'to be'], en1:'am', enpl:'are'},
+  faire:{f:['fais', 'fais', 'fait', 'faisons', 'faites', 'font'], en:['do', 'does', 'to do / to make']},
+  aller:{f:['vais', 'vas', 'va', 'allons', 'allez', 'vont'], en:['go', 'goes', 'to go']}
+};
+var REG = {
+  er:[['parler', 'speak'], ['aimer', 'like'], ['regarder', 'watch'], ['écouter', 'listen'], ['manger', 'eat'], ['jouer', 'play'], ['danser', 'dance'], ['chanter', 'sing'], ['habiter', 'live'], ['travailler', 'work'], ['étudier', 'study'], ['donner', 'give'], ['chercher', 'look for'], ['trouver', 'find'], ['marcher', 'walk']],
+  ir:[['finir', 'finish'], ['choisir', 'choose'], ['réussir', 'succeed'], ['grandir', 'grow'], ['remplir', 'fill'], ['obéir', 'obey'], ['réfléchir', 'think'], ['rougir', 'blush'], ['bâtir', 'build'], ['applaudir', 'applaud']],
+  re:[['vendre', 'sell'], ['attendre', 'wait'], ['répondre', 'answer'], ['entendre', 'hear'], ['perdre', 'lose'], ['descendre', 'go down'], ['rendre', 'give back'], ['défendre', 'defend']]
+};
+var ENDS = {er:['e', 'es', 'e', 'ons', 'ez', 'ent'], ir:['is', 'is', 'it', 'issons', 'issez', 'issent'], re:['s', 's', '', 'ons', 'ez', 'ent']};
+function conj(v, p){
+  if(IRREG[v]) return IRREG[v].f[p];
+  var g = v.slice(-2), st = v.slice(0, -2), e = ENDS[g][p];
+  if(v === 'manger' && p === 3) return 'mangeons';
+  return st + e;
+}
+function withPron(pr, form){ return (pr === 'je' && /^[aeéèêiouhâîôû]/i.test(form)) ? 'j\'' + form : pr + ' ' + form; }
+function en3(base){ if(/(sh|ch|ss|x|o)$/.test(base)) return base + 'es'; if(/[^aeiou]y$/.test(base)) return base.slice(0, -1) + 'ies'; return base + 's'; }
+function engOf(v, pi){
+  var person = PIDX[pi], pr = PRON[pi][1];
+  if(v === 'être') return pr.charAt(0).toUpperCase() + pr.slice(1) + ' ' + (person === 0 ? 'am' : person === 2 ? 'is' : 'are');
+  var base = IRREG[v] ? IRREG[v].en[0] : verbEn(v), parts = base.split(' '), w = parts[0];
+  var f = person === 2 ? (IRREG[v] ? IRREG[v].en[1] : en3(w)) : w;
+  return pr.charAt(0).toUpperCase() + pr.slice(1) + ' ' + f + (parts.length > 1 ? ' ' + parts.slice(1).join(' ') : '');
+}
+function verbEn(v){ var all = REG.er.concat(REG.ir, REG.re); for(var i=0;i<all.length;i++) if(all[i][0] === v) return all[i][1]; return IRREG[v] ? IRREG[v].en[0] : v; }
+function verbsOf(set){ return set === 'irr' ? Object.keys(IRREG) : REG[set].map(function(x){ return x[0]; }); }
+function accentFree(s){ return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[’']/g, '\'').replace(/\s+/g, ' ').trim(); }
+/* one question for a verb machine */
+function verbQuestion(r, set, mode){
+  var verbs = verbsOf(set), v = pickR(r, verbs), pi = Math.floor(r()*8), pr = PRON[pi][0], p = PIDX[pi], form = conj(v, p), full = withPron(pr, form);
+  if(mode === 'mix') mode = pickR(r, ['conj', 'conj', 'write', 'read', 'mean']);
+  if(mode === 'conj'){
+    var wr = [0, 1, 2, 3, 4, 5].filter(function(k){ return conj(v, k) !== form; }).map(function(k){ return conj(v, k); }).filter(function(x, i, a){ return a.indexOf(x) === i; });
+    var m = mc(r, form, wr);
+    return {mode:mode, q:(pr === 'je' && /^[aeéèêiouhâîôû]/i.test(form) ? 'j\'/je' : pr) + ' ______  (' + v + ')', hint:L2('Pick the right form of ', 'Choisis la bonne forme de ') + v, opts:m.opts, ans:m.ans};
+  }
+  if(mode === 'write') return {mode:mode, q:pr + ' ______  (' + v + ')', hint:L2('Type the verb in the present tense', 'Écris le verbe au présent'), type:form, en:engOf(v, pi)};
+  if(mode === 'read'){
+    var wrongs = []; for(var k = 0; k < 10; k++){ var v2 = pickR(r, verbs), p2 = Math.floor(r()*8), e2 = engOf(v2, p2); if(e2 !== engOf(v, pi) && wrongs.indexOf(e2) < 0) wrongs.push(e2); }
+    var m2 = mc(r, engOf(v, pi), wrongs);
+    return {mode:mode, q:full.charAt(0).toUpperCase() + full.slice(1) + '.', hint:L2('What does it mean in English?', 'Qu\'est-ce que ça veut dire en anglais ?'), opts:m2.opts, ans:m2.ans};
+  }
+  var m3 = mc(r, IRREG[v] ? IRREG[v].en[2] : 'to ' + verbEn(v), verbs.filter(function(x){ return x !== v; }).map(function(x){ return IRREG[x] ? IRREG[x].en[2] : 'to ' + verbEn(x); }).concat(['to sleep', 'to swim', 'to run']));
+  return {mode:'mean', q:v, hint:L2('What does this verb mean?', 'Que veut dire ce verbe ?'), opts:m3.opts, ans:m3.ans};
+}
+/* vocabulary machines */
+var VOC = {
+  colours:[['rouge', '#d62a2a'], ['bleu', '#2a5ad6'], ['vert', '#2a9a3a'], ['jaune', '#f2d22a'], ['orange', '#f28a2a'], ['violet', '#8a3ad6'], ['rose', '#f28ac0'], ['noir', '#111111'], ['blanc', '#ffffff'], ['gris', '#8a8a8a'], ['marron', '#7a4a2a']],
+  shapes:[['un cercle', '<svg viewBox="0 0 60 60" width="70"><circle cx="30" cy="30" r="24" fill="#2a5ad6"/></svg>'], ['un carré', '<svg viewBox="0 0 60 60" width="70"><rect x="8" y="8" width="44" height="44" fill="#d62a2a"/></svg>'],
+    ['un triangle', '<svg viewBox="0 0 60 60" width="70"><polygon points="30,6 56,54 4,54" fill="#2a9a3a"/></svg>'], ['un rectangle', '<svg viewBox="0 0 80 60" width="90"><rect x="4" y="14" width="72" height="32" fill="#f28a2a"/></svg>'],
+    ['une étoile', '<svg viewBox="0 0 60 60" width="70"><polygon points="30,4 37,22 56,22 41,34 47,54 30,42 13,54 19,34 4,22 23,22" fill="#f2c22a"/></svg>'], ['un cœur', '<svg viewBox="0 0 60 60" width="70"><path d="M30 52 L8 28 A12 12 0 0 1 30 14 A12 12 0 0 1 52 28 Z" fill="#e0407a"/></svg>'],
+    ['un losange', '<svg viewBox="0 0 60 60" width="70"><polygon points="30,4 54,30 30,56 6,30" fill="#8a3ad6"/></svg>'], ['un ovale', '<svg viewBox="0 0 80 60" width="90"><ellipse cx="40" cy="30" rx="34" ry="20" fill="#2a9ab0"/></svg>'], ['un hexagone', '<svg viewBox="0 0 60 60" width="70"><polygon points="16,6 44,6 58,30 44,54 16,54 2,30" fill="#7a4a2a"/></svg>']],
+  directions:[['à gauche', '⬅'], ['à droite', '➡'], ['tout droit', '⬆'], ['en haut', '🔝'], ['en bas', '🔽'], ['au nord', '🧭 N'], ['au sud', '🧭 S'], ['à l\'est', '🧭 E'], ['à l\'ouest', '🧭 O'], ['derrière vous', '🔙']],
+  weather:[['Il fait beau.', '☀'], ['Il pleut.', '🌧'], ['Il neige.', '❄'], ['Il fait froid.', '🥶'], ['Il fait chaud.', '🥵'], ['Il y a du vent.', '🌬'], ['Il y a des nuages.', '☁'], ['Il y a de l\'orage.', '⛈'], ['Il y a du brouillard.', '🌫']],
+  preps:[['sur', 'on'], ['sous', 'under'], ['dans', 'in'], ['devant', 'in front of'], ['derrière', 'behind'], ['à côté de', 'next to'], ['entre', 'between']]
+};
+function prepScene(p){
+  var cat = '<span style="font-size:40px">🐱</span>', bx2 = '<span style="font-size:52px">📦</span>';
+  var S = {sur:'<div style="text-align:center;line-height:0.8">' + cat + '<br>' + bx2 + '</div>', sous:'<div style="text-align:center;line-height:0.8">' + bx2 + '<br>' + cat + '</div>',
+    dans:'<div style="text-align:center;position:relative">' + bx2 + '<span style="font-size:24px;position:relative;left:-44px;top:-6px">🐱</span></div>', devant:'<div style="text-align:center">' + bx2 + '<span style="font-size:52px;position:relative;left:-30px;top:10px">🐱</span></div>',
+    'derrière':'<div style="text-align:center"><span style="font-size:30px;position:relative;left:24px;top:-16px;opacity:0.7">🐱</span>' + bx2 + '</div>', 'à côté de':'<div style="text-align:center">' + bx2 + ' ' + cat + '</div>',
+    entre:'<div style="text-align:center">' + bx2 + ' ' + cat + ' ' + bx2 + '</div>'};
+  return S[p];
+}
+function vocabQuestion(r, game){
+  if(game === 'colours'){ var c = pickR(r, VOC.colours), m = mc(r, c[0], VOC.colours.filter(function(x){ return x !== c; }).map(function(x){ return x[0]; }));
+    return {q:'<div style="width:90px;height:90px;margin:6px auto;border:3px solid #333;background:' + c[1] + '"></div>', raw:true, hint:L2('What colour is it?', 'C\'est de quelle couleur ?'), opts:m.opts, ans:m.ans}; }
+  if(game === 'numbers'){
+    var n = Math.floor(r()*101), toWord = r() < 0.5, wr = [];
+    for(var k = 0; k < 12; k++){ var d = n + pickR(r, [-10, -1, 1, 10, 20, -20, 2, 11]); if(d >= 0 && d <= 100 && d !== n && wr.indexOf(d) < 0) wr.push(d); }
+    var mm = mc(r, toWord ? frNum(n) : String(n), wr.map(function(x){ return toWord ? frNum(x) : String(x); }));
+    return {q:toWord ? String(n) : frNum(n), hint:toWord ? L2('How do you write this number in French?', 'Comment écrit-on ce nombre en lettres ?') : L2('Which number is it?', 'Quel est ce nombre ?'), opts:mm.opts, ans:mm.ans};
+  }
+  if(game === 'shapes'){ var s = pickR(r, VOC.shapes), m2 = mc(r, s[0], VOC.shapes.filter(function(x){ return x !== s; }).map(function(x){ return x[0]; }));
+    return {q:'<div style="text-align:center">' + s[1] + '</div>', raw:true, hint:L2('What shape is it?', 'Quelle est cette forme ?'), opts:m2.opts, ans:m2.ans}; }
+  if(game === 'directions'){ var d2 = pickR(r, VOC.directions), m3 = mc(r, d2[0], VOC.directions.filter(function(x){ return x !== d2; }).map(function(x){ return x[0]; }));
+    return {q:'<div class="gc-emoji">' + d2[1] + '</div>', raw:true, hint:L2('Which direction?', 'Quelle direction ?'), opts:m3.opts, ans:m3.ans}; }
+  if(game === 'weather'){ var w = pickR(r, VOC.weather), m4 = mc(r, w[0], VOC.weather.filter(function(x){ return x !== w; }).map(function(x){ return x[0]; }));
+    return {q:'<div class="gc-emoji">' + w[1] + '</div>', raw:true, hint:L2('What\'s the weather like?', 'Quel temps fait-il ?'), opts:m4.opts, ans:m4.ans}; }
+  var p = pickR(r, VOC.preps), m5 = mc(r, 'Le chat est ' + p[0] + ' la boîte.', VOC.preps.filter(function(x){ return x !== p; }).map(function(x){ return 'Le chat est ' + x[0] + ' la boîte.'; }));
+  if(p[0] === 'entre') m5 = mc(r, 'Le chat est entre les boîtes.', VOC.preps.filter(function(x){ return x !== p; }).map(function(x){ return 'Le chat est ' + x[0] + ' la boîte.'; }));
+  return {q:prepScene(p[0]), raw:true, hint:L2('Where is the cat?', 'Où est le chat ?'), opts:m5.opts, ans:m5.ans};
+}
+var ARC_GAMES = [
+  {id:'irr', icon:'🦸', nm:'LES 4 FANTASTIQUES', sub:'avoir · être · faire · aller', col:0xc8382f, verb:true},
+  {id:'er', icon:'🚄', nm:'-ER EXPRESS', sub:'parler, aimer, manger...', col:0x1f6fb8, verb:true},
+  {id:'ir', icon:'🏝', nm:'-IR ISLAND', sub:'finir, choisir, réussir...', col:0x2f9a4a, verb:true},
+  {id:'re', icon:'🏃', nm:'-RE RUSH', sub:'vendre, attendre, répondre...', col:0xe07b2c, verb:true},
+  {id:'colours', icon:'🎨', nm:'COULEURS', sub:L2('colours', 'les couleurs'), col:0x8a3ad6},
+  {id:'numbers', icon:'🔢', nm:'NOMBRES', sub:'0 - 100', col:0xe3b52c},
+  {id:'shapes', icon:'🔷', nm:'FORMES', sub:L2('shapes', 'les formes'), col:0x2a9ab0},
+  {id:'directions', icon:'🧭', nm:'DIRECTIONS', sub:'à gauche, à droite...', col:0x5a3a22},
+  {id:'preps', icon:'📦', nm:'PRÉPOSITIONS', sub:'sur, sous, dans...', col:0xe86aa0},
+  {id:'weather', icon:'⛅', nm:'MÉTÉO', sub:L2('the weather', 'la météo'), col:0x5aa0c8}
+];
+var ARC = {name:'L\'Arcade des Verbes', x:-390, z:-655};
+ARC.door = {x:-390, z:-620, yaw:0};
+(function buildArcade(){
+  var X = ARC.x, Z = ARC.z, B = new MeshBatch(), L = new Lot(B, 0, 0, 0);
+  flat(90, 56, X, Z, 0x2a1f4a, 0.045);                                   // purple carpet
+  L.box(90, 9, 1, X, 4.5, Z - 28, 0x3a2a6a); L.box(1, 9, 56, X - 45, 4.5, Z, 0x3a2a6a); L.box(1, 9, 56, X + 45, 4.5, Z, 0x3a2a6a);
+  L.box(38, 9, 1, X - 26, 4.5, Z + 28, 0x3a2a6a); L.box(38, 9, 1, X + 26, 4.5, Z + 28, 0x3a2a6a); L.box(14, 2, 1, X, 8, Z + 28, 0x3a2a6a);
+  addSolid(X - 45, X + 45, Z - 28.5, Z - 27.5, 'champs', -1, 9); addSolid(X - 45.5, X - 44.5, Z - 28, Z + 28, 'champs', -1, 9); addSolid(X + 44.5, X + 45.5, Z - 28, Z + 28, 'champs', -1, 9);
+  addSolid(X - 45, X - 7, Z + 27.5, Z + 28.5, 'champs', -1, 9); addSolid(X + 7, X + 45, Z + 27.5, Z + 28.5, 'champs', -1, 9);
+  var roofM = new THREE.Mesh(new THREE.BoxGeometry(92, 0.6, 58), new THREE.MeshLambertMaterial({color:0x6a4aa8, transparent:true, opacity:0.35})); roofM.position.set(X, 9.2, Z); root.add(roofM);
+  ARC_GAMES.forEach(function(g, i){
+    var row = i < 5 ? 0 : 1, k = i % 5, mx = X - 32 + k*16, mz = row ? Z + 10 : Z - 18, face = row ? Math.PI : 0;
+    var M = new Lot(B, mx, mz, face); M.box(3, 4.2, 2, 0, 2.1, 0, g.col); M.box(2.4, 1.6, 0.2, 0, 3, 1.02, 0x0a0a14); M.box(3.2, 0.3, 1.2, 0, 1.6, 1.4, 0x1b1b1d);
+    M.box(0.25, 0.5, 0.25, -0.6, 1.95, 1.5, 0xff3a3a); M.box(0.3, 0.12, 0.3, 0.5, 1.82, 1.5, 0x3aff6a);
+    addSolid(mx - 1.6, mx + 1.6, mz - 1.1, mz + 1.1, 'champs', -1, 4.4);
+    var c = document.createElement('canvas'); c.width = 256; c.height = 160; var k2 = c.getContext('2d'); k2.fillStyle = '#0a0a14'; k2.fillRect(0, 0, 256, 160);
+    k2.fillStyle = '#' + ('00000' + g.col.toString(16)).slice(-6); k2.font = '64px sans-serif'; k2.textAlign = 'center'; k2.fillText(g.icon, 128, 76); k2.fillStyle = '#fff'; k2.font = 'bold 24px monospace'; k2.fillText(g.nm, 128, 130, 240);
+    var sc = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 1.45), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c)}));
+    sc.position.set(mx + Math.sin(face)*1.14, 3, mz + Math.cos(face)*1.14); sc.rotation.y = face; root.add(sc);
+    addSpot({x:mx + Math.sin(face)*2.6, z:mz + Math.cos(face)*2.6, r:2.4, label:function(){ return '🕹 ' + g.nm + ' - ' + g.sub; }, act:function(){ openArcade(i); }});
+  });
+  B.build();
+  airSign('🕹 L\'ARCADE DES VERBES', X, 11, Z + 28.6, 0, 24, '#6a2aa8');
+  [-1, 1].forEach(function(s){ var nl = new THREE.PointLight(s < 0 ? 0xff4ad6 : 0x4ad6ff, 1.2, 50); nl.position.set(X + s*20, 7, Z); root.add(nl); });
+})();
+function openArcade(i){
+  var g = ARC_GAMES[i], best = (life.eco && life.eco.arc && life.eco.arc[g.id]) || 0;
+  var h = '<h3>' + g.icon + ' ' + esc(g.nm) + '</h3><div class="gc-sub">' + esc(g.sub) + ' · ' + L2('10 questions · +1 🪙 per right answer · best score: ', '10 questions · +1 🪙 par bonne réponse · meilleur score : ') + best + '/10</div>' + noCharLine();
+  if(g.verb){
+    h += '<div class="gc-grid">' + [['conj', '🎯 CONJUGUER', L2('pick the right form', 'choisis la bonne forme')], ['write', '✍ ÉCRIRE', L2('type the verb', 'écris le verbe')], ['read', '📖 LIRE', L2('French → English', 'français → anglais')], ['mean', '💡 SENS', L2('what the verb means', 'le sens du verbe')], ['mix', '🎲 MÉLANGE', L2('a bit of everything', 'un peu de tout')]].map(function(m){
+      return gOpt('arcgo', i + ':' + m[0], '<b>' + m[1] + '</b><br><span class="lf-soft">' + m[2] + '</span>'); }).join('') + '</div>';
+    if(g.id === 'irr') h += '<div class="gc-text">' + Object.keys(IRREG).map(function(v){ return '<b>' + v + '</b> : ' + IRREG[v].f.map(function(f, p){ return ['je', 'tu', 'il/elle', 'nous', 'vous', 'ils/elles'][p] + ' ' + f; }).join(', '); }).join('<br>') + '</div>';
+    else h += '<div class="gc-text"><b>-' + g.id.toUpperCase() + '</b> : ' + ['je', 'tu', 'il/elle', 'nous', 'vous', 'ils/elles'].map(function(p, k){ return p + ' -' + (ENDS[g.id][k] || '∅'); }).join(', ') + '</div>';
+  } else h += '<div class="gc-row">' + gBtn('arcgo', i + ':v', L2('PLAY', 'JOUER'), 'go', ' data-enter="1"') + '</div>';
+  h += '<div class="gc-row">' + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>';
+  showCard(h);
+}
+GACT.arcgo = function(v){ var kv = v.split(':'); gcard.cur = {kind:'arc', i:kv[0]|0, mode:kv[1], n:0, right:0, got:0, r:lifeRand('arc' + Date.now())}; arcNext(); };
+function arcNext(){
+  var c = gcard.cur, g = ARC_GAMES[c.i];
+  if(c.n >= 10){
+    var e = life.eco, best = 0;
+    if(hasChar()){ e.arc = e.arc || {}; best = e.arc[g.id] || 0; if(c.right > best){ e.arc[g.id] = c.right; lifeSave(); } }
+    showCard('<h3>' + g.icon + ' ' + esc(g.nm) + '</h3><div class="gc-emoji">' + (c.right >= 9 ? '🏆' : c.right >= 6 ? '⭐' : '💪') + '</div><div class="gc-big">' + L2('Score: ', 'Score : ') + c.right + ' / 10</div>' +
+      '<div class="gc-sub">' + (c.got ? '+' + c.got + ' 🪙' : '') + (c.right > best && hasChar() ? ' · ' + L2('NEW BEST SCORE!', 'NOUVEAU RECORD !') : '') + '</div>' + noCharLine() +
+      '<div class="gc-row">' + gBtn('arcgo', c.i + ':' + c.mode, L2('PLAY AGAIN', 'REJOUER'), 'go', ' data-enter="1"') + gBtn('arcmenu', c.i, L2('OTHER MODE', 'AUTRE MODE')) + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>');
+    return;
+  }
+  c.q = g.verb ? verbQuestion(c.r, g.id, c.mode) : vocabQuestion(c.r, g.id); c.picked = null; c.typed = null;
+  arcRender();
+}
+function arcRender(){
+  var c = gcard.cur, g = ARC_GAMES[c.i], q = c.q;
+  var h = '<h3>' + g.icon + ' ' + esc(g.nm) + '<span class="gc-score">' + (c.n + 1) + '/10 · ✓ ' + c.right + '</span></h3><div class="gc-sub">' + esc(q.hint) + '</div>';
+  h += q.raw ? q.q : '<div class="gc-big">' + esc(q.q) + '</div>';
+  var done = c.picked != null || c.typed != null;
+  if(q.type != null){
+    if(LANG === 'en' && q.en) h += '<div class="gc-sub">(' + esc(q.en) + ')</div>';
+    h += '<input class="gc-in" id="arc-in" autocomplete="off" spellcheck="false"' + (done ? ' disabled value="' + esc(c.typed) + '"' : '') + '>';
+    if(!done) h += '<div class="gc-row">' + gBtn('arctype', null, L2('CHECK', 'VÉRIFIER'), 'go', ' data-enter="1"') + '<span class="lf-soft">é è ê à ç → ' + ['é', 'è', 'ê', 'â', 'î', 'ç'].map(function(a){ return gBtn('arcacc', a, a); }).join(' ') + '</span></div>';
+  } else h += '<div class="gc-grid">' + q.opts.map(function(o, k){ return gOpt('arcans', k, esc(o), !done ? '' : k === q.ans ? 'right' : k === c.picked ? 'wrongpick' : '', done); }).join('') + '</div>';
+  if(done){
+    h += '<div class="gc-big">' + (c.ok ? '<span class="good">✓ ' + (c.accentNote ? L2('Right - watch the accents: ', 'Juste - attention aux accents : ') + esc(q.type) : 'Bravo !') + '</span>' : '<span class="bad">✗ ' + L2('Answer: ', 'Réponse : ') + esc(q.type != null ? q.type : q.opts[q.ans]) + '</span>') + '</div>';
+    h += '<div class="gc-row">' + gBtn('arcnext', null, L2('NEXT', 'SUIVANT'), 'go', ' data-enter="1"') + '</div>';
+  }
+  showCard(h);
+}
+function arcScore(ok){ var c = gcard.cur; c.ok = ok; if(ok){ c.right++; c.got += addJeton(1); } }
+GACT.arcans = function(v){ var c = gcard.cur; if(c.picked != null) return; c.picked = v|0; arcScore(c.picked === c.q.ans); arcRender(); };
+GACT.arctype = function(){
+  var c = gcard.cur, inp = document.getElementById('arc-in'), val = inp ? inp.value : '';
+  if(!val.trim()) return;
+  c.typed = val; var want = c.q.type, got = val.trim().toLowerCase().replace(/^(je|j'|tu|il|elle|on|nous|vous|ils|elles)\s*/, '');
+  if(got === want){ arcScore(true); } else if(accentFree(got) === accentFree(want)){ c.accentNote = true; arcScore(true); } else arcScore(false);
+  arcRender();
+};
+GACT.arcacc = function(a){ var inp = document.getElementById('arc-in'); if(inp){ inp.value += a; inp.focus(); } };
+GACT.arcnext = function(){ var c = gcard.cur; c.n++; c.accentNote = false; arcNext(); };
+GACT.arcmenu = function(v){ openArcade(v|0); };
+
+/* ---------- LE STADE DES CONCERTS (east of the Concorde) ----------
+   A stadium with a big stage. A different French-speaking star "plays" every few minutes: the giant screen shows who
+   is on stage, the lights and the crowd go wild. Walk up to the stage barrier and press E for the singer's story (in
+   French and English), their best-known songs, and a question (+🪙). Song titles only - look the songs up with your
+   teacher to listen to them. */
+var SINGERS = [
+  {nm:'Édith Piaf', from:'Paris, France', yrs:'1915 – 1963', songs:['La Vie en rose (1947)', 'Hymne à l\'amour (1950)', 'Non, je ne regrette rien (1960)'],
+   fr:'Surnommée « la Môme Piaf », elle a commencé à chanter dans les rues de Paris quand elle était enfant. Sa voix puissante a fait d\'elle la chanteuse française la plus célèbre du monde.', en:'Nicknamed "the Little Sparrow", she started singing in the streets of Paris as a child. Her powerful voice made her the most famous French singer in the world.'},
+  {nm:'Charles Aznavour', from:'Paris, France', yrs:'1924 – 2018', songs:['La Bohème (1965)', 'Emmenez-moi (1967)', 'Hier encore (1964)'],
+   fr:'Né à Paris de parents arméniens, il a écrit plus de 1 000 chansons et chanté dans plusieurs langues. On l\'appelait parfois « le Frank Sinatra français ».', en:'Born in Paris to Armenian parents, he wrote more than 1,000 songs and sang in several languages. He was sometimes called "the French Frank Sinatra".'},
+  {nm:'Jacques Brel', from:'Bruxelles, Belgique', yrs:'1929 – 1978', songs:['Ne me quitte pas (1959)', 'Amsterdam (1964)', 'Quand on n\'a que l\'amour (1956)'],
+   fr:'Ce chanteur belge est l\'un des plus grands auteurs de la chanson française. Ses chansons racontent l\'amour, la Belgique et la vie de tous les jours avec beaucoup d\'émotion.', en:'This Belgian singer is one of the greatest songwriters of French chanson. His songs tell of love, Belgium and everyday life with lots of emotion.'},
+  {nm:'Céline Dion', from:'Charlemagne, Québec (Canada)', yrs:L2('born 1968', 'née en 1968'), songs:['Pour que tu m\'aimes encore (1995)', 'My Heart Will Go On (1997)', 'L\'Hymne à l\'amour (Paris 2024)'],
+   fr:'La plus jeune de 14 enfants, elle a enregistré sa première chanson à 12 ans. Elle chante en français et en anglais. En 2024, elle a chanté sur la tour Eiffel pour l\'ouverture des Jeux olympiques de Paris.', en:'The youngest of 14 children, she recorded her first song at 12. She sings in French and English. In 2024 she sang on the Eiffel Tower at the opening of the Paris Olympic Games.'},
+  {nm:'Stromae', from:'Bruxelles, Belgique', yrs:L2('born 1985', 'né en 1985'), songs:['Alors on danse (2009)', 'Papaoutai (2013)', 'Formidable (2013)', 'L\'enfer (2022)'],
+   fr:'Paul Van Haver, alias Stromae, mélange la musique électronique, le hip-hop et la chanson française. Son nom de scène vient de « maestro » en verlan (les syllabes à l\'envers).', en:'Paul Van Haver, known as Stromae, mixes electronic music, hip-hop and French chanson. His stage name is "maestro" in verlan (French slang that swaps syllables).'},
+  {nm:'Zaz', from:'Tours, France', yrs:L2('born 1980', 'née en 1980'), songs:['Je veux (2010)', 'On ira (2014)', 'Paris sera toujours Paris (2014)'],
+   fr:'Avant d\'être célèbre, elle chantait dans les rues de Montmartre. Sa musique mélange la chanson française, le jazz et la musique manouche.', en:'Before she was famous she sang in the streets of Montmartre. Her music mixes French chanson, jazz and gypsy jazz.'},
+  {nm:'Indila', from:'Paris, France', yrs:L2('born 1984', 'née en 1984'), songs:['Dernière danse (2013)', 'Tourner dans le vide (2014)', 'S.O.S (2014)'],
+   fr:'Avec « Dernière danse », elle est devenue célèbre dans le monde entier, même dans des pays où on ne parle pas français.', en:'With "Dernière danse" she became famous all over the world, even in countries where people don\'t speak French.'},
+  {nm:'Angèle', from:'Bruxelles, Belgique', yrs:L2('born 1995', 'née en 1995'), songs:['Balance ton quoi (2018)', 'Tout oublier (2018)', 'Bruxelles je t\'aime (2021)'],
+   fr:'Chanteuse et pianiste belge, elle écrit des chansons pop pleines d\'humour qui parlent aussi de sujets sérieux, comme le respect et l\'égalité.', en:'A Belgian singer and pianist, she writes funny pop songs that also talk about serious topics, like respect and equality.'},
+  {nm:'Aya Nakamura', from:'Bamako, Mali → Aulnay-sous-Bois, France', yrs:L2('born 1995', 'née en 1995'), songs:['Djadja (2018)', 'Pookie (2019)', 'Copines (2018)'],
+   fr:'C\'est l\'une des chanteuses francophones les plus écoutées au monde. En 2024, elle a chanté avec la Garde républicaine lors de la cérémonie d\'ouverture des Jeux olympiques de Paris.', en:'She is one of the most-streamed French-speaking singers in the world. In 2024 she performed with the Republican Guard at the opening ceremony of the Paris Olympic Games.'},
+  {nm:'Cœur de pirate', from:'Montréal, Québec (Canada)', yrs:L2('born 1989', 'née en 1989'), songs:['Comme des enfants (2008)', 'Place de la République (2012)', 'Oublie-moi (2014)'],
+   fr:'Béatrice Martin, alias Cœur de pirate, est une pianiste et chanteuse québécoise. Elle a appris le piano dès l\'âge de 3 ans.', en:'Béatrice Martin, known as Cœur de pirate, is a pianist and singer from Québec. She started learning the piano at age 3.'},
+  {nm:'Kendji Girac', from:'Périgueux, France', yrs:L2('born 1996', 'né en 1996'), songs:['Andalouse (2014)', 'Color Gitano (2014)', 'Cool (2015)'],
+   fr:'Il a gagné l\'émission The Voice en France en 2014. Sa musique mélange la pop et la guitare gitane.', en:'He won The Voice in France in 2014. His music mixes pop and gypsy guitar.'},
+  {nm:'Louane', from:'Hénin-Beaumont, France', yrs:L2('born 1996', 'née en 1996'), songs:['Avenir (2015)', 'Jour 1 (2015)', 'Si t\'étais là (2017)'],
+   fr:'Elle s\'est fait connaître à The Voice, puis comme actrice dans le film « La Famille Bélier ». Elle a représenté la France à l\'Eurovision en 2025.', en:'She became known on The Voice, then as an actress in the film "La Famille Bélier". She represented France at Eurovision in 2025.'}
+];
+var STAD = {name:'Le Stade des Concerts', x:440, z:-560};
+STAD.door = {x:440, z:-500, yaw:0};
+function singerNow(){ return SINGERS[Math.floor(Date.now()/180000) % SINGERS.length]; }
+(function buildStadium(){
+  var X = STAD.x, Z = STAD.z, B = new MeshBatch(), L = new Lot(B, 0, 0, 0);
+  PLAY_AREAS.push({x0:340, x1:525, z0:-640, z1:-488});
+  flat(185, 150, X, Z, 0x4f8a3a, 0.035);                                 // the pitch
+  flat(170, 4, X, -500, 0x3a3c42, 0.04);
+  // the stands: rings of seats round the pitch (open at the south entrance)
+  for(var tier = 0; tier < 6; tier++){
+    var rr = 1 + tier*0.08, h = 1 + tier*1.6;
+    for(var a = 0; a < 48; a++){ var ang = a/48*Math.PI*2; if(Math.abs(Math.sin(ang) - 1) < 0.08 && Math.cos(ang) > -0.3 && Math.cos(ang) < 0.3) continue;
+      var sx = X + Math.cos(ang)*70*rr, sz = Z + Math.sin(ang)*52*rr; var S = new Lot(B, sx, sz, -ang + Math.PI/2); S.box(9.4*rr, h, 3, 0, h/2, 0, [0xc8382f, 0xe8e8e8, 0x1f3f8f][tier % 3]); }
+  }
+  addSolid(X - 92, X - 70, Z - 60, Z + 40, 'stade', -1, 12); addSolid(X + 70, X + 92, Z - 60, Z + 40, 'stade', -1, 12); addSolid(X - 70, X + 70, Z - 70, Z - 52, 'stade', -1, 12);
+  // the stage at the north end
+  L.box(40, 3, 16, X, 1.5, Z - 40, 0x1b1b1d); L.box(42, 1, 18, X, 18, Z - 42, 0x2a2d36);
+  [-20, 20].forEach(function(o){ L.box(1, 18, 1, X + o, 9, Z - 34, 0x6b6f78); L.box(6, 10, 4, X + o*1.25, 5, Z - 40, 0x1b1b1d); });
+  addSolid(X - 21, X + 21, Z - 48, Z - 32, 'stade', -1, 3);
+  L.box(40, 1.2, 0.4, X, 0.6, Z - 26, 0xe3b52c);   // the barrier
+  B.build();
+  var sc = document.createElement('canvas'); sc.width = 1024; sc.height = 512; STAD.screen = sc;
+  var scr = new THREE.Mesh(new THREE.PlaneGeometry(30, 15), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(sc)})); scr.position.set(X, 26, Z - 49); root.add(scr); STAD.tex = scr.material.map;
+  STAD.lights = [0xff3a6a, 0x3a8aff, 0xffd23f, 0x3aff8a].map(function(c, i){ var l = new THREE.SpotLight(c, 2.2, 120, 0.35, 0.5); l.position.set(X - 18 + i*12, 17, Z - 36); l.target.position.set(X, 0, Z); root.add(l); root.add(l.target); return l; });
+  STAD.crowd = [];
+  var crowdM = new THREE.InstancedMesh(new THREE.BoxGeometry(0.6, 1.7, 0.4), new THREE.MeshLambertMaterial({color:0xffffff}), 160), cc = new THREE.Color(), mm = new THREE.Matrix4();
+  for(var i = 0; i < 160; i++){ var cx = X - 28 + (i % 20)*2.9 + (i % 3)*0.3, cz = Z - 22 + Math.floor(i/20)*2.6; STAD.crowd.push([cx, cz, i]); mm.makeTranslation(cx, 0.85, cz); crowdM.setMatrixAt(i, mm); cc.setHex([0xc8382f, 0x1f6fb8, 0xe3b52c, 0x2f9a4a, 0x8a3ad6, 0xf2f2f2][i % 6]); crowdM.setColorAt(i, cc); }
+  crowdM.frustumCulled = false; root.add(crowdM); STAD.crowdM = crowdM;
+  airSign('🎤 LE STADE DES CONCERTS', X, 9, -495, 0, 26, '#c8382f');
+  addSpot({x:X, z:Z - 23, r:6, label:function(){ return '🎤 ' + L2('On stage now: ', 'Sur scène : ') + singerNow().nm + ' - ' + L2('story, songs and a question', 'biographie, chansons et une question'); }, act:function(){ openSinger(SINGERS.indexOf(singerNow())); }});
+  [-1, 1].forEach(function(s){ addSpot({x:X + s*30, z:Z + 30, r:4, label:function(){ return '📋 ' + L2('All the singers', 'Tous les chanteurs'); }, act:function(){ openSingerList(); }}); bx(4, 2.5, 0.3, X + s*30, 1.5, Z + 32, 0x1b1b1d); airSign(L2('SINGERS', 'CHANTEURS'), X + s*30, 2.2, Z + 31.8, Math.PI, 3.6, '#c8382f'); });
+})();
+function drawStageScreen(){
+  var s = singerNow(), k = STAD.screen.getContext('2d'), t = performance.now()/1000;
+  if(STAD.last === s.nm && Math.floor(t*2) === STAD.tick) return; STAD.last = s.nm; STAD.tick = Math.floor(t*2);
+  var g = k.createLinearGradient(0, 0, 1024, 512); g.addColorStop(0, 'hsl(' + (t*40 % 360) + ',70%,25%)'); g.addColorStop(1, '#0a0a14'); k.fillStyle = g; k.fillRect(0, 0, 1024, 512);
+  k.fillStyle = '#ffd23f'; k.font = 'bold 40px sans-serif'; k.textAlign = 'center'; k.fillText(L2('LIVE ON STAGE', 'EN CONCERT'), 512, 70);
+  k.fillStyle = '#fff'; k.font = 'bold 110px Georgia, serif'; k.fillText(s.nm, 512, 220, 980);
+  k.font = '44px sans-serif'; k.fillText('♪ ' + s.songs[Math.floor(t/20) % s.songs.length] + ' ♪', 512, 320, 980);
+  k.fillStyle = '#cfd6e0'; k.font = '34px sans-serif'; k.fillText(s.from, 512, 400, 980);
+  STAD.tex.needsUpdate = true;
+}
+function stadiumTick(){
+  if(Math.hypot(camera.position.x - STAD.x, camera.position.z - STAD.z) > 260) return;
+  drawStageScreen();
+  var t = performance.now()/1000, mm = new THREE.Matrix4();
+  STAD.lights.forEach(function(l, i){ l.target.position.set(STAD.x + Math.sin(t*0.8 + i*1.7)*30, 0, STAD.z - 10 + Math.cos(t*1.1 + i)*15); });
+  STAD.crowd.forEach(function(c){ mm.makeTranslation(c[0], 0.85 + Math.max(0, Math.sin(t*6 + c[2]*0.7))*0.5, c[1]); STAD.crowdM.setMatrixAt(c[2], mm); });
+  STAD.crowdM.instanceMatrix.needsUpdate = true;
+  if(CE.wheel) CE.wheel.rotation.x = t*0.05;
+}
+function openSinger(i, q){
+  var s = SINGERS[i], h = '<h3>🎤 ' + esc(s.nm) + '</h3><div class="gc-sub">' + esc(s.from) + ' · ' + esc(s.yrs) + '</div><div class="gc-text">' + esc(s.fr) + '</div>' + (LANG === 'en' ? '<div class="gc-sub">' + esc(s.en) + '</div>' : '');
+  h += '<div class="gc-text"><b>' + L2('Best-known songs', 'Chansons célèbres') + ' :</b><br>' + s.songs.map(function(x){ return '♪ ' + esc(x); }).join('<br>') + '</div>';
+  h += '<div class="gc-sub">' + L2('Ask your teacher to listen to them together!', 'Demande à ton enseignant(e) de les écouter ensemble !') + '</div>';
+  if(!q) h += '<div class="gc-row">' + gBtn('singq', i, L2('QUIZ (+🪙)', 'QUIZ (+🪙)'), 'go', ' data-enter="1"') + gBtn('singlist', null, L2('ALL THE SINGERS', 'TOUS LES CHANTEURS')) + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>';
+  else {
+    h += '<div class="gc-big">' + esc(q.say) + '</div><div class="gc-grid">' + q.opts.map(function(o, k){ return gOpt('singans', k, esc(o), q.picked == null ? '' : k === q.ans ? 'right' : k === q.picked ? 'wrongpick' : '', q.picked != null); }).join('') + '</div>';
+    if(q.picked != null) h += '<div class="gc-big">' + (q.picked === q.ans ? '<span class="good">✓ Bravo !</span>' + (q.got ? ' +1 🪙' : '') : '<span class="bad">✗ ' + esc(q.opts[q.ans]) + '</span>') + '</div><div class="gc-row">' + gBtn('singq', i, L2('ANOTHER QUESTION', 'UNE AUTRE QUESTION')) + gBtn('close', null, L2('CLOSE', 'FERMER'), 'go', ' data-enter="1"') + '</div>';
+  }
+  showCard(h);
+}
+GACT.singq = function(v){
+  var i = v|0, s = SINGERS[i], r = lifeRand('sing' + Date.now()), q;
+  if(r() < 0.5){ var m = mc(r, s.songs[0].replace(/ \(.*\)$/, ''), SINGERS.filter(function(x){ return x !== s; }).map(function(x){ return x.songs[0].replace(/ \(.*\)$/, ''); })); q = {say:L2('Which song is by ', 'Quelle chanson est de ') + s.nm + ' ?', opts:m.opts, ans:m.ans}; }
+  else { var places = SINGERS.map(function(x){ return x.from; }).filter(function(x, k, a){ return a.indexOf(x) === k && x !== s.from; }); var m2 = mc(r, s.from, places); q = {say:L2('Where is ', 'D\'où vient ') + s.nm + (LANG === 'en' ? ' from?' : ' ?'), opts:m2.opts, ans:m2.ans}; }
+  gcard.cur = {kind:'sing', i:i, q:q}; openSinger(i, q);
+};
+GACT.singans = function(v){ var c = gcard.cur, q = c.q; if(q.picked != null) return; q.picked = v|0; if(q.picked === q.ans) q.got = addJeton(1); openSinger(c.i, q); };
+function openSingerList(){
+  showCard('<h3>🎤 ' + L2('THE SINGERS', 'LES CHANTEURS') + '</h3><div class="gc-sub">' + L2('A new star takes the stage every 3 minutes.', 'Une nouvelle star monte sur scène toutes les 3 minutes.') + '</div><div class="gc-grid">' +
+    SINGERS.map(function(s, i){ return gOpt('singone', i, '<b>' + esc(s.nm) + '</b><br><span class="lf-soft">' + esc(s.from) + '</span>', s === singerNow() ? 'sel' : ''); }).join('') + '</div><div class="gc-row">' + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>');
+}
+GACT.singlist = openSingerList;
+GACT.singone = function(v){ openSinger(v|0); };
+
+/* ---------- LE CENTRE COMMERCIAL (the mall, Champs-Élysées district) ----------
+   Six shops round a big hall. In each shop: CLOTHES GAMES (name the clothes with un/une/des, colour agreement,
+   shop conversations) for 🪙, and CLOTHES TO BUY with your 🪙 - ask for them in French, then wear them. */
+OUTFITS.push(
+  {en:'Hoodie', fr:'Sweat à capuche', icon:'🧥', cost:6, shell:0x6b6f78, front:0x5a5e66, legs:0x2a3a5a},
+  {en:'Denim jacket', fr:'Veste en jean', icon:'🧥', cost:8, shell:0x3a5a8a, front:0xf4f4f4},
+  {en:'Red winter coat', fr:'Manteau d\'hiver rouge', icon:'🧣', cost:10, shell:0xc8382f, scarf:0xf4f4f4, legs:0x2a2d36},
+  {en:'Yellow summer dress', fr:'Robe d\'été jaune', icon:'👗', cost:8, shell:0xf2d22a, legs:0xf2d22a},
+  {en:'Tracksuit', fr:'Survêtement', icon:'🏃', cost:7, shell:0x1f6fb8, stripes:0xf4f4f4, legs:0x1f6fb8},
+  {en:'Checked shirt', fr:'Chemise à carreaux', icon:'👔', cost:6, shell:0xc8382f, stripes:0x2a2d36},
+  {en:'Pirate', fr:'Pirate', icon:'🏴‍☠️', cost:14, shell:0xf4f0e0, cape:0x8a1c1c, top:0x1b1b1d, scarf:0xc8382f, hideHat:true},
+  {en:'Ski suit', fr:'Combinaison de ski', icon:'🎿', cost:9, shell:0x2f9a4a, legs:0x2f9a4a, scarf:0xe3b52c}
+);
+var CLOTHES = [['un t-shirt', 'a T-shirt', '👕', 'm'], ['un pantalon', 'trousers', '👖', 'm'], ['une robe', 'a dress', '👗', 'f'], ['un short', 'shorts', '🩳', 'm'], ['un manteau', 'a coat', '🧥', 'm'], ['une écharpe', 'a scarf', '🧣', 'f'],
+  ['des gants', 'gloves', '🧤', 'p'], ['des chaussettes', 'socks', '🧦', 'p'], ['des baskets', 'trainers', '👟', 'p'], ['des chaussures', 'shoes', '👞', 'p'], ['des bottes', 'boots', '👢', 'p'], ['une casquette', 'a cap', '🧢', 'f'],
+  ['un chapeau', 'a hat', '👒', 'm'], ['une chemise', 'a shirt', '👔', 'f'], ['une cravate', 'a tie', '👔', 'f'], ['un maillot de bain', 'a swimsuit', '🩱', 'm'], ['des lunettes de soleil', 'sunglasses', '🕶', 'p'], ['un sac à dos', 'a backpack', '🎒', 'm'], ['une montre', 'a watch', '⌚', 'f'], ['un pull', 'a jumper', '🧶', 'm']];
+var COLOUR_AGREE = [['rouge', 'rouge', 'rouges', 'rouges'], ['vert', 'verte', 'verts', 'vertes'], ['bleu', 'bleue', 'bleus', 'bleues'], ['noir', 'noire', 'noirs', 'noires'], ['blanc', 'blanche', 'blancs', 'blanches'], ['gris', 'grise', 'gris', 'grises'], ['jaune', 'jaune', 'jaunes', 'jaunes'], ['violet', 'violette', 'violets', 'violettes']];
+var MALL = {name:'Centre Commercial Les Galeries', x:-25, z:-660};
+MALL.door = {x:-25, z:-624, yaw:0};
+var MALL_SHOPS = [
+  {nm:'Mode & Style', col:0xd27aa0, sells:[1, 10, 11, 13, 15, 6]},
+  {nm:'Sport Champion', col:0x1f6fb8, sells:[5, 14, 17]},
+  {nm:'L\'Hiver Chaud', col:0xc8382f, sells:[12, 17, 10]},
+  {nm:'Déguisements Fous', col:0x8a3ad6, sells:[16, 7, 8, 9, 2, 4]},
+  {nm:'Chaussures & Cie', col:0x5a3a22, sells:[]},
+  {nm:'Accessoires Chic', col:0xe3b52c, sells:[3]}
+];
+(function buildMall(){
+  var X = MALL.x, Z = MALL.z, B = new MeshBatch(), L = new Lot(B, 0, 0, 0);
+  flat(110, 56, X, Z, 0xe8e4dc, 0.045);
+  L.box(110, 10, 1, X, 5, Z - 28, 0xd8d2c4); L.box(1, 10, 56, X - 55, 5, Z, 0xd8d2c4); L.box(1, 10, 56, X + 55, 5, Z, 0xd8d2c4);
+  L.box(47, 10, 1, X - 31.5, 5, Z + 28, 0xd8d2c4); L.box(47, 10, 1, X + 31.5, 5, Z + 28, 0xd8d2c4); L.box(16, 3, 1, X, 8.5, Z + 28, 0xd8d2c4);
+  addSolid(X - 55, X + 55, Z - 28.5, Z - 27.5, 'champs', -1, 10); addSolid(X - 55.5, X - 54.5, Z - 28, Z + 28, 'champs', -1, 10); addSolid(X + 54.5, X + 55.5, Z - 28, Z + 28, 'champs', -1, 10);
+  addSolid(X - 55, X - 8, Z + 27.5, Z + 28.5, 'champs', -1, 10); addSolid(X + 8, X + 55, Z + 27.5, Z + 28.5, 'champs', -1, 10);
+  var glass = new THREE.Mesh(new THREE.BoxGeometry(112, 0.5, 58), new THREE.MeshLambertMaterial({color:0xcfe6f0, transparent:true, opacity:0.4})); glass.position.set(X, 10.2, Z); root.add(glass);
+  L.cyl(5, 5.4, 0.8, X, 0.4, Z, 0xd8d2c4, 20); var w = new THREE.Mesh(new THREE.CylinderGeometry(4.6, 4.6, 0.2, 20), waterMat); w.position.set(X, 0.75, Z); root.add(w); pushSegCollider(X, Z, X, Z, 5.4, -50, 1);
+  [[-40, -14], [-20, -14], [0, -14], [20, -14], [40, -14], [-40, 14]].forEach(function(p, i){
+    var s = MALL_SHOPS[i]; if(!s) return;
+    var back = i < 5, sx = X + p[0], sz = back ? Z - 22 : Z + 8, face = back ? 0 : 0;
+    if(i === 5){ sx = X + 44; sz = Z + 8; }
+    L.box(16, 7, 10, sx, 3.5, sz, 0xf4f0e8); L.box(16.2, 1.2, 0.3, sx, 6.2, sz + 5.1, s.col); L.box(12, 4.5, 0.15, sx, 2.6, sz + 5.05, 0x9fc8e0);
+    addSolid(sx - 8, sx + 8, sz - 5, sz + 5, 'champs', -1, 7);
+    airSign(s.nm, sx, 6.2, sz + 5.3, 0, 9, '#' + ('00000' + s.col.toString(16)).slice(-6));
+    addSpot({x:sx, z:sz + 7.5, r:3.8, label:function(){ return '🛒 ' + s.nm + ' - ' + L2('clothes games and clothes to buy', 'jeux et vêtements à acheter'); }, act:function(){ openMallShop(i); }});
+  });
+  B.build();
+  airSign('🛒 CENTRE COMMERCIAL LES GALERIES', X, 12, Z + 28.6, 0, 30, '#2a6fa8');
+})();
+function ownsOut(i){ var e = life.eco; if(!e) return i === 0; if(i === 0) return true; var l = e.outl || String(e.outs || '').split('').map(function(d){ return d|0; }); return l.indexOf(i) >= 0; }
+function addOut(i){ var e = life.eco; var l = e.outl || String(e.outs || '0').split('').map(function(d){ return d|0; }); if(l.indexOf(i) < 0) l.push(i); e.outl = l; }
+function openMallShop(i, msg){
+  var s = MALL_SHOPS[i]; gcard.cur = {kind:'mall', i:i};
+  var tok = hasChar() ? life.eco.tok|0 : 0;
+  var h = '<h3>🛒 ' + esc(s.nm) + '</h3><div class="gc-sub">🪙 ' + tok + ' · ' + L2('earn jetons with the clothes games', 'gagne des jetons avec les jeux') + '</div>' + (msg || '') + noCharLine();
+  h += '<div class="gc-grid">' + gOpt('mallgame', i + ':name', '<b>👕 ' + L2('NAME THE CLOTHES', 'NOMME LES VÊTEMENTS') + '</b><br><span class="lf-soft">un, une, des</span>') + gOpt('mallgame', i + ':colour', '<b>🎨 ' + L2('COLOUR AGREEMENT', 'L\'ACCORD DES COULEURS') + '</b><br><span class="lf-soft">une robe verte</span>') +
+    gOpt('mallgame', i + ':talk', '<b>💬 ' + L2('IN THE SHOP', 'DANS LE MAGASIN') + '</b><br><span class="lf-soft">' + L2('sizes, prices, trying on', 'tailles, prix, essayage') + '</span>') + gOpt('mallgame', i + ':mix', '<b>🎲 ' + L2('MIXED', 'MÉLANGE') + '</b><br><span class="lf-soft">10 questions</span>') + '</div>';
+  if(s.sells.length){
+    h += '<div class="gc-sub" style="margin-top:12px">' + L2('CLOTHES FOR SALE', 'VÊTEMENTS À VENDRE') + '</div><div class="gc-grid">' + s.sells.map(function(k){ var o = OUTFITS[k], have = ownsOut(k);
+      return gOpt('mallbuy', k, o.icon + ' <b>' + esc(L2(o.en, o.fr)) + '</b><br><span class="lf-soft">' + (have ? L2('yours - click to wear', 'à toi - clique pour la porter') : o.cost + ' 🪙') + '</span>', have && life.eco && (life.eco.out|0) === k ? 'sel' : '', !have && tok < o.cost); }).join('') + '</div>';
+  }
+  h += '<div class="gc-row">' + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>';
+  showCard(h);
+}
+function clothesQuestion(r, kind){
+  if(kind === 'mix') kind = pickR(r, ['name', 'name', 'colour', 'talk']);
+  if(kind === 'name'){ var c = pickR(r, CLOTHES), m = mc(r, c[0], CLOTHES.filter(function(x){ return x !== c && x[2] !== c[2]; }).map(function(x){ return x[0]; }));
+    return {q:'<div class="gc-emoji">' + c[2] + '</div>', raw:true, hint:L2('What is it? (with un / une / des)', 'Qu\'est-ce que c\'est ? (avec un / une / des)'), opts:m.opts, ans:m.ans}; }
+  if(kind === 'colour'){
+    var c2 = pickR(r, CLOTHES), col = pickR(r, COLOUR_AGREE), g = c2[3], plural = g === 'p', fem = g === 'f' || (plural && /^des (chaussettes|baskets|chaussures|bottes|lunettes)/.test(c2[0]));
+    var right = col[plural ? (fem ? 3 : 2) : (fem ? 1 : 0)], forms = col.filter(function(x, i, a){ return a.indexOf(x) === i && x !== right; });
+    var noun = c2[0].replace(/^(un|une|des) /, ''), art = c2[0].split(' ')[0], m2 = mc(r, art + ' ' + noun + ' ' + right, forms.map(function(f){ return art + ' ' + noun + ' ' + f; }));
+    return {q:art + ' ' + noun + ' (' + col[0] + ')', hint:L2('Make the colour agree!', 'Accorde la couleur !') + ' ' + c2[2], opts:m2.opts, ans:m2.ans};
+  }
+  var T = pickR(r, [
+    ['« Quelle taille faites-vous ? »', L2('The shop assistant asks your size.', 'La vendeuse demande ta taille.'), 'Je fais du M.', ['Je fais du sport.', 'J\'ai douze ans.', 'Il fait beau.']],
+    ['« Je peux vous aider ? »', L2('What does the assistant say?', 'Que dit la vendeuse ?'), L2('Can I help you?', 'Puis-je vous aider ?'), L2('Are you lost?|Do you want to dance?|It is closed.', 'Vous êtes perdu ?|Vous voulez danser ?|C\'est fermé.').split('|')],
+    ['« Où sont les cabines d\'essayage ? »', L2('What are you looking for?', 'Que cherches-tu ?'), L2('the changing rooms', 'les cabines pour essayer les vêtements'), L2('the toilets|the exit|the café', 'les toilettes|la sortie|le café').split('|')],
+    ['« Je peux essayer ce pantalon ? »', L2('What do you want to do?', 'Que veux-tu faire ?'), L2('try on the trousers', 'essayer le pantalon'), L2('buy a cake|wash the trousers|sell the trousers', 'acheter un gâteau|laver le pantalon|vendre le pantalon').split('|')],
+    ['« C\'est trop grand. Vous l\'avez en plus petit ? »', L2('What is the problem?', 'Quel est le problème ?'), L2('it is too big', 'c\'est trop grand'), L2('it is too expensive|it is ugly|it is wet', 'c\'est trop cher|c\'est moche|c\'est mouillé').split('|')],
+    ['« Ce pull coûte trente-neuf euros quatre-vingt-dix-neuf. »', L2('How much is the jumper?', 'Combien coûte le pull ?'), '39,99 €', ['29,99 €', '39,90 €', '93,99 €']],
+    ['« Vous payez par carte ou en espèces ? »', L2('Answer: by card.', 'Réponds : par carte.'), 'Par carte, s\'il vous plaît.', ['En haut, merci.', 'Je fais du M.', 'Il est midi.']]
+  ]), m3 = mc(r, T[2], T[3]);
+  return {q:T[0], hint:T[1], opts:m3.opts, ans:m3.ans};
+}
+GACT.mallgame = function(v){ var kv = v.split(':'); gcard.cur = {kind:'mallg', i:kv[0]|0, mode:kv[1], n:0, right:0, got:0, r:lifeRand('mall' + Date.now())}; mallNext(); };
+function mallNext(){
+  var c = gcard.cur;
+  if(c.n >= 10){ showCard('<h3>🛒 ' + esc(MALL_SHOPS[c.i].nm) + '</h3><div class="gc-emoji">' + (c.right >= 8 ? '🏆' : '👍') + '</div><div class="gc-big">' + c.right + ' / 10</div><div class="gc-sub">' + (c.got ? '+' + c.got + ' 🪙' : '') + '</div>' + noCharLine() + '<div class="gc-row">' + gBtn('mallgame', c.i + ':' + c.mode, L2('PLAY AGAIN', 'REJOUER'), 'go', ' data-enter="1"') + gBtn('mallback', c.i, L2('BACK TO THE SHOP', 'RETOUR AU MAGASIN')) + '</div>'); return; }
+  c.q = clothesQuestion(c.r, c.mode); c.picked = null; mallRender();
+}
+function mallRender(){
+  var c = gcard.cur, q = c.q, done = c.picked != null;
+  var h = '<h3>🛒 ' + esc(MALL_SHOPS[c.i].nm) + '<span class="gc-score">' + (c.n + 1) + '/10 · ✓ ' + c.right + '</span></h3><div class="gc-sub">' + esc(q.hint) + '</div>' + (q.raw ? q.q : '<div class="gc-big">' + esc(q.q) + '</div>');
+  h += '<div class="gc-grid">' + q.opts.map(function(o, k){ return gOpt('mallans', k, esc(o), !done ? '' : k === q.ans ? 'right' : k === c.picked ? 'wrongpick' : '', done); }).join('') + '</div>';
+  if(done) h += '<div class="gc-big">' + (c.picked === q.ans ? '<span class="good">✓ Bravo !</span>' : '<span class="bad">✗ ' + esc(q.opts[q.ans]) + '</span>') + '</div><div class="gc-row">' + gBtn('mallnext', null, L2('NEXT', 'SUIVANT'), 'go', ' data-enter="1"') + '</div>';
+  showCard(h);
+}
+GACT.mallans = function(v){ var c = gcard.cur; if(c.picked != null) return; c.picked = v|0; if(c.picked === c.q.ans){ c.right++; c.got += addJeton(1); } mallRender(); };
+GACT.mallnext = function(){ gcard.cur.n++; mallNext(); };
+GACT.mallback = function(v){ openMallShop(v|0); };
+GACT.mallbuy = function(v){
+  var k = v|0, o = OUTFITS[k], c = gcard.cur, i = c.i;
+  if(!hasChar()){ openMallShop(i); return; }
+  if(ownsOut(k)){ life.eco.out = k; lifeSave(true); sendPresence(true); openMallShop(i, '<div class="good gc-big">' + o.icon + ' ' + L2('You\'re wearing it!', 'Tu la portes !') + '</div>'); return; }
+  var r = lifeRand('buy' + Date.now()), name = L2(o.en, o.fr).toLowerCase();
+  var m = mc(r, 'Je voudrais acheter cette tenue, s\'il vous plaît.', ['Je voudrais vendre mes chaussettes.', 'Donne-moi ça !', 'Je voudrais manger une pizza, s\'il vous plaît.']);
+  gcard.cur = {kind:'mallorder', i:i, k:k, q:m};
+  showCard('<h3>🛒 ' + esc(MALL_SHOPS[i].nm) + '</h3><div class="gc-emoji">' + o.icon + '</div><div class="gc-big">« Bonjour ! Je peux vous aider ? »</div><div class="gc-sub">' + L2('You want to buy: ', 'Tu veux acheter : ') + esc(L2(o.en, o.fr)) + ' (' + o.cost + ' 🪙). ' + L2('What do you say?', 'Que dis-tu ?') + '</div><div class="gc-grid">' +
+    m.opts.map(function(x, j){ return gOpt('mallorder', j, esc(x)); }).join('') + '</div><div class="gc-row">' + gBtn('mallback', i, L2('BACK', 'RETOUR')) + '</div>');
+};
+GACT.mallorder = function(v){
+  var c = gcard.cur, o = OUTFITS[c.k];
+  if((v|0) !== c.q.ans){ openMallShop(c.i, '<div class="bad gc-big">' + L2('The assistant didn\'t understand. Say: ', 'La vendeuse n\'a pas compris. Dis : ') + esc(c.q.opts[c.q.ans]) + '</div>'); return; }
+  if((life.eco.tok|0) < o.cost){ openMallShop(c.i); return; }
+  life.eco.tok -= o.cost; addOut(c.k); life.eco.out = c.k; lifeSave(true); sendPresence(true);
+  openMallShop(c.i, '<div class="good gc-big">' + o.icon + ' ' + L2('Bought and wearing it: ', 'Achetée et portée : ') + esc(L2(o.en, o.fr)) + ' ! « Merci, bonne journée ! »</div>');
+};
+
+/* ---------- 🔍 SEARCH: find any place and go straight there ---------- */
+function searchIndex(){
+  var L = [];
+  function add(icon, name, sub, x, z, yaw, act){ L.push({icon:icon, name:name, sub:sub || '', x:x, z:z, yaw:yaw || 0, act:act}); }
+  LANDMARK_INFO.forEach(function(l){ if(l.view) return; var g = l.go || {x:l.x, z:l.z + l.r + 4}; add('🏛', L2(l.en, l.fr), L2('Monument', 'Monument'), g.x, g.z, g.yaw || 0); });
+  VILLAGES.forEach(function(v){ add(v.elite ? '🥖' : '🏘', v.q, v.elite ? L2('Madame\'s elite village', 'Le village d\'élite de Madame') : t('vgClassOf', {t:tx(v.t)}), 0, 0, 0, function(){ goVillage(v); }); });
+  add('✈', 'Aéroport Paris-CDG', L2('Flights to the test cities and Québec', 'Vols vers les villes test et Québec'), CDG.x + 6, CDG.z - 25, 0);
+  add('🛍', L2('Champs-Élysées (avenue)', 'Avenue des Champs-Élysées'), L2('Shops, cafés, restaurants', 'Boutiques, cafés, restaurants'), -420, -520, -Math.PI/2);
+  CE_SHOPS.forEach(function(s, i){ var north = i < 14, k = north ? i : i - 14, x = CE.x0 + 30 + k*26, fz = north ? CE.z - 31 + 4 : CE.z + 31 - 4; add('🛍', s[0], 'Champs-Élysées', x, fz, north ? 0 : Math.PI); });
+  if(typeof ARC !== 'undefined') add('🕹', ARC.name, L2('Games: verbs, colours, numbers...', 'Jeux : verbes, couleurs, nombres...'), ARC.door.x, ARC.door.z, ARC.door.yaw);
+  if(typeof STAD !== 'undefined') add('🎤', STAD.name, L2('Concerts of French singers', 'Concerts de chanteurs français'), STAD.door.x, STAD.door.z, STAD.door.yaw);
+  if(typeof MALL !== 'undefined') add('🛒', MALL.name, L2('Clothes shops and games', 'Magasins de vêtements et jeux'), MALL.door.x, MALL.door.z, MALL.door.yaw);
+  add('🚔', L2('Public Shame Chamber', 'Chambre de la honte publique'), '', JAIL.x, JAIL.z + 8, 0);
+  // Québec
+  var Q = [['❄', 'Québec - Carnaval', L2('The Carnaval de Québec', 'Le Carnaval de Québec'), -30, 200, -0.25], ['🏰', 'Palais de glace', 'Québec', 0, -100, 0], ['🦉', 'Givre', L2('The Carnaval host', 'L\'hôte du Carnaval'), -12, -86, 0],
+    ['🛷', 'Glissades', L2('Ice slide', 'Glissade sur glace'), 64, -48, 0], ['🎿', 'Ski · télésiège', 'Québec', 160, -100, 0], ['🐕', 'Traîneau à chiens', L2('Dogsled', 'Traîneau'), -132, 60, Math.PI/2],
+    ['⛸', 'Patinoire', L2('Skating rink', 'Patinoire'), 100, 45, 0], ['🛷', 'Motoneige', L2('Snowmobile', 'Motoneige'), 120, 166, 0], ['❄', 'Sculptures sur neige', 'Québec', -110, 50, 0],
+    ['🩱', 'Bain de neige', 'Québec', -110, 140, 0], ['🏰', L2('Vacation ice palaces', 'Palais de vacances'), 'Québec', 270, -100, Math.PI], ['🍁', 'La Cabane à Sucre', L2('Food stand', 'Kiosque'), -11, 175, Math.PI/2], ['🍟', 'Chez Poutine', L2('Food stand', 'Kiosque'), 11, 175, -Math.PI/2]];
+  Q.forEach(function(q){ add(q[0], q[1], q[2], qx(q[3]), qz(q[4]), q[5]); });
+  QC_CULTURE.forEach(function(c){ add('📜', c.t, L2('Culture station, Québec', 'Station culturelle, Québec'), qx(c.x + (c.x < 0 ? 2.5 : -2.5)), qz(c.z), c.x < 0 ? -Math.PI/2 : Math.PI/2); });
+  // players' shops and houses
+  PLOTS.forEach(function(p){ if(!p.data || p.data.builtIn) return; var w = plotToWorld(p, 0, 7.8); add(p.kind === 'store' ? '🏪' : '🏠', plotTitle(p), plotLabel(p) + ' · ' + memberName(p.data.o), w.x, w.z, 0); });
+  // streets
+  var seen = {};
+  STREETS.forEach(function(s){ if(!s.name || seen[s.name]) return; seen[s.name] = 1; var mid = (s.a + s.b)/2; add('🛣', s.name, L2('Street', 'Rue'), s.v ? s.at + 6 : mid, s.v ? mid : s.at + 6, 0); });
+  return L;
+}
+var srch = {el:null};
+(function(){
+  var lang = document.getElementById('lang-toggle'), b = document.createElement('button');
+  b.className = 'bar-btn'; b.id = 'search-toggle'; b.textContent = '🔍'; b.title = 'Search / Rechercher';
+  lang.parentNode.insertBefore(b, lang);
+  b.addEventListener('click', function(){ openSearch(); });
+  window.addEventListener('keydown', function(e){ if(e.key === '/' && !e.target.closest('input,textarea,select') && titleScreen.classList.contains('hidden')){ e.preventDefault(); openSearch(); } });
+})();
+function openSearch(){
+  showCard('<h3>🔍 ' + L2('FIND A PLACE', 'TROUVER UN LIEU') + '</h3><input class="gc-in" id="srch-q" autocomplete="off" spellcheck="false" placeholder="' + esc(L2('Eiffel Tower, poutine, Opéra, Mani, a player\'s shop...', 'Tour Eiffel, poutine, Opéra, Mani, la boutique d\'un joueur...')) + '"><div id="srch-res"></div>');
+  srch.list = searchIndex();
+  var q = document.getElementById('srch-q');
+  q.addEventListener('input', function(){ renderSearch(q.value); });
+  renderSearch('');
+}
+function renderSearch(q){
+  var words = nameKeyWords(q), out = [];
+  srch.list.forEach(function(it, i){
+    var hay = nameKeyWords(it.name + ' ' + it.sub).join(' ');
+    if(words.every(function(w){ return hay.indexOf(w) >= 0; })) out.push(i);
+  });
+  if(!q) out = out.filter(function(i){ var ic = srch.list[i].icon; return ic === '🏛' || ic === '🏘' || ic === '🥖' || ic === '✈' || ic === '❄' || ic === '🕹' || ic === '🎤' || ic === '🛒'; });
+  var res = document.getElementById('srch-res');
+  res.innerHTML = out.slice(0, 14).map(function(i){ var it = srch.list[i]; return gOpt('srchgo', i, it.icon + ' <b>' + esc(it.name) + '</b>' + (it.sub ? '<br><span class="lf-soft">' + esc(it.sub) + '</span>' : '')); }).join('') ||
+    '<div class="gc-sub">' + L2('Nothing found - try another word.', 'Rien trouvé - essaie un autre mot.') + '</div>';
+  var first = res.querySelector('[data-g]'); if(first) first.setAttribute('data-enter', '1');
+}
+function nameKeyWords(s){ return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean); }
+GACT.srchgo = function(v){
+  var it = srch.list[v|0]; if(!it) return;
+  gcard.resume = false; closeCard();
+  if(typeof amJailed === 'function' && amJailed()){ showToast(t('vgJail')); return; }
+  if(it.act){ it.act(); return; }
+  if(driving){ exitDriveMode(); driving = false; applyModeUI(); }
+  var fade = flyCard.fade; fade.style.opacity = 1;
+  setTimeout(function(){ goTo({x:it.x, z:it.z, yaw:it.yaw}); setTimeout(function(){ fade.style.opacity = 0; }, 300); }, 500);
+  showToast('📍 ' + it.name);
+};
+
 /* ---------- JAIL (for Madame's class) ----------
    Say something inappropriate in the chat (anything the swear filter catches, English or French) and the message is
    not sent: you go straight to jail - a cell with bars, far north of the city. In jail you can't walk out, drive,
@@ -10889,7 +12239,7 @@ function farLandTick(){
     bc.position.sub(farLand.c); g.add(bc); farLand.bag = bc;
     g.children.forEach(function(o){ if(o !== bc && o.position) o.position.sub(farLand.c); });
   }
-  var show = d > 950;
+  var show = d > 950 && Math.abs(camera.position.x) < 1500;
   g.visible = show;
   if(!show) return;
   var k = 700/d;
@@ -11074,6 +12424,8 @@ function animate(){
   updateSpeedo();
   lifeTick(dt);
   jailTick();
+  qcTick(dt); stadiumTick();
+  if(!ICE.t || performance.now() - ICE.t > 1000){ ICE.t = performance.now(); if(Math.hypot(camera.position.x - QC.x, camera.position.z - QC.z) < 800) iceSync(); }
   villageTick();
   sendPresence(false);
   followSky();
