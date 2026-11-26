@@ -7737,6 +7737,7 @@ function presenceState(){
   if(typeof life !== 'undefined' && life.eco && life.eco.pet) s.pet = life.eco.pet.k + '|' + (life.eco.pet.c|0);
   if(typeof radio !== 'undefined'){ if(radio.req) s.rq = radio.req; var vk = Object.keys(radio.vote)[0]; if(vk) s.vt = vk + '#' + radio.vote[vk]; }
   if(typeof amElite === 'function' && !net.isOwner && !amTeacher() && amElite()) s.el = 1;
+  if(typeof PLEA !== 'undefined' && PLEA.done && typeof amJailed === 'function' && amJailed()) s.plea = PLEA.done.s + '|' + PLEA.done.at;
   if(updateCheck.outdated()) s.old = 1;
   if(net.isOwner){ s.role = 'owner'; if(myAnnounce) s.announce = myAnnounce; if(myNap && napPhase()) s.nap = myNap; if(myLeash) s.leash = myLeash; }
   return s;
@@ -15317,6 +15318,150 @@ var _enterIntR = enterInterior;
 enterInterior = function(o, at){ _enterIntR(o, at); if(ROOM_SONG[o.id]) setTimeout(function(){ if(INT.cur === o) roomSongStart(o); }, 900); };
 var _interiorTickR = interiorTick;
 interiorTick = function(dt){ _interiorTickR(dt); if(player.loopRoom && (!INT.cur || INT.cur.id !== player.loopRoom)) roomSongStop(); };
+/* ---------- 💼 LE CENTRE DE L'EMPLOI: every job, a day in its life, its pay, its words, practice to earn money ---------- */
+var JOBC = [
+ {id:'serveur', icon:'☕', fr:'Serveur / Serveuse', en:'Café server', pay:1900, col:0x8a1c24, place:'Le Grand Café des Champs',
+  about:'Tu accueilles les clients, tu prends les commandes, tu sers les plats et tu calcules l\'addition. Le sourire est très important !',
+  day:[['7 h 30', 'J\'arrive au café et je prépare la terrasse.'], ['8 h', 'Je sers les premiers cafés et les croissants.'], ['12 h', 'C\'est le coup de feu : beaucoup de clients pour le déjeuner !'], ['15 h', 'Je fais une pause et je mange.'], ['16 h', 'Je sers des chocolats chauds et des crêpes.'], ['18 h', 'Je compte la caisse et je range.']],
+  voc:[['la carte (le menu)', 'the menu'], ['la commande', 'the order'], ['l\'addition', 'the bill'], ['le pourboire', 'the tip'], ['le plateau', 'the tray'], ['la terrasse', 'the terrace'], ['le client / la cliente', 'the customer'], ['servir', 'to serve']],
+  q:[['Un client entre. Tu dis...', '« Bonjour ! Une table pour combien de personnes ? »', ['« Qu\'est-ce que tu veux ? »', '« C\'est fermé. »', '« Au revoir ! »']], ['Le client veut payer. Il demande...', 'l\'addition', ['la carte', 'le plateau', 'la terrasse']], ['Un café coûte 2,50 € et un croissant 1,50 €. L\'addition ?', '4 €', ['3 €', '5 €', '6 €']], ['Le client laisse de l\'argent en plus pour toi. C\'est...', 'un pourboire', ['une commande', 'un menu', 'un plateau']]]},
+ {id:'caissier', icon:'🧾', fr:'Caissier / Caissière', en:'Cashier', pay:1867, col:0xc8382f, place:'Supermarché du Monde',
+  about:'Tu passes les articles à la caisse, tu dis le total et tu rends la monnaie. Tu dois être rapide, précis et poli.',
+  day:[['8 h', 'J\'ouvre ma caisse et je compte le fond de caisse.'], ['9 h', 'Je scanne les courses des premiers clients.'], ['11 h', 'Je réponds aux questions : « Où sont les pâtes ? »'], ['13 h', 'Pause déjeuner.'], ['14 h', 'Beaucoup de clients : je rends la monnaie vite et bien.'], ['17 h', 'Je ferme ma caisse et je compte l\'argent.']],
+  voc:[['la caisse', 'the till'], ['la monnaie', 'the change'], ['le ticket de caisse', 'the receipt'], ['scanner', 'to scan'], ['le sac', 'the bag'], ['la carte bancaire', 'the bank card'], ['les espèces', 'cash'], ['le code-barres', 'the barcode']],
+  q:[['Le total est 7,40 €. Le client donne 10 €. Tu rends...', '2,60 €', ['3,60 €', '2,40 €', '17,40 €']], ['Le client paie avec des billets et des pièces. Il paie en...', 'espèces', ['carte', 'chèque', 'chocolat']], ['Tu donnes au client le papier avec la liste des achats : c\'est...', 'le ticket de caisse', ['le menu', 'le passeport', 'le journal']], ['Pour être poli à la fin, tu dis...', '« Merci, bonne journée ! »', ['« Suivant ! Vite ! »', '« Va-t\'en. »', '« Rien. »']]]},
+ {id:'boulanger', icon:'🥖', fr:'Boulanger / Boulangère', en:'Baker', pay:2050, col:0xb8822e, place:'Boulangerie de l\'Avenue',
+  about:'Tu fabriques le pain, les baguettes et les viennoiseries très tôt le matin. Tu connais les recettes, les ingrédients et la cuisson.',
+  day:[['3 h', 'J\'arrive à la boulangerie. Il fait nuit !'], ['3 h 30', 'Je pétris la pâte et je nourris le levain.'], ['5 h', 'Je façonne les baguettes et les croissants.'], ['6 h', 'Tout cuit au four : ça sent bon !'], ['7 h', 'La boulangerie ouvre : les clients achètent le pain chaud.'], ['12 h', 'Je finis ma journée et je dors l\'après-midi.']],
+  voc:[['la farine', 'flour'], ['la levure', 'yeast'], ['le levain', 'sourdough starter'], ['pétrir', 'to knead'], ['le four', 'the oven'], ['la pâte', 'the dough'], ['les viennoiseries', 'pastries (croissants...)'], ['enfourner', 'to put in the oven']],
+  q:[['Pour faire du pain, on mélange de la farine, de l\'eau, du sel et...', 'de la levure ou du levain', ['du chocolat', 'du lait de coco', 'du sucre glace']], ['Travailler la pâte avec les mains, c\'est...', 'pétrir', ['nager', 'danser', 'peindre']], ['Les croissants et les pains au chocolat, ce sont des...', 'viennoiseries', ['légumes', 'fromages', 'boissons']], ['À quelle heure un boulanger commence-t-il souvent ?', 'vers 3 ou 4 heures du matin', ['à midi', 'à 20 heures', 'à minuit et demi le dimanche seulement']]]},
+ {id:'livreur', icon:'📦', fr:'Livreur / Livreuse', en:'Delivery rider', pay:1950, col:0x2f8a3a, place:'les rues de Paris',
+  about:'Tu livres des colis et des repas à vélo ou en scooter. Tu dois connaître les rues, lire les adresses et être à l\'heure.',
+  day:[['8 h', 'Je prends mes colis au dépôt.'], ['9 h', 'Je trouve les adresses avec mon GPS.'], ['11 h', 'Je livre des repas : vite, ils sont chauds !'], ['13 h', 'Pause.'], ['14 h', 'Je livre des colis dans tout Paris.'], ['18 h', 'Je rentre au dépôt.']],
+  voc:[['le colis', 'the parcel'], ['l\'adresse', 'the address'], ['livrer', 'to deliver'], ['le casque', 'the helmet'], ['à droite / à gauche', 'right / left'], ['tout droit', 'straight on'], ['le code de la porte', 'the door code'], ['signer', 'to sign']],
+  q:[['« 12, rue de la Paix » : le chiffre 12, c\'est...', 'le numéro de la maison', ['l\'âge du client', 'le prix', 'l\'heure']], ['Pour ta sécurité à vélo, tu portes...', 'un casque', ['une cravate', 'des pantoufles', 'un chapeau de paille']], ['Le GPS dit : « Continuez... »', 'tout droit', ['dans le four', 'à la plage', 'en arrière']], ['Le client prend le colis et écrit son nom : il...', 'signe', ['chante', 'nage', 'cuisine']]]},
+ {id:'guide', icon:'🗼', fr:'Guide touristique', en:'Tour guide', pay:2150, col:0x1f3f8f, place:'les monuments de Paris',
+  about:'Tu fais visiter Paris aux touristes. Tu connais l\'histoire des monuments et tu parles plusieurs langues.',
+  day:[['9 h', 'J\'accueille mon groupe devant la tour Eiffel.'], ['10 h', 'Je raconte l\'histoire de la tour (1889 !).'], ['12 h', 'Déjeuner dans un bistrot avec le groupe.'], ['14 h', 'Visite du Louvre.'], ['16 h', 'Promenade sur les Champs-Élysées jusqu\'à l\'Arc de Triomphe.'], ['18 h', 'Fin de la visite : « Merci et bon séjour ! »']],
+  voc:[['le monument', 'the monument'], ['la visite guidée', 'the guided tour'], ['le groupe', 'the group'], ['le billet d\'entrée', 'the entry ticket'], ['raconter', 'to tell (a story)'], ['le siècle', 'the century'], ['le plan', 'the map'], ['suivez-moi !', 'follow me!']],
+  q:[['En quelle année a-t-on construit la tour Eiffel ?', '1889', ['1789', '1950', '2001']], ['Pour que le groupe reste avec toi, tu dis...', '« Suivez-moi ! »', ['« Partez ! »', '« Dormez ! »', '« Courez ! »']], ['Cent ans, c\'est...', 'un siècle', ['une semaine', 'un mois', 'une heure']], ['Le Louvre était autrefois...', 'un palais royal', ['une gare', 'une piscine', 'un aéroport']]]},
+ {id:'banquier', icon:'🏦', fr:'Conseiller / Conseillère bancaire', en:'Bank adviser', pay:2500, col:0x2a4a6a, place:'la banque',
+  about:'Tu aides les clients à gérer leur argent : ouvrir un compte, économiser, faire un budget.',
+  day:[['9 h', 'J\'ouvre la banque et je lis mes courriels.'], ['10 h', 'J\'aide un étudiant à ouvrir un compte.'], ['12 h', 'Déjeuner.'], ['14 h', 'J\'explique l\'épargne à une famille.'], ['16 h', 'Je prépare un budget avec un client.'], ['17 h 30', 'La banque ferme.']],
+  voc:[['le compte en banque', 'the bank account'], ['économiser', 'to save'], ['l\'épargne', 'savings'], ['le budget', 'the budget'], ['dépenser', 'to spend'], ['le salaire', 'the salary'], ['le distributeur', 'the ATM'], ['le virement', 'the transfer']],
+  q:[['Garder de l\'argent pour plus tard, c\'est...', 'économiser', ['dépenser', 'perdre', 'manger']], ['Tu gagnes 100 € et tu dépenses 70 €. Tu économises...', '30 €', ['170 €', '70 €', '7 €']], ['L\'argent qu\'on reçoit pour son travail, c\'est...', 'le salaire', ['le budget', 'le distributeur', 'le virement']], ['On retire de l\'argent au...', 'distributeur', ['four', 'zoo', 'tableau']]]},
+ {id:'medecin', icon:'🩺', fr:'Médecin', en:'Doctor', pay:6000, col:0x1f6fb8, place:'le cabinet médical',
+  about:'Tu soignes les malades. Tu écoutes, tu examines et tu prescris des médicaments. Il faut étudier environ 10 ans !',
+  day:[['8 h', 'J\'arrive au cabinet et je regarde mes rendez-vous.'], ['8 h 30', 'Premier patient : « Qu\'est-ce qui ne va pas ? »'], ['11 h', 'J\'écoute le cœur d\'un enfant avec mon stéthoscope.'], ['13 h', 'Déjeuner rapide.'], ['14 h', 'Visites à domicile chez des personnes âgées.'], ['18 h', 'J\'écris mes ordonnances et je rentre.']],
+  voc:[['le patient / la patiente', 'the patient'], ['le stéthoscope', 'the stethoscope'], ['l\'ordonnance', 'the prescription'], ['le médicament', 'the medicine'], ['la fièvre', 'the fever'], ['avoir mal à...', 'to have a pain in...'], ['le rendez-vous', 'the appointment'], ['guérir', 'to heal']],
+  q:[['Le patient dit : « J\'ai 39 °C. » Il a de...', 'la fièvre', ['la chance', 'la musique', 'l\'argent']], ['Le papier du médecin pour la pharmacie, c\'est...', 'l\'ordonnance', ['l\'addition', 'le ticket de caisse', 'le menu']], ['Pour demander au patient ce qui va mal :', '« Qu\'est-ce qui ne va pas ? »', ['« Quelle heure est-il ? »', '« Tu veux une pizza ? »', '« Où est le zoo ? »']], ['« J\'ai mal à la tête » veut dire...', 'I have a headache', ['I have a hat', 'I am tall', 'I am happy']]]},
+ {id:'infirmier', icon:'💉', fr:'Infirmier / Infirmière', en:'Nurse', pay:2300, col:0x2a8a8a, place:'l\'hôpital',
+  about:'Tu prends soin des patients à l\'hôpital : tu donnes les médicaments, tu fais les pansements et tu rassures les familles.',
+  day:[['7 h', 'Je commence mon service et je lis les dossiers.'], ['8 h', 'Je prends la température et la tension des patients.'], ['10 h', 'Je fais des pansements.'], ['12 h', 'J\'aide les patients à manger.'], ['15 h', 'Je parle avec les familles.'], ['19 h', 'Je transmets les informations à l\'équipe de nuit.']],
+  voc:[['l\'hôpital', 'the hospital'], ['le pansement', 'the bandage'], ['la température', 'the temperature'], ['la piqûre', 'the injection'], ['soigner', 'to care for'], ['le lit', 'the bed'], ['l\'équipe de nuit', 'the night shift'], ['rassurer', 'to reassure']],
+  q:[['Pour protéger une blessure, l\'infirmière met...', 'un pansement', ['un chapeau', 'une écharpe', 'un sac']], ['On travaille à l\'hôpital la nuit : c\'est...', 'l\'équipe de nuit', ['l\'équipe de foot', 'les vacances', 'la récréation']], ['Pour calmer un patient qui a peur, tu le...', 'rassures', ['grondes', 'ignores', 'chatouilles']], ['L\'infirmière prend la... avec un thermomètre.', 'température', ['tension du piano', 'photo', 'route']]]},
+ {id:'pompier', icon:'🚒', fr:'Pompier / Pompière', en:'Firefighter', pay:2200, col:0xc8382f, place:'la caserne',
+  about:'Tu éteins les incendies, mais surtout tu secours les personnes : accidents, malaises, inondations. À Paris, les pompiers sont des militaires !',
+  day:[['7 h', 'J\'arrive à la caserne et je vérifie le camion.'], ['8 h', 'Sport : il faut être en forme !'], ['10 h', 'Alerte ! Une personne a fait un malaise.'], ['13 h', 'Déjeuner à la caserne.'], ['15 h', 'Exercice d\'incendie avec la grande échelle.'], ['19 h', 'Je reste de garde toute la nuit.']],
+  voc:[['l\'incendie', 'the fire'], ['éteindre', 'to put out'], ['le camion de pompiers', 'the fire engine'], ['la grande échelle', 'the ladder truck'], ['le tuyau', 'the hose'], ['secourir', 'to rescue'], ['la caserne', 'the fire station'], ['le 18', 'the fire emergency number in France']],
+  q:[['En France, on appelle les pompiers au...', '18 (ou 112)', ['15 et demi', '1789', '0']], ['Arrêter un feu, c\'est l\'...', 'éteindre', ['allumer', 'manger', 'peindre']], ['Les pompiers habitent et travaillent à la...', 'caserne', ['boulangerie', 'piscine', 'plage']], ['Pour monter très haut, les pompiers utilisent...', 'la grande échelle', ['un parapluie', 'un ballon', 'une trottinette']]]},
+ {id:'prof', icon:'📚', fr:'Enseignant / Enseignante', en:'Teacher', pay:2400, col:0x5a3a8a, place:'l\'école',
+  about:'Tu enseignes aux élèves, tu prépares les cours, tu corriges les devoirs et tu aides chaque élève à progresser. Comme Madame !',
+  day:[['7 h 30', 'J\'arrive à l\'école et je prépare ma classe.'], ['8 h 30', 'Premier cours : le français !'], ['10 h 15', 'La récréation : je surveille la cour.'], ['12 h', 'Je mange à la cantine.'], ['13 h 30', 'Cours de maths et de sciences.'], ['17 h', 'Je corrige les devoirs à la maison.']],
+  voc:[['l\'élève', 'the student'], ['le cours', 'the lesson'], ['les devoirs', 'the homework'], ['corriger', 'to correct'], ['le tableau', 'the board'], ['la récréation', 'recess'], ['la note', 'the grade'], ['le cahier', 'the notebook']],
+  q:[['Le travail que les élèves font à la maison :', 'les devoirs', ['les vacances', 'la cantine', 'la récréation']], ['La pause dans la cour, c\'est...', 'la récréation', ['le cours', 'la note', 'le tableau']], ['Le professeur écrit au...', 'tableau', ['plafond', 'frigo', 'jardin']], ['Si un élève a une question, il...', 'lève la main', ['crie', 'sort', 'dort']]]},
+ {id:'veto', icon:'🐾', fr:'Vétérinaire', en:'Vet', pay:3200, col:0x4a8a3a, place:'le zoo de Paris',
+  about:'Tu soignes les animaux : chiens, chats, mais aussi les animaux du zoo ! Tu vaccines, tu opères et tu conseilles les propriétaires.',
+  day:[['8 h', 'Je visite les animaux du zoo : la girafe tousse !'], ['10 h', 'Je vaccine un chiot.'], ['12 h', 'Déjeuner.'], ['14 h', 'J\'opère un chat.'], ['16 h', 'J\'explique à une famille comment nourrir leur lapin.'], ['18 h', 'Dernière visite : les manchots vont bien !']],
+  voc:[['l\'animal (les animaux)', 'the animal(s)'], ['le vaccin', 'the vaccine'], ['le chiot', 'the puppy'], ['le chaton', 'the kitten'], ['la patte', 'the paw'], ['nourrir', 'to feed'], ['le propriétaire', 'the owner'], ['opérer', 'to operate']],
+  q:[['Un bébé chien, c\'est un...', 'chiot', ['chaton', 'poussin', 'veau']], ['Le pied d\'un chien, c\'est sa...', 'patte', ['main', 'roue', 'chaussure']], ['Donner à manger à un animal, c\'est le...', 'nourrir', ['laver', 'peindre', 'vacciner']], ['Un bébé chat, c\'est un...', 'chaton', ['chiot', 'agneau', 'lionceau']]]},
+ {id:'chef', icon:'👨‍🍳', fr:'Cuisinier / Cuisinière (chef)', en:'Cook / chef', pay:2300, col:0xf2f2f2, place:'l\'École de Cuisine Française',
+  about:'Tu prépares les plats au restaurant. Tu connais les coupes, les sauces et les cuissons. En cuisine, on dit « Oui, chef ! »',
+  day:[['9 h', 'Je reçois les livraisons : légumes, poissons, viande.'], ['10 h', 'Mise en place : je coupe les légumes en brunoise.'], ['12 h', 'Le service commence : « Deux steaks, une soupe ! »'], ['15 h', 'Pause et nettoyage.'], ['17 h', 'Je prépare les sauces pour le soir.'], ['19 h', 'Deuxième service.']],
+  voc:[['la mise en place', 'prep (getting ready)'], ['le service', 'the service (meal time)'], ['la recette', 'the recipe'], ['la toque', 'the chef\'s hat'], ['le tablier', 'the apron'], ['la poêle', 'the frying pan'], ['goûter', 'to taste'], ['« Oui, chef ! »', '"Yes, chef!"']],
+  q:[['Préparer tous les ingrédients avant de cuisiner, c\'est...', 'la mise en place', ['la récréation', 'le dessert', 'le menu']], ['Le chapeau blanc du chef, c\'est la...', 'toque', ['casquette', 'couronne', 'tuque']], ['Des cubes de 3 mm, c\'est la...', 'brunoise', ['julienne', 'mirepoix', 'chiffonade']], ['Le chef donne un ordre. Tu réponds...', '« Oui, chef ! »', ['« Non ! »', '« Plus tard. »', '« Pourquoi ? »']]]},
+ {id:'pilote', icon:'✈', fr:'Pilote de ligne', en:'Airline pilot', pay:7000, col:0x1f3f8f, place:'l\'aéroport Paris-CDG',
+  about:'Tu pilotes un avion de passagers, par exemple de Paris à Québec. Tu prépares le vol, tu parles avec la tour de contrôle et tu ramènes tout le monde en sécurité.',
+  day:[['6 h', 'Briefing : la météo et la route du vol.'], ['7 h', 'Je vérifie l\'avion avec le copilote.'], ['8 h', 'Décollage de Paris-CDG !'], ['10 h', 'Vol au-dessus de l\'Atlantique.'], ['15 h', 'Atterrissage à Québec.'], ['16 h', 'Repos à l\'hôtel avant le vol retour.']],
+  voc:[['décoller', 'to take off'], ['atterrir', 'to land'], ['le copilote', 'the co-pilot'], ['la tour de contrôle', 'the control tower'], ['la piste', 'the runway'], ['le passager / la passagère', 'the passenger'], ['la ceinture', 'the seatbelt'], ['l\'équipage', 'the crew']],
+  q:[['L\'avion quitte le sol : il...', 'décolle', ['atterrit', 'nage', 'dort']], ['L\'avion arrive et touche le sol : il...', 'atterrit', ['décolle', 'tombe', 'chante']], ['Pour être en sécurité, les passagers attachent leur...', 'ceinture', ['chaussure', 'baguette', 'valise']], ['Le pilote parle avec...', 'la tour de contrôle', ['la boulangerie', 'le zoo', 'la piscine']]]},
+ {id:'info', icon:'💻', fr:'Informaticien / Informaticienne', en:'IT developer', pay:3300, col:0x2a2d36, place:'un bureau à La Défense',
+  about:'Tu crées des sites web, des applications et des jeux vidéo (comme ce jeu !). Tu écris du code et tu répares les bogues.',
+  day:[['9 h', 'Réunion d\'équipe : qu\'est-ce qu\'on fait aujourd\'hui ?'], ['10 h', 'J\'écris du code pour une nouvelle application.'], ['12 h', 'Déjeuner avec l\'équipe.'], ['14 h', 'Je cherche un bogue... et je le trouve !'], ['16 h', 'Je teste le jeu.'], ['18 h', 'Je mets la nouvelle version en ligne.']],
+  voc:[['l\'ordinateur', 'the computer'], ['le logiciel', 'the software'], ['le bogue', 'the bug'], ['le site web', 'the website'], ['le clavier', 'the keyboard'], ['la souris', 'the mouse'], ['télécharger', 'to download'], ['le mot de passe', 'the password']],
+  q:[['Une erreur dans un programme, c\'est un...', 'bogue', ['bouquet', 'bonbon', 'bateau']], ['On tape les lettres sur le...', 'clavier', ['plafond', 'tapis', 'fromage']], ['Un mot de passe, on le...', 'garde secret', ['crie dans la rue', 'écrit sur la porte', 'donne à tout le monde']], ['« The mouse » de l\'ordinateur, en français :', 'la souris', ['le rat', 'le chat', 'la sourire']]]},
+ {id:'journaliste', icon:'📰', fr:'Journaliste', en:'Journalist', pay:2600, col:0x6a6a6a, place:'le journal',
+  about:'Tu cherches les informations, tu interviewes des personnes et tu écris des articles pour le journal, la radio ou la télévision.',
+  day:[['8 h', 'Conférence de rédaction : quelles sont les nouvelles ?'], ['9 h', 'Je pars en reportage au Carnaval de Québec !'], ['11 h', 'J\'interviewe des visiteurs.'], ['13 h', 'Je vérifie les informations.'], ['15 h', 'J\'écris mon article.'], ['18 h', 'L\'article est publié en ligne.']],
+  voc:[['l\'article', 'the article'], ['l\'interview', 'the interview'], ['le reportage', 'the report'], ['les nouvelles (l\'actualité)', 'the news'], ['vérifier', 'to check'], ['la source', 'the source'], ['publier', 'to publish'], ['le titre', 'the headline']],
+  q:[['Poser des questions à une personne pour le journal, c\'est une...', 'interview', ['recette', 'addition', 'ordonnance']], ['Avant de publier, un bon journaliste... les informations.', 'vérifie', ['invente', 'oublie', 'mange']], ['Le titre d\'un article, c\'est...', 'la phrase en gros au début', ['la dernière ligne', 'le prix du journal', 'la photo du chat']], ['Les nouvelles du jour, c\'est l\'...', 'actualité', ['addition', 'avion', 'aquarium']]]},
+ {id:'fermier', icon:'🚜', fr:'Agriculteur / Agricultrice', en:'Farmer', pay:1900, col:0x6a8a3a, place:'la ferme du zoo',
+  about:'Tu cultives les légumes et les céréales, et tu élèves des animaux. Tu nourris le pays ! Tu travailles dehors, par tous les temps.',
+  day:[['5 h', 'Je me lève et je trais les vaches.'], ['7 h', 'Je nourris les poules et je ramasse les œufs.'], ['9 h', 'Je conduis le tracteur dans les champs.'], ['12 h', 'Déjeuner en famille.'], ['14 h', 'Je plante des pommes de terre.'], ['19 h', 'Je vérifie que tous les animaux vont bien.']],
+  voc:[['la ferme', 'the farm'], ['le tracteur', 'the tractor'], ['le champ', 'the field'], ['traire', 'to milk'], ['la récolte', 'the harvest'], ['planter', 'to plant'], ['la poule', 'the hen'], ['le blé', 'wheat']],
+  q:[['Prendre le lait de la vache, c\'est la...', 'traire', ['vendre', 'peindre', 'laver']], ['La machine pour travailler dans les champs :', 'le tracteur', ['le métro', 'le vélo', 'l\'avion']], ['Ramasser les fruits et les légumes mûrs, c\'est la...', 'récolte', ['récréation', 'recette', 'rentrée']], ['Avec le blé, on fait de la...', 'farine', ['confiture', 'limonade', 'colle']]]}
+];
+var JC = {cur:null, n:0, ok:0, m:null};
+function jobCard(i, tab){
+  var j = JOBC[i]; JC.cur = i; tab = tab || 'desc';
+  var tabs = [['desc', '📋 ' + L2('Job', 'Le métier')], ['day', '🕐 ' + L2('A day', 'Une journée')], ['voc', '📚 ' + L2('Words', 'Le vocabulaire')], ['prac', '🎯 ' + L2('Practise (+🪙)', 'S\'entraîner (+🪙)')]];
+  var h = '<h3>' + j.icon + ' ' + esc(j.fr.toUpperCase()) + '</h3><div class="gc-row">' + tabs.map(function(t){ return gBtn('jobtab', i + '|' + t[0], t[1], t[0] === tab ? 'go' : ''); }).join('') + '</div>';
+  if(tab === 'desc') h += '<div class="gc-text gc-say">' + esc(j.about) + '</div><div class="gc-text">💶 ' + L2('Pay in the game: ', 'Salaire dans le jeu : ') + '<b>' + j.pay.toLocaleString('fr-FR') + ' € ' + L2('gross a month', 'brut par mois') + '</b><br>📍 ' + L2('Where: ', 'Où : ') + esc(j.place) + '</div>';
+  if(tab === 'day') h += '<div class="gc-text" style="text-align:left">' + j.day.map(function(d){ return '<div class="gc-say" style="margin:4px 0"><b>' + esc(d[0]) + '</b> - ' + esc(d[1]) + '</div>'; }).join('') + '</div>';
+  if(tab === 'voc') h += '<div class="gc-grid">' + j.voc.map(function(w){ return '<div class="gc-text gc-say" style="margin:2px">' + esc(w[0]) + '<br><span class="lf-soft">' + esc(w[1]) + '</span></div>'; }).join('') + '</div>';
+  if(tab === 'prac'){ JC.n = 0; JC.ok = 0; JC.list = shuffleR(Math.random, j.q); jobQ(); return; }
+  var life6 = typeof JOB_BY_ID !== 'undefined' && JOB_BY_ID[j.id];
+  h += '<div class="gc-row">' + gBtn('jobpick', i, life6 ? '✅ ' + L2('CHOOSE THIS JOB', 'CHOISIR CE MÉTIER') : '⭐ ' + L2('MY DREAM JOB', 'MON MÉTIER DE RÊVE'), 'go') + gBtn('jobboard', null, L2('ALL JOBS', 'TOUS LES MÉTIERS')) + gBtn('close', null, 'OK') + '</div>';
+  showCard(h);
+}
+GACT.jobtab = function(v){ var p = String(v).split('|'); jobCard(+p[0], p[1]); };
+function jobQ(msg){
+  var j = JOBC[JC.cur];
+  if(JC.n >= JC.list.length){ var g = !(chal.cool['job' + j.id] > Date.now()) ? addJeton(JC.ok >= 3 ? 3 : JC.ok >= 2 ? 1 : 0) : 0; if(g) chal.cool['job' + j.id] = Date.now() + 5*60000;
+    showCard('<h3>' + j.icon + ' ' + esc(j.fr) + '</h3><div class="gc-big">' + JC.ok + ' / ' + JC.list.length + (g ? ' · +' + g + ' 🪙' : '') + '</div><div class="gc-text">' + (JC.ok >= 3 ? L2('Great work - you\'d be good at this job!', 'Excellent travail - tu serais doué(e) pour ce métier !') : L2('Keep practising!', 'Continue à t\'entraîner !')) + '</div>' + noCharLine() + '<div class="gc-row">' + gBtn('jobtab', JC.cur + '|prac', L2('AGAIN', 'ENCORE')) + gBtn('jobtab', JC.cur + '|desc', L2('BACK', 'RETOUR'), 'go') + '</div>'); return; }
+  var q = JC.list[JC.n], m = mc(Math.random, q[1], q[2]); JC.m = m;
+  showCard('<h3>' + j.icon + ' ' + esc(j.fr) + ' · ' + (JC.n + 1) + '/' + JC.list.length + '</h3>' + (msg || '') + '<div class="gc-big gc-say">' + esc(q[0]) + '</div><div class="gc-grid">' + m.opts.map(function(o, k){ return gOpt('jobans', k, esc(o)); }).join('') + '</div>');
+}
+GACT.jobans = function(v){ if(JC.busy) return; JC.busy = true; setTimeout(function(){ JC.busy = false; }, 400); var ok = (v|0) === JC.m.ans; if(ok) JC.ok++; JC.n++; jobQ(ok ? '<div class="good">✓ ' + esc(JC.m.opts[JC.m.ans]) + '</div>' : '<div class="bad">✗ ' + esc(JC.m.opts[JC.m.ans]) + '</div>'); };
+GACT.jobpick = function(v){
+  var j = JOBC[v|0]; if(!hasChar()){ showToast(L2('Create your character first (LIFE).', 'Crée d\'abord ton personnage (LIFE).')); return; }
+  var e = life.eco;
+  if(typeof JOB_BY_ID !== 'undefined' && JOB_BY_ID[j.id] && lifeOn()){
+    if(e.jobMonth === e.month){ showToast(L2('You already changed job this month.', 'Tu as déjà changé de métier ce mois-ci.')); return; }
+    e.job = j.id; e.jobMonth = e.month; lifeSave(true); say('Félicitations ! Tu es maintenant ' + j.fr.split(' /')[0].toLowerCase() + ' !'); showToast(j.icon + ' ' + L2('New job: ', 'Nouveau métier : ') + j.fr); closeCard(); return;
+  }
+  e.dream = j.id; lifeSave(true); say('Ton métier de rêve : ' + j.fr.split(' /')[0].toLowerCase() + ' !'); showToast('⭐ ' + L2('Dream job saved: ', 'Métier de rêve : ') + j.fr); closeCard();
+};
+function jobBoard(){
+  showCard('<h3>💼 ' + L2('ALL THE JOBS', 'TOUS LES MÉTIERS') + '</h3><div class="gc-sub">' + L2('Click a job: description, a day in its life, pay, vocabulary and practice.', 'Clique sur un métier : description, une journée type, salaire, vocabulaire et entraînement.') + '</div><div class="gc-grid">' + JOBC.map(function(j, i){ return gOpt('jobopen', i, j.icon + ' <b>' + esc(j.fr) + '</b><br><span class="lf-soft">' + j.pay.toLocaleString('fr-FR') + ' € / ' + L2('month', 'mois') + '</span>'); }).join('') + '</div><div class="gc-row">' + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>');
+}
+GACT.jobopen = function(v){ jobCard(v|0); }; GACT.jobboard = jobBoard;
+/* the building (between the Invalides and the Centre Pompidou) and its job fair hall */
+var JOBCTR = {x:150, z:-660};
+(function(){
+  var X = JOBCTR.x, Z = JOBCTR.z, B = new MeshBatch(), H = new Lot(B, X, Z, 0);
+  H.box(28, 10, 16, 0, 5, 0, 0xe8eef4); H.box(29, 0.8, 17, 0, 10.4, 0, 0x1f6fb8); for(var w=-12; w<=12; w+=4){ if(Math.abs(w) < 2) continue; H.box(2.6, 2.4, 0.2, w, 3, 8.05, 0xa8d4ee); H.box(2.6, 2.4, 0.2, w, 7, 8.05, 0xa8d4ee); }
+  H.box(4, 4, 0.3, 0, 2, 8.1, 0x2a4a6a); B.build(); addSolid(X - 14, X + 14, Z - 8, Z + 8, 'champs', -1, 11);
+  airSign('💼 LE CENTRE DE L\'EMPLOI', X, 11.6, Z + 8.3, 0, 16, '#1f6fb8'); tag(X, 5, Z + 8, 'le centre de l\'emploi', 'the job centre', 6);
+  var o = makeInterior({id:'emploi', name:'Le Centre de l\'Emploi', en:'The Job Centre', w:46, d:28, h:8, wall:0xf2f6fa, floor:0xd8dce2, ceil:0xffffff, light:0xffffff, signBg:'#1f6fb8',
+    out:{x:X, z:Z + 12, yaw:Math.PI}, door:{x:X, z:Z + 9.4, r:2.6},
+    blurb:'Ici, tu peux découvrir seize métiers : une journée type, le salaire, le vocabulaire... et t\'entraîner pour gagner de l\'argent ! Va voir les stands, ou regarde le grand tableau des métiers.',
+    facts:[['En France, la durée légale du travail est de 35 heures par semaine.', 'In France the legal working week is 35 hours.', ['Combien d\'heures par semaine, en France ?', '35 heures', ['5 heures', '80 heures', '100 heures']]], ['Un « CV », c\'est un document qui présente tes études et tes expériences. On l\'envoie pour trouver un travail.', 'A "CV" is a document showing your studies and experience. You send it to find a job.', ['Qu\'est-ce qu\'un CV ?', 'un document qui présente tes études et tes expériences', ['une sorte de croissant', 'un jeu vidéo', 'un moyen de transport']]], ['Pour un entretien d\'embauche, on dit « Bonjour », on sourit, on écoute bien et on pose des questions !', 'At a job interview, say "Bonjour", smile, listen carefully and ask questions!', ['Comment dit-on « job interview » ?', 'un entretien d\'embauche', ['un rendez-vous chez le médecin', 'une fête', 'un examen de conduite']]]],
+    spots:[{x:0, z:-11.5, r:3.4, label:function(){ return '💼 ' + L2('The big board of all the jobs', 'Le grand tableau des métiers'); }, act:jobBoard}],
+    build:function(L, X2, Z2, B2, F){
+      var Bd = new Lot(B2, X2, Z2 - 13.75, 0); Bd.box(18, 5, 0.15, 0, 4, 0, 0x1f3f8f); JOBC.forEach(function(j, i){ Bd.box(1.9, 1.1, 0.05, -7.6 + (i % 8)*2.17, 5.4 - Math.floor(i/8)*1.6, 0.1, j.col === 0xf2f2f2 ? 0xd8d8d8 : j.col); });
+      F.tagAt(0, 4, -13.7, 'le tableau des métiers', 'the jobs board', 3); airSign('LES MÉTIERS · LES SALAIRES · UNE JOURNÉE TYPE', X2, 7, Z2 - 13.6, 0, 14, '#1f3f8f');
+      JOBC.forEach(function(j, i){ var row = Math.floor(i/8), col = i % 8, x = -19.25 + col*5.5, z = row ? 4 : -4.5;
+        L.box(4, 1, 1.4, x, 0.5, z, j.col === 0xf2f2f2 ? 0xd8d8d8 : j.col); L.box(4.2, 0.08, 1.6, x, 1.04, z, 0xf6f6f6); L.box(0.1, 2.6, 0.1, x - 1.9, 2.3, z - 0.6, 0x8a8f98); L.box(0.1, 2.6, 0.1, x + 1.9, 2.3, z - 0.6, 0x8a8f98);
+        airSign(j.icon + ' ' + j.fr.split(' /')[0].toUpperCase(), X2 + x, 3.5, Z2 + z - 0.6, 0, 4, '#' + ('00000' + (j.col === 0xf2f2f2 ? 0x8a8a8a : j.col).toString(16)).slice(-6));
+        person({x:X2 + x, z:Z2 + z - 1.2, ry:Math.PI, shirt:j.col, pants:0x2a2d36, hair:[0x4a2a1a, 0xe8c070, 0x1b1b1d, 0x8a4a1a][i % 4], hat:j.id === 'chef' ? 0xffffff : j.id === 'pompier' ? 0xc8382f : null, h:1.7 + (i % 3)*0.05});
+        F.tagAt(x, 1.6, z - 1.2, j.fr.toLowerCase(), j.en, 0.6);
+        addSpot({x:X2 + x, z:Z2 + z + 1.3, r:1.9, label:function(){ return j.icon + ' ' + j.fr + ' - ' + L2('find out & practise', 'découvrir et s\'entraîner'); }, act:function(){ jobCard(i); }}); });
+      F.tagAt(-19.25, 1, -4.5, 'le stand', 'the stand', 1); F.item('banc', -12, 10); F.item('banc', 12, 10); F.item('plante', -21.5, 12); F.item('plante', 21.5, 12);
+      F.item('bureau', 18, 10); F.item('ordi', 18, 10); F.tagAt(18, 1.2, 10, 'l\'ordinateur pour écrire son CV', 'the computer to write your CV', 0.6);
+    }});
+  EXTRA_PLACES.push(['💼', 'Le Centre de l\'Emploi (choisir un métier)', L2('16 jobs: a day in the life, pay, words, practice', '16 métiers : journée type, salaire, vocabulaire, entraînement'), X, Z + 13, Math.PI]);
+})();
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
@@ -15426,6 +15571,99 @@ try { jail.local = localStorage.getItem('paris.jail') === '1'; } catch(e){}
   var st = document.createElement('style'); st.textContent = '#jail-banner{position:fixed; left:50%; top:calc(70px + env(safe-area-inset-top,0px)); transform:translateX(-50%); z-index:50; padding:10px 14px; font-family:"VT323", monospace; font-size:21px; background:#8a1c1c; color:#fff; border-color:#3a0a0a; max-width:90vw; text-align:center;} #jail-banner.hidden{display:none;}';
   document.head.appendChild(st); document.body.appendChild(el); jail.banner = el;
 })();
+/* ---------- ⚖ LE TRIBUNAL DE LA POLITESSE: a plea hearing in French to ask Madame to be released ---------- */
+var PLEA = {done:null, wait:0, n:0, ok:0, list:null, m:null};
+try { PLEA.done = JSON.parse(localStorage.getItem('paris.plea') || 'null'); } catch(e){}
+var PLEA_RESPECT = [
+  ['Quand quelqu\'un vous aide, que dites-vous ?', 'Merci beaucoup !', ['Laisse-moi tranquille.', 'C\'est normal, tu es mon serviteur.', 'Rien du tout.']],
+  ['Comment s\'excuser poliment ?', 'Je suis désolé(e). Je m\'excuse.', ['Ce n\'est pas ma faute.', 'Tant pis pour toi.', 'Je m\'en fiche.']],
+  ['Pour demander quelque chose poliment, on dit...', '« S\'il vous plaît. »', ['« Donne-moi ça ! »', '« Vite ! »', '« Tais-toi ! »']],
+  ['Dans le chat du jeu, on doit...', 'être gentil et respectueux avec tout le monde.', ['écrire des gros mots.', 'se moquer des autres.', 'écrire en majuscules pour crier.']],
+  ['Un ami est triste. Que lui dis-tu ?', '« Ça va ? Je peux t\'aider ? »', ['« C\'est drôle ! »', '« Arrête de pleurer ! »', '« Je m\'en fiche. »']],
+  ['En classe, quand le professeur parle, on...', 'écoute et on lève la main pour parler.', ['crie très fort.', 'joue avec son téléphone.', 'dort sur sa table.']],
+  ['Que veut dire « respecter les autres » ?', 'Être poli, gentil, et ne pas se moquer.', ['Gagner tous les jeux.', 'Avoir toujours raison.', 'Parler plus fort que les autres.']],
+  ['Quand on entre dans un magasin en France, on dit...', '« Bonjour, madame ! » ou « Bonjour, monsieur ! »', ['Rien.', '« Hé, toi ! »', '« Bonne nuit ! »']],
+  ['Tu as fait de la peine à quelqu\'un. Que dis-tu ?', '« Pardon. Je ne voulais pas te faire de peine. »', ['« C\'est ton problème. »', '« Ha ha ha ! »', '« Je recommencerai. »']],
+  ['Comment dit-on « bullying » en français ?', 'l\'intimidation (le harcèlement)', ['la politesse', 'la gentillesse', 'l\'amitié']],
+  ['Les règles de la vie en société servent à...', 'vivre ensemble en paix et en sécurité.', ['embêter les enfants.', 'rien du tout.', 'faire peur aux gens.']],
+  ['Tu vois quelqu\'un jeter un papier par terre. Tu dis poliment...', '« Il y a une poubelle juste là ! »', ['« Bravo ! »', '« Jette-en plus ! »', 'Rien, et tu en jettes aussi.']],
+  ['On parle à un juge, à un professeur ou à un adulte qu\'on ne connaît pas. On utilise...', '« vous » (on vouvoie).', ['« tu » (on tutoie).', 'des gros mots.', 'le langage des chats.']],
+  ['Quelqu\'un a une opinion différente de la tienne. Tu...', 'l\'écoutes et tu réponds calmement.', ['te moques de lui.', 'cries plus fort.', 'quittes le jeu en colère.']],
+  ['Que veut dire « la politesse » ?', 'Les bonnes manières : dire bonjour, merci, s\'il vous plaît...', ['Une sorte de gâteau.', 'Un sport olympique.', 'Une ville en France.']]
+];
+function pleaIntro(){
+  var me = (life.eco && life.eco.ch && life.eco.ch.fn) || net.name || 'Alex';
+  return [
+    ['Bonjour. La séance est ouverte. Comment vous appelez-vous ?', 'Hello. The hearing is open. What is your name?', 'Je m\'appelle ' + me + ', Madame la Juge.', ['Pourquoi ? Ça ne te regarde pas.', 'J\'ai faim.', 'Il fait beau aujourd\'hui.']],
+    ['Savez-vous pourquoi vous êtes ici ?', 'Do you know why you are here?', 'Oui. Je n\'ai pas respecté les règles.', ['Non, et je m\'en fiche.', 'Parce que je suis le roi du jeu.', 'Pour manger une pizza.']],
+    ['Qu\'est-ce que vous avez fait ?', 'What did you do?', 'J\'ai utilisé des mots ou un comportement inappropriés.', ['J\'ai gagné une course.', 'J\'ai aidé un ami.', 'Rien, c\'est les autres.']]
+  ];
+}
+var PLEA_FINAL = ['Madame la Juge, je suis désolé(e) pour mon comportement. À partir de maintenant, je promets d\'être poli(e) et respectueux(se) avec tout le monde. Je vous demande de me libérer, s\'il vous plaît.',
+  ['Libère-moi tout de suite, c\'est injuste !', 'Je ne suis pas désolé(e), mais laisse-moi sortir.', 'Je recommencerai, mais je veux sortir maintenant.']];
+function pleaStart(){
+  if(PLEA.wait > Date.now()){ showToast('⚖ ' + L2('Think a little more... try again in ', 'Réfléchis encore un peu... réessaie dans ') + Math.ceil((PLEA.wait - Date.now())/1000) + ' s'); return; }
+  var intro = pleaIntro().map(function(q){ return [q[0], q[2], q[3], q[1]]; }), resp = shuffleR(Math.random, PLEA_RESPECT).slice(0, 5);
+  PLEA.list = intro.concat(resp).concat([['Maintenant, faites votre plaidoirie. Que dites-vous à la cour ?', PLEA_FINAL[0], PLEA_FINAL[1]]]);
+  PLEA.n = 0; PLEA.ok = 0; say('Silence ! La séance est ouverte.'); pleaQ();
+}
+function pleaQ(msg){
+  if(!PLEA.list || PLEA.n >= PLEA.list.length) return;
+  var q = PLEA.list[PLEA.n], m = mc(Math.random, q[1], q[2]); PLEA.m = m;
+  var part = PLEA.n < 3 ? L2('PART 1: QUESTIONS', '1RE PARTIE : LES QUESTIONS') : PLEA.n < PLEA.list.length - 1 ? L2('PART 2: RESPECT IN SOCIETY', '2E PARTIE : LE RESPECT EN SOCIÉTÉ') : L2('PART 3: YOUR PLEA', '3E PARTIE : TA PLAIDOIRIE');
+  say(q[0]);
+  showCard('<h3>⚖ ' + L2('THE COURT OF POLITENESS', 'LE TRIBUNAL DE LA POLITESSE') + ' · ' + (PLEA.n + 1) + '/' + PLEA.list.length + '</h3><div class="gc-sub">' + part + '</div>' + (msg || '') + '<div class="gc-big gc-say">👩‍⚖️ « ' + esc(q[0]) + ' »</div>' + (LANG === 'en' && q[3] ? '<div class="gc-sub">' + esc(q[3]) + '</div>' : '') +
+    '<div class="gc-grid">' + m.opts.map(function(o, k){ return gOpt('pleaans', k, '🗨 ' + esc(o)); }).join('') + '</div><div class="gc-sub">' + L2('Speak to a judge with « vous ». Be honest and respectful.', 'On parle à une juge avec « vous ». Sois honnête et respectueux(se).') + '</div>');
+}
+GACT.pleaans = function(v){
+  if(PLEA.busy || !PLEA.list || PLEA.n >= PLEA.list.length) return; PLEA.busy = true; setTimeout(function(){ PLEA.busy = false; }, 750);
+  var ok = (v|0) === PLEA.m.ans, q = PLEA.list[PLEA.n];
+  if(ok){ PLEA.ok++; say(PLEA.m.opts[PLEA.m.ans]); }
+  PLEA.n++;
+  var fb = ok ? '<div class="good">✓ ' + L2('Good answer.', 'Bonne réponse.') + '</div>' : '<div class="bad">✗ ' + L2('A better answer: ', 'Une meilleure réponse : ') + '« ' + esc(PLEA.m.opts[PLEA.m.ans]) + ' »</div>';
+  if(PLEA.n < PLEA.list.length){ setTimeout(function(){ pleaQ(fb); }, ok ? 700 : 300); return; }
+  var total = PLEA.list.length, pass = PLEA.ok >= total - 2 && ok;
+  if(pass){
+    PLEA.done = {s:PLEA.ok + '/' + total, at:Date.now()}; try { localStorage.setItem('paris.plea', JSON.stringify(PLEA.done)); } catch(e){}
+    if(net.uid && net.db) net.db.ref('paris/owners/' + net.uid + '/plea').set(PLEA.done).catch(function(){});
+    if(typeof sendPresence === 'function') sendPresence(true);
+    say('Votre plaidoirie est acceptée. J\'envoie votre demande de libération à Madame.');
+    showCard('<h3>⚖ ' + L2('THE VERDICT', 'LE VERDICT') + '</h3><div class="gc-emoji">📜</div><div class="gc-big">' + L2('Your plea is accepted!', 'Ta plaidoirie est acceptée !') + ' (' + PLEA.ok + '/' + total + ')</div><div class="gc-text">« Votre plaidoirie est acceptée. J\'envoie votre demande de libération à Madame. »</div><div class="gc-sub">' + L2('Madame decides when you get out. Wait patiently and respectfully!', 'C\'est Madame qui décide quand tu sors. Attends patiemment et poliment !') + '</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go', ' data-enter="1"') + '</div>');
+  } else {
+    PLEA.wait = Date.now() + 60000; say('La cour n\'est pas convaincue. Réfléchissez, et réessayez dans une minute.');
+    showCard('<h3>⚖ ' + L2('THE VERDICT', 'LE VERDICT') + '</h3><div class="gc-emoji">🤔</div><div class="gc-big">' + PLEA.ok + '/' + total + '</div><div class="gc-text">« La cour n\'est pas convaincue. Réfléchissez, et réessayez dans une minute. »</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>');
+  }
+};
+/* the court desk in the chamber */
+(function(){
+  var X = JAIL.x, Z = JAIL.z, B = new MeshBatch(), C = new Lot(B, X + 2.4, Z - 3.2, 0);
+  C.box(2.6, 1.3, 0.9, 0, 0.65, 0, 0x5a3a22); C.box(2.8, 0.1, 1.1, 0, 1.33, 0, 0x6b4a32); C.box(0.5, 0.1, 0.35, 0.6, 1.42, 0, 0x2a2d36);
+  C.part(new THREE.CylinderGeometry(0.06, 0.06, 0.3, 8).rotateZ(Math.PI/2), -0.6, 1.45, 0.1, 0x6b4a32); C.box(0.12, 0.12, 0.12, -0.75, 1.45, 0.1, 0x6b4a32);
+  B.build();
+  person({x:X + 2.4, z:Z - 3.9, ry:0, shirt:0x1b1b1d, pants:0x1b1b1d, hair:0xc8c8c8, h:1.72});
+  airSign('⚖ LE TRIBUNAL DE LA POLITESSE', X, 4.3, Z - 5.2, 0, 7, '#1f3f8f');
+  tag(X + 2.4, 1.6, Z - 3.9, 'la juge (Madame la Juge)', 'the judge', 0.5); tag(X + 1.8, 1.5, Z - 3.1, 'le marteau du juge', 'the judge\'s gavel', 0.3); tag(X + 2.4, 1, Z - 3.2, 'le bureau du tribunal', 'the court desk', 0.8);
+  addSpot({x:X + 2.4, z:Z - 2, r:2.6, label:function(){ return '⚖ ' + (amJailed() ? L2('Plead your case to get out (in French)', 'Faire ta plaidoirie pour sortir (en français)') : L2('Practise a plea hearing (in French)', 'S\'entraîner au tribunal (en français)')); }, act:pleaStart});
+})();
+/* the plea goes to Madame: with the player's presence (s.plea), and a panel for teachers with a RELEASE button */
+var _sendPresenceP = typeof sendPresence === 'function' ? sendPresence : null;
+var pleaPanel = (function(){
+  var el = document.createElement('div'); el.id = 'plea-panel'; el.className = 'card hidden';
+  var st = document.createElement('style'); st.textContent = '#plea-panel{position:fixed; right:12px; top:calc(70px + env(safe-area-inset-top,0px)); z-index:33; width:min(330px, 80vw); padding:8px 10px; font-family:"VT323", monospace; font-size:18px;} #plea-panel.hidden{display:none;} #plea-panel h4{margin:0 0 6px; font-family:"Press Start 2P", monospace; font-size:8px; color:var(--accent);} #plea-panel .row{display:flex; justify-content:space-between; align-items:center; gap:6px; margin:4px 0;} #plea-panel button{font-family:inherit; font-size:15px; border:2px solid var(--panel-border); background:var(--panel); color:var(--ink); cursor:pointer;}';
+  document.head.appendChild(st); document.body.appendChild(el);
+  el.addEventListener('click', function(e){ var b = e.target.closest('button[data-u]'); if(!b) return; var u = b.getAttribute('data-u'); if(b.getAttribute('data-a') === 'free'){ releaseUid(u); showToast('🔓 ' + L2('Released!', 'Libéré(e) !')); } PLEA_IGN[u] = Date.now(); pleaPanelTick(true); });
+  return el;
+})();
+var PLEA_IGN = {}, PLEA_T = 0;
+function pleaPanelTick(force){
+  var now = Date.now(); if(!force && now - PLEA_T < 2000) return; PLEA_T = now;
+  if(!isStaff()){ pleaPanel.classList.add('hidden'); return; }
+  var rows = (mp.others || []).filter(function(p){ var s = p.presence || {}; return s.plea && isJailedUid(p.by) && !(PLEA_IGN[p.by] > (+String(s.plea).split('|')[1] || 0)); });
+  if(!rows.length){ pleaPanel.classList.add('hidden'); return; }
+  pleaPanel.innerHTML = '<h4>⚖ ' + L2('RELEASE REQUESTS (PLEAS)', 'DEMANDES DE LIBÉRATION') + '</h4>' + rows.map(function(p){ return '<div class="row"><span>📜 ' + esc(playerName(p)) + ' · ' + esc(String(p.presence.plea).split('|')[0]) + '</span><span><button data-u="' + esc(p.by) + '" data-a="free">🔓 ' + L2('RELEASE', 'LIBÉRER') + '</button><button data-u="' + esc(p.by) + '" data-a="no">✕</button></span></div>'; }).join('');
+  pleaPanel.classList.remove('hidden');
+}
+function pleaSelfTick(){ if(PLEA.done && signedIn() && !amJailed()){ PLEA.done = null; try { localStorage.removeItem('paris.plea'); } catch(e){} if(net.uid && net.db) net.db.ref('paris/owners/' + net.uid + '/plea').remove().catch(function(){}); } }
 /* TEACHERS: Daniel can make any account a teacher (MENU → PLAYERS → the player's menu → TEACHER). Teachers can't be
    jailed, and get the ÉLITE tab: make players elite 🥖, and send them to / let them out of the Public Shame Chamber.
    Their changes go in paris/mod (jail, elite), which Daniel's account and teachers can write. */
@@ -15800,7 +16038,7 @@ function animate(){
   updateSpeedo();
   lifeTick(dt);
   jailTick();
-  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick();
+  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick();
   if(!ICE.t || performance.now() - ICE.t > 1000){ ICE.t = performance.now(); if(Math.hypot(camera.position.x - QC.x, camera.position.z - QC.z) < 800) iceSync(); }
   villageTick();
   sendPresence(false);
