@@ -1,0 +1,17 @@
+{
+  "name": "Paris – le jeu de français de Madame",
+  "short_name": "Paris",
+  "description": "Explore Paris, Québec and Baguetteville in French: games, shops, jobs, homes and friends.",
+  "start_url": "paris.html?app=1",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#1f3f8f",
+  "theme_color": "#1f3f8f",
+  "lang": "fr",
+  "icons": [
+    {"src": "icons/paris-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icons/paris-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icons/paris-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}

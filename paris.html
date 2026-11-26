@@ -1,7 +1,21 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}
+/* 📱 phones held sideways: smaller bars, no clutter */
+@media (pointer:coarse) and (max-height:520px){
+  #top-bar .bar-btn{min-width:0 !important; padding:4px 6px !important; font-size:9px !important; height:auto !important}
+  #top-bar{gap:3px !important; flex-wrap:nowrap; overflow-x:auto; max-width:calc(100vw - 16px)}
+  #hint{display:none !important}
+  #radio-bar{left:8px !important; right:auto !important; bottom:auto !important; top:58px !important; transform:scale(.6); transform-origin:top left; opacity:.85}
+  #greet{max-width:46vw !important; font-size:12px !important}
+  #g-card{max-height:86vh !important; overflow-y:auto !important}
+  #pick-btn, #pay-btn{font-size:10px !important; padding:7px 9px !important}
+  #rotate-tip{display:none}
+}
+html.as-app body{overscroll-behavior:none}
+</style></head><body>
 <title>Paris</title>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<link rel="manifest" href="paris.webmanifest"><meta name="theme-color" content="#1f3f8f"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Paris"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><link rel="icon" type="image/png" sizes="192x192" href="icons/paris-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap">
 <style>
@@ -17642,9 +17656,10 @@ function tpUpdate(){
   g.position.set(cp.x, cp.y - EYE_HEIGHT + (moving ? Math.abs(Math.sin(performance.now()*0.012))*0.05 : 0), cp.z); g.rotation.y = yaw;
   var back = INT.cur ? 2.8 : 4.6, up = INT.cur ? 0.9 : 1.5, fx = -Math.sin(yaw), fz = -Math.cos(yaw);
   var tx = cp.x - fx*back, tz = cp.z - fz*back;
-  if(!INT.cur){ for(var s=back; s>0.8; s-=0.4){ tx = cp.x - fx*s; tz = cp.z - fz*s; if(!hitSolid(tx, tz, 0.2, cp.y - 1, cp.y + 1)) break; } }
+  var used = back; if(!INT.cur){ for(var s=back; s>2.4; s-=0.4){ tx = cp.x - fx*s; tz = cp.z - fz*s; used = s; if(!hitSolid(tx, tz, 0.2, cp.y + 0.8, cp.y + 2.4)) break; } }
   else { var o = INT.cur; tx = Math.max(o.X - o.w/2 + 0.4, Math.min(o.X + o.w/2 - 0.4, tx)); tz = Math.max(o.Z - o.d/2 + 0.4, Math.min(o.Z + o.d/2 - 0.4, tz)); }
-  TP.cam.position.set(tx, cp.y + up, tz); TP.cam.quaternion.setFromEuler(new THREE.Euler(pitch - 0.22, yaw, 0, 'YXZ'));
+  var short = Math.max(0, back - used); up = Math.max(0.5, up - short*0.2);
+  TP.cam.position.set(tx, cp.y + up, tz); var ah = used*0.45 + 0.6; TP.cam.lookAt(cp.x + fx*ah, cp.y - 0.9 + Math.tan(pitch)*ah, cp.z + fz*ah);
   TP.cam.fov = camera.fov; TP.cam.aspect = camera.aspect; TP.cam.near = camera.near; TP.cam.far = camera.far; TP.cam.projectionMatrix.copy(camera.projectionMatrix); TP.cam.projectionMatrixInverse.copy(camera.projectionMatrixInverse);
   TP.cam.updateMatrixWorld(true);
   return true;
@@ -17777,6 +17792,30 @@ var _armAct = THING.armoireMine[3], _friAct = THING.frigoMine[3];
 THING.armoireMine[3] = function(s){ _armAct({uid:HOME.plotOwner || net.uid}); }; THING.frigoMine[3] = function(s){ _friAct({uid:HOME.plotOwner || net.uid}); };
 var _renderPlotPanelM = renderPlotPanel;
 renderPlotPanel = function(){ _renderPlotPanelM(); var p = panelPlot; if(!p || !p.data || panelConfirm || p.kind !== 'house' || p.data.o !== net.uid) return; var row = document.getElementById('pp-btns'), b = document.createElement('button'); b.className = 'btn'; b.textContent = '🏠 ' + L2('MY HOME: wardrobe, fridge, rooms, creations', 'MA MAISON : armoire, frigo, pièces, créations'); b.addEventListener('click', function(){ closePlotPanel(false); homeHub(); }); row.appendChild(b); };
+
+/* ---------- 📱 THE PHONE APP: installable (Add to Home Screen), opens full screen, works offline for the parts that don't need the internet ---------- */
+var APP = {prompt:null, standalone:!!((window.matchMedia && matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches) || navigator.standalone)};
+if('serviceWorker' in navigator && /^https:|localhost/.test(location.protocol + location.hostname)){ window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); }); }
+window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); APP.prompt = e; appBtn(); });
+window.addEventListener('appinstalled', function(){ APP.prompt = null; APP.standalone = true; var b = document.getElementById('app-btn'); if(b) b.remove(); showToast('📱 ' + L2('Paris is on your home screen!', 'Paris est sur ton écran d\'accueil !')); });
+function appBtn(){ if(APP.standalone || document.getElementById('app-btn')) return; var s = document.getElementById('search-toggle'); if(!s) return; var b = document.createElement('button'); b.className = 'bar-btn'; b.id = 'app-btn'; b.textContent = '📱'; b.title = L2('Install the app', 'Installer l\'appli'); s.parentNode.insertBefore(b, s); b.addEventListener('click', appInstall); }
+function appInstall(){
+  if(APP.prompt){ APP.prompt.prompt(); APP.prompt.userChoice.then(function(){ APP.prompt = null; }); return; }
+  var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  showCard('<h3>📱 ' + L2('PUT PARIS ON YOUR PHONE', 'METS PARIS SUR TON TÉLÉPHONE') + '</h3>' + (ios ?
+    '<div class="gc-text" style="text-align:left">1. ' + L2('Open this page in <b>Safari</b>.', 'Ouvre cette page dans <b>Safari</b>.') + '<br>2. ' + L2('Tap the <b>Share</b> button (the square with an arrow ⬆).', 'Touche le bouton <b>Partager</b> (le carré avec une flèche ⬆).') + '<br>3. ' + L2('Choose <b>Add to Home Screen</b>.', 'Choisis <b>Sur l\'écran d\'accueil</b>.') + '<br>4. ' + L2('Tap <b>Add</b>. The 🗼 Paris icon appears with your apps!', 'Touche <b>Ajouter</b>. L\'icône 🗼 Paris apparaît avec tes applis !') + '</div>'
+    : '<div class="gc-text" style="text-align:left">1. ' + L2('Open this page in <b>Chrome</b>.', 'Ouvre cette page dans <b>Chrome</b>.') + '<br>2. ' + L2('Tap the menu <b>⋮</b> (top right).', 'Touche le menu <b>⋮</b> (en haut à droite).') + '<br>3. ' + L2('Choose <b>Install app</b> or <b>Add to Home screen</b>.', 'Choisis <b>Installer l\'application</b> ou <b>Ajouter à l\'écran d\'accueil</b>.') + '</div>') +
+    '<div class="gc-sub">' + L2('Turn your phone sideways (landscape) to play. You need the internet to see friends and save your progress.', 'Tourne ton téléphone à l\'horizontale pour jouer. Il faut internet pour voir tes amis et sauvegarder.') + '</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>');
+}
+(function(){ var mobile = IS_TOUCH || /android|iphone|ipad|ipod/i.test(navigator.userAgent); if(mobile && !APP.standalone){ appBtn(); try { if(!localStorage.getItem('paris.apptip')){ localStorage.setItem('paris.apptip', '1'); setTimeout(function(){ showToast('📱 ' + L2('Tip: tap 📱 to put Paris on your home screen like an app!', 'Astuce : touche 📱 pour mettre Paris sur ton écran d\'accueil comme une appli !')); }, 6000); } } catch(e){} }
+  if(APP.standalone){ document.documentElement.classList.add('as-app'); }
+  /* phones held upright: ask to turn sideways */
+  var rot = document.createElement('div'); rot.id = 'rotate-tip'; rot.innerHTML = '<div style="font-size:64px">📱↻</div><div>' + L2('Turn your phone sideways to play', 'Tourne ton téléphone à l\'horizontale pour jouer') + '</div>'; rot.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#1f3f8f;color:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;font:14px "Press Start 2P",monospace;text-align:center;padding:20px'; document.body.appendChild(rot);
+  function chk(){ var portrait = innerHeight > innerWidth*1.1; rot.style.display = mobile && portrait && flying ? 'flex' : 'none'; }
+  addEventListener('resize', chk); addEventListener('orientationchange', function(){ setTimeout(chk, 300); }); setInterval(chk, 1500);
+  rot.addEventListener('click', function(){ rot.style.display = 'none'; });
+  if(mobile && screen.orientation && screen.orientation.lock && APP.standalone){ try { screen.orientation.lock('landscape').catch(function(){}); } catch(e){} }
+})();
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
