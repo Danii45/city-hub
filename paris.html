@@ -14817,9 +14817,9 @@ buildInterior = function(o){
   var first = !o.built; _buildIntG(o);
   if(!first || o.greeter === false || o.noExit) return;
   var gx = o.X + Math.min(3, o.w/2 - 1.5), gz = o.Z + o.d/2 - 6.2, w = INTERIORS.indexOf(o) % 2;
-  person({x:gx, z:gz, ry:Math.PI, shirt:[0x1f3f8f, 0x8a1c2c][w], pants:0x2a2a2a, hair:[0x4a2a1a, 0x8a5a2a][w], h:1.72});
-  tag(gx, 1.6, gz, w ? 'l\'hôtesse d\'accueil' : 'l\'hôte d\'accueil', 'the greeter', 0.5); o.words.push(w ? 'l\'hôtesse d\'accueil' : 'l\'hôte d\'accueil');
-  addSpot({x:gx, z:gz + 1.2, r:2, label:function(){ return '🙋 ' + L2('Ask the greeter about this place', 'Parler à l\'accueil'); }, act:function(){ greet(o); }});
+  if(typeof greeterSpawn === 'function') greeterSpawn(o, gx, gz); else person({x:gx, z:gz, ry:Math.PI, shirt:[0x1f3f8f, 0x8a1c2c][w], pants:0x2a2a2a, hair:[0x4a2a1a, 0x8a5a2a][w], h:1.72});
+  o.words.push(w ? 'l\'hôtesse d\'accueil' : 'l\'hôte d\'accueil');
+  addSpot({x:gx, z:gz + 1.2, r:2, label:function(){ var g = typeof greeterOf === 'function' ? greeterOf(o) : null; return (g ? g.icon + ' ' + L2('Talk to ', 'Parler à ') + g.nm + ' (' + L2(g.en, g.role) + ')' : '🙋 ' + L2('Ask the greeter about this place', 'Parler à l\'accueil')); }, act:function(){ greet(o); }});
 };
 /* shop interiors know their kind (for the greeter's blurb) */
 INTERIORS.forEach(function(o){ var m = /^ce(\d+)$/.exec(o.id); if(m) o.ty = CE_SHOPS[+m[1]][1]; var q = /^qv(\d+)$/.exec(o.id); if(q) o.ty = QV_SHOPS[+q[1]][1]; if(/^mall/.test(o.id)) o.ty = o.n === 1 ? 'sport' : 'fashion'; });
@@ -17046,6 +17046,263 @@ browseGo = function(it){
 GACT.plotin = function(){ var it = BROWSE.pick; closeCard(); if(it && it.plot){ if(BROWSE.on) setBrowse(false); enterPlot(it.plot); } };
 var _browseTravelD = browseTravel;
 browseTravel = function(it, inside){ if(inside && it && it.plot){ if(BROWSE.on) setBrowse(false); enterPlot(it.plot); return; } _browseTravelD(it, inside); };
+/* ---------- 🙋 GREETERS WITH A REAL CHARACTER: a person who fits the place, their own voice (slower, different for each), English translation, fun facts ---------- */
+var GREET_OPEN_EN = ['Hello and welcome', 'Hi! Welcome', 'Hello, hello! Come in, come in! Welcome', 'Hey there! Welcome', 'Welcome, welcome', 'Hello! I\'m so happy to see you! Welcome', 'Ah, a visitor! Welcome'];
+var GREET_END_EN = ['Enjoy your visit!', 'Have fun!', 'Look everywhere: every object has its French name!', 'Don\'t hesitate to ask questions!', 'Enjoy your visit!', 'Do the word hunt if you want to win tokens!'];
+var GENERAL_FACTS = [['Le français est parlé par plus de 320 millions de personnes dans le monde, sur cinq continents !', 'French is spoken by over 320 million people on five continents!'], ['Au Canada, le français et l\'anglais sont les deux langues officielles.', 'In Canada, French and English are the two official languages.'], ['Paris s\'appelait Lutèce à l\'époque des Romains.', 'Paris was called Lutetia in Roman times.'], ['La France produit plus de 1 000 sortes de fromages !', 'France makes more than 1,000 kinds of cheese!'], ['Le 14 juillet, c\'est la fête nationale française.', 'July 14th is France\'s national day.'], ['Le mot « bureau » vient d\'un vieux tissu, la bure, qu\'on mettait sur les tables.', 'The word "bureau" comes from an old cloth, la bure, put on tables.'], ['L\'Ontario compte plus de 600 000 francophones : ce sont les Franco-Ontariens !', 'Ontario has over 600,000 French speakers: the Franco-Ontarians!'], ['Le drapeau franco-ontarien est vert et blanc, avec un lys et un trille.', 'The Franco-Ontarian flag is green and white, with a lily and a trillium.'], ['Environ 30 % des mots anglais viennent du français, comme « restaurant » et « menu » !', 'About 30% of English words come from French, like "restaurant" and "menu"!'], ['La tour Eiffel grandit d\'environ 15 cm en été à cause de la chaleur.', 'The Eiffel Tower grows about 15 cm in summer because of the heat.'], ['En France, on se fait la bise pour dire bonjour : une, deux, trois ou quatre bises selon la région !', 'In France people greet with kisses on the cheek: one to four, depending on the region!'], ['Le Québec a pour devise « Je me souviens ».', 'Québec\'s motto is "Je me souviens" (I remember).']];
+var GROLES = [
+  [/louvre|orsay|musee|musée|pompidou|galerie/i, ['Mona', 'la guide du musée', 'the museum guide', 'guide', '🖼', 1]],
+  [/notre|sacre|sacré|eglise|église|chapelle/i, ['Frère Jacques', 'le gardien de la cathédrale', 'the cathedral keeper', 'prof', '⛪', 0]],
+  [/opera|opéra|concert|stade/i, ['Carmen', 'la placeuse de l\'Opéra', 'the usher', 'musicien', '🎭', 1]],
+  [/eiffel|arc|pantheon|panthéon|invalides|grandpalais|monument/i, ['Victor', 'le guide touristique', 'the tour guide', 'guide', '🗼', 0]],
+  [/gare|train|metro|métro/i, ['Gérard', 'le chef de gare', 'the station master', 'chauffeur', '🚉', 0]],
+  [/yqb|aeroport|aéroport|cdg/i, ['Camille', 'l\'agente de l\'aéroport', 'the airport agent', 'pilote', '✈', 1]],
+  [/levain|bakery|boulang|pain/i, ['Henri', 'le boulanger', 'the baker', 'boulanger', '🥖', 0]],
+  [/pastry|patiss/i, ['Lucie', 'la pâtissière', 'the pastry chef', 'chef', '🧁', 1]],
+  [/cafe|café|restaurant|crepes|bistrot/i, ['Antoine', 'le serveur', 'the waiter', 'serveur', '☕', 0]],
+  [/cheese|fromag/i, ['Marcel', 'le fromager', 'the cheesemonger', 'boulanger', '🧀', 0]],
+  [/candy|confis|chocolat/i, ['Rose', 'la confiseuse', 'the sweet-maker', 'chef', '🍬', 1]],
+  [/books|librairie/i, ['Hugo', 'le libraire', 'the bookseller', 'prof', '📚', 0]],
+  [/fashion|mall|mode|sport|merceri/i, ['Chloé', 'la vendeuse', 'the shop assistant', 'caissier', '👗', 1]],
+  [/flowers|fleur/i, ['Jasmine', 'la fleuriste', 'the florist', 'fermier', '💐', 1]],
+  [/toys|jouet/i, ['Théo', 'le vendeur de jouets', 'the toy seller', 'caissier', '🧸', 0]],
+  [/sciences|labo/i, ['Docteure Curie', 'la scientifique', 'the scientist', 'pharmacien', '🔬', 1]],
+  [/emploi/i, ['Sophie', 'la conseillère d\'orientation', 'the career adviser', 'banquier', '💼', 1]],
+  [/ecole|école/i, ['Madame Martin', 'la maîtresse', 'the teacher', 'prof', '🏫', 1]],
+  [/moulin/i, ['Marcel', 'le meunier', 'the miller', 'fermier', '🌾', 0]],
+  [/zoo|ferme|animal/i, ['Inès', 'la soigneuse', 'the zookeeper', 'veto', '🐾', 1]],
+  [/chef|cuisine|ecolecuisine/i, ['Chef Paul', 'le chef cuisinier', 'the chef', 'chef', '👨‍🍳', 0]],
+  [/qv|quebec|québec|chateau|château|palais|ice|capit/i, ['Gabrielle', 'la Québécoise du coin', 'the local Québécoise', 'guide', '⚜', 1]],
+  [/famille|maison|house|mhome|rdc/i, ['Mamie', 'la grand-mère', 'the grandmother', 'prof', '🏡', 1]],
+  [/sup|grocery|marche|marché/i, ['Nathan', 'le caissier', 'the cashier', 'caissier', '🛒', 0]]
+];
+function greeterOf(o){
+  if(o._gr) return o._gr;
+  var key = (o.id || '') + ' ' + (o.ty || '') + ' ' + (o.name || ''), r = null;
+  for(var i=0;i<GROLES.length;i++){ if(GROLES[i][0].test(key)){ r = GROLES[i][1]; break; } }
+  if(!r){ var f = INTERIORS.indexOf(o) % 2; r = [f ? 'Julie' : 'Paul', f ? 'l\'hôtesse d\'accueil' : 'l\'hôte d\'accueil', 'the greeter', 'guide', '🙋', f]; }
+  var h = 0; for(var k=0;k<key.length;k++) h = (h*31 + key.charCodeAt(k)) | 0; h = Math.abs(h);
+  o._gr = {nm:r[0], role:r[1], en:r[2], job:r[3], icon:r[4], fem:r[5], pitch:r[5] ? 1.05 + (h % 5)*0.06 : 0.72 + (h % 5)*0.07, rate:0.74 + (h % 4)*0.03, vi:h};
+  return o._gr;
+}
+function frVoices(){ if(!window.speechSynthesis) return []; return (speechSynthesis.getVoices() || []).filter(function(v){ return /^fr/i.test(v.lang || ''); }); }
+function sayAs(text, g){
+  if(!window.speechSynthesis || !text) return;
+  var t = String(text).replace(/<[^>]*>/g, ' ').replace(/[\u{1F000}-\u{1FFFF}☀-➿️‍⟶→←↗▶⏮⏭⏹✓✗🪙]/gu, ' ').replace(/\s+/g, ' ').trim(); if(!t) return;
+  speechSynthesis.cancel();
+  var vs = frVoices(), u = new SpeechSynthesisUtterance(t); u.lang = 'fr-FR'; u.volume = typeof VOL !== 'undefined' ? VOL.voice : 1;
+  if(g){ var good = vs.filter(function(v){ return /google|natural|premium|enhanced|neural/i.test(v.name); }), pool = (good.length >= 2 ? good : vs), fem = pool.filter(function(v){ return /amélie|amelie|audrey|aurélie|marie|julie|céline|celine|léa|female|femme|denise|chantal|virginie|hortense/i.test(v.name); }), mal = pool.filter(function(v){ return /thomas|daniel|nicolas|henri|paul|male|homme|guillaume|claude|antoine/i.test(v.name); });
+    var list = (g.fem ? fem : mal).length ? (g.fem ? fem : mal) : pool; if(list.length) u.voice = list[g.vi % list.length]; u.pitch = g.pitch; u.rate = g.rate; }
+  else { var v = frVoice(); if(v) u.voice = v; u.rate = 0.8; }
+  speechSynthesis.speak(u);
+}
+say = function(text){ sayAs(text, null); };
+function greetParts(o){
+  var all = (o.facts && o.facts.length ? o.facts : []).concat(GENERAL_FACTS), oi = Math.floor(Math.random()*GREET_OPEN.length), ei = Math.floor(Math.random()*GREET_END.length), g = greeterOf(o);
+  o._fi = (o._fi == null ? Math.floor(Math.random()*all.length) : o._fi) % all.length; var f = all[o._fi];
+  var fr = [GREET_OPEN[oi] + ' : ' + o.name + ' ! Je m\'appelle ' + g.nm + ', je suis ' + g.role + '.', greetBlurb(o), f ? 'Le saviez-vous ? ' + f[0] : '', GREET_END[ei]].filter(Boolean).join(' ');
+  var en = [GREET_OPEN_EN[oi] + ' to ' + (o.en || o.name) + '! My name is ' + g.nm + ', I\'m ' + g.en + '.', o.blurbEn || (greetBlurb(o) ? 'Look around and click on things: everything has its French name and you can hear it.' : ''), f ? 'Did you know? ' + f[1] : '', GREET_END_EN[ei]].filter(Boolean).join(' ');
+  return {fr:fr, en:en};
+}
+greetText = function(o){ return greetParts(o); };
+var GB = {o:null, en:false};
+greet = function(o){
+  var g = greeterOf(o), t = greetParts(o); GB.o = o; GB.t = t;
+  greetBox.setAttribute('data-say', t.fr);
+  greetBox.innerHTML = '<div class="gh"><span>' + g.icon + ' ' + esc(g.nm) + ' · ' + esc(L2(g.en, g.role)) + '</span><span><button data-g="s" title="répéter">🔊</button><button data-g="tr" title="English">🇬🇧</button><button data-g="ff" title="fun fact">💡</button><button data-g="x">✕</button></span></div><div class="gfr">' + esc(t.fr) + '</div><div class="gen" style="display:' + (GB.en ? 'block' : 'none') + ';color:#5a5f70;font-style:italic;margin-top:4px">🇬🇧 ' + esc(t.en) + '</div>';
+  greetBox.classList.remove('hidden'); clearTimeout(greetBox.tm); greetBox.tm = setTimeout(function(){ greetBox.classList.add('hidden'); }, 40000);
+  sayAs(t.fr, g);
+};
+greetBox.addEventListener('click', function(e){ var b = e.target.closest('button'); if(!b) return; var a = b.getAttribute('data-g'), o = GB.o; if(!o) return;
+  e.stopImmediatePropagation();
+  if(a === 'x'){ greetBox.classList.add('hidden'); return; }
+  if(a === 's'){ sayAs(GB.t.fr, greeterOf(o)); return; }
+  if(a === 'tr'){ GB.en = !GB.en; var en = greetBox.querySelector('.gen'); if(en) en.style.display = GB.en ? 'block' : 'none'; return; }
+  if(a === 'ff'){ var all = (o.facts && o.facts.length ? o.facts : []).concat(GENERAL_FACTS); o._fi = ((o._fi|0) + 1) % all.length; var f = all[o._fi];
+    GB.t = {fr:'Le saviez-vous ? ' + f[0], en:'Did you know? ' + f[1]}; greetBox.querySelector('.gfr').textContent = GB.t.fr; greetBox.querySelector('.gen').textContent = '🇬🇧 ' + GB.t.en; greetBox.setAttribute('data-say', GB.t.fr); sayAs(GB.t.fr, greeterOf(o)); clearTimeout(greetBox.tm); greetBox.tm = setTimeout(function(){ greetBox.classList.add('hidden'); }, 40000); }
+}, true);
+/* the greeter's body: dressed for the place */
+function greeterSpawn(o, gx, gz){
+  var g = greeterOf(o), h = g.fem ? 1.68 : 1.78, cols = JDRESS[g.job] ? null : null;
+  var m = person({x:gx, z:gz, ry:Math.PI, shirt:[0x1f3f8f, 0x8a1c2c, 0x2f6a3a, 0x5a3a8a, 0xc8642a][g.vi % 5], pants:0x2a2a2a, hair:[0x4a2a1a, 0x8a5a2a, 0x1b1b1d, 0xe8c070, 0xd8d8d8][g.vi % 5], h:h});
+  if(typeof jobDress === 'function') jobDress(m, g.job, h);
+  LBL.dyn.push({m:m, fr:g.nm + ' - ' + g.role, en:g.en, dy:h + 0.35, r:0.6, act:function(){ greet(o); }});
+  return m;
+}
+/* fun facts for EVERY interior: places without their own facts get general France/Canada facts */
+INTERIORS.forEach(function(o){ if(!o.facts || !o.facts.length) o.facts = GENERAL_FACTS.map(function(f){ return [f[0], f[1], null]; }); });
+/* ---------- 🎈 THE ARCADE, SUPERCHARGED: balloons outside, 16 more machines inside (26 games), every Ontario FSL strand ---------- */
+function numFr2(n){ if(n < 70) return numFr(n); if(n < 80) return n === 71 ? 'soixante et onze' : 'soixante-' + NUM_FR[n - 60]; if(n === 80) return 'quatre-vingts'; if(n < 100) return 'quatre-vingt-' + (n < 90 ? NUM_FR[n - 80] : NUM_FR[n - 80]); return 'cent'; }
+function pick3(arr, not, f){ return shuffleR(Math.random, arr.filter(function(x){ return (f ? f(x) : x) !== not; })).slice(0, 3).map(function(x){ return f ? f(x) : x; }); }
+var AV = {
+  colours:[['rouge', '🟥'], ['bleu', '🟦'], ['vert', '🟩'], ['jaune', '🟨'], ['orange', '🟧'], ['violet', '🟪'], ['noir', '⬛'], ['blanc', '⬜'], ['marron', '🟫'], ['rose', '🩷'], ['gris', '🩶']],
+  weather:[['Il fait beau.', '☀️'], ['Il pleut.', '🌧'], ['Il neige.', '❄️'], ['Il fait du vent.', '🌬'], ['Il y a des nuages.', '☁️'], ['Il y a un orage.', '⛈'], ['Il fait chaud.', '🥵'], ['Il fait froid.', '🥶'], ['Il y a du brouillard.', '🌫']],
+  body:[['la tête', '🙂'], ['l\'œil', '👁'], ['l\'oreille', '👂'], ['le nez', '👃'], ['la bouche', '👄'], ['la main', '✋'], ['le pied', '🦶'], ['la jambe', '🦵'], ['le bras', '💪'], ['les dents', '🦷'], ['le cœur', '❤️'], ['le cerveau', '🧠']],
+  food:[['la pomme', '🍎'], ['la banane', '🍌'], ['le fromage', '🧀'], ['le pain', '🍞'], ['le lait', '🥛'], ['l\'œuf', '🥚'], ['la carotte', '🥕'], ['le poulet', '🍗'], ['le gâteau', '🍰'], ['la fraise', '🍓'], ['le poisson', '🐟'], ['la pizza', '🍕'], ['le raisin', '🍇'], ['la tomate', '🍅']],
+  animals:[['le chien', '🐶'], ['le chat', '🐱'], ['le cheval', '🐴'], ['la vache', '🐮'], ['le cochon', '🐷'], ['le lapin', '🐰'], ['l\'ours', '🐻'], ['le lion', '🦁'], ['le singe', '🐒'], ['l\'oiseau', '🐦'], ['la grenouille', '🐸'], ['le poisson', '🐠'], ['l\'éléphant', '🐘'], ['le castor', '🦫'], ['l\'orignal', '🫎']],
+  sports:[['jouer au hockey', '🏒'], ['jouer au soccer', '⚽'], ['jouer au basketball', '🏀'], ['faire du ski', '⛷'], ['faire de la natation', '🏊'], ['faire du vélo', '🚴'], ['jouer du piano', '🎹'], ['jouer de la guitare', '🎸'], ['faire du patin', '⛸'], ['lire', '📖'], ['dessiner', '🎨'], ['danser', '💃']],
+  days:['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'],
+  months:['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'],
+  etre:[['je', 'suis'], ['tu', 'es'], ['il', 'est'], ['elle', 'est'], ['nous', 'sommes'], ['vous', 'êtes'], ['ils', 'sont'], ['elles', 'sont']],
+  avoir:[['j\'', 'ai'], ['tu', 'as'], ['il', 'a'], ['elle', 'a'], ['nous', 'avons'], ['vous', 'avez'], ['ils', 'ont'], ['elles', 'ont']],
+  aller:[['je', 'vais'], ['tu', 'vas'], ['il', 'va'], ['elle', 'va'], ['nous', 'allons'], ['vous', 'allez'], ['ils', 'vont'], ['elles', 'vont']],
+  erverbs:['parler', 'jouer', 'manger', 'aimer', 'danser', 'chanter', 'regarder', 'écouter', 'habiter', 'marcher', 'travailler', 'dessiner'],
+  gender:[['chaise', 'une'], ['livre', 'un'], ['table', 'une'], ['crayon', 'un'], ['maison', 'une'], ['chat', 'un'], ['voiture', 'une'], ['soleil', 'un'], ['lune', 'une'], ['ordinateur', 'un'], ['école', 'une'], ['arbre', 'un'], ['fleur', 'une'], ['stylo', 'un'], ['fenêtre', 'une'], ['bureau', 'un'], ['porte', 'une'], ['téléphone', 'un']],
+  adj:[['grand', 'grande', 'grands', 'grandes'], ['petit', 'petite', 'petits', 'petites'], ['content', 'contente', 'contents', 'contentes'], ['vert', 'verte', 'verts', 'vertes'], ['intelligent', 'intelligente', 'intelligents', 'intelligentes'], ['amusant', 'amusante', 'amusants', 'amusantes'], ['bleu', 'bleue', 'bleus', 'bleues']],
+  nouns:[['le garçon', 0], ['la fille', 1], ['les garçons', 2], ['les filles', 3], ['le chien', 0], ['la maison', 1], ['les livres', 2], ['les voitures', 3]],
+  qwords:[['Qui', 'Who'], ['Quoi / Qu\'est-ce que', 'What'], ['Où', 'Where'], ['Quand', 'When'], ['Pourquoi', 'Why'], ['Comment', 'How'], ['Combien', 'How many / much'], ['Quel / Quelle', 'Which']],
+  qsent:[['___ habites-tu ? - À Toronto.', 'Où'], ['___ est ton anniversaire ? - Le 3 mai.', 'Quand'], ['___ t\'appelles-tu ? - Je m\'appelle Léa.', 'Comment'], ['___ as-tu de frères ? - Deux.', 'Combien'], ['___ est ton professeur ? - C\'est Madame.', 'Qui'], ['___ es-tu triste ? - Parce que je suis malade.', 'Pourquoi']],
+  neg:[['Je mange.', 'Je ne mange pas.'], ['Tu parles anglais.', 'Tu ne parles pas anglais.'], ['Il aime le hockey.', 'Il n\'aime pas le hockey.'], ['Nous jouons dehors.', 'Nous ne jouons pas dehors.'], ['Elle est fatiguée.', 'Elle n\'est pas fatiguée.'], ['J\'ai un chat.', 'Je n\'ai pas de chat.']],
+  prep:[['sur', 'on', '📦⬆🐱 Le chat est ___ la boîte.'], ['sous', 'under', '🐱⬇📦 Le chat est ___ la table.'], ['dans', 'in', '📦🐱 Le chat est ___ la boîte.'], ['devant', 'in front of', '🐱➡🏠 Le chat est ___ la maison.'], ['derrière', 'behind', '🏠⬅🐱 Le chat est ___ la maison.'], ['à côté de', 'next to', '🐱↔🐶 Le chat est ___ du chien.'], ['entre', 'between', '🐶🐱🐶 Le chat est ___ les deux chiens.']],
+  opp:[['grand', 'petit'], ['chaud', 'froid'], ['jour', 'nuit'], ['ouvert', 'fermé'], ['heureux', 'triste'], ['rapide', 'lent'], ['vieux', 'jeune'], ['facile', 'difficile'], ['monter', 'descendre'], ['entrer', 'sortir'], ['gagner', 'perdre'], ['beaucoup', 'peu']],
+  pc:[['manger', 'mangé'], ['jouer', 'joué'], ['regarder', 'regardé'], ['finir', 'fini'], ['choisir', 'choisi'], ['vendre', 'vendu'], ['faire', 'fait'], ['prendre', 'pris'], ['voir', 'vu'], ['boire', 'bu'], ['lire', 'lu'], ['écrire', 'écrit']],
+  culture:[['Quelle est la capitale du Canada ?', 'Ottawa', ['Toronto', 'Montréal', 'Vancouver']], ['Les Franco-Ontariens ont un drapeau...', 'vert et blanc', ['rouge et bleu', 'noir et jaune', 'rose et violet']], ['Quelle ville a un grand Carnaval d\'hiver avec Bonhomme ?', 'Québec', ['Paris', 'Ottawa', 'Halifax']], ['Où parle-t-on français en Afrique ?', 'au Sénégal', ['au Brésil', 'en Australie', 'au Japon']], ['La fête nationale du Québec, c\'est...', 'la Saint-Jean-Baptiste (24 juin)', ['Noël', 'la Saint-Patrick', 'le 4 juillet']], ['Les Acadiens vivent surtout...', 'dans les Maritimes (N.-B., N.-É.)', ['au Mexique', 'en Alaska', 'en Floride']], ['« Poutine » vient de quelle province ?', 'du Québec', ['de l\'Ontario', 'de la C.-B.', 'du Manitoba']], ['La Louisiane a une culture...', 'cadienne (cajun)', ['viking', 'aztèque', 'samouraï']], ['Combien de pays ont le français comme langue officielle ?', 'environ 29', ['2', '150', '1']], ['Quelle ville ontarienne a beaucoup de francophones ?', 'Sudbury', ['Londres', 'Dallas', 'Sydney']]],
+  pairs:[['le chien', 'dog'], ['la maison', 'house'], ['rouge', 'red'], ['manger', 'to eat'], ['l\'école', 'school'], ['le livre', 'book'], ['heureux', 'happy'], ['la neige', 'snow'], ['le soleil', 'sun'], ['l\'ami', 'friend'], ['la voiture', 'car'], ['le chat', 'cat']]
+};
+function erConj(v, p){ var r = v.slice(0, -2), e = {je:'e', tu:'es', il:'e', elle:'e', nous:'ons', vous:'ez', ils:'ent', elles:'ent'}[p]; if(p === 'nous' && /g$/.test(r)) r += 'e'; var pre = p === 'je' && /^[aeéèiouh]/.test(v) ? 'j\'' : p + ' '; return pre + r + e; }
+function emojiQ(list, title){ var it = pickR(Math.random, list), m = mc(Math.random, it[0], pick3(list, it[0], function(x){ return x[0]; })); return {big:it[1], q:title, opts:m.opts, ans:m.ans, say:it[0]}; }
+var ARC2 = [
+  {id:'nombres', icon:'🔢', nm:'Les nombres 0-100', st:'👂 écouter', col:0xe84a4a, gen:function(){ var n = Math.floor(Math.random()*101), opts = [n]; while(opts.length < 4){ var d = Math.max(0, Math.min(100, n + Math.floor(Math.random()*21) - 10)); if(opts.indexOf(d) < 0) opts.push(d); } opts = shuffleR(Math.random, opts); return {listen:numFr2(n), q:L2('Listen: which number?', 'Écoute : quel nombre ?'), opts:opts.map(String), ans:opts.indexOf(n)}; }},
+  {id:'couleurs', icon:'🎨', nm:'Les couleurs', st:'👀 voir', col:0xf2943a, gen:function(){ return emojiQ(AV.colours, L2('What colour?', 'Quelle couleur ?')); }},
+  {id:'jours', icon:'📅', nm:'Les jours et les mois', st:'🧠 logique', col:0xf2c230, gen:function(){ var L = Math.random() < 0.5 ? AV.days : AV.months, i = Math.floor(Math.random()*L.length), r = L[(i + 1) % L.length], m = mc(Math.random, r, pick3(L, r)); return {q:'Après « ' + L[i] + ' », c\'est...', opts:m.opts, ans:m.ans}; }},
+  {id:'meteo', icon:'🌦', nm:'La météo', st:'👀 voir', col:0x5ab8f2, gen:function(){ return emojiQ(AV.weather, L2('What\'s the weather?', 'Quel temps fait-il ?')); }},
+  {id:'corps', icon:'🧍', nm:'Le corps', st:'👀 voir', col:0xf28ac8, gen:function(){ return emojiQ(AV.body, L2('Which part of the body?', 'Quelle partie du corps ?')); }},
+  {id:'nourriture', icon:'🍎', nm:'La nourriture', st:'👀 voir', col:0x5ad87a, gen:function(){ return emojiQ(AV.food, L2('What is it?', 'Qu\'est-ce que c\'est ?')); }},
+  {id:'animaux', icon:'🐾', nm:'Les animaux', st:'👂 écouter', col:0x8a5a32, gen:function(){ var it = pickR(Math.random, AV.animals), others = pick3(AV.animals, it[1], function(x){ return x[1]; }), opts = shuffleR(Math.random, [it[1]].concat(others)); return {listen:it[0], q:L2('Listen: which animal?', 'Écoute : quel animal ?'), opts:opts, ans:opts.indexOf(it[1]), emo:true}; }},
+  {id:'loisirs', icon:'⚽', nm:'Les sports et loisirs', st:'👀 voir', col:0x2f8a3a, gen:function(){ return emojiQ(AV.sports, L2('What are they doing?', 'Qu\'est-ce qu\'on fait ?')); }},
+  {id:'etreavoir', icon:'⭐', nm:'Être et avoir', st:'✍ grammaire', col:0x8a3ad6, gen:function(){ var V = Math.random() < 0.5 ? ['être', AV.etre] : ['avoir', AV.avoir], p = pickR(Math.random, V[1]), m = mc(Math.random, p[1], pick3(V[1], p[1], function(x){ return x[1]; })); return {q:V[0].toUpperCase() + ' : ' + p[0] + (p[0].slice(-1) === '\'' ? '' : ' ') + '___', opts:m.opts, ans:m.ans}; }},
+  {id:'verbeser', icon:'🗣', nm:'Les verbes en -ER', st:'✍ grammaire', col:0x1f6fb8, gen:function(){ var v = pickR(Math.random, AV.erverbs), P = ['je', 'tu', 'il', 'elle', 'nous', 'vous', 'ils', 'elles'], p = pickR(Math.random, P), r = erConj(v, p), wr = shuffleR(Math.random, P.filter(function(x){ return erConj(v, x).split(/[ ']/).pop() !== r.split(/[ ']/).pop(); })).slice(0, 3).map(function(x){ var w = erConj(v, x).split(/[ ']/).pop(); return (p === 'je' && /^[aeéèiouh]/.test(v) ? 'j\'' : p + ' ') + w; }), m = mc(Math.random, r, wr.filter(function(x, i, a){ return a.indexOf(x) === i; })); return {q:v.toUpperCase() + ' - ' + p + ' ...?', opts:m.opts, ans:m.ans}; }},
+  {id:'futur', icon:'🚀', nm:'Aller + le futur proche', st:'✍ grammaire', col:0xc84ad6, gen:function(){ var p = pickR(Math.random, AV.aller), inf = pickR(Math.random, ['manger', 'jouer', 'danser', 'regarder la télé', 'faire du vélo']), r = p[0] + ' ' + p[1] + ' ' + inf, m = mc(Math.random, r, pick3(AV.aller, p[1], function(x){ return x[1]; }).map(function(w){ return p[0] + ' ' + w + ' ' + inf; })); return {q:L2('Tomorrow... (near future)', 'Demain... (le futur proche)'), opts:m.opts, ans:m.ans}; }},
+  {id:'genre', icon:'⚖', nm:'Un ou une ?', st:'🗂 trier', col:0xe86aa0, gen:function(){ var it = pickR(Math.random, AV.gender), opts = ['un', 'une']; return {big:'___ ' + it[0], q:L2('Masculine or feminine?', 'Masculin ou féminin ?'), opts:opts, ans:opts.indexOf(it[1]), say:it[1] + ' ' + it[0]}; }},
+  {id:'accord', icon:'🎯', nm:'L\'accord des adjectifs', st:'✍ grammaire', col:0x3ab8a0, gen:function(){ var a = pickR(Math.random, AV.adj), n = pickR(Math.random, AV.nouns), r = a[n[1]], m = mc(Math.random, r, a.filter(function(x){ return x !== r; }).filter(function(x, i, arr){ return arr.indexOf(x) === i; })); return {q:n[0].charAt(0).toUpperCase() + n[0].slice(1) + (n[1] > 1 ? ' sont ' : ' est ') + '___ (' + a[0] + ')', opts:m.opts, ans:m.ans}; }},
+  {id:'questions', icon:'❓', nm:'Les mots interrogatifs', st:'💬 oral', col:0xe3b52c, gen:function(){ var s = pickR(Math.random, AV.qsent), m = mc(Math.random, s[1], pick3(AV.qsent, s[1], function(x){ return x[1]; })); return {q:s[0], opts:m.opts, ans:m.ans}; }},
+  {id:'negation', icon:'🚫', nm:'Ne... pas', st:'✍ grammaire', col:0x5a5a6a, gen:function(){ var s = pickR(Math.random, AV.neg), bad = [s[0].replace(/^(\w+) /, '$1 pas ').replace(/\.$/, '.'), 'Ne ' + s[0].charAt(0).toLowerCase() + s[0].slice(1).replace(/\.$/, ' pas.'), s[1].replace(' pas', '')], m = mc(Math.random, s[1], bad.filter(function(x){ return x !== s[1]; })); return {q:'« ' + s[0] + ' » → ' + L2('negative:', 'négatif :'), opts:m.opts, ans:m.ans}; }},
+  {id:'heure', icon:'🕐', nm:'L\'heure', st:'👀 voir', col:0x2a4a8a, gen:function(){ var h = 1 + Math.floor(Math.random()*12), mi = pickR(Math.random, [0, 15, 30, 45]), w = function(H, M){ var hh = numFr(H) + (H > 1 ? ' heures' : ' heure'); return 'Il est ' + hh + (M === 0 ? '' : M === 15 ? ' et quart' : M === 30 ? ' et demie' : ' quarante-cinq'); }, r = w(h, mi), wr = [w(h % 12 + 1, mi), w(h, (mi + 15) % 60), w(h === 1 ? 12 : h - 1, (mi + 30) % 60)].filter(function(x){ return x !== r; }), m = mc(Math.random, r, wr); return {big:'🕐 ' + h + ':' + ('0' + mi).slice(-2), q:L2('What time is it?', 'Quelle heure est-il ?'), opts:m.opts, ans:m.ans}; }},
+  {id:'dictee', icon:'✏', nm:'La dictée', st:'✍ écrire', col:0x6a4aa8, gen:function(){ var w = pickR(Math.random, AV.food.concat(AV.animals, AV.body)).map ? pickR(Math.random, AV.food.concat(AV.animals, AV.body)) : null; var word = w[0].replace(/^(le |la |les |l')/, ''); return {listen:w[0], type:word, q:L2('Listen and type the word (without le / la):', 'Écoute et écris le mot (sans le / la) :'), hint:w[1]}; }},
+  {id:'phrase', icon:'🧩', nm:'Remets la phrase dans l\'ordre', st:'✍ écrire', col:0xc8382f, gen:function(){ var S = ['Je m\'appelle Léa', 'J\'aime jouer au hockey', 'Il fait froid en hiver', 'Nous allons au parc', 'Mon chat est très mignon', 'Elle a douze ans', 'Le chien mange une pomme', 'Tu habites à Toronto'], s = pickR(Math.random, S); return {order:s.split(' '), q:L2('Click the words in the right order:', 'Clique sur les mots dans le bon ordre :')}; }},
+  {id:'francophonie', icon:'🌍', nm:'La francophonie et le Canada', st:'🌎 culture', col:0x2f6a3a, gen:function(){ var c = pickR(Math.random, AV.culture), m = mc(Math.random, c[1], c[2]); return {q:c[0], opts:m.opts, ans:m.ans}; }},
+  {id:'vraifaux', icon:'⚡', nm:'Vrai ou faux ? (rapide)', st:'⚡ vitesse', col:0xf2c230, timer:6, gen:function(){ var L = AV.food.concat(AV.animals, AV.colours), it = pickR(Math.random, L), ok = Math.random() < 0.5, sh = ok ? it : pickR(Math.random, L.filter(function(x){ return x !== it; })); return {big:it[1] + ' = « ' + sh[0] + ' » ?', q:L2('True or false? (6 seconds!)', 'Vrai ou faux ? (6 secondes !)'), opts:['VRAI ✅', 'FAUX ❌'], ans:ok ? 0 : 1}; }},
+  {id:'memoire', icon:'🃏', nm:'Le jeu de mémoire', st:'🧠 mémoire', col:0x1f3f8f, memory:true},
+  {id:'prepositions', icon:'📦', nm:'Les prépositions', st:'👀 voir', col:0xb8823a, gen:function(){ var p = pickR(Math.random, AV.prep), m = mc(Math.random, p[0], pick3(AV.prep, p[0], function(x){ return x[0]; })); return {q:p[2], opts:m.opts, ans:m.ans}; }},
+  {id:'passe', icon:'⏮', nm:'Le passé composé', st:'✍ grammaire', col:0x8a1c3a, gen:function(){ var v = pickR(Math.random, AV.pc), m = mc(Math.random, 'j\'ai ' + v[1], pick3(AV.pc, v[1], function(x){ return x[1]; }).map(function(w){ return 'j\'ai ' + w; }).concat([]).slice(0, 2).concat(['je ' + v[0]])); return {q:L2('Yesterday... ', 'Hier... ') + v[0].toUpperCase(), opts:m.opts, ans:m.ans}; }},
+  {id:'contraires', icon:'↔', nm:'Les contraires', st:'🧠 logique', col:0x3a8ae8, gen:function(){ var p = pickR(Math.random, AV.opp), flip = Math.random() < 0.5, a = flip ? p[1] : p[0], b = flip ? p[0] : p[1], all = AV.opp.reduce(function(s, x){ return s.concat(x); }, []), m = mc(Math.random, b, pick3(all, b).filter(function(x){ return x !== a; })); return {q:L2('The opposite of ', 'Le contraire de ') + '« ' + a + ' » ?', opts:m.opts, ans:m.ans}; }},
+  {id:'ecoute', icon:'🎧', nm:'Écoute et choisis l\'image', st:'👂 écouter', col:0x5ad8c8, gen:function(){ var L = AV.food.concat(AV.weather, AV.sports), it = pickR(Math.random, L), others = pick3(L, it[1], function(x){ return x[1]; }), opts = shuffleR(Math.random, [it[1]].concat(others)); return {listen:it[0], q:L2('Listen and choose the picture:', 'Écoute et choisis l\'image :'), opts:opts, ans:opts.indexOf(it[1]), emo:true}; }}
+];
+var A2 = {};
+function arc2Open(i){ var g = ARC2[i], best = hasChar() && life.eco.arc2 && life.eco.arc2[g.id] || 0;
+  showCard('<h3>' + g.icon + ' ' + esc(g.nm.toUpperCase()) + '</h3><div class="gc-sub">' + esc(g.st) + ' · ' + L2('best score: ', 'meilleur score : ') + best + '/10</div><div class="gc-text">' + L2('10 questions. Every 3 right answers = +1 🪙.', '10 questions. Toutes les 3 bonnes réponses = +1 🪙.') + '</div><div class="gc-row">' + gBtn('a2go', i, '▶ ' + L2('PLAY', 'JOUER'), 'go', ' data-enter="1"') + gBtn('a2all', null, '🕹 ' + L2('ALL GAMES', 'TOUS LES JEUX')) + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>'); }
+GACT.a2all = function(){ showCard('<h3>🕹 ' + L2('ALL THE ARCADE GAMES', 'TOUS LES JEUX DE L\'ARCADE') + '</h3><div class="gc-grid">' + ARC2.map(function(g, i){ return gOpt('a2pick', i, g.icon + ' <b>' + esc(g.nm) + '</b><br><span class="lf-soft">' + esc(g.st) + '</span>'); }).join('') + (typeof ARC_GAMES !== 'undefined' ? ARC_GAMES.map(function(g, i){ return gOpt('a2old', i, g.icon + ' <b>' + esc(g.nm) + '</b><br><span class="lf-soft">' + esc(g.sub) + '</span>'); }).join('') : '') + '</div><div class="gc-row">' + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>'); };
+GACT.a2pick = function(i){ arc2Open(i|0); }; GACT.a2old = function(i){ openArcade(i|0); };
+GACT.a2go = function(i){ var g = ARC2[i|0]; A2 = {g:g, n:0, ok:0}; if(g.memory){ memStart(); return; } a2Q(); };
+function a2Q(msg){
+  var g = A2.g; clearTimeout(A2.tm);
+  if(A2.n >= 10){ var e = hasChar() ? life.eco : null, gain = Math.floor(A2.ok/3), got = gain ? addJeton(gain) : 0; if(e){ e.arc2 = e.arc2 || {}; if(A2.ok > (e.arc2[g.id]|0)){ e.arc2[g.id] = A2.ok; lifeSave(true); } } say(A2.ok >= 8 ? 'Excellent ! Bravo !' : A2.ok >= 5 ? 'Bien joué !' : 'Continue à t\'entraîner !');
+    showCard('<h3>' + g.icon + ' ' + esc(g.nm) + '</h3><div class="gc-big">' + A2.ok + ' / 10' + (got ? ' · +' + got + ' 🪙' : '') + '</div>' + noCharLine() + '<div class="gc-row">' + gBtn('a2go', ARC2.indexOf(g), L2('AGAIN', 'ENCORE'), 'go') + gBtn('a2all', null, '🕹 ' + L2('OTHER GAMES', 'AUTRES JEUX')) + gBtn('close', null, 'OK') + '</div>'); return; }
+  var q = g.gen(); A2.q = q; A2.picked = [];
+  var h = '<h3>' + g.icon + ' ' + esc(g.nm) + ' · ' + (A2.n + 1) + '/10 · ✓ ' + A2.ok + '</h3>' + (msg || '') + (q.big ? '<div class="gc-big" style="font-size:' + (q.big.length < 6 ? '56px' : '26px') + '">' + esc(q.big) + '</div>' : '') + '<div class="gc-sub">' + esc(q.q) + '</div>';
+  if(q.listen) h += '<div class="gc-row">' + gBtn('a2hear', null, '🔊 ' + L2('LISTEN AGAIN', 'RÉÉCOUTER'), 'go') + '</div>';
+  if(q.type) h += (q.hint ? '<div class="gc-big" style="font-size:40px">' + q.hint + '</div>' : '') + '<input id="a2-in" class="gc-in" autocomplete="off" style="font-size:18px"><div class="gc-row">' + gBtn('a2type', null, L2('CHECK', 'VÉRIFIER'), 'go', ' data-enter="1"') + '</div><div class="gc-sub">é è ê à ç ô û î ï</div>';
+  else if(q.order){ A2.shuf = shuffleR(Math.random, q.order.map(function(w, i){ return i; })); h += '<div class="gc-big" id="a2-built" style="min-height:30px"></div><div class="gc-row">' + A2.shuf.map(function(i){ return gBtn('a2word', i, q.order[i]); }).join('') + '</div><div class="gc-row">' + gBtn('a2reset', null, '↺') + '</div>'; }
+  else h += '<div class="gc-grid">' + q.opts.map(function(o, k){ return gOpt('a2ans', k, q.emo ? '<span style="font-size:40px">' + o + '</span>' : esc(o)); }).join('') + '</div>';
+  if(g.timer) h += '<div style="height:10px;border:2px solid #23243a;margin-top:6px"><div id="a2-bar" style="height:100%;width:100%;background:#f2c230;transition:width ' + g.timer + 's linear"></div></div>';
+  showCard(h);
+  if(q.listen) setTimeout(function(){ say(q.listen); }, 250);
+  if(g.timer){ setTimeout(function(){ var b = document.getElementById('a2-bar'); if(b) b.style.width = '0%'; }, 50); A2.tm = setTimeout(function(){ A2.n++; a2Q('<div class="bad">⏱ ' + L2('Too slow!', 'Trop lent !') + '</div>'); }, g.timer*1000); }
+}
+GACT.a2hear = function(){ if(A2.q && A2.q.listen) say(A2.q.listen); };
+function a2Done(ok, right){ if(A2.busy) return; A2.busy = true; setTimeout(function(){ A2.busy = false; }, 350); if(ok) A2.ok++; A2.n++; if(A2.q.say) say(A2.q.say); a2Q(ok ? '<div class="good">✓ ' + esc(right) + '</div>' : '<div class="bad">✗ ' + esc(right) + '</div>'); }
+GACT.a2ans = function(v){ var q = A2.q; a2Done((v|0) === q.ans, (q.emo ? q.opts[q.ans] + ' = ' + q.listen : q.opts[q.ans])); };
+GACT.a2type = function(){ var el = document.getElementById('a2-in'), v = (el && el.value || '').trim().toLowerCase().replace(/’/g, '\''), want = A2.q.type.toLowerCase(), plain = function(s){ return s.normalize('NFD').replace(/[̀-ͯ]/g, ''); };
+  if(v === want) a2Done(true, want); else if(plain(v) === plain(want)){ A2.ok += 0.5; a2Done(false, want + ' (' + L2('watch the accents!', 'attention aux accents !') + ')'); A2.ok = Math.floor(A2.ok); } else a2Done(false, want); };
+GACT.a2word = function(i){ i = i|0; if(A2.picked.indexOf(i) >= 0) return; A2.picked.push(i); var q = A2.q, el = document.getElementById('a2-built'); if(el) el.textContent = A2.picked.map(function(k){ return q.order[k]; }).join(' ');
+  if(A2.picked.length === q.order.length){ var s = A2.picked.map(function(k){ return q.order[k]; }).join(' '), r = q.order.join(' '); A2.q.say = r; a2Done(s === r, r + '.'); } };
+GACT.a2reset = function(){ A2.picked = []; var el = document.getElementById('a2-built'); if(el) el.textContent = ''; };
+/* the memory game: flip cards, match French and English */
+var MEM = {};
+function memStart(){ var P = shuffleR(Math.random, AV.pairs.slice()).slice(0, 6), cards = []; P.forEach(function(p, i){ cards.push({t:p[0], k:i, fr:true}, {t:p[1], k:i}); }); MEM = {c:shuffleR(Math.random, cards), open:[], done:[], moves:0}; memDraw(); }
+function memDraw(msg){ showCard('<h3>🃏 ' + L2('MEMORY: match French and English', 'MÉMOIRE : associe le français et l\'anglais') + '</h3>' + (msg || '') + '<div class="gc-grid" style="grid-template-columns:repeat(4,1fr)">' + MEM.c.map(function(c, i){ var up = MEM.open.indexOf(i) >= 0 || MEM.done.indexOf(c.k) >= 0; return gOpt('memflip', i, up ? (c.fr ? '🇫🇷 ' : '🇬🇧 ') + esc(c.t) : '❓'); }).join('') + '</div><div class="gc-sub">' + L2('Moves: ', 'Coups : ') + MEM.moves + '</div>'); }
+GACT.memflip = function(i){ i = i|0; var c = MEM.c[i]; if(MEM.busy || MEM.open.indexOf(i) >= 0 || MEM.done.indexOf(c.k) >= 0) return; if(c.fr) say(c.t); MEM.open.push(i);
+  if(MEM.open.length === 2){ MEM.moves++; var a = MEM.c[MEM.open[0]], b = MEM.c[MEM.open[1]]; memDraw();
+    if(a.k === b.k){ MEM.done.push(a.k); MEM.open = []; if(MEM.done.length === 6){ var got = addJeton(MEM.moves <= 10 ? 3 : 2); var e = hasChar() ? life.eco : null; if(e){ e.arc2 = e.arc2 || {}; e.arc2.memoire = Math.max(e.arc2.memoire|0, Math.max(1, 16 - MEM.moves)); lifeSave(true); } say('Bravo ! Toutes les paires !'); showCard('<h3>🃏 ' + L2('ALL PAIRS!', 'TOUTES LES PAIRES !') + '</h3><div class="gc-big">' + MEM.moves + ' ' + L2('moves', 'coups') + (got ? ' · +' + got + ' 🪙' : '') + '</div>' + noCharLine() + '<div class="gc-row">' + gBtn('a2go', ARC2.map(function(x){ return x.id; }).indexOf('memoire'), L2('AGAIN', 'ENCORE'), 'go') + gBtn('a2all', null, '🕹') + gBtn('close', null, 'OK') + '</div>'); } else memDraw(); }
+    else { MEM.busy = true; setTimeout(function(){ MEM.open = []; MEM.busy = false; memDraw(); }, 900); }
+  } else memDraw(); };
+(function(){
+  var X = ARC.x, Z = ARC.z, B = new MeshBatch(), L = new Lot(B, 0, 0, 0), bc = [0xff4a6a, 0xffd23a, 0x4ad6ff, 0x6aff7a, 0xc84aff, 0xff8a3a];
+  for(var s=0;s<12;s++){ if(Math.abs(-45 + (s + 0.5)*90/12) < 9) continue; L.box(90/12 - 0.2, 0.9, 0.2, X - 45 + (s + 0.5)*90/12, 1.2, Z + 28.6, bc[s % 6]); L.box(90/12 - 0.2, 0.9, 0.2, X - 45 + (s + 0.5)*90/12, 7.6, Z + 28.6, bc[(s + 3) % 6]); }
+  for(var a=0;a<=16;a++){ var an = Math.PI*a/16, bx = X + Math.cos(an)*8.5, by = 0.6 + Math.sin(an)*9; L.part(new THREE.SphereGeometry(0.75, 10, 8), bx, by, Z + 29.3, bc[a % 6]); }
+  [[-20, 14], [20, 14], [-36, 11], [36, 11], [0, 16], [-8, 13], [8, 13]].forEach(function(p, i){ var bx = X + p[0], by = 9 + p[1], c = bc[i % 6]; L.part(new THREE.SphereGeometry(2.4, 16, 12), bx, by, Z + 24, c); L.part(new THREE.ConeGeometry(0.5, 0.7, 8), bx, by - 2.6, Z + 24, c); L.box(0.05, p[1], 0.05, bx, 9.6 + p[1]/2 - 2.8, Z + 24, 0xffffff); });
+  for(var k=0;k<10;k++){ var bx2 = X - 14 + (k % 2)*28 + Math.sin(k)*2, bz2 = Z + 31 + Math.floor(k/2)*1.4; L.part(new THREE.SphereGeometry(0.55, 10, 8), bx2, 2.8 + (k % 3)*0.5, bz2, bc[k % 6]); L.box(0.03, 2.4, 0.03, bx2, 1.2, bz2, 0xffffff); }
+  ARC2.forEach(function(g, i){ var row = i < 8 ? 0 : i < 16 ? 1 : 2, k = i % 8, mx = X - 35 + k*10, mz = row === 0 ? Z - 6 : Z + 20, face = row === 1 ? Math.PI : 0;
+    if(row === 2){ mx = X - 40.5 + (i - 16)*9; mz = Z + 1.5; face = 0; }
+    var M = new Lot(B, mx, mz, face); M.box(2.6, 3.8, 1.8, 0, 1.9, 0, g.col); M.box(2.1, 1.4, 0.2, 0, 2.8, 0.92, 0x0a0a14); M.box(2.8, 0.25, 1.1, 0, 1.5, 1.25, 0x1b1b1d); M.box(2.7, 0.5, 1.9, 0, 4.0, 0, 0xffffff); M.part(new THREE.SphereGeometry(0.35, 10, 8), 0, 4.6, 0, bc[i % 6]);
+    M.box(0.22, 0.45, 0.22, -0.5, 1.8, 1.35, 0xff3a3a); M.box(0.25, 0.1, 0.25, 0.5, 1.7, 1.35, 0x3aff6a);
+    addSolid(mx - 1.4, mx + 1.4, mz - 1.0, mz + 1.0, 'champs', -1, 4.2);
+    var c = document.createElement('canvas'); c.width = 256; c.height = 160; var k2 = c.getContext('2d'); k2.fillStyle = '#0a0a14'; k2.fillRect(0, 0, 256, 160); k2.font = '60px sans-serif'; k2.textAlign = 'center'; k2.fillText(g.icon, 128, 72); k2.fillStyle = '#fff'; k2.font = 'bold 21px monospace'; k2.fillText(g.nm, 128, 118, 244); k2.fillStyle = '#' + ('00000' + g.col.toString(16)).slice(-6); k2.font = '16px monospace'; k2.fillText(g.st, 128, 146, 240);
+    var sc = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 1.3), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c)})); sc.position.set(mx + Math.sin(face)*1.03, 2.8, mz + Math.cos(face)*1.03); sc.rotation.y = face; root.add(sc);
+    tag(mx, 3.6, mz, 'la borne d\'arcade : ' + g.nm.toLowerCase(), 'arcade machine: ' + g.st, 1);
+    addSpot({x:mx + Math.sin(face)*2.4, z:mz + Math.cos(face)*2.4, r:2.1, label:function(){ return g.icon + ' ' + g.nm + ' · ' + g.st; }, act:function(){ arc2Open(i); }}); });
+  B.build();
+  airSign('🎈 ' + (ARC2.length + (typeof ARC_GAMES !== 'undefined' ? ARC_GAMES.length : 0)) + ' ' + L2('FRENCH GAMES!', 'JEUX DE FRANÇAIS !') + ' 🎈', X, 3.2, Z + 29, 0, 16, '#ff4a6a');
+  addSpot({x:X, z:Z + 24, r:3.5, label:function(){ return '🕹 ' + L2('See ALL the arcade games', 'Voir TOUS les jeux de l\'arcade'); }, act:function(){ GACT.a2all(); }});
+  [-1, 1].forEach(function(s){ var nl = new THREE.PointLight(s < 0 ? 0xffd23a : 0x6aff7a, 1, 45); nl.position.set(X + s*25, 7, Z + 8); root.add(nl); });
+})();
+/* ---------- 🧺 A LIVELY CHAMP DE MARS (daytime): picnics on the lawns, strollers, tourists, street vendors and artists ---------- */
+var PIC = {groups:[], walkers:[], vendors:[], on:null};
+var PIC_VOC = [['le pique-nique', 'picnic'], ['la nappe', 'tablecloth'], ['le panier', 'basket'], ['la pelouse', 'lawn'], ['le sandwich', 'sandwich'], ['le fromage', 'cheese'], ['les fraises', 'strawberries'], ['la limonade', 'lemonade'], ['le soleil', 'sun'], ['bronzer', 'to sunbathe'], ['le frisbee', 'frisbee'], ['partager', 'to share']];
+var PIC_TALK = ['Bonjour ! Tu veux un morceau de baguette ?', 'Il fait beau aujourd\'hui, c\'est parfait pour un pique-nique !', 'Goûte ce fromage, c\'est du camembert de Normandie !', 'On regarde la tour Eiffel, elle est magnifique !', 'Tu veux jouer au frisbee avec nous ?', 'Attention aux pigeons, ils adorent les miettes !', 'Ce soir, la tour Eiffel va scintiller à 21 heures !', 'Nous sommes des touristes du Québec. Et toi, tu viens d\'où ?'];
+(function(){
+  var g = new THREE.Group(); root.add(g); PIC.root = g; var M = function(c){ return solidMat(c); };
+  var spots = [[-30, 40], [-50, 52], [-68, 38], [-22, 58], [30, 42], [52, 55], [70, 40], [24, 60], [-40, -42], [-62, -55], [-28, -60], [40, -40], [62, -52], [28, -58], [48, 10], [66, -12], [40, -16], [-48, -8], [-66, 12], [-40, 16]];
+  var cloth = [[0xc8382f, 0xffffff], [0x1f6fb8, 0xffffff], [0x2f8a3a, 0xf2e8c8], [0xe3b52c, 0xffffff], [0xd27aa0, 0xffffff]], shirts = [0xc8382f, 0x1f6fb8, 0x2f8a3a, 0xe3b52c, 0x8a3ad6, 0xf28aa0, 0xffffff, 0x2a2d36, 0xe8642a], hairs = [0x1b1b1d, 0x4a2a1a, 0x8a4a1a, 0xe8c070, 0xd8d8d8, 0xc8382f];
+  spots.forEach(function(s, i){
+    var G = new THREE.Group(); G.position.set(s[0], 0, s[1]); G.rotation.y = i*1.3; g.add(G);
+    var cc = cloth[i % cloth.length];
+    for(var a=0;a<4;a++) for(var b=0;b<4;b++){ var t = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.02, 0.5), M((a + b) % 2 ? cc[0] : cc[1])); t.position.set(-0.75 + a*0.5, 0.03, -0.75 + b*0.5); G.add(t); }
+    var bk = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 0.35), M(0xb8823a)); bk.position.set(0.6, 0.18, -0.6); G.add(bk); var hd = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.025, 4, 10, Math.PI), M(0x8a5a2a)); hd.position.set(0.6, 0.33, -0.6); G.add(hd);
+    var bg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.6, 6), M(0xd99a45)); bg.rotation.z = Math.PI/2; bg.position.set(-0.2, 0.08, 0.2); G.add(bg);
+    var bt = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.28, 8), M([0xf2e23a, 0x3a8a3a, 0xe84a4a][i % 3])); bt.position.set(0.2, 0.16, -0.1); G.add(bt);
+    var ch = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.06, 12), M(0xf2e2b0)); ch.position.set(-0.3, 0.06, -0.3); G.add(ch);
+    var n = 2 + (i % 3);
+    for(var p=0;p<n;p++){ var an = p/n*Math.PI*2, px = Math.cos(an)*1.25, pz = Math.sin(an)*1.25, lie = (i + p) % 7 === 0;
+      var per = person({x:0, z:0, ry:0, sit:!lie, shirt:shirts[(i*3 + p) % shirts.length], pants:[0x2a3a5a, 0xc8b89a, 0x1b1b1d][p % 3], hair:hairs[(i + p*2) % hairs.length], h:p === n - 1 && i % 4 === 0 ? 1.0 : 1.55 + (p % 3)*0.08});
+      root.remove(per); per.position.set(px, lie ? 0.15 : -0.15, pz); per.rotation.y = Math.atan2(-px, -pz) + Math.PI; if(lie){ per.rotation.x = -Math.PI/2; per.position.y = 0.18; } G.add(per); }
+    if(i % 5 === 2){ var dog = animal('chien', s[0] + 1.6, 0, s[1] + 0.8, i, 0xc8904a); root.remove(dog); g.add(dog); }
+    PIC.groups.push({x:s[0], z:s[1], i:i});
+    LBL.dyn.push({m:G, fr:'un pique-nique', en:'a picnic', dy:1.3, r:1.6, act:function(){ picTalk(i); }});
+  });
+  for(var w=0;w<16;w++){ var per2 = person({x:0, z:0, ry:0, shirt:shirts[(w*5) % shirts.length], pants:[0x2a3a5a, 0xc8b89a, 0x1b1b1d][w % 3], hair:hairs[w % hairs.length], h:1.6 + (w % 4)*0.06});
+    if(w % 4 === 0){ var cam = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.1, 0.08), M(0x1b1b1d)); cam.position.set(0, 1.4, -0.25); per2.add(cam); }
+    if(w % 5 === 1){ var bal = new THREE.Mesh(new THREE.SphereGeometry(0.25, 10, 8), M([0xe84a4a, 0x3a8ae8, 0xf2c230][w % 3])); bal.position.set(0.3, 2.6, 0); per2.add(bal); var str = new THREE.Mesh(new THREE.BoxGeometry(0.01, 1.2, 0.01), M(0xffffff)); str.position.set(0.3, 1.8, 0); per2.add(str); }
+    root.remove(per2); g.add(per2); PIC.walkers.push({m:per2, a:w*0.39, r:w % 2 ? 22 + (w % 3)*2 : 84 + (w % 2), sp:(w % 2 ? 0.05 : 0.02)*(w % 3 ? 1 : -1), rect:!(w % 2)}); }
+  [['🍦', 'le marchand de glaces', 'the ice-cream seller', -6, 30, 0xf2a8c8, ['Une glace à la vanille, s\'il vous plaît.', 'Une boule fraise et une boule chocolat.', 'Un sorbet au citron, s\'il vous plaît.'], 'Voilà ! Ça fait trois euros.'],
+   ['🥞', 'la crêpière', 'the crêpe seller', 6, -30, 0xe3b52c, ['Une crêpe au sucre, s\'il vous plaît.', 'Une crêpe au Nutella, s\'il vous plaît.', 'Une galette jambon-fromage, s\'il vous plaît.'], 'Et voilà, une bonne crêpe chaude ! Quatre euros, s\'il vous plaît.'],
+   ['🎈', 'le vendeur de ballons', 'the balloon seller', 12, 30, 0x3a8ae8, ['Un ballon rouge, s\'il vous plaît.', 'Un ballon bleu, s\'il vous plaît.', 'Un ballon en forme de cœur !'], 'Tiens, ton ballon ! Ne le lâche pas !'],
+   ['🗼', 'le vendeur de souvenirs', 'the souvenir seller', -12, -30, 0x8a6a4a, ['Une petite tour Eiffel, s\'il vous plaît.', 'Un porte-clés, s\'il vous plaît.', 'Une carte postale de Paris.'], 'Voilà ! Un beau souvenir de Paris !'],
+   ['🎨', 'le peintre', 'the street painter', 30, 26, 0xe86a3a, ['Vous pouvez faire mon portrait ?', 'Qu\'est-ce que vous peignez ?', 'C\'est très beau !'], 'Merci ! Je peins la tour Eiffel au soleil. Tu veux un portrait ? Assieds-toi !'],
+   ['🪗', 'l\'accordéoniste', 'the accordion player', -30, 26, 0x1b1b1d, ['Bravo ! C\'est très joli !', 'Vous pouvez jouer encore ?', 'Merci pour la musique !'], 'Merci beaucoup ! La musique, c\'est la joie de Paris !']].forEach(function(v, i){
+    var x = v[3], z = v[4], per3 = person({x:x, z:z, ry:Math.PI, shirt:v[5], pants:0x2a2d36, hair:hairs[i % hairs.length], hat:i === 4 ? 0x1b1b1d : null, h:1.75}); root.remove(per3); g.add(per3);
+    var cart = new THREE.Group(); cart.position.set(x + 1.3, 0, z); var cb = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.9, 0.8), M(v[5])); cb.position.y = 0.75; cart.add(cb); var um = new THREE.Mesh(new THREE.ConeGeometry(1.1, 0.5, 10), M(0xffffff)); um.position.y = 2.4; cart.add(um); var po = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.2, 6), M(0x8a8f98)); po.position.y = 1.2; cart.add(po);
+    if(i === 2) for(var bb=0;bb<6;bb++){ var bl = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), M([0xe84a4a, 0x3a8ae8, 0xf2c230, 0x6ad04a, 0xd27aa0, 0xff8a3a][bb])); bl.position.set(-0.5 + (bb % 3)*0.5, 3.2 + Math.floor(bb/3)*0.5, 0); cart.add(bl); }
+    if(i === 4){ var ea = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 0.05), M(0xf6f2ea)); ea.position.set(0, 1.5, 0.5); cart.add(ea); }
+    g.add(cart); PIC.vendors.push(per3);
+    LBL.dyn.push({m:per3, fr:v[1], en:v[2], dy:2.0, r:0.7, act:function(){ vendorTalk(v); }}); });
+})();
+function picTalk(i){ var t = PIC_TALK[i % PIC_TALK.length]; say(t);
+  showCard('<h3>🧺 ' + L2('A PICNIC ON THE CHAMP DE MARS', 'UN PIQUE-NIQUE AU CHAMP-DE-MARS') + '</h3><div class="gc-big gc-say">« ' + esc(t) + ' »</div><div class="gc-grid">' + ['Oui, merci beaucoup !', 'Bon appétit !', 'Il fait vraiment beau !', 'Je viens de l\'Ontario, au Canada !'].map(function(r, k){ return gOpt('picrep', k, '« ' + esc(r) + ' »'); }).join('') + '</div><div class="gc-text">' + PIC_VOC.map(function(w){ return '<span class="gc-say">' + esc(w[0]) + '</span> <span class="lf-soft">(' + esc(w[1]) + ')</span>'; }).join(' · ') + '</div>'); }
+GACT.picrep = function(v){ var r = ['Oui, merci beaucoup !', 'Bon appétit !', 'Il fait vraiment beau !', 'Je viens de l\'Ontario, au Canada !'][v|0], ans = ['Avec plaisir ! Prends aussi une fraise !', 'Merci, à toi aussi !', 'Oui, c\'est une journée parfaite !', 'Oh, l\'Ontario ! J\'adore Toronto et les chutes du Niagara !'][v|0]; say(r + ' ' + ans); var g = !(chal.cool.pic > Date.now()) ? addJeton(1) : 0; if(g) chal.cool.pic = Date.now() + 3*60000;
+  showCard('<h3>🧺</h3><div class="gc-text gc-say">« ' + esc(r) + ' »</div><div class="gc-big gc-say">« ' + esc(ans) + ' »</div>' + (g ? '<div class="gc-big">+1 🪙</div>' : '') + '<div class="gc-row">' + gBtn('close', null, L2('BYE!', 'AU REVOIR !'), 'go') + '</div>'); };
+function vendorTalk(v){ say('Bonjour ! Qu\'est-ce que je vous sers ?');
+  showCard('<h3>' + v[0] + ' ' + esc(v[1].toUpperCase()) + '</h3><div class="gc-big gc-say">« Bonjour ! Qu\'est-ce que je vous sers ? »</div><div class="gc-grid">' + v[6].map(function(o, k){ return gOpt('vendo', k, '« ' + esc(o) + ' »'); }).join('') + '</div>'); PIC.v = v; }
+GACT.vendo = function(k){ var v = PIC.v; say(v[6][k|0] + ' ' + v[7]); var g = !(chal.cool.vend > Date.now()) ? addJeton(1) : 0; if(g) chal.cool.vend = Date.now() + 3*60000; showCard('<h3>' + v[0] + '</h3><div class="gc-text gc-say">« ' + esc(v[6][k|0]) + ' »</div><div class="gc-big gc-say">« ' + esc(v[7]) + ' »</div>' + (g ? '<div class="gc-big">+1 🪙</div>' : '') + '<div class="gc-row">' + gBtn('close', null, L2('THANK YOU!', 'MERCI !'), 'go') + '</div>'); };
+function picnicTick(dt){
+  var day = !(typeof skyState !== 'undefined' && (skyState.night || skyState.rain > 0.4));
+  if(PIC.on !== day){ PIC.on = day; PIC.root.visible = day; }
+  if(!day) return; var cp = camera.position; if(Math.abs(cp.x) > 260 || Math.abs(cp.z) > 260) return;
+  PIC.walkers.forEach(function(w){ w.a += w.sp*(dt || 0.016)*(w.rect ? 0.6 : 1); var x, z, ox, oz;
+    if(w.rect){ var t = ((w.a % 1) + 1) % 1, P = [[-84, -66], [84, -66], [84, 66], [-84, 66]], seg = Math.floor(t*4), u = t*4 - seg, A = P[seg], B = P[(seg + 1) % 4]; x = A[0] + (B[0] - A[0])*u; z = A[1] + (B[1] - A[1])*u; ox = B[0] - A[0]; oz = B[1] - A[1]; }
+    else { x = Math.cos(w.a*Math.PI*2)*w.r; z = Math.sin(w.a*Math.PI*2)*w.r*1.8; ox = -Math.sin(w.a*Math.PI*2)*w.sp; oz = Math.cos(w.a*Math.PI*2)*w.sp; }
+    w.m.position.set(x, Math.abs(Math.sin(performance.now()*0.008 + w.r))*0.04, z); w.m.rotation.y = Math.atan2(-ox, -oz) + Math.PI; });
+}
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
@@ -17622,7 +17879,7 @@ function animate(){
   updateSpeedo();
   lifeTick(dt);
   jailTick();
-  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016);
+  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt);
   if(!ICE.t || performance.now() - ICE.t > 1000){ ICE.t = performance.now(); if(Math.hypot(camera.position.x - QC.x, camera.position.z - QC.z) < 800) iceSync(); }
   villageTick();
   sendPresence(false);
