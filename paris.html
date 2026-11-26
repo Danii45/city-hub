@@ -7241,14 +7241,16 @@ var RANKS = {
   vip:    {en:'VIP', fr:'VIP', fg:'#ffcc33', bg:'#2b1d00'},
   mvp:    {en:'MVP', fr:'MVP', fg:'#d48cff', bg:'#1d0033'},
   legend: {en:'LEGEND', fr:'LÉGENDE', fg:'#ff6b6b', bg:'#2e0008'},
-  helper: {en:'HELPER', fr:'AIDE', fg:'#5affa0', bg:'#00281a'}
+  helper: {en:'HELPER', fr:'AIDE', fg:'#5affa0', bg:'#00281a'},
+  dev:    {en:'DEV', fr:'DEV', fg:'#c77dff', bg:'#22003f'}
 };
-var RANK_ORDER = ['vip', 'mvp', 'legend', 'helper'];
+var RANK_ORDER = ['vip', 'mvp', 'legend', 'helper', 'dev'];
+var RANK_BY_NAME = {enzob:'dev'};   // given by Daniel
 STR.en.rankNone = 'NO RANK'; STR.fr.rankNone = 'AUCUN RANG';
 STR.en.rankSet = '{name} is now {rank}.'; STR.fr.rankSet = '{name} est maintenant {rank}.';
 STR.en.rankCleared = '{name} has no rank now.'; STR.fr.rankCleared = '{name} n\'a plus de rang.';
 STR.en.rankLabel = 'Rank'; STR.fr.rankLabel = 'Rang';
-function rankOf(uid){ var m = net.members && net.members[uid]; return m && RANKS[m.rank] ? m.rank : ''; }
+function rankOf(uid){ var m = net.members && net.members[uid]; if(m && RANKS[m.rank]) return m.rank; var nm = m && String(m.name || '').toLowerCase().replace(/\s+/g, ''); return nm && RANK_BY_NAME[nm] ? RANK_BY_NAME[nm] : ''; }
 function myRole(){ return net.isOwner ? 'owner' : rankOf(net.uid); }
 
 function loadScript(src){
@@ -21144,6 +21146,66 @@ copTick = function(dt){ if(!COP.list.length) return; COP.chase = null; COP.list.
 try { localStorage.removeItem('paris.jailStars'); } catch(e){}
 /* driving: the view from inside the car (first person) is the default; V still changes the view */
 try { if(localStorage.getItem('paris.carView2') !== '1'){ localStorage.setItem('paris.carView2', '1'); localStorage.setItem('paris.carView', 'inside'); carView = 'inside'; } } catch(e){}
+/* =====================================================================================================================
+   🏓 LE PING-PONG (arcade): 2 players or 4 players (doubles), played live with friends on other computers (synced through
+   the game's player positions, no new database rules), the computer fills any empty spot. First to 11, win by 2,
+   serve changes every 2 points, the score is called in French.
+   ===================================================================================================================== */
+var PING = {on:false, t:'T1', mode:2, slot:-1, x:0.5, ball:null, sa:0, sb:0, srv:0, host:false, last:0, recv:null, ai:[], key:{l:false, r:false}, msg:'', over:null, seq:0};
+var PTW = 1, PTL = 1.6;   // table width x length (units)
+function pingPeers(){ return (mp && mp.others || []).filter(function(p){ var s = p.presence && p.presence.pp; return s && s.t === PING.t && Date.now() - (p.updatedAt || 0) < 4000; }); }
+function pingSlots(){ var m = {}; pingPeers().forEach(function(p){ m[p.presence.pp.s] = p; }); return m; }
+function pingHostSlot(){ var sl = pingSlots(), best = PING.on ? PING.slot : 99; Object.keys(sl).forEach(function(k){ if(+k < best) best = +k; }); return best; }
+function pingSide(slot){ return slot % 2; }   // 0 = bottom (A), 1 = top (B); slots 0,1 = singles; 2,3 = the partners in doubles
+function pingPadW(){ return PING.mode === 4 ? 0.2 : 0.26; }
+function pingRange(slot){ if(PING.mode === 2) return [0, PTW]; return slot < 2 ? [0, PTW/2] : [PTW/2, PTW]; }
+var _presencePP = presenceState; presenceState = function(){ var s = _presencePP(); if(PING.on){ s.pp = {t:PING.t, m:PING.mode, s:PING.slot, x:Math.round(PING.x*1000)/1000, n:(net.name || '').slice(0, 14)}; if(PING.host && PING.ball){ var B = PING.ball; s.pp.b = [r3(B.x), r3(B.y), r3(B.vx), r3(B.vy), PING.sa, PING.sb, PING.srv, PING.seq, PING.ai.map(function(v){ return v == null ? -1 : r3(v); }), B.wait ? 1 : 0]; } } return s; };
+function r3(v){ return Math.round(v*1000)/1000; }
+GACT.pinglobby = function(){ var sl = pingSlots(), hostP = null, hm = 0; Object.keys(sl).forEach(function(k){ var p = sl[k]; if(!hostP || +k < hm){ hostP = p; hm = +k; } }); var running = hostP ? hostP.presence.pp.m : 0;
+  showCard('<h3>🏓 ' + L2('PING-PONG', 'LE PING-PONG') + '</h3><div class="gc-sub">' + (running ? L2('A game is on: ', 'Une partie est en cours : ') + running + L2(' players · join in!', ' joueurs · rejoins-la !') : L2('Nobody at the table yet. The computer plays any empty spot.', 'Personne à la table. L\'ordinateur joue les places vides.')) + '</div><div class="gc-grid">' + (running ? gOpt('pingjoin', running, '🏓 <b>' + L2('JOIN THE GAME', 'REJOINDRE LA PARTIE') + '</b><br><span class="lf-soft">' + Object.keys(sl).length + '/' + running + '</span>') : gOpt('pingjoin', 2, '👥 <b>' + L2('2 players (singles)', '2 joueurs (simple)') + '</b>') + gOpt('pingjoin', 4, '👥👥 <b>' + L2('4 players (doubles)', '4 joueurs (double)') + '</b>')) + '</div><div class="gc-text">🎮 ' + L2('Move your paddle with the mouse, or A / D, or ← / →. First to 11 (win by 2).', 'Bouge ta raquette avec la souris, ou A / D, ou ← / →. Le premier à 11 (avec 2 points d\'écart).') + '<br>📚 la raquette · la balle · le filet · le service · un point · égalité · balle de match · onze à neuf</div><div class="gc-row">' + gBtn('close', null, 'OK') + '</div>'); };
+GACT.pingjoin = function(m){ m = m|0; var sl = pingSlots(), free = -1; for(var i=0;i<m;i++) if(!sl[i]){ free = i; break; } if(free < 0){ showToast(L2('The table is full!', 'La table est pleine !')); return; }
+  PING.mode = m; PING.slot = free; PING.on = true; PING.x = (pingRange(free)[0] + pingRange(free)[1])/2; PING.ai = [null, null, null, null]; PING.sa = PING.sb = 0; PING.srv = 0; PING.ball = null; PING.over = null; PING.recv = null; say('C\'est parti pour une partie de ping-pong !'); pingOpen(); if(typeof sendPresence === 'function') sendPresence(true); };
+function pingOpen(){ showCard('<h3>🏓 ' + L2('PING-PONG', 'LE PING-PONG') + ' · ' + PING.mode + ' ' + L2('players', 'joueurs') + '</h3><div style="text-align:center"><canvas id="ping-c" width="380" height="560" style="max-width:100%;max-height:62vh;border-radius:12px;touch-action:none;background:#14284a"></canvas></div><div class="gc-sub" id="ping-s"></div><div class="gc-row">' + gBtn('pingquit', null, L2('LEAVE THE TABLE', 'QUITTER LA TABLE')) + '</div>');
+  var c = document.getElementById('ping-c'); function mv(e){ var r = c.getBoundingClientRect(), p = e.touches ? e.touches[0] : e, fx = (p.clientX - r.left)/r.width; if(PING.flip) fx = 1 - fx; var rg = pingRange(PING.slot), hw = pingPadW()/2; PING.x = Math.max(rg[0] + hw, Math.min(rg[1] - hw, fx*PTW)); }
+  c.addEventListener('mousemove', mv); c.addEventListener('touchmove', function(e){ e.preventDefault(); mv(e); }, {passive:false}); if(!PING.loop){ PING.loop = true; requestAnimationFrame(pingFrame); } }
+GACT.pingquit = function(){ PING.on = false; PING.slot = -1; closeCard(); if(typeof sendPresence === 'function') sendPresence(true); };
+window.addEventListener('keydown', function(e){ if(!PING.on) return; if(['KeyA', 'ArrowLeft'].indexOf(e.code) >= 0){ PING.key.l = true; e.preventDefault(); e.stopImmediatePropagation(); } if(['KeyD', 'ArrowRight'].indexOf(e.code) >= 0){ PING.key.r = true; e.preventDefault(); e.stopImmediatePropagation(); } if(['KeyW', 'KeyS', 'ArrowUp', 'ArrowDown', 'Space'].indexOf(e.code) >= 0){ e.preventDefault(); e.stopImmediatePropagation(); } }, true);
+window.addEventListener('keyup', function(e){ if(['KeyA', 'ArrowLeft'].indexOf(e.code) >= 0) PING.key.l = false; if(['KeyD', 'ArrowRight'].indexOf(e.code) >= 0) PING.key.r = false; }, true);
+function pingSay(t){ try { say(t); } catch(e){} PING.msg = t; PING.msgT = performance.now(); }
+var NUMFR = ['zéro', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf', 'dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize', 'dix-sept', 'dix-huit', 'dix-neuf', 'vingt'];
+function pingServe(){ var down = PING.srv === 0; PING.ball = {x:PTW/2, y:down ? 0.25 : PTL - 0.25, vx:(Math.random() - 0.5)*0.35, vy:(down ? 1 : -1)*0.72, wait:0.9}; }
+function pingPoint(toA){ if(toA) PING.sa++; else PING.sb++; var a = PING.sa, b = PING.sb, tot = a + b; if(tot % 2 === 0 || (a >= 10 && b >= 10)) PING.srv = 1 - PING.srv; PING.seq++;
+  var me = pingSide(PING.slot) === 0 ? a : b, them = pingSide(PING.slot) === 0 ? b : a;
+  if((a >= 11 || b >= 11) && Math.abs(a - b) >= 2){ PING.over = {a:a, b:b, t:performance.now()}; pingSay((a > b ? 'Côté A' : 'Côté B') + ' gagne, ' + (NUMFR[Math.max(a, b)] || Math.max(a, b)) + ' à ' + (NUMFR[Math.min(a, b)] || Math.min(a, b)) + ' !'); PING.ball = null; return; }
+  pingSay(a === b && a >= 10 ? 'Égalité !' : (NUMFR[a] || a) + ' à ' + (NUMFR[b] || b) + ((a >= 10 || b >= 10) && Math.abs(a - b) === 1 ? '. Balle de match !' : '.')); pingServe(); }
+function pingStep(dt){ var B = PING.ball; if(!B) return; if(B.wait > 0){ B.wait -= dt; return; } B.x += B.vx*dt; B.y += B.vy*dt; if(B.x < 0.02){ B.x = 0.02; B.vx = Math.abs(B.vx); } if(B.x > PTW - 0.02){ B.x = PTW - 0.02; B.vx = -Math.abs(B.vx); }
+  var pads = pingPads(); pads.forEach(function(p){ var py = p.side === 0 ? 0.06 : PTL - 0.06, coming = p.side === 0 ? B.vy < 0 : B.vy > 0; if(!coming) return; if(Math.abs(B.y - py) < 0.035 && Math.abs(B.x - p.x) < p.w/2 + 0.02){ var off = (B.x - p.x)/(p.w/2); B.vy = -B.vy*1.045; if(Math.abs(B.vy) > 2.4) B.vy = Math.sign(B.vy)*2.4; B.vx = off*0.9 + B.vx*0.3; B.y = p.side === 0 ? py + 0.036 : py - 0.036; PING.hitT = performance.now(); try { playNotes([[p.side ? 79 : 84, 0.05]], 'square', 0.06, 60); } catch(e){} } });
+  if(B.y < -0.05) pingPoint(false); else if(B.y > PTL + 0.05) pingPoint(true); }
+function pingPads(){ var L = [], sl = pingSlots(), w = pingPadW(); for(var i=0;i<PING.mode;i++){ var x; if(i === PING.slot) x = PING.x; else if(sl[i]) x = sl[i].presence.pp.x; else x = PING.ai[i] != null ? PING.ai[i] : (pingRange(i)[0] + pingRange(i)[1])/2; L.push({slot:i, side:pingSide(i), x:x, w:w, human:i === PING.slot || !!sl[i], name:i === PING.slot ? (net.name || L2('You', 'Toi')) : sl[i] ? (sl[i].presence.pp.n || '?') : L2('Computer', 'Ordinateur')}); } return L; }
+function pingAI(dt){ var B = PING.ball, sl = pingSlots(); for(var i=0;i<PING.mode;i++){ if(i === PING.slot || sl[i]){ PING.ai[i] = null; continue; } var rg = pingRange(i), hw = pingPadW()/2, cur = PING.ai[i] != null ? PING.ai[i] : (rg[0] + rg[1])/2, tgt = (rg[0] + rg[1])/2; if(B){ var coming = pingSide(i) === 0 ? B.vy < 0 : B.vy > 0; if(coming && B.x >= rg[0] - 0.05 && B.x <= rg[1] + 0.05) tgt = B.x + Math.sin(performance.now()/700 + i)*0.05; } var sp = 0.75*dt; cur += Math.max(-sp, Math.min(sp, tgt - cur)); PING.ai[i] = Math.max(rg[0] + hw, Math.min(rg[1] - hw, cur)); } }
+function pingFrame(){ if(!PING.on){ PING.loop = false; return; } requestAnimationFrame(pingFrame); var now = performance.now(), dt = Math.min(0.05, (now - (PING.last || now))/1000); PING.last = now;
+  if(gcard && gcard.el && gcard.el.classList.contains('hidden')){ GACT.pingquit(); return; }
+  var rg = pingRange(PING.slot), hw = pingPadW()/2, kd = (PING.key.r ? 1 : 0) - (PING.key.l ? 1 : 0); if(PING.flip) kd = -kd; if(kd) PING.x = Math.max(rg[0] + hw, Math.min(rg[1] - hw, PING.x + kd*0.9*dt));
+  PING.host = pingHostSlot() === PING.slot;
+  if(PING.host){ if(!PING.ball && !PING.over) pingServe(); if(PING.over && now - PING.over.t > 5000){ PING.over = null; PING.sa = PING.sb = 0; PING.srv = 0; pingServe(); } pingAI(dt); pingStep(dt); }
+  else { var hs = pingSlots()[pingHostSlot()], b = hs && hs.presence.pp.b; if(b){ if(!PING.recv || PING.recv.seqRaw !== JSON.stringify(b)){ PING.recv = {b:b, t:now, seqRaw:JSON.stringify(b)}; if(b[7] !== PING.seq){ var na = b[4], nb = b[5]; if(na !== PING.sa || nb !== PING.sb){ PING.sa = na; PING.sb = nb; pingSay((NUMFR[na] || na) + ' à ' + (NUMFR[nb] || nb) + '.'); } PING.seq = b[7]; } PING.srv = b[6]; PING.ai = (b[8] || []).map(function(v){ return v < 0 ? null : v; }); }
+      var age = Math.min(0.25, (now - PING.recv.t)/1000), R = PING.recv.b; PING.ball = {x:R[0] + (R[9] ? 0 : R[2]*age), y:R[1] + (R[9] ? 0 : R[3]*age), vx:R[2], vy:R[3]}; if(PING.ball.x < 0) PING.ball.x = -PING.ball.x; if(PING.ball.x > PTW) PING.ball.x = 2*PTW - PING.ball.x; } }
+  if(typeof sendPresence === 'function') sendPresence();
+  pingDraw(); }
+function pingDraw(){ var c = document.getElementById('ping-c'); if(!c) return; var k = c.getContext('2d'), W = c.width, H = c.height, M = 20, sx = (W - 2*M)/PTW, sy = (H - 2*M)/PTL; PING.flip = pingSide(PING.slot) === 1;
+  function P(x, y){ if(PING.flip){ x = PTW - x; y = PTL - y; } return [M + x*sx, H - M - y*sy]; }
+  k.fillStyle = '#0f2140'; k.fillRect(0, 0, W, H); k.fillStyle = '#1f5fa0'; k.fillRect(M, M, W - 2*M, H - 2*M); k.strokeStyle = '#fff'; k.lineWidth = 3; k.strokeRect(M, M, W - 2*M, H - 2*M); k.lineWidth = 1.5; k.beginPath(); k.moveTo(W/2, M); k.lineTo(W/2, H - M); k.stroke();
+  k.fillStyle = '#e8e8e8'; k.fillRect(M - 8, H/2 - 2, W - 2*M + 16, 4);
+  pingPads().forEach(function(p){ var a = P(p.x - p.w/2, p.side === 0 ? 0.06 : PTL - 0.06), b = P(p.x + p.w/2, p.side === 0 ? 0.06 : PTL - 0.06), x0 = Math.min(a[0], b[0]), wpx = Math.abs(b[0] - a[0]); k.fillStyle = p.slot === PING.slot ? '#ffd23a' : p.human ? '#ff6a6a' : '#c8ccd2'; k.fillRect(x0, a[1] - 6, wpx, 12); k.fillStyle = '#fff'; k.font = '11px sans-serif'; k.textAlign = 'center'; k.fillText(p.name, x0 + wpx/2, a[1] + (a[1] > H/2 ? 22 : -12)); });
+  if(PING.ball){ var bp = P(PING.ball.x, PING.ball.y); k.fillStyle = '#fff'; k.beginPath(); k.arc(bp[0], bp[1], 7, 0, 7); k.fill(); k.strokeStyle = 'rgba(0,0,0,.4)'; k.stroke(); }
+  var mine = pingSide(PING.slot) === 0 ? PING.sa : PING.sb, theirs = pingSide(PING.slot) === 0 ? PING.sb : PING.sa; k.fillStyle = 'rgba(0,0,0,.45)'; k.fillRect(W/2 - 60, H/2 - 52, 120, 34); k.fillStyle = '#ffd23a'; k.font = 'bold 26px sans-serif'; k.textAlign = 'center'; k.fillText(theirs + '  :  ' + mine, W/2, H/2 - 26);
+  if(PING.over){ var won = (pingSide(PING.slot) === 0) === (PING.over.a > PING.over.b); k.fillStyle = 'rgba(0,0,0,.6)'; k.fillRect(0, H/2 - 40, W, 80); k.fillStyle = won ? '#6aff7a' : '#ff8a8a'; k.font = 'bold 30px sans-serif'; k.fillText(won ? L2('YOU WIN! 🏆', 'TU AS GAGNÉ ! 🏆') : L2('Good game!', 'Bien joué !'), W/2, H/2 + 10); if(won && !PING.over.paid){ PING.over.paid = true; try { if(typeof tixAdd === 'function') tixAdd(5); addJeton(1); } catch(e){} } }
+  var st = document.getElementById('ping-s'); if(st) st.textContent = (PING.msg && performance.now() - PING.msgT < 3000 ? '🗣 ' + PING.msg + ' · ' : '') + L2('You: yellow paddle · friends: red · computer: grey', 'Toi : raquette jaune · amis : rouge · ordinateur : gris'); }
+/* the table in the arcade */
+(function(){ var X = ARC.x + 20, Z = ARC.z + 16, B = new MeshBatch(), L = new Lot(B, X, Z, 0); L.box(2.74, 0.06, 1.53, 0, 0.76, 0, 0x1f5fa0); L.box(2.76, 0.02, 0.03, 0, 0.8, 0, 0xffffff); L.box(0.02, 0.02, 1.55, 0, 0.8, 0, 0xffffff); L.box(0.03, 0.16, 1.6, 0, 0.87, 0, 0xf4f4f0);
+  [[-1.2, -0.6], [1.2, -0.6], [-1.2, 0.6], [1.2, 0.6]].forEach(function(p){ L.box(0.06, 0.74, 0.06, p[0], 0.37, p[1], 0x2a2d32); }); [[-1.6, 0.3], [1.6, -0.3]].forEach(function(p){ L.box(0.03, 0.18, 0.16, p[0], 0.82, p[1], 0xc8382f); L.cyl(0.08, 0.08, 0.02, p[0], 0.95, p[1], 0xc8382f, 14); }); L.part(new THREE.SphereGeometry(0.02, 10, 8), 0.4, 0.9, 0.2, 0xffffff); B.build(); addSolid(X - 1.4, X + 1.4, Z - 0.8, Z + 0.8, 'champs', -1, 0.9);
+  airSign('🏓 PING-PONG · 2 / 4 JOUEURS', X, 2.6, Z - 1.4, 0, 5, '#1f5fa0'); addSpot({x:X, z:Z + 1.8, r:2.6, label:function(){ var n = pingPeers().length; return '🏓 ' + L2('Play ping-pong (2 or 4 players)', 'Jouer au ping-pong (2 ou 4 joueurs)') + (n ? ' · ' + n + L2(' playing', ' en jeu') : ''); }, act:function(){ GACT.pinglobby(); }});
+  tag(X, 1, Z, 'la table de ping-pong', 'the ping-pong table', 1.4); tag(X - 1.6, 1, Z + 0.3, 'la raquette', 'the paddle', 0.4); tag(X, 1.1, Z, 'le filet', 'the net', 0.8); })();
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
