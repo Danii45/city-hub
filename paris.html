@@ -17478,6 +17478,185 @@ var _renderPlotPanelH = renderPlotPanel;
 renderPlotPanel = function(){ _renderPlotPanelH(); var p = panelPlot; if(!p || !p.data || panelConfirm || p.kind !== 'house' || p.data.o !== net.uid) return; var row = document.getElementById('pp-btns'), b = document.createElement('button'); b.className = 'btn' + (hasChar() && life.eco.hg ? '' : ' go'); b.textContent = '💬 ' + L2('MY GREETING', 'MON ACCUEIL') + (hasChar() && life.eco.hg ? '' : ' ⚠'); b.addEventListener('click', function(){ closePlotPanel(false); HGE = {}; hgEditor(); }); row.appendChild(b); };
 /* a reminder for students with a home but no greeting yet */
 setTimeout(function(){ try { if(hasChar() && !life.eco.hg && myHouse()) showToast('🏠 ' + L2('Your home needs a greeting! Open your house panel → MY GREETING', 'Ta maison a besoin d\'un message d\'accueil ! Ouvre ta maison → MON ACCUEIL')); } catch(e){} }, 20000);
+/* ---------- 🎮 PLAY MODE EVERYWHERE: walk up to things and USE them (play the piano, sit, sleep, open the fridge, read...) ---------- */
+var NOTES_FR = [['do', 60], ['ré', 62], ['mi', 64], ['fa', 65], ['sol', 67], ['la', 69], ['si', 71], ['do', 72], ['ré', 74], ['mi', 76]];
+var INSTR = {piano:['🎹', 'le piano', 'triangle'], guitare:['🎸', 'la guitare', 'sawtooth'], clavier:['🎹', 'le clavier', 'square'], batterie:['🥁', 'la batterie', 'drum']};
+var PLAYI = {k:null};
+function instrCard(kind){ var I = INSTR[kind] || INSTR.piano; PLAYI.k = kind; say('Tu joues ' + (I[1].indexOf('la ') === 0 ? 'de la ' + I[1].slice(3) : 'du ' + I[1].slice(3)) + ' !');
+  var keys = NOTES_FR.map(function(n, i){ return '<button class="btn" data-g="note" data-v="' + i + '" style="min-width:44px;height:' + (kind === 'batterie' ? '50px' : '90px') + ';background:#fff;font-size:15px">' + n[0] + '<br><small>' + 'ASDFGHJKL;'[i] + '</small></button>'; }).join('');
+  showCard('<h3>' + I[0] + ' ' + L2('PLAY ', 'JOUER ') + esc(I[1].toUpperCase()) + '</h3><div class="gc-row" style="gap:2px">' + keys + '</div><div class="gc-sub">' + L2('Click the keys or use A S D F G H J K L. The notes in French: do, ré, mi, fa, sol, la, si, do!', 'Clique sur les touches ou A S D F G H J K L. Les notes en français : do, ré, mi, fa, sol, la, si, do !') + '</div><div class="gc-row">' + gBtn('song', 'frere', '🎵 Frère Jacques') + gBtn('song', 'clair', '🌙 Au clair de la lune') + gBtn('song', 'gamme', '🎼 ' + L2('the scale', 'la gamme')) + gBtn('close', null, L2('STOP', 'ARRÊTER')) + '</div>'); }
+function playNote(i){ var n = NOTES_FR[i]; if(!n) return; if(PLAYI.k === 'batterie'){ playNotes([[i % 2 ? 40 : 36, 0.3]], 'square', 0.25, 240); } else playNotes([[n[1], 1]], (INSTR[PLAYI.k] || INSTR.piano)[2], 0.18, 160); }
+GACT.note = function(v){ playNote(v|0); };
+GACT.song = function(v){ var S = {frere:[[60, 1], [62, 1], [64, 1], [60, 1], [60, 1], [62, 1], [64, 1], [60, 1], [64, 1], [65, 1], [67, 2], [64, 1], [65, 1], [67, 2]], clair:[[60, 1], [60, 1], [60, 1], [62, 1], [64, 2], [62, 2], [60, 1], [64, 1], [62, 1], [62, 1], [60, 4]], gamme:NOTES_FR.slice(0, 8).map(function(n){ return [n[1], 1]; })}[v]; playNotes(S, (INSTR[PLAYI.k] || INSTR.piano)[2], 0.16, 150); if(v === 'gamme') say('do, ré, mi, fa, sol, la, si, do'); };
+window.addEventListener('keydown', function(e){ if(!PLAYI.k || gcard.el.classList.contains('hidden') || typingInBox(e)) return; var i = 'asdfghjkl;'.indexOf(e.key.toLowerCase()); if(i >= 0){ playNote(i); e.preventDefault(); } });
+var THING = {
+  piano:['🎹', 'Jouer du piano', 'Play the piano', function(){ instrCard('piano'); }],
+  guitare:['🎸', 'Jouer de la guitare', 'Play the guitar', function(){ instrCard('guitare'); }],
+  chaise:['🪑', 'S\'asseoir', 'Sit down', function(s){ sitAt(s); }], canape:['🛋', 'S\'asseoir sur le canapé', 'Sit on the sofa', function(s){ sitAt(s); }], fauteuil:['💺', 'S\'asseoir dans le fauteuil', 'Sit in the armchair', function(s){ sitAt(s); }], banc:['🪑', 'S\'asseoir sur le banc', 'Sit on the bench', function(s){ sitAt(s); }],
+  lit:['🛏', 'Faire une sieste', 'Have a nap', function(){ var f = flyCard.fade; f.style.opacity = 1; say('Bonne nuit ! Fais de beaux rêves...'); hudMsg('😴 Zzz... « Bonne nuit ! »'); setTimeout(function(){ say('Bonjour ! Bien dormi ?'); f.style.opacity = 0; }, 2200); }],
+  tele:['📺', 'Allumer la télé', 'Turn on the TV', function(){ var c = pickR(Math.random, ['la météo : « Demain, il fera beau à Paris ! »', 'un dessin animé : « Astérix et Obélix »', 'le journal : « Bonjour, voici les nouvelles. »', 'un match de foot : « Buuut ! »', 'une émission de cuisine : « Aujourd\'hui, on fait des crêpes ! »']); say('À la télé, il y a ' + c); hudMsg('📺 ' + c); }],
+  frigo:['🧊', 'Ouvrir le frigo', 'Open the fridge', function(){ var f = ['du lait', 'du fromage', 'des yaourts', 'du beurre', 'des œufs', 'de la confiture', 'du jus d\'orange', 'des carottes']; say('Dans le frigo, il y a ' + f.slice(0, 5).join(', ') + '.'); showCard('<h3>🧊 ' + L2('IN THE FRIDGE', 'DANS LE FRIGO') + '</h3><div class="gc-big">🥛🧀🥚🧈🍓🥕</div><div class="gc-text gc-say">Dans le frigo, il y a : ' + f.join(', ') + '.</div><div class="gc-row">' + gBtn('close', null, L2('CLOSE THE FRIDGE', 'FERMER LE FRIGO'), 'go') + '</div>'); }],
+  four:['🔥', 'Faire cuire un gâteau', 'Bake a cake', function(){ say('Je mets le gâteau dans le four... à cent quatre-vingts degrés, pendant trente minutes.'); hudMsg('🎂 ' + L2('Baking... ', 'Ça cuit... ') + '180 °C'); setTimeout(function(){ say('Ding ! Le gâteau est prêt ! Miam !'); hudMsg('🎂 Ding ! « Le gâteau est prêt ! »'); }, 3500); }],
+  lampe:['💡', 'Allumer / éteindre la lampe', 'Switch the lamp on / off', function(){ INT.lampOff = !INT.lampOff; INT.lamps.forEach(function(l, i){ l.intensity = INT.lampOff ? 0.08 : [0.5, 0.4][i]; }); say(INT.lampOff ? 'J\'éteins la lumière.' : 'J\'allume la lumière.'); }],
+  livre:['📖', 'Lire le livre', 'Read the book', function(){ var s = pickR(Math.random, ['Il était une fois une petite baguette qui voulait voir la tour Eiffel...', 'Le Petit Prince dit : « On ne voit bien qu\'avec le cœur. »', 'Le chat de Madame adore dormir au soleil sur le balcon.', 'Un jour, un croissant a décidé de partir en vacances au Québec...']); say(s); showCard('<h3>📖 ' + L2('THE BOOK', 'LE LIVRE') + '</h3><div class="gc-big gc-say">« ' + esc(s) + ' »</div><div class="gc-row">' + gBtn('close', null, L2('CLOSE THE BOOK', 'FERMER LE LIVRE'), 'go') + '</div>'); }],
+  biblio:['📚', 'Choisir un livre', 'Pick a book', function(){ THING.livre[3](); }],
+  miroir:['🪞', 'Se regarder dans le miroir', 'Look in the mirror', function(){ var c = pickR(Math.random, ['Tu es super aujourd\'hui !', 'Quel beau sourire !', 'Tu parles très bien français !', 'Tu es courageux et gentil !']); say(c); hudMsg('🪞 « ' + c + ' »'); }],
+  ballon:['⚽', 'Taper dans le ballon', 'Kick the ball', function(){ say('Et c\'est le but ! Buuut !'); hudMsg('⚽ « Buuut ! »'); }],
+  jouets:['🧸', 'Jouer avec les jouets', 'Play with the toys', function(){ var t = pickR(Math.random, ['la poupée', 'la petite voiture', 'le robot', 'les cubes', 'le nounours']); say('Je joue avec ' + t + ' !'); hudMsg('🧸 ' + t); }],
+  machcafe:['☕', 'Faire un café', 'Make a coffee', function(){ say('Un café, s\'il vous plaît ! Psssh... Voilà, un petit café bien chaud.'); hudMsg('☕ Psssh...'); }],
+  horloge:['🕰', 'Quelle heure est-il ?', 'What time is it?', function(){ var d = new Date(), h = d.getHours(), m = d.getMinutes(); var t = 'Il est ' + numFr2(h) + (h === 1 ? ' heure' : ' heures') + (m ? ' ' + numFr2(m) : '') + '.'; say(t); hudMsg('🕰 ' + t); }],
+  velo:['🚲', 'Faire du vélo', 'Ride the bike', function(s){ if(!INT.cur) startDrive('escooter', s.x, s.z, yaw); else { say('Je pédale, je pédale !'); hudMsg('🚲 « Je fais du vélo ! »'); } }],
+  baignoire:['🛁', 'Prendre un bain', 'Have a bath', function(){ say('Je prends un bain avec beaucoup de mousse !'); hudMsg('🛁 🫧🫧🫧'); }],
+  lavabo:['🚰', 'Se laver les mains', 'Wash your hands', function(){ say('Je me lave les mains avec du savon.'); hudMsg('🧼 « Je me lave les mains. »'); }],
+  aquarium:['🐠', 'Nourrir les poissons', 'Feed the fish', function(){ say('Je donne à manger aux poissons. Ils sont contents !'); hudMsg('🐠 ' + L2('The fish are happy!', 'Les poissons sont contents !')); }],
+  chevalet:['🎨', 'Peindre un tableau', 'Paint a picture', function(){ var c = pickR(Math.random, ['un coucher de soleil orange', 'la tour Eiffel bleue', 'un chat rose', 'des fleurs jaunes']); say('Je peins ' + c + ' !'); hudMsg('🎨 ' + c); }],
+  ordi:['💻', 'Utiliser l\'ordinateur', 'Use the computer', function(){ say('J\'écris un courriel en français : Bonjour Madame !'); hudMsg('💻 « Bonjour Madame ! »'); }],
+  bougie:['🕯', 'Souffler la bougie', 'Blow out the candle', function(){ say('Je souffle la bougie. Joyeux anniversaire !'); hudMsg('🕯 « Fffff ! »'); }],
+  poubelle:['🗑', 'Jeter un papier (bravo, la planète dit merci)', 'Throw away litter', function(){ say('Je jette mon papier dans la poubelle. La planète dit merci !'); hudMsg('🌍 ' + L2('Thanks for keeping it clean!', 'Merci de garder ça propre !')); }]
+};
+function sitAt(s){ camera.position.set(s.x, 1.15 + (INT.cur ? 0 : 0), s.z); hudMsg('🪑 ' + L2('You sit down. Move to stand up.', 'Tu t\'assieds. Bouge pour te lever.')); say('Je m\'assieds. Ah, ça fait du bien !'); }
+var _furnKitP = furnKit;
+furnKit = function(o, B, X, Z){
+  var F = _furnKitP(o, B, X, Z), _item = F.item;
+  F.item = function(kind, x, z){ var r = _item.apply(this, arguments), T = THING[kind];
+    if(T){ var s = {x:X + x, z:Z + z}; addSpot({x:s.x, z:s.z + (kind === 'tele' || kind === 'miroir' || kind === 'frigo' ? 1.2 : 0.9), r:1.25, label:function(){ return T[0] + ' ' + L2(T[2], T[1]); }, act:function(){ T[3](s); }}); }
+    return r; };
+  return F;
+};
+/* the players' own homes: pianos, guitars, drums, keyboards, beds, TVs... all usable */
+var PLOT_THING = {pn:'piano', gt:'guitare', dm:'batterie', kb:'clavier', bd:'lit', bb:'lit', tv:'tele', gc:'tele', fr:'frigo', ov:'four', kt:'four', sf:'canape', ac:'fauteuil', rc:'fauteuil', bg:'fauteuil', ch:'chaise', bk:'biblio', mr:'miroir', aq:'aquarium', ea:'chevalet', pc:'ordi', hl:'horloge', ba:'baignoire', sk:'lavabo', bc:'velo', lp:'lampe'};
+THING.batterie = ['🥁', 'Jouer de la batterie', 'Play the drums', function(){ instrCard('batterie'); }]; THING.clavier = ['🎹', 'Jouer du clavier', 'Play the keyboard', function(){ instrCard('clavier'); }];
+var PLOTSPOT = {};
+var _labelPlotP = labelPlot;
+labelPlot = function(p){ _labelPlotP(p); if(!p || !p.data) return; var key = (p.id || '') + '|' + (p.data.it || ''); if(PLOTSPOT[p.id] === key) return; PLOTSPOT[p.id] = key;
+  var L = p.kind === 'house' && p.data.md === 'b' ? LAYOUT.room : layoutOf(p.kind);
+  parseItems(p.data.it).forEach(function(o){ var k = PLOT_THING[o.id], T = k && THING[k]; if(!T) return; var c = itemCenter(o, L), w = plotToWorld(p, c.x, c.z); addSpot({x:w.x, z:w.z, r:1.3, when:function(){ return PLOTSPOT[p.id] === key; }, label:function(){ return T[0] + ' ' + L2(T[2], T[1]); }, act:function(){ T[3](w); }}); });
+};
+/* ---------- 🛴 E-SCOOTERS ALL OVER PARIS + L'ATELIER DES TROTTINETTES (a building shaped like an e-scooter) ---------- */
+var SC_COL = [['rouge', 0xc8382f], ['bleu', 0x1f6fb8], ['vert', 0x2f8a3a], ['jaune', 0xf2c230], ['rose', 0xf28ac8], ['violet', 0x8a3ad6], ['orange', 0xf2943a], ['noir', 0x1b1b1d], ['blanc', 0xf6f6f6], ['turquoise', 0x3ab8a0]];
+var SC_LIGHT = [['pas de néon', null], ['néon bleu', 0x3ab8ff], ['néon rose', 0xff4ad6], ['néon vert', 0x4aff6a], ['néon arc-en-ciel', 'rb']];
+var SC_EXTRA = [['rien', ''], ['un panier', 'basket'], ['un drapeau français', 'flag'], ['un drapeau du Canada', 'flagca'], ['des ailes', 'wings'], ['une baguette', 'baguette']];
+var SC_SPEED = [['tortue 🐢 (lente)', 0.7], ['normale', 1], ['turbo 🚀', 1.45]];
+var SC_BELL = [['dring dring', [[84, 0.5], [84, 0.5]]], ['tut tut', [[60, 0.6], [60, 0.6]]], ['la mélodie', [[72, 0.5], [76, 0.5], [79, 0.5], [84, 1]]]];
+var SC_STICK = ['', '⭐', '❤️', '🔥', '⚡', '🌈', '🥐', '🗼', '🍁', '😎'];
+function scData(){ var d = hasChar() && life.eco.sc ? life.eco.sc : (SCD.tmp || {}); return {d:d.d == null ? 1 : d.d, s:d.s == null ? 7 : d.s, w:d.w == null ? 7 : d.w, l:d.l|0, x:d.x|0, v:d.v == null ? 1 : d.v, b:d.b|0, k:d.k|0, n:d.n || ''}; }
+var SCD = {};
+function escooterModel(){
+  var S = scData(), g = new THREE.Group(), M = function(c){ return solidMat(c); };
+  var deck = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.1, 1.25), M(SC_COL[S.d][1])); deck.position.set(0, 0.2, 0.15); g.add(deck);
+  var stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.15, 8), M(SC_COL[S.s][1])); stem.position.set(0, 0.8, -0.5); stem.rotation.x = -0.15; g.add(stem);
+  var bar = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.7, 8), M(0x1b1b1d)); bar.rotation.z = Math.PI/2; bar.position.set(0, 1.38, -0.58); g.add(bar);
+  var disp = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.04, 0.09), M(0x3ab8e8)); disp.position.set(0, 1.4, -0.55); g.add(disp);
+  var lamp = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshBasicMaterial({color:0xfff2b0})); lamp.position.set(0, 1.25, -0.62); g.add(lamp);
+  [-0.5, 0.75].forEach(function(z){ var w = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.08, 14), M(SC_COL[S.w][1])); w.rotation.z = Math.PI/2; w.position.set(0, 0.15, z); g.add(w); });
+  var L = SC_LIGHT[S.l][1]; if(L){ var ne = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.03, 1.2), new THREE.MeshBasicMaterial({color:L === 'rb' ? 0xff4ad6 : L})); ne.position.set(0, 0.13, 0.15); ne.userData.rb = L === 'rb'; g.add(ne); g.userData.neon = ne; }
+  var X = SC_EXTRA[S.x][1];
+  if(X === 'basket'){ var bk = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.22, 0.25), M(0xb8823a)); bk.position.set(0, 1.2, -0.75); g.add(bk); }
+  if(X === 'flag' || X === 'flagca'){ var po = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1, 6), M(0xd8d8d8)); po.position.set(0, 0.7, 0.7); g.add(po); var cols = X === 'flag' ? [0x1f3f8f, 0xffffff, 0xc8382f] : [0xc8382f, 0xffffff, 0xc8382f]; cols.forEach(function(c, i){ var f = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.2, 0.1), M(c)); f.position.set(0, 1.08, 0.75 + i*0.1); g.add(f); }); }
+  if(X === 'wings') [-1, 1].forEach(function(s){ var w2 = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.03, 0.3), M(0xffffff)); w2.position.set(s*0.4, 0.3, 0.3); w2.rotation.z = s*0.4; g.add(w2); });
+  if(X === 'baguette'){ var bg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.7, 8), M(0xd99a45)); bg.rotation.x = Math.PI/2; bg.position.set(0.18, 0.3, 0.2); g.add(bg); }
+  if(S.k){ var c = document.createElement('canvas'); c.width = 64; c.height = 64; var k = c.getContext('2d'); k.font = '48px sans-serif'; k.textAlign = 'center'; k.fillText(SC_STICK[S.k], 32, 50); var st = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.3), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c), transparent:true})); st.rotation.x = -Math.PI/2; st.position.set(0, 0.26, 0.4); g.add(st); }
+  g.visible = false; root.add(g); return g;
+}
+DRIVE.escooter = {max:13, back:-4, acc:9, turn:2.2, eye:1.95, model:escooterModel, off:function(){ return L2('Get off the e-scooter', 'Descendre de la trottinette'); }, nm:function(){ var n = scData().n; return '🛴 ' + (n ? n.toUpperCase() : L2('E-SCOOTER', 'LA TROTTINETTE ÉLECTRIQUE')); }};
+var _startDriveE = startDrive;
+startDrive = function(kind, x, z, h){
+  if(kind === 'escooter'){ if(ride.models) delete ride.models.escooter; var S = scData(); DRIVE.escooter.max = 13*SC_SPEED[S.v][1]; DRIVE.escooter.acc = 9*SC_SPEED[S.v][1]; }
+  _startDriveE(kind, x, z, h);
+  if(kind === 'escooter' && ride.on){ var m = ride.model; if(!m.userData.rider){ var w = buildWalker(); w.group.scale.set(0.9, 0.9, 0.9); w.group.position.set(0, 0.25, 0.25); w.group.rotation.y = Math.PI; m.add(w.group); m.userData.rider = w; } applyLook(m.userData.rider, myCode(hasChar() ? life.eco.out|0 : 0)); RIDEVIEW = 'bird';
+    playNotes(SC_BELL[scData().b][1], 'square', 0.12, 200); if(!SCD.told){ SCD.told = true; showToast('🛴 ' + L2('Customise your e-scooter at the Atelier des Trottinettes (map → 🛴)!', 'Personnalise ta trottinette à l\'Atelier des Trottinettes (carte → 🛴) !')); } }
+};
+var _rideCameraE = rideCamera;
+rideCamera = function(P, now){ if(ride.kind === 'escooter'){ var rd = ride.model && ride.model.userData.rider; if(rd) rd.group.visible = RIDEVIEW !== 'inside'; var ne = ride.model && ride.model.userData.neon; if(ne && ne.userData.rb) ne.material.color.setHSL((now*0.0003) % 1, 1, 0.55);
+  if(RIDEVIEW === 'bird'){ var fx = -Math.sin(ride.h), fz = -Math.cos(ride.h), x = ride.px, z = ride.pz; camera.position.set(x - fx*5, 9, z - fz*5); camera.lookAt(x + fx*1.5, 0.6, z + fz*1.5); return; } } _rideCameraE(P, now); };
+window.addEventListener('keydown', function(e){ if(e.code === 'KeyB' && ride.on && ride.kind === 'escooter' && !typingInBox(e)) playNotes(SC_BELL[scData().b][1], 'square', 0.12, 200); });
+/* parked e-scooters near every place on the map */
+var ESC = [];
+(function(){
+  var pts = [];
+  (EXTRA_PLACES || []).forEach(function(p){ pts.push([p[3], p[4]]); });
+  INTERIORS.forEach(function(o){ if(o.out && o.door && o.door.x > -9e4 && Math.abs(o.out.x) < 3000) pts.push([o.out.x, o.out.z]); });
+  [[0, 80], [0, -80], [100, 0], [-100, 0], [60, 75], [-60, -75], [-120, 40], [120, -40]].forEach(function(p){ pts.push(p); });
+  var used = [];
+  pts.forEach(function(p){ if(ESC.length >= 60) return; for(var t=0;t<8;t++){ var a = t*0.8, x = p[0] + Math.cos(a)*3.2, z = p[1] + Math.sin(a)*3.2; if(hitSolid(x, z, 0.6, 0.2, 1.6) || boundsContact(x, z, 0.6) || used.some(function(u){ return Math.hypot(u[0] - x, u[1] - z) < 8; })) continue; used.push([x, z]); ESC.push({x:x, z:z, h:a}); return; } });
+  var gS = escooterModel; ESC.forEach(function(s, i){ var m = new THREE.Group(), M = function(c){ return solidMat(c); }, col = SC_COL[i % SC_COL.length][1];
+    var d = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.1, 1.25), M(col)); d.position.set(0, 0.2, 0.15); m.add(d); var st = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.15, 8), M(0x2a2d36)); st.position.set(0, 0.8, -0.5); st.rotation.x = -0.15; m.add(st); var br = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.7, 8), M(0x1b1b1d)); br.rotation.z = Math.PI/2; br.position.set(0, 1.38, -0.58); m.add(br);
+    [-0.5, 0.75].forEach(function(z){ var w = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.08, 14), M(0x1b1b1d)); w.rotation.z = Math.PI/2; w.position.set(0, 0.15, z); m.add(w); });
+    m.position.set(s.x, 0, s.z); m.rotation.set(0, s.h, 0.12); root.add(m); s.m = m;
+    LBL.dyn.push({m:m, fr:'la trottinette électrique', en:'the e-scooter', dy:1.6, r:0.7, act:function(){ rideESc(s); }});
+    addSpot({x:s.x, z:s.z, r:2, label:function(){ return '🛴 ' + L2('Ride this e-scooter!', 'Prendre cette trottinette !'); }, act:function(){ rideESc(s); }}); });
+})();
+function rideESc(s){ if(INT.cur) return; s.m.visible = false; startDrive('escooter', s.x, s.z, s.h); ride.parked = s.m; }
+/* the workshop: a giant e-scooter you walk into */
+var ATSC = {x:-250, z:-648};
+(function(){
+  var X = ATSC.x, Z = ATSC.z, B = new MeshBatch(), L = new Lot(B, X, Z, 0);
+  L.box(26, 3, 8, 0, 1.5, 0, 0x3ab8a0); L.box(26.4, 0.4, 8.4, 0, 3.2, 0, 0x1b1b1d); L.box(25.6, 0.5, 0.2, 0, 0.6, 4.05, 0x4affff);
+  [-11, 11].forEach(function(x){ L.part(new THREE.CylinderGeometry(3.2, 3.2, 2.2, 24), x, 3.2, 0, 0x1b1b1d, 0, 0, Math.PI/2); L.part(new THREE.CylinderGeometry(1.4, 1.4, 2.3, 16), x, 3.2, 0, 0xd8d8d8, 0, 0, Math.PI/2); });
+  L.part(new THREE.CylinderGeometry(0.9, 0.9, 14, 12), -11, 10, 0, 0x2a2d36, 0, 0, -0.12); L.part(new THREE.CylinderGeometry(0.6, 0.6, 12, 10), -12, 17, 0, 0x1b1b1d, Math.PI/2, 0, 0); L.box(1.6, 1, 1.2, -11.6, 16.6, 0, 0x3ab8e8);
+  L.part(new THREE.SphereGeometry(0.8, 12, 8), -10.6, 14.6, 0, 0xfff2b0);
+  for(var w=-8; w<=8; w+=4) L.box(3, 1.8, 0.15, w, 1.6, 4.1, 0x9fd8f0);
+  L.box(3.2, 2.6, 0.2, 0, 1.3, 4.12, 0x1b1b1d);
+  B.build(); addSolid(X - 13, X + 13, Z - 4, Z + 4, 'champs', -1, 4); addSolid(X - 12.2, X - 9.8, Z - 1, Z + 1, 'champs', -1, 18);
+  airSign('🛴 L\'ATELIER DES TROTTINETTES', X, 5, Z + 4.4, 0, 16, '#1b8a8a'); tag(X, 2, Z + 4, 'l\'atelier des trottinettes', 'the e-scooter workshop', 6); tag(X - 11, 10, Z, 'le guidon géant', 'the giant handlebar', 4); tag(X + 11, 3.2, Z + 1, 'la roue géante', 'the giant wheel', 3);
+  var o = makeInterior({id:'atelier-sc', name:'L\'Atelier des Trottinettes', en:'The E-scooter Workshop', w:30, d:18, h:6, wall:0xe8f6f6, floor:0x2a3a4a, ceil:0xf6ffff, light:0xe8ffff, signBg:'#1b8a8a',
+    out:{x:X, z:Z + 7.5, yaw:Math.PI}, door:{x:X, z:Z + 4.8, r:2.2},
+    blurb:'Bienvenue à l\'Atelier ! Ici, tu personnalises ta trottinette électrique : la couleur, les roues, les néons, les accessoires, la sonnette et la vitesse. Ensuite, prends n\'importe quelle trottinette dans Paris !',
+    facts:[['À Paris, la trottinette électrique est limitée à 25 km/h, et le casque est très conseillé.', 'In France e-scooters are limited to 25 km/h; a helmet is strongly advised.', ['Quelle est la vitesse maximum d\'une trottinette en France ?', '25 km/h', ['100 km/h', '5 km/h', '300 km/h']]], ['En 2023, les Parisiens ont voté pour interdire les trottinettes en libre-service.', 'In 2023 Parisians voted to ban rental e-scooters.', ['Les Parisiens ont voté en...', '2023', ['1889', '1789', '2050']]], ['Sur une trottinette, on roule à droite, sur la piste cyclable, et jamais à deux !', 'Ride on the right, in the bike lane, and never two people!', ['Combien de personnes sur une trottinette ?', 'une seule', ['deux', 'trois', 'toute la famille']]]],
+    spots:[{x:0, z:-3, r:3.5, label:function(){ return '🛠 ' + L2('CUSTOMISE MY E-SCOOTER', 'PERSONNALISER MA TROTTINETTE'); }, act:scEditor}],
+    build:function(L2_, X2, Z2, B2, F){ var W = new Lot(B2, X2, Z2, 0);
+      W.box(4, 0.4, 4, 0, 0.2, -3, 0x5a6a7a); W.cyl(1.8, 1.8, 0.1, 0, 0.45, -3, 0x4affff, 24); F.tagAt(0, 0.8, -3, 'la plateforme tournante', 'the turntable', 1);
+      SC_COL.forEach(function(c, i){ W.box(1.2, 1.2, 0.1, -12 + i*2.6, 3.4, -8.8, c[1]); F.tagAt(-12 + i*2.6, 2.6, -8.6, c[0], c[0] === 'rouge' ? 'red' : c[0], 0.4); });
+      airSign('LES COULEURS · LES NÉONS · LES ACCESSOIRES', X2, 4.6, Z2 - 8.7, 0, 12, '#1b8a8a');
+      for(var t=0;t<3;t++){ W.box(2, 0.9, 0.8, -12 + t*2.4, 0.45, 6.5, 0x8a8f98); } F.tagAt(-10, 1.2, 6.5, 'l\'établi', 'the workbench', 1); W.box(0.4, 0.05, 0.1, -12, 0.93, 6.5, 0xc8382f); F.tagAt(-12, 1.1, 6.6, 'la clé', 'the spanner', 0.3); W.box(0.3, 0.05, 0.08, -11.4, 0.93, 6.4, 0xf2c230); F.tagAt(-11.4, 1.1, 6.4, 'le tournevis', 'the screwdriver', 0.3);
+      [[9, -6], [12, -6], [9, 5], [12, 5]].forEach(function(p, i){ var s = new THREE.Group(); s.position.set(X2 + p[0], 0, Z2 + p[1]); var d = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.1, 1.25), solidMat(SC_COL[i*2][1])); d.position.y = 0.2; s.add(d); var st = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.15, 8), solidMat(0x2a2d36)); st.position.set(0, 0.8, -0.5); s.add(st); [-0.5, 0.75].forEach(function(z){ var w = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.08, 14), solidMat(0x1b1b1d)); w.rotation.z = Math.PI/2; w.position.set(0, 0.15, z); s.add(w); }); root.add(s); });
+      F.tagAt(10.5, 1.4, -6, 'les trottinettes en exposition', 'scooters on display', 1); F.tagAt(10.5, 0.3, 5, 'la roue', 'the wheel', 0.4); F.tagAt(10.5, 1.3, 4.5, 'le guidon', 'the handlebar', 0.4); F.tagAt(9, 0.4, 5.3, 'le plateau', 'the deck', 0.4);
+      var c = document.createElement('canvas'); c.width = 512; c.height = 640; var k = c.getContext('2d'); k.fillStyle = '#fff8d8'; k.fillRect(0, 0, 512, 640); k.fillStyle = '#1b8a8a'; k.fillRect(0, 0, 512, 90); k.fillStyle = '#fff'; k.font = 'bold 34px sans-serif'; k.textAlign = 'center'; k.fillText('LA SÉCURITÉ À TROTTINETTE', 256, 58, 490); k.fillStyle = '#23243a'; k.font = '26px sans-serif'; k.textAlign = 'left';
+      ['⛑ Je porte un casque.', '➡ Je roule à droite.', '🚲 Sur la piste cyclable.', '👤 Une seule personne.', '🔔 J\'utilise la sonnette.', '🚦 Je respecte le feu rouge.', '📵 Pas de téléphone !'].forEach(function(l, i){ k.fillText(l, 30, 150 + i*66); });
+      var pm = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 3), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c)})); pm.position.set(X2 - 14.75, 2.8, Z2); pm.rotation.y = Math.PI/2; root.add(pm); F.tagAt(-14.5, 1.3, 0, 'l\'affiche de sécurité', 'the safety poster', 1);
+    }});
+  EXTRA_PLACES.push(['🛴', 'L\'Atelier des Trottinettes (personnaliser ta trottinette)', L2('Colours, neons, accessories, bell, speed', 'Couleurs, néons, accessoires, sonnette, vitesse'), X, Z + 8, Math.PI]);
+})();
+var SCE = {};
+function scEditor(msg){ var S = scData(); SCE = S;
+  var row = function(lab, key, list, nameIdx){ return '<div class="gc-sub">' + lab + '</div><div class="gc-row" style="flex-wrap:wrap">' + list.map(function(c, i){ var col = typeof c[1] === 'number' ? hexCss(c[1]) : null; return '<button class="btn' + (S[key] === i ? ' go' : '') + '" data-g="scset" data-v="' + key + '|' + i + '"' + (col ? ' style="border-bottom:6px solid ' + col + '"' : '') + '>' + esc(typeof c === 'string' ? (c || '∅') : c[0]) + '</button>'; }).join('') + '</div>'; };
+  showCard('<h3>🛴 ' + L2('MY E-SCOOTER', 'MA TROTTINETTE') + '</h3>' + (msg || '') + '<div class="gc-sub">' + L2('Its name', 'Son nom') + '</div><input id="sc-n" maxlength="18" value="' + esc(S.n) + '" placeholder="La Fusée, Éclair..." style="font-size:16px;padding:5px">' +
+    row('🎨 ' + L2('the deck', 'le plateau'), 'd', SC_COL) + row('🎨 ' + L2('the stem', 'le guidon'), 's', SC_COL) + row('⚫ ' + L2('the wheels', 'les roues'), 'w', SC_COL) + row('💡 ' + L2('the neon lights', 'les néons'), 'l', SC_LIGHT) + row('🎁 ' + L2('accessory', 'l\'accessoire'), 'x', SC_EXTRA) + row('🔔 ' + L2('the bell (B)', 'la sonnette (B)'), 'b', SC_BELL) + row('🚀 ' + L2('the speed', 'la vitesse'), 'v', SC_SPEED) + row('⭐ ' + L2('the sticker', 'l\'autocollant'), 'k', SC_STICK.map(function(s){ return [s || '∅']; })) +
+    '<div class="gc-row">' + gBtn('scsave', null, '💾 ' + L2('SAVE & RIDE', 'ENREGISTRER ET ROULER'), 'go') + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>'); }
+GACT.scset = function(v){ var p = String(v).split('|'), n = document.getElementById('sc-n'); SCE[p[0]] = +p[1]; if(n) SCE.n = n.value.replace(/[<>]/g, '').slice(0, 18); if(p[0] === 'b') playNotes(SC_BELL[+p[1]][1], 'square', 0.12, 200); var L = {d:SC_COL, s:SC_COL, w:SC_COL, l:SC_LIGHT, x:SC_EXTRA, v:SC_SPEED}[p[0]]; if(L && L[+p[1]]) say(L[+p[1]][0]); scSaveSilent(); scEditor(); };
+function scSaveSilent(){ var d = {d:SCE.d, s:SCE.s, w:SCE.w, l:SCE.l, x:SCE.x, v:SCE.v, b:SCE.b, k:SCE.k, n:SCE.n}; if(hasChar()){ life.eco.sc = d; lifeSave(); } else SCD.tmp = d; if(ride.models) delete ride.models.escooter; }
+GACT.scsave = function(){ var n = document.getElementById('sc-n'); if(n){ var v = n.value.replace(/[<>]/g, '').slice(0, 18); if(v && hasBadWord(v)){ showToast('🙅'); return; } SCE.n = v; } scSaveSilent(); if(hasChar()) lifeSave(true); closeCard(); var o = INT.cur; if(o){ leaveInterior(o); } setTimeout(function(){ startDrive('escooter', ATSC.x + 4, ATSC.z + 10, Math.PI); }, 900); };
+/* ---------- 👤 SEE YOURSELF: a third-person view while you walk (your own character, always on screen). C or 👤 to switch. ---------- */
+var TP = {on:true, cam:null, model:null, key:'', v:new THREE.Vector3(), d:new THREE.Vector3()};
+try { TP.on = localStorage.getItem('paris.tp') !== '0'; } catch(e){}
+function tpActive(){ return TP.on && flying && !driving && !ride.on && !(typeof CAB !== 'undefined' && CAB.seated && INT.cur === CAB.o) && !(typeof CAFE !== 'undefined' && CAFE.seat); }
+function tpUpdate(){
+  var act = tpActive(), want = act ? myCode(hasChar() ? life.eco.out|0 : 0) : '';
+  if(want !== TP.key){ if(TP.model){ root.remove(TP.model.group); TP.model = null; } if(want){ TP.model = buildWalker(); applyLook(TP.model, want); root.add(TP.model.group); } TP.key = want; }
+  if(!act || !TP.model) return false;
+  if(!TP.cam){ TP.cam = camera.clone(); }
+  var cp = camera.position, g = TP.model.group; g.visible = true; var moving = keyFwd() || keyBack() || keyLeft() || keyRight();
+  g.position.set(cp.x, cp.y - EYE_HEIGHT + (moving ? Math.abs(Math.sin(performance.now()*0.012))*0.05 : 0), cp.z); g.rotation.y = yaw + Math.PI;
+  var back = INT.cur ? 2.8 : 4.6, up = INT.cur ? 0.9 : 1.5, fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+  var tx = cp.x - fx*back, tz = cp.z - fz*back;
+  if(!INT.cur){ for(var s=back; s>0.8; s-=0.4){ tx = cp.x - fx*s; tz = cp.z - fz*s; if(!hitSolid(tx, tz, 0.2, cp.y - 1, cp.y + 1)) break; } }
+  else { var o = INT.cur; tx = Math.max(o.X - o.w/2 + 0.4, Math.min(o.X + o.w/2 - 0.4, tx)); tz = Math.max(o.Z - o.d/2 + 0.4, Math.min(o.Z + o.d/2 - 0.4, tz)); }
+  TP.cam.position.set(tx, cp.y + up, tz); TP.cam.quaternion.setFromEuler(new THREE.Euler(pitch - 0.22, yaw, 0, 'YXZ'));
+  TP.cam.fov = camera.fov; TP.cam.aspect = camera.aspect; TP.cam.near = camera.near; TP.cam.far = camera.far; TP.cam.projectionMatrix.copy(camera.projectionMatrix); TP.cam.projectionMatrixInverse.copy(camera.projectionMatrixInverse);
+  TP.cam.updateMatrixWorld(true);
+  return true;
+}
+(function(){
+  var _render = renderer.render.bind(renderer);
+  renderer.render = function(s, c){ if(c === camera && tpUpdate()) return _render(s, TP.cam); return _render(s, c); };
+  var _sfc = THREE.Raycaster.prototype.setFromCamera;
+  THREE.Raycaster.prototype.setFromCamera = function(coords, cam){ if(cam === camera && TP.cam && tpActive()) cam = TP.cam; return _sfc.call(this, coords, cam); };
+  var s = document.getElementById('search-toggle'), b = document.createElement('button');
+  b.className = 'bar-btn'; b.id = 'tp-toggle'; b.textContent = '👤'; b.title = L2('See yourself on/off (C)', 'Te voir / vue à la première personne (C)');
+  s.parentNode.insertBefore(b, s); b.addEventListener('click', function(){ tpToggle(); });
+  window.addEventListener('keydown', function(e){ if(e.code === 'KeyC' && flying && !chatOpen && !typingInBox(e)) tpToggle(); });
+})();
+function tpToggle(){ TP.on = !TP.on; try { localStorage.setItem('paris.tp', TP.on ? '1' : '0'); } catch(e){} showToast(TP.on ? '👤 ' + L2('You can see yourself (third person)', 'Tu te vois (troisième personne)') : '👁 ' + L2('First person view', 'Vue à la première personne')); if(!TP.on && TP.model){ root.remove(TP.model.group); TP.model = null; TP.key = ''; } }
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
