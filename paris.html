@@ -2993,6 +2993,7 @@ function buildPlot(ext, inn, p, d, quads, opts){
   opts = opts || {};
   var E = new Lot(ext, p.cx, p.cz, p.rot), I = new Lot(inn, p.cx, p.cz, p.rot);
   if(!d){ buildEmptyPlot(E, p, quads); return; }
+  if(typeof removeSolidsOf === 'function') removeSolidsOf('fence:' + p.id);
   if(isBlockHouse(p, d)){ buildBlockHouse(E, p, d, quads, opts); buildBlockRoom(I, p, d, quads, opts); return; }
   if(p.kind === 'house') buildHouse(E, I, p, d, quads, opts);
   else buildShop(E, I, p, d, quads, opts);
@@ -3001,6 +3002,11 @@ function buildPlot(ext, inn, p, d, quads, opts){
    Residential: a lawn with a white picket fence (a gap for the gate) and a green FOR SALE sign. */
 function buildEmptyPlot(E, p, quads){
   var store = p.kind === 'store';
+  // hitboxes for the barriers / picket fence (they used to be walk-through)
+  (function(){ var own = 'fence:' + p.id, c = Math.cos(p.rot || 0), sn = Math.sin(p.rot || 0); removeSolidsOf(own);
+    function seg(x0, z0, x1, z1){ var ax = p.cx + x0*c + z0*sn, az = p.cz - x0*sn + z0*c, bx = p.cx + x1*c + z1*sn, bz = p.cz - x1*sn + z1*c; addSolid(Math.min(ax, bx) - 0.08, Math.max(ax, bx) + 0.08, Math.min(az, bz) - 0.08, Math.max(az, bz) + 0.08, own, -0.5, 1.15); }
+    if(store){ seg(-4.85, -5.8, -4.85, 5.8); seg(4.85, -5.8, 4.85, 5.8); seg(-4.8, -5.85, 4.8, -5.85); }
+    else { seg(-4.9, -5.9, -4.9, 5.8); seg(4.9, -5.9, 4.9, 5.8); seg(-4.9, -5.9, 4.9, -5.9); seg(-4.9, 5.8, -1.0, 5.8); seg(1.0, 5.8, 4.9, 5.8); } })();
   E.box(10, 0.04, 12, 0, 0.02, 0, store ? 0x9c988f : GARDEN_GREEN);
   if(store){
     [[-4.85, 0, 0.12, 11.6], [4.85, 0, 0.12, 11.6], [0, -5.85, 9.6, 0.12]].forEach(function(b){
@@ -17334,7 +17340,7 @@ function picnicTick(dt){
   PIC.walkers.forEach(function(w){ w.a += w.sp*(dt || 0.016)*(w.rect ? 0.6 : 1); var x, z, ox, oz;
     if(w.rect){ var t = ((w.a % 1) + 1) % 1, P = [[-84, -66], [84, -66], [84, 66], [-84, 66]], seg = Math.floor(t*4), u = t*4 - seg, A = P[seg], B = P[(seg + 1) % 4]; x = A[0] + (B[0] - A[0])*u; z = A[1] + (B[1] - A[1])*u; ox = B[0] - A[0]; oz = B[1] - A[1]; }
     else { x = Math.cos(w.a*Math.PI*2)*w.r; z = Math.sin(w.a*Math.PI*2)*w.r*1.8; ox = -Math.sin(w.a*Math.PI*2)*w.sp; oz = Math.cos(w.a*Math.PI*2)*w.sp; }
-    w.m.position.set(x, 0, z); w.m.rotation.y = Math.atan2(-ox, -oz) + Math.PI; });
+    w.m.position.set(x, 0, z); w.m.rotation.y = Math.atan2(-ox, -oz); });
 }
 /* ---------- 🌾 THE WINDMILL, explained: every machine says what it is, what it's for, how it works - and you can try it. Posters on the walls. ---------- */
 var MILL_ITEMS = [
@@ -19961,6 +19967,255 @@ window.addEventListener('keydown', function(e){ if(e.code !== 'KeyX' || e.repeat
 var _walkSpeedCr = null;
 function crouchTick(dt){ CROUCH.k += ((CROUCH.on ? 1 : 0) - CROUCH.k)*Math.min(1, dt*10); RIGS.forEach(function(R){ if(R.me && R.g === (typeof TP !== 'undefined' && TP.model ? TP.model.group : null)) R.crouch = CROUCH.k; });
   if(CROUCH.on && _walkSpeedCr == null){ _walkSpeedCr = walkSpeed; walkSpeed = walkSpeed*0.45; } else if(!CROUCH.on && _walkSpeedCr != null){ walkSpeed = _walkSpeedCr; _walkSpeedCr = null; } }
+/* ---------- 🚇 LE MÉTRO DE PARIS + 🚌 RATP BUSES + 👮 POLICE + ⭐ WANTED LEVEL ----------
+   Real line numbers, official colours and termini, real station names in their real order (Ligne 1: Étoile → Franklin
+   D. Roosevelt → Champs-Élysées–Clemenceau → Concorde → Palais Royal–Musée du Louvre → Hôtel de Ville), RER A to
+   Marne-la-Vallée–Chessy, RER B to the airport, Guimard entrances, white bevelled tiles, blue enamel name plates,
+   Motte-style seats, turnstiles, Métro-Train-RER tickets (2,50 €), Bus-Tram tickets (2 €), Navigo Semaine, the airport
+   ticket (13 €). The game's own places sit at real stations (Bercy = sports, Bibliothèque F. Mitterrand = learning). */
+var ML = {
+  '1':{c:'#FFCD00', t:'#1b1b1d', a:'La Défense', b:'Château de Vincennes', s:['etoile','fdr','clemenceau','concorde','louvre','hdv']},
+  '2':{c:'#003CA6', t:'#fff', a:'Porte Dauphine', b:'Nation', s:['etoile','blanche']},
+  '3':{c:'#837902', t:'#fff', a:'Pont de Levallois–Bécon', b:'Gallieni', s:['opera']},
+  '4':{c:'#CF009E', t:'#fff', a:'Porte de Clignancourt', b:'Bagneux–Lucie Aubrac', s:['smichel']},
+  '6':{c:'#6ECA97', t:'#1b1b1d', a:'Charles de Gaulle–Étoile', b:'Nation', s:['etoile','bir','bercy']},
+  '7':{c:'#FA9ABA', t:'#1b1b1d', a:'La Courneuve–8 Mai 1945', b:'Villejuif / Mairie d\'Ivry', s:['opera','louvre']},
+  '8':{c:'#E19BDF', t:'#1b1b1d', a:'Balard', b:'Pointe du Lac', s:['invalides','concorde','madeleine','opera']},
+  '9':{c:'#B6BD00', t:'#1b1b1d', a:'Pont de Sèvres', b:'Mairie de Montreuil', s:['fdr']},
+  '11':{c:'#704B1C', t:'#fff', a:'Châtelet', b:'Rosny–Bois-Perrier', s:['hdv']},
+  '12':{c:'#007852', t:'#fff', a:'Mairie d\'Issy', b:'Mairie d\'Aubervilliers', s:['concorde','madeleine']},
+  '13':{c:'#6EC4E8', t:'#1b1b1d', a:'Châtillon–Montrouge', b:'Saint-Denis–Université', s:['invalides','clemenceau']},
+  '14':{c:'#62259D', t:'#fff', a:'Saint-Denis Pleyel', b:'Aéroport d\'Orly', s:['madeleine','bercy','bfm']},
+  'A':{c:'#E2231A', t:'#fff', a:'Saint-Germain-en-Laye', b:'Marne-la-Vallée–Chessy', s:['etoile','chessy'], rer:true},
+  'B':{c:'#7BA3DC', t:'#fff', a:'Robinson / Saint-Rémy-lès-Chevreuse', b:'Aéroport Charles-de-Gaulle 2 TGV', s:['luxembourg','smichel','cdg'], rer:true},
+  'C':{c:'#FFCE00', t:'#1b1b1d', a:'Saint-Martin-d\'Étampes', b:'Baguetteville', s:['smichel','invalides','bir','baguette'], rer:true}
+};
+var MS = {
+  etoile:{n:'Charles de Gaulle–Étoile', near:'l\'Arc de Triomphe', x:-60, z:-70.5, ex:true},
+  bir:{n:'Bir-Hakeim', near:'la tour Eiffel', x:-88.5, z:30, ex:true},
+  smichel:{n:'Saint-Michel–Notre-Dame', near:'Notre-Dame', x:60, z:-70.5, ex:true},
+  louvre:{n:'Palais Royal–Musée du Louvre', near:'le Louvre', x:60, z:70.5, ex:true},
+  luxembourg:{n:'Luxembourg', near:'le jardin du Luxembourg', x:-60, z:70.5, ex:true},
+  blanche:{n:'Blanche', near:'le Moulin Rouge', x:88.5, z:-30, ex:true},
+  fdr:{n:'Franklin D. Roosevelt', near:'les Champs-Élysées', x:-80, z:-546},
+  clemenceau:{n:'Champs-Élysées–Clemenceau', near:'le Grand Palais', x:110, z:-546},
+  concorde:{n:'Concorde', near:'la place de la Concorde', x:240, z:-546},
+  opera:{n:'Opéra', near:'l\'Opéra Garnier', x:-290, z:-596},
+  invalides:{n:'Invalides', near:'les Invalides', x:70, z:-596},
+  hdv:{n:'Hôtel de Ville', near:'le Centre Pompidou', x:232, z:-596},
+  madeleine:{n:'Madeleine', near:'le Centre de l\'Emploi', find:'💼'},
+  bercy:{n:'Bercy', near:'le Centre Sportif', find:'🏟'},
+  bfm:{n:'Bibliothèque François Mitterrand', near:'le Centre d\'apprentissage', find:'🎓'},
+  chessy:{n:'Marne-la-Vallée–Chessy', near:'le Royaume du Fromage', x:PK.x + 16, z:PK.z + 126},
+  cdg:{n:'Aéroport Charles-de-Gaulle 2 TGV', near:'l\'aéroport (vol pour Québec)', fly:true},
+  baguette:{n:'Baguetteville', near:'Baguetteville (gare du jeu)', find:'🌾', dx:22}
+};
+Object.keys(MS).forEach(function(k){ var s = MS[k]; s.id = k; s.lines = Object.keys(ML).filter(function(l){ return ML[l].s.indexOf(k) >= 0; });
+  if(s.find){ var p = EXTRA_PLACES.filter(function(e){ return e[0] === s.find; })[0]; if(p){ s.x = p[3] + (s.dx || 10); s.z = p[4] + 6; } }
+  if(s.fly){ s.x = qx ? qx(-96) : -2700; s.z = qz ? qz(214) : -2390; s.air = true; }
+  if(s.x == null){ s.x = 0; s.z = 40; } if(!s.ex && !s.air){ var f = freeAt(s.x, s.z); s.x = f[0]; s.z = f[1]; } });
+/* the route: fewest stops, then fewest changes */
+function mRoute(a, b){ if(a === b) return null; var best = null, Q = [{st:a, line:null, path:[], ch:0, n:0}], seen = {};
+  while(Q.length){ Q.sort(function(x, y){ return (x.n + x.ch*3) - (y.n + y.ch*3); }); var c = Q.shift(), key = c.st + '|' + c.line; if(seen[key]) continue; seen[key] = 1; if(c.st === b){ best = c; break; }
+    MS[c.st].lines.forEach(function(l){ var L = ML[l].s, i = L.indexOf(c.st); [i - 1, i + 1].forEach(function(j){ if(j < 0 || j >= L.length) return; var ch = c.line && c.line !== l ? 1 : 0; Q.push({st:L[j], line:l, ch:c.ch + ch, n:c.n + 1, path:c.path.concat([{l:l, from:c.st, to:L[j], dir:j > i ? ML[l].b : ML[l].a}])}); }); }); }
+  if(!best) return null; var legs = []; best.path.forEach(function(p){ var g = legs[legs.length - 1]; if(g && g.l === p.l){ g.to = p.to; g.n++; g.stops.push(p.to); } else legs.push({l:p.l, from:p.from, to:p.to, dir:p.dir, n:1, stops:[p.to]}); }); return legs; }
+function lineBadge(l, sz){ var L = ML[l], r = sz || 22; return '<span style="display:inline-flex;align-items:center;justify-content:center;min-width:' + r + 'px;height:' + r + 'px;border-radius:' + (L.rer ? '5px' : '50%') + ';background:' + L.c + ';color:' + L.t + ';font:700 ' + Math.round(r*0.55) + 'px Arial,sans-serif;margin:0 2px;padding:0 3px;border:' + (L.rer ? '2px solid #fff' : '0') + '">' + (L.rer ? 'RER ' : '') + l + '</span>'; }
+/* tiles + enamel plates */
+function tileTex(){ if(tileTex.t) return tileTex.t; var c = document.createElement('canvas'); c.width = 256; c.height = 256; var k = c.getContext('2d'); k.fillStyle = '#d8d6cf'; k.fillRect(0, 0, 256, 256);
+  for(var r=0;r<16;r++) for(var q=-1;q<9;q++){ var x = q*32 + (r % 2)*16, y = r*16; var g = k.createLinearGradient(x, y, x, y + 14); g.addColorStop(0, '#ffffff'); g.addColorStop(0.5, '#f4f2ec'); g.addColorStop(1, '#dddad1'); k.fillStyle = g; k.fillRect(x + 1, y + 1, 30, 14); }
+  var t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; tileTex.t = t; return t; }
+function enamel(txt, w){ var c = document.createElement('canvas'); c.width = 1024; c.height = 150; var k = c.getContext('2d'); k.fillStyle = '#16245c'; k.fillRect(0, 0, 1024, 150); k.strokeStyle = '#f2f2ee'; k.lineWidth = 8; k.strokeRect(10, 10, 1004, 130); k.fillStyle = '#ffffff'; k.font = 'bold 74px Arial, sans-serif'; k.textAlign = 'center'; k.textBaseline = 'middle'; k.fillText(txt, 512, 80, 960); return c; }
+var MET = {cur:null, valid:false, train:null, riding:null, plates:[], tunnel:null};
+var MST = makeInterior({id:'metro', name:'Le Métro', en:'The Métro', w:150, d:18, h:9, title:false, hunt:false, ceil:false, wall:0xeeece4, floor:0x8a8a86, light:0xfff4dc, trim:0x16245c, signBg:'#16245c', out:{x:0, z:40, yaw:0},
+  words:[['le quai', 'the platform'], ['la voie', 'the track'], ['le tourniquet', 'the turnstile'], ['le distributeur de tickets', 'the ticket machine'], ['la sortie', 'the exit'], ['la correspondance', 'the connection'], ['la rame', 'the train'], ['le plan du métro', 'the metro map']],
+  facts:[['Le métro de Paris a ouvert le 19 juillet 1900, pour l\'Exposition universelle.', 'The Paris Métro opened on 19 July 1900, for the World\'s Fair.'], ['Les entrées vertes en fer forgé ont été dessinées par Hector Guimard, dans le style Art nouveau.', 'The green wrought-iron entrances were designed by Hector Guimard, in the Art Nouveau style.'], ['Les carreaux blancs biseautés reflètent la lumière : ça éclaire les stations.', 'The white bevelled tiles reflect the light to brighten the stations.'], ['La ligne 14 est automatique : il n\'y a pas de conducteur !', 'Line 14 is automatic: there is no driver!'], ['Il y a 16 lignes de métro et plus de 300 stations.', 'There are 16 metro lines and more than 300 stations.'], ['Pour sortir, suis les panneaux « Sortie ».', 'To leave, follow the "Sortie" signs.']],
+  build:function(L, X, Z, B, F){ var w = 150, d = 18, h = 9;
+    // the vault (white bevelled tiles), the platform, the track bed, rails, the white edge line
+    var vg = new THREE.CylinderGeometry(9.6, 9.6, w, 28, 1, true, 0, Math.PI); vg.rotateZ(Math.PI/2); var vm = new THREE.MeshLambertMaterial({map:tileTex(), side:THREE.DoubleSide}); vm.map.repeat.set(30, 6); var vault = new THREE.Mesh(vg, vm); vault.position.set(X, 0.6, Z); root.add(vault);
+    L.box(w, 1.1, 8, 0, 0.55, 4.5, 0xa8a49a); L.box(w, 0.05, 0.4, 0, 1.13, 0.7, 0xf2f2ee); L.box(w, 0.05, 0.8, 0, 1.13, 1.3, 0x9a968a); L.box(w, 0.2, 6.5, 0, 0.1, -3.2, 0x3a3634);
+    [-4.2, -2.6].forEach(function(z){ L.box(w, 0.18, 0.12, 0, 0.29, z, 0x8a8f98); }); for(var sl=0;sl<75;sl++) L.box(0.25, 0.12, 2.6, -w/2 + sl*2, 0.18, -3.4, 0x5a4a3a);
+    // the far wall: enamel plates + adverts, the "Motte" seats on the platform, lamps along the vault
+    for(var p=0;p<5;p++){ var px = -48 + p*24; var pl = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 0.82), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(enamel('...'))})); pl.position.set(X + px, 3.4, Z - 7.25); root.add(pl); MET.plates.push(pl); var pl2 = pl.clone(); pl2.material = pl.material; pl2.position.set(X + px + 3, 3.4, Z + 8.6); pl2.rotation.y = Math.PI; root.add(pl2); MET.plates.push(pl2);
+      L.box(4.6, 3, 0.1, px + 12, 3.2, -7.3, [0xc8382f, 0x2b4c9b, 0xe3b52c, 0x2f8a3a, 0x8a3ad6][p]); L.box(4.8, 3.2, 0.06, px + 12, 3.2, -7.33, 0x2a2a2a); }
+    for(var m=0;m<8;m++){ var mx = -42 + m*12; for(var q=0;q<4;q++) L.box(0.55, 0.12, 0.5, mx + q*0.6, 1.62, 7.2, 0xe8642a); L.box(2.5, 0.5, 0.15, mx + 0.9, 1.4, 7.5, 0x8a8f98); }
+    for(var lm=0;lm<15;lm++){ L.box(4, 0.15, 0.4, -70 + lm*10, 8.6, 2.5, 0xfffbe8); L.box(4, 0.15, 0.4, -70 + lm*10, 8.6, -2.5, 0xfffbe8); }
+    // the access hall at the door end: ticket machines, turnstiles, the map, exit & correspondance signs
+    L.box(1.2, 2, 0.8, -6, 2.1, 8.4, 0x1f5fa8); L.box(0.9, 0.6, 0.05, -6, 2.6, 7.98, 0x9fd8ff); L.box(1.2, 2, 0.8, -8, 2.1, 8.4, 0x1f5fa8); L.box(0.9, 0.6, 0.05, -8, 2.6, 7.98, 0x9fd8ff);
+    for(var tq=0;tq<4;tq++){ L.box(0.3, 1.1, 1.4, 3 + tq*1.6, 1.65, 6.5, 0x5a6670); L.box(0.12, 0.12, 0.9, 3.8 + tq*1.6, 2.0, 6.5, 0xd8d8d8); }
+    L.box(4, 2.6, 0.08, 14, 3, 8.86, 0xffffff); L.box(4.2, 2.8, 0.05, 14, 3, 8.9, 0x16245c);
+    airSign('SORTIE ⟶', X, 5.2, Z + 8.7, Math.PI, 3.4, '#16245c'); airSign('🚇 LE MÉTRO DE PARIS · RATP', X - 22, 6, Z + 8.7, Math.PI, 10, '#16245c');
+    F.tagAt(0, 1.4, 1, 'le quai', 'the platform', 1); F.tagAt(0, 0.5, -3.4, 'la voie', 'the track', 1); F.tagAt(4, 2, 6.5, 'le tourniquet', 'the turnstile', 1); F.tagAt(-7, 2.6, 8.2, 'le distributeur de tickets', 'the ticket machine', 1); F.tagAt(14, 3, 8.6, 'le plan du métro', 'the metro map', 1);
+    // the train (a modern white Paris train with the line colour), waiting in the tunnel
+    var tr = new THREE.Group(); var body = solidMat(0xf4f4f0), dk = solidMat(0x22262e); for(var cr=0;cr<4;cr++){ var cb = new THREE.Mesh(new THREE.BoxGeometry(15.4, 3.2, 2.8), body); cb.position.set(cr*15.6, 1.9, 0); tr.add(cb); for(var wn=0;wn<4;wn++){ var wd = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.1, 2.84), dk); wd.position.set(cr*15.6 - 5.6 + wn*3.8, 2.4, 0); tr.add(wd); } [-3.7, 3.7].forEach(function(dx){ var dr = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.4, 2.86), solidMat(0x2a6a9a)); dr.position.set(cr*15.6 + dx, 1.6, 0); tr.add(dr); }); }
+    MET.stripe = solidMat(0xFFCD00); var st = new THREE.Mesh(new THREE.BoxGeometry(62, 0.22, 2.86), MET.stripe); st.position.set(23.4, 0.9, 0); tr.add(st); var nose = new THREE.Mesh(new THREE.BoxGeometry(0.4, 3, 2.7), MET.stripe); nose.position.set(-7.9, 1.9, 0); tr.add(nose);
+    tr.position.set(X - 150, 0.3, Z - 3.4); root.add(tr); MET.train = tr; MET.X = X; MET.Z = Z; },
+  spots:[{x:-7, z:7.2, r:2.6, label:function(){ return '🎫 ' + L2('Ticket machine', 'Le distributeur de tickets'); }, act:function(){ GACT.mtix(); }},
+    {x:5.4, z:6.2, r:2.6, label:function(){ return '🚧 ' + L2('Validate your ticket (turnstile)', 'Valider ton ticket (le tourniquet)'); }, act:function(){ GACT.mvalid(); }},
+    {x:14, z:7.4, r:2.6, label:function(){ return '🗺 ' + L2('The metro map: where do you want to go?', 'Le plan du métro : où veux-tu aller ?'); }, act:function(){ GACT.mplan(); }},
+    {x:-20, z:1.8, r:6, label:function(){ return '🚇 ' + L2('Take the train', 'Prendre le métro'); }, act:function(){ GACT.mplan(); }}]});
+function mPlates(){ var s = MET.cur && MS[MET.cur]; if(!s) return; var c = enamel(s.n.toUpperCase()); MET.plates.forEach(function(p, i){ if(i === 0){ p.material.map.dispose(); p.material.map = new THREE.CanvasTexture(c); p.material.needsUpdate = true; } else { p.material = MET.plates[0].material; } }); }
+function mEnter(id){ MET.cur = id; MET.valid = false; var s = MS[id]; MST.out = {x:s.x, z:s.z + 4, yaw:0}; enterInterior(MST); setTimeout(function(){ mPlates(); say('Station ' + s.n + '.'); hudMsg('🚇 ' + s.n + ' · ' + s.lines.map(function(l){ return (ML[l].rer ? 'RER ' : 'M') + l; }).join(' · ') + ' · ' + L2('buy a ticket, validate, then choose on the map', 'achète un ticket, valide, puis choisis sur le plan')); }, 700); }
+/* tickets (real Île-de-France prices since 2025) */
+var TIX = [['tm', '🎫', 'le ticket Métro-Train-RER', 'Metro-Train-RER ticket', 2.5], ['tb', '🚌', 'le ticket Bus-Tram', 'Bus-Tram ticket', 2], ['ta', '✈', 'le billet Paris Région <> Aéroports', 'Airport ticket', 13], ['nv', '💳', 'le passe Navigo Semaine (7 jours, tout compris sauf l\'aéroport)', 'Navigo weekly pass (7 days)', 31.6]];
+function tixE(){ var e = hasChar() ? life.eco : null; if(e && !e.tix) e.tix = {}; return e; }
+function hasNavigo(){ var e = tixE(); return !!(e && e.tix.nv > Date.now()); }
+GACT.mtix = function(){ var e = tixE(); if(!e){ showToast(noCharLine ? L2('Make your character first', 'Crée ton personnage d\'abord') : ''); return; } showCard('<h3>🎫 ' + L2('TICKET MACHINE', 'LE DISTRIBUTEUR DE TICKETS') + '</h3><div class="gc-sub">Île-de-France Mobilités · ' + L2('you have', 'tu as') + ' : 🎫 ' + (e.tix.tm || 0) + ' · 🚌 ' + (e.tix.tb || 0) + ' · ✈ ' + (e.tix.ta || 0) + (hasNavigo() ? ' · 💳 Navigo ✓' : '') + ' · ' + Math.round(+e.cash || 0) + ' €</div><div class="gc-grid">' + TIX.map(function(t, i){ return gOpt('mbuy', i, t[1] + ' <b>' + esc(t[2]) + '</b><br><span class="lf-soft">' + esc(t[3]) + ' · ' + t[4].toFixed(2).replace('.', ',') + ' €</span>'); }).join('') + '</div><div class="gc-text">« ' + L2('Say it in French', 'Dis-le en français') + ' : Un ticket, s\'il vous plaît. »</div><div class="gc-row">' + gBtn('close', null, 'OK') + '</div>'); };
+GACT.mbuy = function(i){ var t = TIX[i|0], e = tixE(); if(!e) return; if((+e.cash || 0) < t[4]){ showToast(L2('Not enough money!', 'Pas assez d\'argent !')); return; } e.cash = Math.round((+e.cash - t[4])*100)/100; if(typeof finRec === 'function') finRec(-t[4], 'transport'); if(t[0] === 'nv') e.tix.nv = Date.now() + 7*86400000; else e.tix[t[0]] = (e.tix[t[0]] || 0) + 1; lifeSave(true); say('J\'achète ' + t[2].split(' (')[0] + '. Merci !'); GACT.mtix(); };
+function useTicket(kind){ var e = tixE(); if(!e) return true; if(kind !== 'ta' && hasNavigo()) return 'Navigo'; if((e.tix[kind] || 0) > 0){ e.tix[kind]--; lifeSave(true); return true; } return false; }
+GACT.mvalid = function(){ if(MET.valid){ showToast('✅ ' + L2('Already validated', 'Déjà validé')); return; } var u = useTicket('tm'); if(!u){ showToast('🎫 ' + L2('Buy a ticket at the machine first!', 'Achète d\'abord un ticket au distributeur !')); return; } MET.valid = true; try { playNotes([[84, 0.12], [88, 0.2]], 'square', 0.1, 200); } catch(e){} showToast('✅ ' + (u === 'Navigo' ? 'Navigo ' : '') + L2('Validated - go to the platform', 'Validé - va sur le quai')); say('Bip ! C\'est bon.'); };
+GACT.mplan = function(){ var cur = MET.cur; var h = '<h3>🗺 ' + L2('THE METRO MAP', 'LE PLAN DU MÉTRO') + '</h3><div class="gc-sub">' + L2('You are at', 'Tu es à') + ' <b>' + esc(MS[cur].n) + '</b> ' + MS[cur].lines.map(function(l){ return lineBadge(l, 20); }).join('') + (MET.valid ? '' : '<br>⚠ ' + L2('Validate your ticket at the turnstile first!', 'Valide d\'abord ton ticket au tourniquet !')) + '</div><div style="max-height:52vh;overflow:auto;text-align:left">';
+  Object.keys(ML).forEach(function(l){ var L = ML[l]; h += '<div style="margin:6px 0 2px;display:flex;align-items:center;gap:6px">' + lineBadge(l, 24) + '<span class="lf-soft" style="font-size:13px">' + esc(L.a) + ' ⟷ ' + esc(L.b) + '</span></div><div style="display:flex;flex-wrap:wrap;gap:4px;border-left:6px solid ' + L.c + ';padding-left:8px">' + L.s.map(function(k){ var me = k === cur; return me ? '<span style="padding:5px 8px;border:2px solid ' + L.c + ';font-weight:700">📍 ' + esc(MS[k].n) + '</span>' : gOpt('mgo', k, esc(MS[k].n) + '<br><span class="lf-soft" style="font-size:12px">' + esc(MS[k].near) + '</span>'); }).join('') + '</div>'; });
+  showCard(h + '</div><div class="gc-row">' + gBtn('close', null, 'OK') + '</div>'); };
+GACT.mgo = function(to){ var cur = MET.cur; if(!MET.valid){ showToast('🚧 ' + L2('Validate your ticket at the turnstile first!', 'Valide d\'abord ton ticket au tourniquet !')); return; } var R = mRoute(cur, to); if(!R){ showToast('?'); return; }
+  if(to === 'cdg' && !useTicket('ta')){ showToast('✈ ' + L2('The airport needs the 13 € airport ticket!', 'Pour l\'aéroport, il faut le billet Aéroports à 13 € !')); return; }
+  var txt = R.map(function(g, i){ return (i ? '🔁 ' + L2('Change at', 'Correspondance à') + ' <b>' + esc(MS[g.from].n) + '</b><br>' : '') + lineBadge(g.l, 22) + ' ' + L2('direction', 'direction') + ' <b>' + esc(g.dir) + '</b> · ' + g.n + ' ' + (g.n > 1 ? L2('stops', 'arrêts') : L2('stop', 'arrêt')); }).join('<br>');
+  MET.plan = {to:to, legs:R}; showCard('<h3>🚇 ' + esc(MS[cur].n) + ' → ' + esc(MS[to].n) + '</h3><div class="gc-text" style="text-align:left">' + txt + '</div><div class="gc-sub">' + L2('In French: « Je prends la ligne ', 'En français : « Je prends la ligne ') + R[0].l + ' direction ' + esc(R[0].dir) + '. »</div><div class="gc-row">' + gBtn('mride', null, '🚇 ' + L2('BOARD THE TRAIN', 'MONTER DANS LA RAME'), 'go') + gBtn('close', null, L2('NOT NOW', 'PAS MAINTENANT')) + '</div>'); };
+GACT.mride = function(){ closeCard(); if(document.pointerLockElement) try { document.exitPointerLock(); } catch(e){} var P = MET.plan, legs = P.legs, X = MET.X, Z = MET.Z, seq = []; legs.forEach(function(g, gi){ seq.push({k:'arrive', l:g.l}); g.stops.forEach(function(s2, si){ seq.push({k:'go', l:g.l, next:s2, last:si === g.stops.length - 1, change:gi < legs.length - 1 && si === g.stops.length - 1}); }); });
+  MET.riding = {seq:seq, i:0, t:0, to:P.to, back:{x:camera.position.x, z:camera.position.z}}; mStep(); };
+function mStep(){ var R = MET.riding; if(!R) return; var st = R.seq[R.i]; if(!st){ mArrive(); return; } R.t = 0; R.st = st; MET.stripe.color.set(ML[st.l].c);
+  if(st.k === 'arrive'){ MET.train.position.x = MET.X - 150; R.dur = 4; say((ML[st.l].rer ? 'RER ' : 'Ligne ') + st.l + ', direction ' + (legDir(st.l)) + '.'); try { playNotes([[76, 0.25], [72, 0.25], [79, 0.5]], 'sine', 0.12, 300); } catch(e){} }
+  else { R.dur = 3.2; say('Prochaine station : ' + MS[st.next].n + (st.change ? '. Correspondance.' : '.')); hudMsg('🚇 ' + L2('Next station: ', 'Prochaine station : ') + MS[st.next].n); } }
+function legDir(l){ var P = MET.plan; for(var i=0;i<P.legs.length;i++) if(P.legs[i].l === l) return P.legs[i].dir; return ''; }
+function metroTick(dt){ var R = MET.riding; if(!R || !R.st) return; R.t += dt; var f = Math.min(1, R.t/R.dur), X = MET.X, Z = MET.Z;
+  if(R.st.k === 'arrive'){ var e = 1 - Math.pow(1 - f, 3); MET.train.position.x = X - 150 + e*(150 - 22); camera.position.set(X - 6, 1.1 + EYE_HEIGHT, Z + 2.4); camera.lookAt(X - 22, 2.2, Z - 3); }
+  else { flyCard.fade.style.opacity = f > 0.75 ? (f - 0.75)*4 : 0; MET.train.position.x = X - 22 + f*f*80; camera.position.set(MET.train.position.x + 8, 2.0 + 1.1, Z - 3.4); camera.lookAt(MET.train.position.x + 30, 2.2, Z - 3.4); if(f >= 1){ MS[R.st.next] && (MET.cur = R.st.next); mPlates(); if(R.st.change){ say('Correspondance : on change de ligne.'); } } }
+  if(f >= 1){ R.i++; mStep(); } }
+function mArrive(){ flyCard.fade.style.opacity = 0; var R = MET.riding, s = MS[R.to]; MET.riding = null; MET.cur = R.to; MET.train.position.x = MET.X - 150; addJeton(1);
+  if(s.air){ MST.out = {x:s.x, z:s.z, yaw:0}; say('Terminus : Aéroport Charles-de-Gaulle. Bon vol pour Québec !'); showToast('✈ CDG → Québec (YQB)'); }
+  else { MST.out = {x:s.x, z:s.z + 4, yaw:0}; say(s.n + '. Terminus, tout le monde descend !' ); }
+  leaveInterior(MST); setTimeout(function(){ showToast('🚇 ' + s.n + ' · ' + L2('exit: ', 'sortie : ') + s.near); }, 900); }
+/* Guimard entrances for the stations that don't have one yet (+ the spots at all of them) */
+function guimard(x, z, ry, name){ var B = new MeshBatch(), L = new Lot(B, x, z, ry || 0), g = 0x2c5a3e; L.box(1.8, 0.04, 3.4, 0, 0.03, 0, 0x1a1a1c);
+  [[-1.05, 0], [1.05, 0]].forEach(function(p){ L.box(0.08, 0.9, 3.4, p[0], 0.45, 0, g); for(var i=0;i<8;i++) L.box(0.05, 0.85, 0.05, p[0], 0.45, -1.6 + i*0.45, g); }); L.box(2.2, 0.9, 0.08, 0, 0.45, 1.7, g);
+  [-1.05, 1.05].forEach(function(px){ L.cyl(0.06, 0.08, 3, px, 1.5, -1.7, g, 8); L.part(new THREE.SphereGeometry(0.2, 10, 8), px, 3.1, -1.6, 0xf0a030); }); L.box(2.2, 0.32, 0.1, 0, 2.6, -1.72, 0x1f4d3a); B.build();
+  airSign('MÉTROPOLITAIN', x - Math.sin(ry || 0)*1.75, 2.6, z - Math.cos(ry || 0)*1.75, (ry || 0) + Math.PI, 2.1, '#1f4d3a'); }
+Object.keys(MS).forEach(function(k){ var s = MS[k]; if(!s.ex && !s.air) guimard(s.x, s.z, 0, s.n);
+  if(!s.air){ addSpot({x:s.x, z:s.z, r:3.2, label:function(){ return '🚇 ' + L2('Go down into the Métro: ', 'Descendre dans le métro : ') + s.n + ' ' + s.lines.map(function(l){ return (ML[l].rer ? 'RER ' : 'M') + l; }).join('·'); }, act:function(){ mEnter(k); }}); tag(s.x, 2.8, s.z - 1.7, 'la station de métro ' + s.n, 'metro station', 1.2); } });
+/* coming back from Québec: the airport counter in Québec has a CDG flight -> lands at the RER B */
+addSpot({x:MS.cdg.x, z:MS.cdg.z + 3, r:3, label:function(){ return '✈ ' + L2('Fly to Paris-CDG (then RER B)', 'Vol pour Paris-CDG (puis le RER B)'); }, act:function(){ if(!useTicket('ta') && !hasNavigo()){ showToast('✈ ' + L2('You need the airport ticket (13 €) - buy it in any metro station', 'Il te faut le billet Aéroports (13 €) - achète-le dans une station')); return; } MET.cur = 'cdg'; MET.valid = true; MST.out = {x:MS.luxembourg.x, z:MS.luxembourg.z + 4}; enterInterior(MST); setTimeout(function(){ mPlates(); GACT.mplan(); }, 800); }});
+EXTRA_PLACES.push(['🚇', 'Le Métro de Paris (' + Object.keys(MS).length + ' stations, lignes 1-14, RER A B C)', L2('Real lines, colours and station names', 'Les vraies lignes, couleurs et stations'), MS.etoile.x, MS.etoile.z + 5, 0]);
+/* ---------- 🚌 RATP buses: real line numbers and termini ---------- */
+var BL = {
+  '42':{c:'#00A88F', a:'Hôpital Européen G. Pompidou', b:'Gare du Nord', s:['bir','fdr','concorde','opera']},
+  '69':{c:'#E3051C', a:'Champ de Mars', b:'Gambetta', s:['bir','invalides','louvre','hdv']},
+  '72':{c:'#F49FB6', a:'Parc de Saint-Cloud', b:'Hôtel de Ville', s:['bir','concorde','louvre','hdv']},
+  '73':{c:'#6E6E00', a:'La Défense', b:'Musée d\'Orsay', s:['etoile','fdr','clemenceau','concorde']},
+  '30':{c:'#8D5E2A', a:'Trocadéro', b:'Gare de l\'Est', s:['etoile','blanche']},
+  '87':{c:'#5091CB', a:'Champ de Mars', b:'Porte de Reuilly', s:['bir','luxembourg','smichel','bercy']},
+  '89':{c:'#9B9842', a:'Gare de Vanves–Malakoff', b:'Bibliothèque F. Mitterrand', s:['luxembourg','smichel','bfm']}
+};
+var BUSST = {}; Object.keys(BL).forEach(function(l){ BL[l].s.forEach(function(k){ (BUSST[k] = BUSST[k] || []).push(l); }); });
+function busBadge(l){ return '<span style="display:inline-block;padding:2px 7px;border-radius:4px;background:' + BL[l].c + ';color:#fff;font:700 13px Arial,sans-serif;margin:0 2px">' + l + '</span>'; }
+var BSTOP = {};
+Object.keys(BUSST).forEach(function(k){ var s = MS[k], f = freeAt(s.x + 9, s.z + 5), x = f[0], z = f[1], B = new MeshBatch(), L = new Lot(B, x, z, 0); BSTOP[k] = {x:x, z:z};
+  L.box(4, 0.12, 1.8, 0, 2.5, 0, 0x5a6670); L.box(0.08, 2.5, 1.8, -2, 1.25, 0, 0x8a8f98); L.box(4, 2, 0.04, 0, 1.4, 0.9, 0xbfe0ea); L.box(3.6, 0.1, 0.4, 0, 0.5, 0.6, 0x6a6a6a); L.box(1.4, 2.1, 0.08, 1.2, 1.4, 0.86, 0xffffff);
+  L.cyl(0.05, 0.05, 3, 2.6, 1.5, -0.8, 0x6a6a6a, 6); L.box(0.6, 0.6, 0.06, 2.6, 2.9, -0.8, 0x00A88F); B.build();
+  airSign('🚌 ' + s.n.toUpperCase() + ' · ' + BUSST[k].join(' · '), x, 2.85, z - 0.95, 0, 3.8, '#00634f');
+  addSpot({x:x, z:z - 1.4, r:2.6, label:function(){ return '🚌 ' + L2('Bus stop ', 'Arrêt de bus ') + s.n + ' · ' + BUSST[k].join(' · '); }, act:function(){ GACT.bstop(k); }});
+  tag(x, 1.5, z, 'l\'arrêt de bus', 'the bus stop', 1); });
+GACT.bstop = function(k){ var h = '<h3>🚌 ' + L2('BUS STOP', 'ARRÊT DE BUS') + ' · ' + esc(MS[k].n) + '</h3><div class="gc-sub">' + L2('Bus-Tram ticket (2 €) or Navigo · buy tickets in any metro station', 'Ticket Bus-Tram (2 €) ou Navigo · tickets dans toutes les stations') + '</div>';
+  BUSST[k].forEach(function(l){ var L = BL[l]; h += '<div style="margin:6px 0 2px">' + busBadge(l) + ' <span class="lf-soft" style="font-size:13px">' + esc(L.a) + ' ⟷ ' + esc(L.b) + '</span></div><div class="gc-grid">' + L.s.filter(function(x){ return x !== k; }).map(function(x){ return gOpt('bgo', k + '|' + l + '|' + x, esc(MS[x].n)); }).join('') + '</div>'; });
+  showCard(h + '<div class="gc-row">' + gBtn('close', null, 'OK') + '</div>'); };
+GACT.bgo = function(v){ var p = String(v).split('|'), from = p[0], l = p[1], to = p[2], L = BL[l]; var u = useTicket('tb'); if(!u){ showToast('🚌 ' + L2('You need a Bus-Tram ticket (2 €) - buy it in a metro station', 'Il te faut un ticket Bus-Tram (2 €) - achète-le dans une station de métro')); return; }
+  var i = L.s.indexOf(from), j = L.s.indexOf(to), dir = j > i ? L.b : L.a, stops = j > i ? L.s.slice(i + 1, j + 1) : L.s.slice(j, i).reverse(); closeCard(); say('Bonjour ! Bus ' + l + ', direction ' + dir + '.');
+  var fade = flyCard.fade; fade.style.opacity = 1; var n = 0; (function next(){ if(n < stops.length){ var s2 = MS[stops[n]]; hudMsg('🚌 ' + busBadge(l).replace(/<[^>]+>/g, '') + ' · ' + L2('Next stop: ', 'Prochain arrêt : ') + s2.n); say('Prochain arrêt : ' + s2.n + '.'); n++; setTimeout(next, 2200); } else { var b = BSTOP[to]; goTo({x:b.x, z:b.z - 2.5, yaw:0}); setTimeout(function(){ fade.style.opacity = 0; showToast('🚌 ' + MS[to].n); addJeton(1); }, 300); } })(); };
+/* ---------- ⭐ WANTED LEVEL (top right, 0-5 stars) ---------- */
+var WANT = {lvl:0, last:0, el:null};
+try { WANT.lvl = Math.min(5, parseInt(localStorage.getItem('paris.want'), 10) || 0); WANT.last = Date.now(); } catch(e){}
+(function(){ var d = document.createElement('div'); d.id = 'wanted'; d.style.cssText = 'position:fixed;top:calc(58px + env(safe-area-inset-top,0px));right:12px;z-index:31;font:700 22px Arial,sans-serif;letter-spacing:2px;text-shadow:0 0 3px #000,0 0 6px #000;pointer-events:auto;cursor:help;display:none'; document.body.appendChild(d); WANT.el = d; d.title = L2('Wanted level: the more trouble you cause, the higher it goes. 3+ stars = arrest.', 'Niveau de recherche : plus tu fais de bêtises, plus il monte. 3 étoiles ou plus = arrestation.'); wantDraw(); })();
+function wantDraw(){ var s = ''; for(var i=0;i<5;i++) s += '<span style="color:' + (i < WANT.lvl ? '#ffd23a' : 'rgba(255,255,255,.35)') + '">★</span>'; WANT.el.innerHTML = s; WANT.el.style.display = WANT.lvl > 0 && flying ? '' : 'none'; }
+function WANT_add(n, why){ if(!net.uid || isStaff()) return; WANT.lvl = Math.max(0, Math.min(5, WANT.lvl + n)); WANT.last = Date.now(); try { localStorage.setItem('paris.want', WANT.lvl); } catch(e){} wantDraw(); if(n > 0){ showToast('⭐ ' + L2('Wanted level: ', 'Recherché : ') + WANT.lvl + '/5' + (why ? ' · ' + why : '')); try { playNotes([[67, 0.15], [67, 0.15]], 'square', 0.12, 160); } catch(e){} } }
+setInterval(function(){ wantDraw(); if(WANT.lvl > 0 && Date.now() - WANT.last > 150000 && !COP.chase){ WANT.lvl--; WANT.last = Date.now(); try { localStorage.setItem('paris.want', WANT.lvl); } catch(e){} wantDraw(); } }, 1000);
+/* offences raise it */
+var _runStrikeW = runStrike; runStrike = function(what){ var c = RUN.cool; _runStrikeW.apply(this, arguments); if(RUN.cool !== c) WANT_add(1, what === 'person' ? L2('ran someone over', 'a renversé quelqu\'un') : L2('crash', 'accident')); };
+var _mikaStrikeW = mikaStrike; mikaStrike = function(){ WANT_add(2, L2('hit Mika', 'a frappé Mika')); return _mikaStrikeW.apply(this, arguments); };
+var _badJailW = badJail; badJail = function(t){ WANT_add(3, L2('bad words', 'gros mots')); return _badJailW.apply(this, arguments); };
+var _hitPersonW = hitPerson; hitPerson = function(){ runStrike('person'); return _hitPersonW.apply(this, arguments); };
+GACT.mvalid0 = GACT.mvalid;
+/* ---------- 👮 POLICE NATIONALE: officers at the bus stops. With stars they come for you: 1-2 stars = a fine, 3+ = jail ---------- */
+var COP = {list:[], chase:null};
+Object.keys(BSTOP).forEach(function(k, i){ var b = BSTOP[k], x = b.x - 3, z = b.z - 2.2, g = person({x:x, z:z, ry:Math.PI, shirt:0x1b2a4a, pants:0x141c33, hair:0x2a1d14, hat:0x141c33, h:1.8}); var c = {g:g, hx:x, hz:z, k:k, st:'post'}; COP.list.push(c);
+  LBL.dyn.push({m:g, fr:'le policier / la policière', en:'the police officer', dy:2.3, r:0.7, act:function(){ say(WANT.lvl ? 'Police ! Ne bougez pas !' : pickR(Math.random, ['Bonjour ! Tout va bien ?', 'Bonne journée !', 'Soyez prudent sur la route.', 'Respectez le code de la route !'])); }}); });
+function copTick(dt){ if(!COP.list.length) return; var cp = camera.position, me = !INT.cur && flying && net.uid && !isStaff() && !amJailed();
+  COP.list.forEach(function(c){ var g = c.g, dx = cp.x - g.position.x, dz = cp.z - g.position.z, d = Math.hypot(dx, dz), hd = Math.hypot(g.position.x - c.hx, g.position.z - c.hz);
+    if(Math.abs(dx) > 160 || Math.abs(dz) > 160){ if(c.st !== 'post'){ g.position.set(c.hx, 0, c.hz); c.st = 'post'; } return; }
+    if(me && WANT.lvl > 0 && d < 40 && hd < 90 && (!COP.chase || COP.chase === c)){ if(c.st !== 'chase'){ c.st = 'chase'; COP.chase = c; say('Police ! Arrêtez-vous !'); try { playNotes([[79, 0.3], [74, 0.3], [79, 0.3], [74, 0.3]], 'square', 0.1, 240); } catch(e){} }
+      var sp = 7.5 + WANT.lvl*0.8; g.position.x += dx/d*Math.min(d, sp*dt); g.position.z += dz/d*Math.min(d, sp*dt); g.rotation.y = Math.atan2(-dx, -dz);
+      if(d < 2.4) copCatch(c); }
+    else { if(c.st === 'chase'){ c.st = 'back'; if(COP.chase === c) COP.chase = null; } if(hd > 0.3){ var bx = c.hx - g.position.x, bz = c.hz - g.position.z; g.position.x += bx/hd*Math.min(hd, 3*dt); g.position.z += bz/hd*Math.min(hd, 3*dt); g.rotation.y = Math.atan2(-bx, -bz); } else { c.st = 'post'; g.rotation.y = 0; } } }); }
+function copCatch(c){ var lv = WANT.lvl; COP.chase = null; c.st = 'back'; try { if(driving){ exitDriveMode(); driving = false; applyModeUI(); } if(ride && ride.on) endRide(); } catch(e){}
+  if(lv <= 2){ var fine = 35*lv, e = hasChar() ? life.eco : null; if(e){ e.cash = Math.round(((+e.cash || 0) - fine)*100)/100; if(typeof finRec === 'function') finRec(-fine, 'amende'); e.fines = (e.fines || 0) + 1; lifeSave(true); } WANT.lvl = 0; try { localStorage.setItem('paris.want', 0); } catch(e2){} wantDraw(); say('Vous avez une amende de ' + fine + ' euros. Soyez plus prudent !');
+    showCard('<h3>👮 ' + L2('A FINE!', 'UNE AMENDE !') + '</h3><div class="gc-emoji">🧾</div><div class="gc-big">−' + fine + ' €</div><div class="gc-text gc-say">« Vous avez une amende de ' + fine + ' euros. Soyez plus prudent ! »</div><div class="gc-sub">' + L2('At 3 stars the police take you to jail.', 'À 3 étoiles, la police t\'emmène en prison.') + '</div><div class="gc-row">' + gBtn('close', null, L2('SORRY', 'PARDON'), 'go') + '</div>'); }
+  else { say('Vous êtes en état d\'arrestation !'); jail.reason = 'cops'; try { localStorage.setItem('paris.jailWhy', 'cops'); localStorage.setItem('paris.jailStars', lv); } catch(e){} jailUid(net.uid, L2('ARRESTED ', 'ARRÊTÉ ') + lv + '★'); systemLine('🚔 ' + (net.name || '') + L2(' was arrested by the police (' + lv + ' stars).', ' a été arrêté(e) par la police (' + lv + ' étoiles).')); } }
+/* ---------- 🚔 JAIL SENTENCES: 1st offence 10 in a row, 2nd 20 in a row, 3rd+ 30 in a row + bail paid to Madame. A wrong answer restarts the count. Stars = time to wait first + a bigger bail. ---------- */
+function jailRecAt(){ var m = net.members && net.members[net.uid], recs = [m && m.jail, jail.all[net.uid], mod.jail && mod.jail[net.uid]].filter(Boolean); return recs.reduce(function(a, r){ return Math.max(a, r.at || 0); }, 0) || (jail.local ? 1 : 0); }
+var _jailUidW = jailUid; jailUid = function(uid, why){ if(uid === net.uid){ try { localStorage.setItem('paris.jailStars', Math.max(WANT.lvl, parseInt(localStorage.getItem('paris.jailStars'), 10) || 0)); localStorage.setItem('paris.jailAt', Date.now()); } catch(e){} } return _jailUidW.apply(this, arguments); };
+function jSentence(){ var e = hasChar() ? life.eco : null, at = jailRecAt() || 1, stars = 0, jat = Date.now(); try { stars = parseInt(localStorage.getItem('paris.jailStars'), 10) || 0; jat = parseInt(localStorage.getItem('paris.jailAt'), 10) || Date.now(); } catch(x){}
+  if(e){ if(e.jlast !== at){ e.jlast = at; e.joff = (e.joff || 0) + 1; e.jbail = 0; lifeSave(true); } } var off = e ? e.joff || 1 : 1;
+  return {off:off, need:Math.min(30, off*10), bail:off >= 3 ? 100 + stars*25 : 0, stars:stars, waitUntil:jat + stars*30000, paid:!!(e && e.jbail)}; }
+GACT.jailquiz = function(){ var S = jSentence(); if(Date.now() < S.waitUntil){ var left = Math.ceil((S.waitUntil - Date.now())/1000); showCard('<h3>⏳ ' + L2('SERVE YOUR TIME', 'PURGE TA PEINE') + '</h3><div class="gc-big">' + left + ' s</div><div class="gc-text">' + L2('Wanted level ', 'Niveau de recherche ') + S.stars + '★ = ' + S.stars*30 + L2(' seconds before you can start.', ' secondes avant de commencer.') + '</div><div class="gc-row">' + gBtn('jailquiz', null, '↻', 'go') + gBtn('close', null, 'OK') + '</div>'); return; }
+  JQ = {n:0, ok:0, need:S.need, S:S}; jqNext(); };
+jqNext = function(msg){ var need = JQ.need || 10; if(JQ.ok >= need){ if(JQ.S && JQ.S.bail && !JQ.S.paid){ jBail(); return; } jailFreeSelf(); WANT.lvl = 0; try { localStorage.setItem('paris.want', 0); localStorage.removeItem('paris.jailStars'); } catch(e){} wantDraw(); return; } var q = jailQ(); JQ.m = q[1];
+  var off = JQ.S ? JQ.S.off : 1; showCard('<h3>🚔 ' + L2('ANSWER ' + need + ' IN A ROW TO GET OUT', 'RÉPONDS À ' + need + ' QUESTIONS DE SUITE POUR SORTIR') + '</h3><div class="gc-sub">' + L2('Offence #', 'Infraction n° ') + off + ' · ' + L2('one mistake = back to 0', 'une erreur = retour à 0') + (JQ.S && JQ.S.bail ? ' · ' + L2('then bail: ', 'puis caution : ') + JQ.S.bail + ' €' : '') + '</div>' + (msg || '') + '<div class="gc-big">✅ ' + JQ.ok + '/' + need + '</div><div style="height:12px;background:#ddd;border:2px solid #23243a"><div style="height:100%;width:' + Math.round(JQ.ok/need*100) + '%;background:#3ab87a"></div></div><div class="gc-big gc-say">' + esc(q[0]) + '</div><div class="gc-grid">' + q[1].opts.map(function(o, k){ return gOpt('jqa', k, esc(o)); }).join('') + '</div>'); };
+GACT.jqa = function(v){ var ok = (v|0) === JQ.m.ans; if(ok) JQ.ok++; else JQ.ok = 0; jqNext(ok ? '<div class="good">✓</div>' : '<div class="bad">✗ ' + esc(JQ.m.opts[JQ.m.ans]) + ' - ' + L2('back to 0!', 'retour à 0 !') + '</div>'); };
+function jBail(){ var S = JQ.S, e = hasChar() ? life.eco : null; showCard('<h3>💰 ' + L2('BAIL', 'LA CAUTION') + '</h3><div class="gc-text">' + L2('Third offence or more: pay bail to Madame to get out.', 'Troisième infraction ou plus : paie la caution à Madame pour sortir.') + '</div><div class="gc-big">' + S.bail + ' €</div><div class="gc-sub">' + L2('You have ', 'Tu as ') + Math.round(e ? +e.cash || 0 : 0) + ' €</div><div class="gc-row">' + gBtn('jbail', null, '💰 ' + L2('PAY BAIL', 'PAYER LA CAUTION'), 'go') + '</div>'); }
+GACT.jbail = function(){ var S = JQ.S, e = hasChar() ? life.eco : null; if(!e) return; if((+e.cash || 0) < S.bail){ showToast(L2('Not enough money! Earn more with your job (after you get out, ask Madame).', 'Pas assez d\'argent ! Demande à Madame.')); return; } e.cash = Math.round((+e.cash - S.bail)*100)/100; e.jbail = 1; if(typeof finRec === 'function') finRec(-S.bail, 'caution'); lifeSave(true); S.paid = true; say('Caution payée à Madame. Vous êtes libre.'); try { if(net.db) net.db.ref('paris/mod/bail/' + net.uid).set({at:Date.now(), amt:S.bail, name:net.name || ''}).catch(function(){}); } catch(x){} jqNext(); };
+/* ---------- 🚔 JAIL QUIZ v2: real French lessons, never the same question twice in a sentence, no button spamming ---------- */
+var JQ_BANK = [
+  // vocabulary
+  ['« la bibliothèque » =', 'the library', ['the bookshop', 'the bakery', 'the school']], ['« le boulanger » =', 'the baker', ['the butcher', 'the bus driver', 'the teacher']], ['« la mairie » =', 'the town hall', ['the market', 'the pharmacy', 'the station']],
+  ['« un trottoir » =', 'a sidewalk', ['a traffic light', 'a bridge', 'a street']], ['« le feu rouge » =', 'the red light', ['the fire truck', 'the red car', 'the fireplace']], ['« la gare » =', 'the train station', ['the garage', 'the airport', 'the guard']],
+  ['« gentil » =', 'kind', ['gentle wind', 'angry', 'tall']], ['« fâché » =', 'angry', ['tired', 'happy', 'sad']], ['« le respect » =', 'respect', ['rest', 'recipe', 'receipt']],
+  ['« s\'excuser » =', 'to apologize', ['to explain', 'to exit', 'to exercise']], ['« la loi » =', 'the law', ['the lake', 'the light', 'the lion']], ['« un ami / une amie » =', 'a friend', ['an enemy', 'a cousin', 'a neighbour']],
+  // translation EN -> FR
+  ['"I am sorry" =', 'Je suis désolé(e)', ['Je suis content(e)', 'Je suis fatigué(e)', 'Je suis prêt(e)']], ['"Thank you very much" =', 'Merci beaucoup', ['Merci bien peu', 'Beaucoup de merci', 'De rien']],
+  ['"Excuse me" =', 'Excusez-moi', ['S\'il te plaît', 'Pardonne-toi', 'Au revoir']], ['"Where is the library?" =', 'Où est la bibliothèque ?', ['Qui est la bibliothèque ?', 'Quand est la bibliothèque ?', 'Comment est la bibliothèque ?']],
+  ['"I have a dog" =', 'J\'ai un chien', ['Je suis un chien', 'J\'ai une chienne chat', 'Il a un chien']], ['"We are going to the park" =', 'Nous allons au parc', ['Nous avons au parc', 'Nous sommes au parc', 'Nous allez au parc']],
+  // numbers, days, months, time
+  ['17 =', 'dix-sept', ['soixante-dix', 'sept', 'vingt-sept']], ['70 =', 'soixante-dix', ['septante', 'sept-dix', 'soixante']], ['80 =', 'quatre-vingts', ['huitante', 'octante-dix', 'quatre-dix']], ['92 =', 'quatre-vingt-douze', ['neuf-deux', 'nonante-deux', 'soixante-douze']],
+  ['Le jour après lundi ?', 'mardi', ['mercredi', 'dimanche', 'jeudi']], ['Le jour avant samedi ?', 'vendredi', ['dimanche', 'jeudi', 'lundi']], ['Le mois après mars ?', 'avril', ['mai', 'février', 'juin']], ['Le dernier mois de l\'année ?', 'décembre', ['novembre', 'janvier', 'octobre']],
+  ['« Il est midi » =', 'It\'s noon', ['It\'s midnight', 'It\'s morning', 'It\'s one o\'clock']], ['« Quelle heure est-il ? » =', 'What time is it?', ['How old are you?', 'What day is it?', 'Where are you?']],
+  // grammar: articles, negation, adjectives, questions, prepositions
+  ['___ pomme (apple, feminine)', 'une', ['un', 'des', 'le']], ['___ livres (plural)', 'les', ['le', 'la', 'l\'']], ['___ école (starts with a vowel)', 'l\'', ['le', 'la', 'les']], ['Je vais ___ cinéma.', 'au', ['à la', 'aux', 'à le']], ['Je vais ___ piscine.', 'à la', ['au', 'aux', 'à le']],
+  ['Negative: « Je mange. » →', 'Je ne mange pas.', ['Je mange ne pas.', 'Je pas mange.', 'Ne je mange pas.']], ['Negative: « Il a un vélo. » →', 'Il n\'a pas de vélo.', ['Il n\'a pas un vélo.', 'Il a ne pas vélo.', 'Il pas a de vélo.']],
+  ['Une fille ___ (petit)', 'petite', ['petit', 'petits', 'petites']], ['Des voitures ___ (vert)', 'vertes', ['vert', 'verts', 'verte']], ['Un ___ garçon (beau)', 'beau', ['belle', 'beaux', 'bel']],
+  ['« ___ t\'appelles-tu ? »', 'Comment', ['Quand', 'Pourquoi', 'Combien']], ['« ___ habites-tu ? » (where)', 'Où', ['Qui', 'Quoi', 'Quand']], ['« ___ coûte ce livre ? » (how much)', 'Combien', ['Comment', 'Pourquoi', 'Qui']],
+  ['Le chat est ___ la table. (under)', 'sous', ['sur', 'dans', 'devant']], ['Le livre est ___ le sac. (in)', 'dans', ['sur', 'sous', 'derrière']],
+  // être / avoir / aller / faire in sentences
+  ['Nous ___ en retard. (être)', 'sommes', ['avons', 'allons', 'faisons']], ['Elles ___ faim. (avoir)', 'ont', ['sont', 'vont', 'font']], ['Tu ___ à l\'école. (aller)', 'vas', ['va', 'vais', 'allez']], ['Vous ___ vos devoirs. (faire)', 'faites', ['faisez', 'font', 'fais']],
+  ['Ils ___ au parc. (aller)', 'vont', ['allent', 'vont aller', 'sont']], ['J\'___ douze ans. (avoir)', 'ai', ['suis', 'as', 'a']], ['Il ___ beau aujourd\'hui. (faire)', 'fait', ['est', 'a', 'va']],
+  // passé composé
+  ['Hier, j\'___ mangé une pomme.', 'ai', ['suis', 'as', 'est']], ['Hier, elle ___ allée au marché.', 'est', ['a', 'ai', 'es']], ['Nous ___ fini nos devoirs.', 'avons', ['sommes', 'ont', 'avez']],
+  // culture
+  ['La capitale de la France ?', 'Paris', ['Lyon', 'Marseille', 'Québec']], ['La fête nationale française ?', 'le 14 juillet', ['le 1er juillet', 'le 24 juin', 'le 4 juillet']], ['La fête nationale du Québec ?', 'le 24 juin', ['le 14 juillet', 'le 1er juillet', 'le 25 décembre']],
+  ['La devise de la France ?', 'Liberté, Égalité, Fraternité', ['Je me souviens', 'Paix, Ordre, Bon gouvernement', 'Honneur et Patrie']], ['La devise du Québec ?', 'Je me souviens', ['Liberté, Égalité, Fraternité', 'Bonjour la vie', 'Vive le Québec']]
+];
+var _jailQ0 = jailQ;
+function jailQ2(){ JQ.seen = JQ.seen || {}; var q, key, tries = 0; do { tries++; if(Math.random() < 0.6){ var b = pickR(Math.random, JQ_BANK); q = [b[0], mc(Math.random, b[1], b[2])]; } else q = _jailQ0(); key = q[0] + '|' + q[1].opts[q[1].ans]; } while(JQ.seen[key] && tries < 40); JQ.seen[key] = 1; return q; }
+var _jqNextS = jqNext; jqNext = function(msg){ var _q = jailQ; jailQ = function(){ return jailQ2(); }; try { _jqNextS(msg); } finally { jailQ = _q; } JQ.shown = Date.now(); JQ.locked = true;
+  var g = document.querySelectorAll('#g-card .lf-opt'); [].forEach.call(g, function(b){ b.style.opacity = 0.45; b.style.pointerEvents = 'none'; }); setTimeout(function(){ JQ.locked = false; [].forEach.call(g, function(b){ b.style.opacity = ''; b.style.pointerEvents = ''; }); }, 1500); };
+var _jqaS = GACT.jqa; GACT.jqa = function(v){ if(JQ.locked || Date.now() - (JQ.shown || 0) < 1500) return; JQ.locked = true; return _jqaS.apply(this, arguments); };
+/* ---------- 🏎 SPEED LEVELS: answer a French question correctly to make every vehicle faster (up to 3x) ---------- */
+var SPD = {lvl:0, base:{}, dbase:{}, cool:0};
+try { SPD.lvl = Math.min(8, parseInt(localStorage.getItem('paris.spd'), 10) || 0); } catch(e){}
+Object.keys(CAR_SPECS).forEach(function(k){ SPD.base[k] = [CAR_SPECS[k].topMul, CAR_SPECS[k].accel]; }); Object.keys(DRIVE).forEach(function(k){ if(DRIVE[k].max) SPD.dbase[k] = [DRIVE[k].max, DRIVE[k].acc]; });
+function spdMul(){ return 1 + SPD.lvl*0.25; }
+function spdApply(){ var m = spdMul(); Object.keys(SPD.base).forEach(function(k){ CAR_SPECS[k].topMul = SPD.base[k][0]*m; CAR_SPECS[k].accel = SPD.base[k][1]*Math.sqrt(m); }); Object.keys(DRIVE).forEach(function(k){ if(!SPD.dbase[k] && DRIVE[k].max) SPD.dbase[k] = [DRIVE[k].max, DRIVE[k].acc]; if(SPD.dbase[k] && k !== 'bumper'){ DRIVE[k].max = SPD.dbase[k][0]*m; DRIVE[k].acc = (SPD.dbase[k][1] || 8)*Math.sqrt(m); } }); }
+spdApply();
+GACT.spd = function(){ var left = Math.max(0, Math.ceil((SPD.cool - Date.now())/1000)); if(SPD.lvl >= 8){ showCard('<h3>🏎 ' + L2('SPEED LEVEL', 'NIVEAU DE VITESSE') + '</h3><div class="gc-big">MAX · ×3</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); return; }
+  if(left){ showCard('<h3>🏎 ' + L2('SPEED LEVEL', 'NIVEAU DE VITESSE') + ' ' + SPD.lvl + '/8 · ×' + spdMul() + '</h3><div class="gc-text">' + L2('Next question in ', 'Prochaine question dans ') + left + ' s</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); return; }
+  var b = pickR(Math.random, JQ_BANK); SPD.q = mc(Math.random, b[1], b[2]); showCard('<h3>🏎 ' + L2('SPEED LEVEL ', 'NIVEAU DE VITESSE ') + SPD.lvl + '/8 · ×' + spdMul() + '</h3><div class="gc-sub">' + L2('Answer correctly: all your vehicles get 25 % faster (max ×3).', 'Bonne réponse : tous tes véhicules vont 25 % plus vite (max ×3).') + '</div><div class="gc-big gc-say">' + esc(b[0]) + '</div><div class="gc-grid">' + SPD.q.opts.map(function(o, k){ return gOpt('spda', k, esc(o)); }).join('') + '</div>'); };
+GACT.spda = function(v){ var ok = (v|0) === SPD.q.ans; SPD.cool = Date.now() + (ok ? 20000 : 30000); if(ok){ SPD.lvl = Math.min(8, SPD.lvl + 1); try { localStorage.setItem('paris.spd', SPD.lvl); } catch(e){} spdApply(); }
+  showCard('<h3>🏎</h3><div class="gc-big ' + (ok ? 'good' : 'bad') + '">' + (ok ? '✓ ' + L2('LEVEL UP! ', 'NIVEAU SUPÉRIEUR ! ') + '×' + spdMul() : '✗ ' + esc(SPD.q.opts[SPD.q.ans])) + '</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); };
+(function(){ var G = BAR_GROUPS.filter(function(g){ return g.id === 'snd'; })[0]; if(!G || !G.d) return; var x = document.createElement('button'); x.className = 'bar-btn'; x.innerHTML = '<span>🏎</span><span class="dl">' + esc(L2('Vehicle speed (French question)', 'Vitesse des véhicules (question)')) + '</span>'; x.addEventListener('click', function(){ closeDrops(); GACT.spd(); }); G.d.insertBefore(x, G.d.firstChild); })();
+/* ---------- 🔄 FORCED UPDATES: every open game checks for a newer version every minute and reloads itself (after saving) ---------- */
+var BUILD_ID = '1795715992';
+(function(){ var busy = false; function check(){ if(busy || document.hidden) return; busy = true; fetch(location.href.split('#')[0], {cache:'no-store'}).then(function(r){ return r.ok ? r.text() : ''; }).then(function(t){ busy = false; var m = /var BUILD_ID = '([^']+)'/.exec(t || ''); if(m && m[1] !== BUILD_ID && m[1] !== '__' + 'BUILD__') upd(); }).catch(function(){ busy = false; }); }
+  function upd(){ if(upd.on) return; upd.on = true; try { if(typeof lifeSave === 'function') lifeSave(true); } catch(e){} var n = 10, d = document.createElement('div'); d.style.cssText = 'position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:99999;background:#16245c;color:#fff;padding:18px 24px;border-radius:14px;font:700 18px Arial,sans-serif;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.5)'; document.body.appendChild(d);
+    (function tick(){ d.innerHTML = '🔄 ' + L2('New update from Madame! The game reloads in ', 'Nouvelle mise à jour ! Le jeu redémarre dans ') + n + ' s'; if(n-- <= 0){ location.reload(); return; } setTimeout(tick, 1000); })(); }
+  setTimeout(check, 20000); setInterval(check, 60000); })();
+/* ---------- ⬭ ROUNDER SHAPES: softer, rounded panels, buttons, cards ---------- */
+(function(){ var st = document.createElement('style'); st.textContent = '.card,#g-card,.side-panel,#status-panel,.bar-drop,#hint,#title-card{border-radius:14px !important}.bar-btn,.lf-opt,#g-card button,.gc-row button,.btn,button.bar-btn{border-radius:10px !important}.card,#g-card{box-shadow:0 6px 18px rgba(0,0,0,.28) !important}.bar-btn{box-shadow:0 3px 8px rgba(0,0,0,.22) !important}.lf-opt{box-shadow:0 2px 6px rgba(0,0,0,.15) !important}input,textarea,select{border-radius:8px !important}'; document.head.appendChild(st); })();
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
@@ -20537,7 +20792,7 @@ function animate(){
   updateSpeedo();
   lifeTick(dt);
   jailTick();
-  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt); ambTrainTick(dt); wearOthersTick(); jamTick(); pkTick(dt); bumpTick(dt); cullTick(dt); rigTick(dt); crouchTick(dt);
+  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt); ambTrainTick(dt); wearOthersTick(); jamTick(); pkTick(dt); bumpTick(dt); cullTick(dt); rigTick(dt); crouchTick(dt); metroTick(dt); copTick(dt);
   if(!ICE.t || performance.now() - ICE.t > 1000){ ICE.t = performance.now(); if(Math.hypot(camera.position.x - QC.x, camera.position.z - QC.z) < 800) iceSync(); }
   villageTick();
   sendPresence(false);
