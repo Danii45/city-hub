@@ -13864,7 +13864,7 @@ function driveTick(dt){
    the balcony, the attic full of toys, the cellar and the garden - and the whole family. */
 var MHOME = {x:-208, z:-662};
 function person(o){   // a simple person: {x, y, z, ry, shirt, pants, hair, skin, h (height), sit, arm:'up'|'fwd'}
-  var g = new THREE.Group(), s = o.h || 1.75, sk = solidMat(o.skin || 0xf0c8a0);
+  var _H = {}, _S = {}, _A = {}, g = new THREE.Group(), s = o.h || 1.75, sk = solidMat(o.skin || 0xf0c8a0);
   var legs = new THREE.Mesh(new THREE.BoxGeometry(0.36*s, (o.sit ? 0.2 : 0.8)*s, 0.22*s), solidMat(o.pants || 0x2a3a5a)); legs.position.y = (o.sit ? 0.5 : 0.4)*s; g.add(legs);
   if(o.sit){ var th = new THREE.Mesh(new THREE.BoxGeometry(0.36*s, 0.16*s, 0.45*s), solidMat(o.pants || 0x2a3a5a)); th.position.set(0, 0.28*s, -0.2*s); g.add(th); }
   var body = new THREE.Mesh(new THREE.BoxGeometry(0.44*s, 0.55*s, 0.26*s), solidMat(o.shirt || 0x1f6fb8)); body.position.y = (o.sit ? 0.88 : 1.08)*s; g.add(body);
@@ -13872,10 +13872,11 @@ function person(o){   // a simple person: {x, y, z, ry, shirt, pants, hair, skin
   var hair = new THREE.Mesh(new THREE.SphereGeometry(0.16*s, 12, 8, 0, Math.PI*2, 0, Math.PI*0.55), solidMat(o.hair || 0x4a2a1a)); hair.position.y = head.position.y + 0.01*s; g.add(hair);
   [-1, 1].forEach(function(sd){ var ey = new THREE.Mesh(new THREE.SphereGeometry(0.022*s, 6, 5), solidMat(0x1b1b1d)); ey.position.set(sd*0.055*s, head.position.y + 0.02*s, -0.138*s); g.add(ey); var br = new THREE.Mesh(new THREE.BoxGeometry(0.05*s, 0.012*s, 0.01*s), solidMat(o.hair || 0x4a2a1a)); br.position.set(sd*0.055*s, head.position.y + 0.06*s, -0.14*s); g.add(br); });
   var ns = new THREE.Mesh(new THREE.SphereGeometry(0.02*s, 6, 5), sk); ns.position.set(0, head.position.y - 0.02*s, -0.15*s); g.add(ns); var mo = new THREE.Mesh(new THREE.BoxGeometry(0.06*s, 0.012*s, 0.01*s), solidMat(0xa83a3a)); mo.position.set(0, head.position.y - 0.065*s, -0.135*s); g.add(mo);
-  [-1, 1].forEach(function(sd){ var hd2 = new THREE.Mesh(new THREE.SphereGeometry(0.05*s, 6, 5), sk); hd2.position.set(sd*0.28*s, (o.sit ? 0.6 : 0.8)*s, 0); g.add(hd2); var sh = new THREE.Mesh(new THREE.BoxGeometry(0.15*s, 0.07*s, 0.26*s), solidMat(0x2a2a2a)); sh.position.set(sd*0.1*s, 0.035*s, o.sit ? -0.45*s : -0.03*s); g.add(sh); });
+  [-1, 1].forEach(function(sd){ var hd2 = new THREE.Mesh(new THREE.SphereGeometry(0.05*s, 6, 5), sk); hd2.position.set(sd*0.28*s, (o.sit ? 0.6 : 0.8)*s, 0); g.add(hd2); _H[sd] = hd2; var sh = new THREE.Mesh(new THREE.BoxGeometry(0.15*s, 0.07*s, 0.26*s), solidMat(0x2a2a2a)); sh.position.set(sd*0.1*s, 0.035*s, o.sit ? -0.45*s : -0.03*s); g.add(sh); _S[sd] = sh; });
   if(o.hat){ var hb = new THREE.Mesh(new THREE.CylinderGeometry(0.3*s, 0.3*s, 0.03*s, 14), solidMat(o.hat)); hb.position.y = head.position.y + 0.1*s; g.add(hb); var ht = new THREE.Mesh(new THREE.CylinderGeometry(0.15*s, 0.16*s, 0.14*s, 12), solidMat(o.hat)); ht.position.y = head.position.y + 0.17*s; g.add(ht); }
-  [-1, 1].forEach(function(sd){ var a = new THREE.Mesh(new THREE.BoxGeometry(0.11*s, 0.5*s, 0.11*s), solidMat(o.shirt || 0x1f6fb8)); a.position.set(sd*0.28*s, body.position.y, 0); if(o.arm === 'fwd' || (o.arm === 'up' && sd > 0)){ a.rotation.x = -1.2; a.position.z = -0.18*s; a.position.y += 0.08*s; } g.add(a); });
+  [-1, 1].forEach(function(sd){ var a = new THREE.Mesh(new THREE.BoxGeometry(0.11*s, 0.5*s, 0.11*s), solidMat(o.shirt || 0x1f6fb8)); a.position.set(sd*0.28*s, body.position.y, 0); if(o.arm === 'fwd' || (o.arm === 'up' && sd > 0)){ a.rotation.x = -1.2; a.position.z = -0.18*s; a.position.y += 0.08*s; } g.add(a); _A[sd] = a; });
   if(o.hold){ var hd = new THREE.Mesh(new THREE.BoxGeometry(o.hold[0], o.hold[1], o.hold[2]), solidMat(o.hold[3])); hd.position.set(0, body.position.y + 0.05*s, -0.42*s); g.add(hd); }
+  if(!o.sit && !o.noRig) personRig(g, s, legs, _A, _H, _S, o.arm, body.position.y);
   g.position.set(o.x, o.y || 0, o.z); g.rotation.y = o.ry || 0; root.add(g); return g;
 }
 function animal(kind, x, y, z, ry, col){
@@ -17333,7 +17334,7 @@ function picnicTick(dt){
   PIC.walkers.forEach(function(w){ w.a += w.sp*(dt || 0.016)*(w.rect ? 0.6 : 1); var x, z, ox, oz;
     if(w.rect){ var t = ((w.a % 1) + 1) % 1, P = [[-84, -66], [84, -66], [84, 66], [-84, 66]], seg = Math.floor(t*4), u = t*4 - seg, A = P[seg], B = P[(seg + 1) % 4]; x = A[0] + (B[0] - A[0])*u; z = A[1] + (B[1] - A[1])*u; ox = B[0] - A[0]; oz = B[1] - A[1]; }
     else { x = Math.cos(w.a*Math.PI*2)*w.r; z = Math.sin(w.a*Math.PI*2)*w.r*1.8; ox = -Math.sin(w.a*Math.PI*2)*w.sp; oz = Math.cos(w.a*Math.PI*2)*w.sp; }
-    w.m.position.set(x, Math.abs(Math.sin(performance.now()*0.008 + w.r))*0.04, z); w.m.rotation.y = Math.atan2(-ox, -oz) + Math.PI; });
+    w.m.position.set(x, 0, z); w.m.rotation.y = Math.atan2(-ox, -oz) + Math.PI; });
 }
 /* ---------- 🌾 THE WINDMILL, explained: every machine says what it is, what it's for, how it works - and you can try it. Posters on the walls. ---------- */
 var MILL_ITEMS = [
@@ -17668,7 +17669,7 @@ function tpUpdate(){
   if(!act || !TP.model) return false;
   if(!TP.cam){ TP.cam = camera.clone(); }
   var cp = camera.position, g = TP.model.group; g.visible = true; var moving = keyFwd() || keyBack() || keyLeft() || keyRight();
-  g.position.set(cp.x, cp.y - EYE_HEIGHT + (moving ? Math.abs(Math.sin(performance.now()*0.012))*0.05 : 0), cp.z); g.rotation.y = yaw;
+  g.position.set(cp.x, cp.y - EYE_HEIGHT, cp.z); g.rotation.y = yaw;
   var back = INT.cur ? 2.8 : 4.6, up = INT.cur ? 0.9 : 1.5, fx = -Math.sin(yaw), fz = -Math.cos(yaw);
   var tx = cp.x - fx*back, tz = cp.z - fz*back;
   var used = back; if(!INT.cur){ for(var s=back; s>2.4; s-=0.4){ tx = cp.x - fx*s; tz = cp.z - fz*s; used = s; if(!hitSolid(tx, tz, 0.2, cp.y + 0.8, cp.y + 2.4)) break; } }
@@ -19764,7 +19765,7 @@ GACT.pov = function(){ if(typeof tpToggle === 'function') tpToggle(); };
 window.addEventListener('keydown', function(e){ if(e.code === 'KeyV' && flying && !chatOpen && !typingInBox(e)) tpToggle(); });
 setTimeout(gfxApply, 1500);
 /* the SOUND menu becomes SETTINGS, with graphics and the view */
-(function(){ var G = BAR_GROUPS.filter(function(g){ return g.id === 'snd'; })[0]; if(!G || !G.b) return; G.b.textContent = '⚙ ' + L2('SETTINGS', 'RÉGLAGES') + ' ▾'; [['@gfx', 'Les graphismes (shaders)', 'Graphics (shaders)', '🎨'], ['@pov', '1re / 3e personne (C)', 'First / third person (C)', '👁']].forEach(function(it){ var x = document.createElement('button'); x.className = 'bar-btn'; x.innerHTML = '<span>' + it[3] + '</span><span class="dl">' + esc(L2(it[2], it[1])) + '</span>'; x.addEventListener('click', function(){ closeDrops(); GACT[it[0].slice(1)](); }); G.d.insertBefore(x, G.d.firstChild); }); })();
+(function(){ var G = BAR_GROUPS.filter(function(g){ return g.id === 'snd'; })[0]; if(!G || !G.b) return; G.b.textContent = '⚙ ' + L2('SETTINGS', 'RÉGLAGES') + ' ▾'; [['@dark', 'Mode sombre', 'Dark mode', '🌙'], ['@gfx', 'Les graphismes (shaders)', 'Graphics (shaders)', '🎨'], ['@pov', '1re / 3e personne (C)', 'First / third person (C)', '👁']].forEach(function(it){ var x = document.createElement('button'); x.className = 'bar-btn'; x.innerHTML = '<span>' + it[3] + '</span><span class="dl">' + esc(L2(it[2], it[1])) + '</span>'; x.addEventListener('click', function(){ closeDrops(); GACT[it[0].slice(1)](); }); G.d.insertBefore(x, G.d.firstChild); }); })();
 BAR_GROUPS.forEach(function(G){ G.items.forEach(function(it){ if(it[0] === 'tp-toggle'){ it[1] = '1re / 3e personne (C)'; it[2] = 'First / third person (C)'; } }); });
 
 /* ---------- 🤸 WHEELIES on skateboards, scooters, e-scooters and e-bikes (hold SHIFT, or the 🤸 button) ---------- */
@@ -19902,6 +19903,64 @@ setInterval(function(){ if(!flying || INT.cur) return; var x, z, sp, r, car = dr
   if(sp > 4){ var hit = runPeople().filter(function(p){ return Math.hypot(p[0] - x, p[1] - z) < r && !(RUN.tgt[p[2]] > Date.now()); })[0]; if(hit){ RUN.tgt[hit[2]] = Date.now() + 5000; runStrike('person'); } }
   if(RUN.prev > 9 && sp < RUN.prev*0.35) runStrike('thing'); RUN.prev = sp; }, 150);
 langHooks.push(function(){ if(jail.banner && jail.reason === 'run') jail.banner.textContent = t('jailBannerRun'); });
+/* ---------- ⚡ LESS LAG: size-aware distance culling + a tidier screen ----------
+   The city drew ~1,500 objects a frame, half of them more than 350 m away. Every 0.3 s each object gets a draw distance from
+   its size (a mailbox disappears long before a building does) scaled by the graphics setting. Hidden objects go on layer 1,
+   which the camera doesn't draw, so nothing else in the game that shows or hides things is disturbed. */
+GACT.dark = function(){ darkToggle.click(); showToast((darkMode ? '🌙 ' : '☀ ') + L2(darkMode ? 'Dark mode on' : 'Dark mode off', darkMode ? 'Mode sombre activé' : 'Mode sombre désactivé')); };
+var CULL = {t:0, k:1, v:new THREE.Vector3(), list:null, at:0};
+function cullK(){ return GFX.mode === 'fast' ? 0.65 : GFX.mode === 'pretty' ? 1.6 : 1; }
+function cullScan(){ var L = []; scene.traverse(function(o){ if(!(o.isMesh || o.isSprite || o.isPoints || o.isLine) || !o.geometry) return; if(!o.geometry.boundingSphere) o.geometry.computeBoundingSphere(); var bs = o.geometry.boundingSphere; if(!bs || !isFinite(bs.radius)) return; L.push(o); }); CULL.list = L; CULL.at = performance.now(); }
+function cullTick(dt){ CULL.t += dt; if(CULL.t < 0.3) return; CULL.t = 0; if(!CULL.list || performance.now() - CULL.at > 4000) cullScan();
+  var cp = camera.position, k = cullK(), v = CULL.v, inside = !!(typeof INT !== 'undefined' && INT.cur), fly = !flying, up = Math.max(0, cp.y - 30);
+  for(var i=0;i<CULL.list.length;i++){ var o = CULL.list[i]; if(!o.parent){ continue; } var bs = o.geometry.boundingSphere, s = o.matrixWorld.elements, sc = Math.max(Math.hypot(s[0], s[1], s[2]), Math.hypot(s[8], s[9], s[10]), Math.hypot(s[4], s[5], s[6])), r = bs.radius*sc;
+    if(r > 120 || o.userData.noCull){ if(o.layers.mask === 2) o.layers.set(0); continue; }
+    v.copy(bs.center).applyMatrix4(o.matrixWorld); var d = v.distanceTo(cp) - r, lim = k*(70 + r*24) + up*2; if(fly) lim *= 1.6;
+    var hide = d > lim; if(hide && o.layers.mask === 1) o.layers.set(1); else if(!hide && o.layers.mask === 2) o.layers.set(0); } }
+/* the player list (and the title card it lives in) can be folded away */
+(function(){ var css = document.createElement('style'); css.textContent = '#players{pointer-events:auto}#players .players-head{cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px}#players .players-head .pl-fold{margin-left:auto;font-size:10px;opacity:.8}#players.pl-min #players-list{display:none}#title-card.tc-play p[data-t="tagline"]{display:none}#title-card.tc-play h1{font-size:14px;margin:0}#title-card.tc-play{padding:8px 10px}#title-card.tc-play.pl-min-card #players{margin-top:4px;padding-top:4px}#hint-bar.hint-fade,.hint-fade{opacity:0!important;transition:opacity .8s;pointer-events:none}';
+  document.head.appendChild(css);
+  var P = document.getElementById('players'), H = P && P.querySelector('.players-head'); if(!H) return; var f = document.createElement('span'); f.className = 'pl-fold'; H.appendChild(f);
+  var min = false; try { min = localStorage.getItem('paris.plMin') === '1'; } catch(e){}
+  function apply(){ P.classList.toggle('pl-min', min); document.getElementById('title-card').classList.toggle('pl-min-card', min); f.textContent = min ? '▸ ' + L2('SHOW', 'AFFICHER') : '▾ ' + L2('HIDE', 'MASQUER'); H.title = min ? L2('Show the player list', 'Afficher la liste des joueurs') : L2('Minimise the player list', 'Réduire la liste des joueurs'); }
+  H.addEventListener('click', function(e){ e.stopPropagation(); min = !min; try { localStorage.setItem('paris.plMin', min ? '1' : '0'); } catch(e2){} apply(); }); apply(); langHooks.push(apply);
+  /* in play, the title card shrinks to just "PARIS" + the (foldable) list */
+  setInterval(function(){ var tc = document.getElementById('title-card'); if(tc) tc.classList.toggle('tc-play', !!flying); }, 1000);
+})();
+/* the WASD help line fades after you've been moving for a bit, and comes back if you stand still in a new mode */
+(function(){ var hint = document.getElementById('hint') || document.querySelector('.hint-bar,#hint-bar,#controls-hint'); if(!hint) return; var moved = 0, lastMode = null; setInterval(function(){ var mode = (flying ? 1 : 0) + (driving ? 2 : 0); if(mode !== lastMode){ lastMode = mode; moved = 0; hint.classList.remove('hint-fade'); } if(flying && (keys && (keys.KeyW || keys.KeyA || keys.KeyS || keys.KeyD || keys.ArrowUp || keys.ArrowDown))) moved++; if(moved > 12) hint.classList.add('hint-fade'); }, 500); })();
+/* ---------- 🚶 REAL WALKING: legs and arms swing from the hips and shoulders (no more floating) + 🧎 CROUCHING ---------- */
+var RIGS = RIGS || [];
+function personRig(g, s, legs, A, H, S, armPose, bodyY){
+  var hip = 0.8*s, mat = legs.material, R = {L:[], A:[], g:g, ph:Math.random()*6, px:null, pz:null, v:0}; g.remove(legs);
+  [-1, 1].forEach(function(sd){ var pv = new THREE.Group(); pv.position.set(sd*0.095*s, hip, 0); var geo = new THREE.BoxGeometry(0.17*s, 0.8*s, 0.22*s); geo.translate(0, -0.4*s, 0); pv.add(new THREE.Mesh(geo, mat)); if(S[sd]){ g.remove(S[sd]); S[sd].position.set(0, 0.035*s - hip, S[sd].position.z); pv.add(S[sd]); } g.add(pv); R.L.push(pv); });
+  if(!armPose) [-1, 1].forEach(function(sd){ var a = A[sd], h = H[sd]; if(!a) return; var sy = bodyY + 0.25*s, pv = new THREE.Group(); pv.position.set(sd*0.28*s, sy, 0); g.remove(a); a.position.set(0, bodyY - sy, 0); pv.add(a); if(h){ g.remove(h); h.position.set(0, h.position.y - sy, 0); pv.add(h); } g.add(pv); R.A.push(pv); });
+  g.userData.rig = R; (RIGS || (RIGS = [])).push(R); return R; }
+/* the players' own bodies (yours in third person + everyone else's) */
+var _buildWalkerR = buildWalker;
+buildWalker = function(){ var w = _buildWalkerR.apply(this, arguments), g = w.group, P = w.parts, R = {L:[], A:[], g:g, ph:0, px:null, pz:null, v:0, me:true};
+  var legs = P.legs, mat = legs.material; legs.geometry = new THREE.BoxGeometry(0.24, 0.85, 0.3); legs.geometry.translate(0, -0.425, 0); legs.position.set(-0.13, 0.855, 0);
+  var legR = new THREE.Mesh(legs.geometry, mat); legR.position.set(0.13, 0.855, 0); g.add(legR); R.L = [legs, legR]; R.legR = legR;
+  g.children.slice().forEach(function(c){ var gp = c.geometry && c.geometry.parameters; if(c.isMesh && gp && Math.abs(gp.width - 0.16) < 1e-3 && Math.abs(gp.height - 0.62) < 1e-3){ c.geometry = c.geometry.clone(); c.geometry.translate(0, -0.28, 0); c.position.y += 0.28; R.A.push(c); } });
+  var O = P.out; if(O && O.armL){ [O.armL, O.armR].forEach(function(a){ a.geometry = a.geometry.clone(); a.geometry.translate(0, -0.28, 0); a.position.y += 0.28; }); R.A2 = [O.armL, O.armR]; (O.armStripes || []).forEach(function(st){ st.visible = st.visible; }); }
+  g.userData.rig = R; RIGS.push(R); return w; };
+var CROUCH = {on:false, k:0, btn:null};
+function rigTick(dt){ if(!dt) return; var cp = camera.position;
+  for(var i=0;i<RIGS.length;i++){ var R = RIGS[i], g = R.g; if(!g.parent || !g.visible) { R.px = null; continue; } var e = g.matrixWorld.elements, x = e[12], z = e[14]; if(Math.abs(x - cp.x) > 70 || Math.abs(z - cp.z) > 70){ R.px = null; continue; }
+    if(R.px != null){ var sp = Math.hypot(x - R.px, z - R.pz)/dt; if(sp > 25) sp = 0; R.v += (sp - R.v)*Math.min(1, dt*8); } R.px = x; R.pz = z;
+    var amp = Math.min(1, R.v/2.2)*(R.v > 5 ? 0.75 : 0.55); R.ph += dt*Math.min(12, 2 + R.v*2.6); var sw = Math.sin(R.ph)*amp;
+    if(R.L[0]){ R.L[0].rotation.x = sw; R.L[1].rotation.x = -sw; } if(R.legR) R.legR.visible = R.L[0].visible;
+    if(R.A[0]){ R.A[0].rotation.x = -sw*0.8; R.A[1].rotation.x = sw*0.8; } if(R.A2){ R.A2[0].rotation.x = -sw*0.8; R.A2[1].rotation.x = sw*0.8; }
+    if(R.me){ var c = R.crouch || 0; if(c){ R.L[0].rotation.x = -1.0*c + sw*0.4; R.L[1].rotation.x = -1.0*c - sw*0.4; } g.scale.y = 1 - c*0.3; } } }
+/* crouch: X (or the 🧎 button on a tablet): lower eye, slower, sneaky */
+STR.en.crouchHint = 'X = crouch'; STR.fr.crouchHint = 'X = s\'accroupir';
+function setCrouch(on){ if(on === CROUCH.on) return; if(on && (!flying || driving || (ride && ride.on))) return; CROUCH.on = on; EYE_HEIGHT = on ? 1.05 : 1.7; if(!on){ var feet = camera.position.y - 1.05; if(!hitSolid(camera.position.x, camera.position.z, 0.45, feet + 0.55, feet + 1.7)) camera.position.y = feet + 1.7; else { CROUCH.on = true; EYE_HEIGHT = 1.05; return; } } else camera.position.y -= 0.65; if(CROUCH.btn) CROUCH.btn.classList.toggle('on', on); }
+window.addEventListener('keydown', function(e){ if(e.code !== 'KeyX' || e.repeat) return; var t = e.target; if(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return; if(!flying) return; setCrouch(!CROUCH.on); });
+(function(){ var b = document.createElement('button'); b.className = 'bar-btn'; b.id = 'crouch-btn'; b.textContent = '🧎'; b.title = L2('Crouch (X)', 's\'accroupir (X)'); b.style.cssText = 'position:fixed;right:12px;bottom:calc(190px + env(safe-area-inset-bottom,0px));z-index:30;font-size:18px;padding:8px 10px;display:none'; b.addEventListener('click', function(){ setCrouch(!CROUCH.on); }); document.body.appendChild(b); CROUCH.btn = b;
+  setInterval(function(){ var touch = typeof touchPlay !== 'undefined' && touchPlay; b.style.display = flying && !driving && touch ? '' : 'none'; if(CROUCH.on && (!flying || driving || (ride && ride.on))){ CROUCH.on = false; EYE_HEIGHT = 1.7; b.classList.remove('on'); } }, 500); })();
+var _walkSpeedCr = null;
+function crouchTick(dt){ CROUCH.k += ((CROUCH.on ? 1 : 0) - CROUCH.k)*Math.min(1, dt*10); RIGS.forEach(function(R){ if(R.me && R.g === (typeof TP !== 'undefined' && TP.model ? TP.model.group : null)) R.crouch = CROUCH.k; });
+  if(CROUCH.on && _walkSpeedCr == null){ _walkSpeedCr = walkSpeed; walkSpeed = walkSpeed*0.45; } else if(!CROUCH.on && _walkSpeedCr != null){ walkSpeed = _walkSpeedCr; _walkSpeedCr = null; } }
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
@@ -20478,7 +20537,7 @@ function animate(){
   updateSpeedo();
   lifeTick(dt);
   jailTick();
-  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt); ambTrainTick(dt); wearOthersTick(); jamTick(); pkTick(dt); bumpTick(dt);
+  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt); ambTrainTick(dt); wearOthersTick(); jamTick(); pkTick(dt); bumpTick(dt); cullTick(dt); rigTick(dt); crouchTick(dt);
   if(!ICE.t || performance.now() - ICE.t > 1000){ ICE.t = performance.now(); if(Math.hypot(camera.position.x - QC.x, camera.position.z - QC.z) < 800) iceSync(); }
   villageTick();
   sendPresence(false);
