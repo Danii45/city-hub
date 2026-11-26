@@ -16299,6 +16299,404 @@ ACAD.spots.push({x:6, z:-5.6, r:2.8, label:function(){ return '👨‍🍳 ' + L
   person({x:X + 6, z:Z - 7.6, ry:Math.PI, shirt:0xf6f2ea, pants:0x2a2d36, hair:0x6a5a4a, hat:0xffffff, h:1.8}); var A = new Lot(B, X, Z, 0); A.box(0.55, 0.8, 0.04, 6, 1.0, -7.42, 0x5a3a22);
   F.tagAt(6, 2.2, -7.6, 'Henri, le maître boulanger', 'Henri, the master baker', 0.6); }; })();
 (function(){ var _e = ACAD.onEnter; ACAD.onEnter = function(){ if(_e) _e.apply(this, arguments); setTimeout(function(){ if(INT.cur === ACAD){ say('Bienvenue au cours de pain au levain ! Laisse-moi te guider : viens me voir, je suis Henri.'); hudMsg('👨‍🍳 ' + L2('Henri the baker: take the sourdough class (walk up to him or click him)', 'Henri le boulanger : suis le cours de pain au levain (va le voir ou clique sur lui)')); } }, 4500); }; })();
+/* ---------- 👨‍👩‍👧 MY FAMILY: students create family members (all the family words), name them, give each a room, and visit them at home ---------- */
+var FAM_REL = [
+  ['mere', 'ma mère', 'my mother', 'f', 1, 'C\'est la femme qui m\'a donné la vie, ma maman.'], ['pere', 'mon père', 'my father', 'm', 1, 'C\'est mon papa.'],
+  ['bellemere', 'ma belle-mère', 'my stepmother', 'f', 1, 'C\'est la femme de mon père (mais pas ma mère).'], ['beaupere', 'mon beau-père', 'my stepfather', 'm', 1, 'C\'est le mari de ma mère (mais pas mon père).'],
+  ['frere', 'mon frère', 'my brother', 'm', 2, 'C\'est le fils de mes parents.'], ['soeur', 'ma sœur', 'my sister', 'f', 2, 'C\'est la fille de mes parents.'],
+  ['demifrere', 'mon demi-frère', 'my half-brother', 'm', 2, 'Nous avons un seul parent en commun.'], ['demisoeur', 'ma demi-sœur', 'my half-sister', 'f', 2, 'Nous avons un seul parent en commun.'],
+  ['jumeau', 'mon jumeau', 'my twin brother', 'm', 2, 'Mon frère né le même jour que moi.'], ['jumelle', 'ma jumelle', 'my twin sister', 'f', 2, 'Ma sœur née le même jour que moi.'],
+  ['grandpere', 'mon grand-père', 'my grandfather', 'm', 0, 'C\'est le père de mon père ou de ma mère. Je l\'appelle « papi ».'], ['grandmere', 'ma grand-mère', 'my grandmother', 'f', 0, 'C\'est la mère de mon père ou de ma mère. Je l\'appelle « mamie ».'],
+  ['agp', 'mon arrière-grand-père', 'my great-grandfather', 'm', -1, 'C\'est le père de mon grand-père ou de ma grand-mère.'], ['agm', 'mon arrière-grand-mère', 'my great-grandmother', 'f', -1, 'C\'est la mère de mon grand-père ou de ma grand-mère.'],
+  ['oncle', 'mon oncle', 'my uncle', 'm', 1, 'C\'est le frère de mon père ou de ma mère.'], ['tante', 'ma tante', 'my aunt', 'f', 1, 'C\'est la sœur de mon père ou de ma mère.'],
+  ['cousin', 'mon cousin', 'my cousin (boy)', 'm', 2, 'C\'est le fils de mon oncle ou de ma tante.'], ['cousine', 'ma cousine', 'my cousin (girl)', 'f', 2, 'C\'est la fille de mon oncle ou de ma tante.'],
+  ['neveu', 'mon neveu', 'my nephew', 'm', 3, 'C\'est le fils de mon frère ou de ma sœur.'], ['niece', 'ma nièce', 'my niece', 'f', 3, 'C\'est la fille de mon frère ou de ma sœur.'],
+  ['fils', 'mon fils', 'my son', 'm', 3, 'C\'est mon enfant, un garçon.'], ['fille', 'ma fille', 'my daughter', 'f', 3, 'C\'est mon enfant, une fille.'],
+  ['petitfils', 'mon petit-fils', 'my grandson', 'm', 4, 'C\'est le fils de mon fils ou de ma fille.'], ['petitefille', 'ma petite-fille', 'my granddaughter', 'f', 4, 'C\'est la fille de mon fils ou de ma fille.'],
+  ['mari', 'mon mari', 'my husband', 'm', 2, 'C\'est l\'homme avec qui je suis marié(e).'], ['femme', 'ma femme', 'my wife', 'f', 2, 'C\'est la femme avec qui je suis marié(e).'],
+  ['beaufrere', 'mon beau-frère', 'my brother-in-law', 'm', 2, 'C\'est le mari de ma sœur, ou le frère de mon mari / ma femme.'], ['bellesoeur', 'ma belle-sœur', 'my sister-in-law', 'f', 2, 'C\'est la femme de mon frère, ou la sœur de mon mari / ma femme.'],
+  ['parrain', 'mon parrain', 'my godfather', 'm', 1, 'Un ami de la famille choisi à ma naissance pour veiller sur moi.'], ['marraine', 'ma marraine', 'my godmother', 'f', 1, 'Une amie de la famille choisie à ma naissance pour veiller sur moi.'],
+  ['bebe', 'le bébé', 'the baby', 'm', 3, 'Le plus petit de la famille !'], ['chien', 'mon chien', 'my dog', 'm', 9, 'Mon animal de compagnie qui aboie : « ouaf ! »'], ['chat', 'mon chat', 'my cat', 'm', 9, 'Mon animal de compagnie qui miaule : « miaou ! »']
+];
+var FAM_BY = {}; FAM_REL.forEach(function(r){ FAM_BY[r[0]] = r; });
+var FAM_AGE = [['un bébé', 0.7], ['un enfant', 1.2], ['un ado', 1.62], ['un adulte', 1.76], ['une personne âgée', 1.68]];
+var FAM_ROOMS = [['c1', 'la chambre 1', -13, -8], ['c2', 'la chambre 2', 0, -8], ['c3', 'la chambre 3', 13, -8], ['c4', 'la chambre 4', -13, 8], ['c5', 'la chambre 5', 13, 8], ['salon', 'le salon', -3.6, 7], ['cuisine', 'la cuisine', 3.6, 7], ['jardin', 'le couloir', 0, 0]];
+var FAM_SHIRTS = [0xc8382f, 0x1f6fb8, 0x2f8a3a, 0xe3b52c, 0x8a3ad6, 0xf28aa0, 0x2a2d36, 0xf2f2f2];
+var FAM_HAIR = [0x1b1b1d, 0x4a2a1a, 0x8a4a1a, 0xe8c070, 0xc8382f, 0xd8d8d8];
+function famList(){ return hasChar() ? (life.eco.fam = life.eco.fam || []) : (FH.tmp = FH.tmp || []); }
+function famLine(m){ var r = FAM_BY[m.r] || FAM_REL[0]; return esc(m.n) + ', ' + esc(r[1]); }
+function roomName(k, list){ var R = FAM_ROOMS.filter(function(x){ return x[0] === k; })[0]; if(!R) return 'le couloir'; if(/^c\d/.test(k)){ var who = (list || famList()).filter(function(m){ return m.room === k; }); if(who.length) return 'la chambre de ' + who.map(function(m){ return m.n; }).join(' et '); } return R[1]; }
+function famCard(msg){
+  var L = famList();
+  showCard('<h3>👨‍👩‍👧 ' + L2('MY FAMILY', 'MA FAMILLE') + '</h3>' + (msg || '') + '<div class="gc-sub">' + L2('Create your family: who they are, their name, their look and their room. Then visit them at home!', 'Crée ta famille : qui c\'est, son prénom, son look et sa chambre. Puis rends-leur visite à la maison !') + '</div>' +
+    (L.length ? '<div class="gc-grid">' + L.map(function(m, i){ return '<div class="gc-text gc-say" style="margin:2px">' + famLine(m) + '<br><span class="lf-soft">' + esc(roomName(m.room, L)) + '</span><br>' + gBtn('famdel', i, '✕') + '</div>'; }).join('') + '</div>' : '<div class="gc-text gc-say">Ta famille est vide. Ajoute quelqu\'un !</div>') + noCharLine() +
+    '<div class="gc-row">' + (L.length < 12 ? gBtn('famadd', null, '➕ ' + L2('ADD A FAMILY MEMBER', 'AJOUTER QUELQU\'UN'), 'go') : '') + gBtn('famtree', null, '🌳 ' + L2('FAMILY TREE', 'L\'ARBRE GÉNÉALOGIQUE')) + gBtn('famquiz', null, '🎯 ' + L2('FAMILY WORDS QUIZ (+🪙)', 'QUIZ DE LA FAMILLE (+🪙)')) + gBtn('famvisit', null, '🏠 ' + L2('VISIT MY FAMILY', 'ALLER CHEZ MA FAMILLE')) + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>');
+}
+var FNEW = {};
+GACT.famadd = function(){ FNEW = {};
+  showCard('<h3>➕ ' + L2('WHO IS IT?', 'QUI EST-CE ?') + '</h3><div class="gc-sub">' + L2('Choose the family word (click 🔊 to hear it)', 'Choisis le mot de la famille') + '</div><div class="gc-grid">' + FAM_REL.map(function(r){ return gOpt('famrel', r[0], '<b class="gc-say">' + esc(r[1]) + '</b><br><span class="lf-soft">' + esc(r[2]) + '</span>'); }).join('') + '</div><div class="gc-row">' + gBtn('famback', null, L2('BACK', 'RETOUR')) + '</div>'); };
+GACT.famback = function(){ famCard(); };
+GACT.famrel = function(k){ FNEW.r = k; var r = FAM_BY[k]; say(r[1]);
+  showCard('<h3>✏ ' + esc(r[1]) + '</h3><div class="gc-text gc-say">' + esc(r[5]) + '</div><div class="gc-big gc-say">Comment s\'appelle ' + esc(r[1]) + ' ?</div><input id="fam-name" maxlength="16" placeholder="' + (r[3] === 'f' ? 'Sophie' : 'Lucas') + '" style="font-size:18px;padding:6px;width:80%"><div class="gc-row">' + gBtn('famname', null, L2('NEXT →', 'SUIVANT →'), 'go') + gBtn('famadd', null, L2('BACK', 'RETOUR')) + '</div>');
+};
+GACT.famname = function(){ var v = (document.getElementById('fam-name') || {}).value || ''; v = v.replace(/[<>]/g, '').trim().slice(0, 16); if(!v){ showToast(L2('Write a name!', 'Écris un prénom !')); return; } if(hasBadWord(v)){ showToast('🙅'); return; } FNEW.n = v;
+  var pet = FAM_BY[FNEW.r][4] === 9;
+  if(pet){ FNEW.a = 3; FNEW.c = 0; FNEW.h = 0; famRoomPick(); return; }
+  showCard('<h3>🎨 ' + esc(v) + '</h3><div class="gc-big gc-say">' + esc(v) + ' est...</div><div class="gc-row">' + FAM_AGE.map(function(a, i){ return gBtn('famage', i, a[0]); }).join('') + '</div>'); };
+GACT.famage = function(i){ FNEW.a = i|0; say(FNEW.n + ' est ' + FAM_AGE[FNEW.a][0] + '.');
+  showCard('<h3>🎨 ' + esc(FNEW.n) + '</h3><div class="gc-sub">' + L2('Shirt colour', 'La couleur du haut') + '</div><div class="gc-row">' + FAM_SHIRTS.map(function(c, i){ return '<button class="btn" data-g="famshirt" data-v="' + i + '" style="background:' + hexCss(c) + ';width:40px;height:34px"></button>'; }).join('') + '</div>'); };
+GACT.famshirt = function(i){ FNEW.c = i|0;
+  showCard('<h3>🎨 ' + esc(FNEW.n) + '</h3><div class="gc-sub">' + L2('Hair', 'Les cheveux') + '</div><div class="gc-row">' + FAM_HAIR.map(function(c, i){ return '<button class="btn" data-g="famhair" data-v="' + i + '" style="background:' + hexCss(c) + ';width:40px;height:34px"></button>'; }).join('') + '</div><div class="gc-text">noirs · bruns · châtains · blonds · roux · gris</div>'); };
+GACT.famhair = function(i){ FNEW.h = i|0; famRoomPick(); };
+function famRoomPick(){ var L = famList();
+  showCard('<h3>🛏 ' + L2('WHICH ROOM?', 'QUELLE PIÈCE ?') + '</h3><div class="gc-big gc-say">Où est la chambre de ' + esc(FNEW.n) + ' ?</div><div class="gc-grid">' + FAM_ROOMS.slice(0, 7).map(function(R){ var who = L.filter(function(m){ return m.room === R[0]; }).map(function(m){ return m.n; }); return gOpt('famroom', R[0], '<b>' + esc(R[1]) + '</b><br><span class="lf-soft">' + (who.length ? esc(who.join(', ')) : L2('empty', 'libre')) + '</span>'); }).join('') + '</div>'); }
+GACT.famroom = function(k){ FNEW.room = k; var L = famList(); L.push({r:FNEW.r, n:FNEW.n, a:FNEW.a|0, c:FNEW.c|0, h:FNEW.h|0, room:k}); if(hasChar()) lifeSave(true);
+  var r = FAM_BY[FNEW.r], txt = FNEW.n + ' est ' + r[1] + '. ' + (/^c\d/.test(k) ? 'C\'est la chambre de ' + FNEW.n + '.' : FNEW.n + ' dort dans ' + roomName(k) + '.'); say(txt);
+  if(FH.o && INT.cur === FH.o) famBuild();
+  famCard('<div class="good gc-say">✓ ' + esc(txt) + '</div>'); };
+GACT.famdel = function(i){ var L = famList(); var m = L.splice(i|0, 1)[0]; if(hasChar()) lifeSave(true); if(FH.o && INT.cur === FH.o) famBuild(); famCard(m ? '<div class="gc-sub">✕ ' + esc(m.n) + '</div>' : ''); };
+GACT.famtree = function(){ var L = famList(), gens = {};
+  L.forEach(function(m){ var g = (FAM_BY[m.r] || FAM_REL[0])[4]; (gens[g] = gens[g] || []).push(m); });
+  var names = {'-1':'Les arrière-grands-parents', 0:'Les grands-parents', 1:'Les parents, oncles, tantes...', 2:'Ma génération (moi !)', 3:'Les enfants', 4:'Les petits-enfants', 9:'Les animaux'};
+  var me = hasChar() ? life.eco.ch.fn : 'moi';
+  showCard('<h3>🌳 ' + L2('MY FAMILY TREE', 'MON ARBRE GÉNÉALOGIQUE') + '</h3>' + [-1, 0, 1, 2, 3, 4, 9].filter(function(g){ return gens[g] || g === 2; }).map(function(g){ return '<div class="gc-sub">' + names[g] + '</div><div class="gc-text">' + (g === 2 ? '⭐ <b>' + esc(me) + '</b> (moi)' + (gens[g] ? ' · ' : '') : '') + (gens[g] || []).map(function(m){ return '<span class="gc-say">' + esc(m.n) + ' est ' + esc((FAM_BY[m.r] || FAM_REL[0])[1]) + '.</span>'; }).join(' ') + '</div>'; }).join('') + '<div class="gc-row">' + gBtn('famback', null, L2('BACK', 'RETOUR'), 'go') + '</div>'); };
+var FQZ = {};
+GACT.famquiz = function(){ FQZ = {n:0, ok:0, list:shuffleR(Math.random, FAM_REL.filter(function(r){ return r[4] !== 9; })).slice(0, 6)}; famQ(); };
+function famQ(msg){
+  if(FQZ.n >= FQZ.list.length){ var g = !(chal.cool.famq > Date.now()) ? addJeton(FQZ.ok >= 5 ? 3 : FQZ.ok >= 3 ? 1 : 0) : 0; if(g) chal.cool.famq = Date.now() + 5*60000; showCard('<h3>👨‍👩‍👧 ' + FQZ.ok + ' / ' + FQZ.list.length + (g ? ' · +' + g + ' 🪙' : '') + '</h3>' + noCharLine() + '<div class="gc-row">' + gBtn('famquiz', null, L2('AGAIN', 'ENCORE')) + gBtn('famback', null, L2('BACK', 'RETOUR'), 'go') + '</div>'); return; }
+  var r = FQZ.list[FQZ.n], m = mc(Math.random, r[1], shuffleR(Math.random, FAM_REL.filter(function(x){ return x !== r && x[4] !== 9 && x[3] === r[3]; })).slice(0, 3).map(function(x){ return x[1]; })); FQZ.m = m;
+  showCard('<h3>👨‍👩‍👧 ' + (FQZ.n + 1) + '/' + FQZ.list.length + '</h3>' + (msg || '') + '<div class="gc-big gc-say">' + esc(r[5]) + '</div><div class="gc-sub">' + L2('Who is it?', 'Qui est-ce ?') + '</div><div class="gc-grid">' + m.opts.map(function(o, k){ return gOpt('famqans', k, esc(o)); }).join('') + '</div>');
+}
+GACT.famqans = function(v){ if(FQZ.busy) return; FQZ.busy = true; setTimeout(function(){ FQZ.busy = false; }, 350); var ok = (v|0) === FQZ.m.ans; if(ok) FQZ.ok++; FQZ.n++; famQ(ok ? '<div class="good">✓</div>' : '<div class="bad">✗ ' + esc(FQZ.m.opts[FQZ.m.ans]) + '</div>'); };
+/* the family house (one interior, filled with YOUR family when you go in) */
+var FH = {o:null, g:null, plates:[], tmp:null};
+GACT.famvisit = function(){ closeCard(); famVisit(FH.from); };
+function famVisit(p){
+  var o = FH.o; if(p){ var f = plotToWorld(p, 0, 9.5); o.out = {x:f.x, z:f.z, yaw:p.rot}; FH.from = p; }
+  else if(!FH.from){ o.out = {x:camera.position.x, z:camera.position.z, yaw:yaw}; }
+  if(INT.cur && INT.cur !== o){ INT.cur = null; } enterInterior(o);
+}
+function famPlate(i, txt){ var P = FH.plates[i]; if(!P) return; var c = P.c, k = c.getContext('2d'); k.fillStyle = '#fffaf0'; k.fillRect(0, 0, 512, 128); k.strokeStyle = '#8a5a32'; k.lineWidth = 10; k.strokeRect(5, 5, 502, 118); k.fillStyle = '#23243a'; k.textAlign = 'center'; var fs = 44; do { k.font = 'bold ' + fs + 'px serif'; fs -= 2; } while(k.measureText(txt).width > 470 && fs > 16); k.fillText(txt, 256, 78); P.tex.needsUpdate = true; }
+function famBuild(){
+  var o = FH.o, X = o.X, Z = o.Z, L = famList();
+  if(FH.g){ root.remove(FH.g); } FH.g = new THREE.Group(); root.add(FH.g);
+  LBL.dyn = LBL.dyn.filter(function(d){ return !d.fam; });
+  FAM_ROOMS.slice(0, 5).forEach(function(R, i){ var who = L.filter(function(m){ return m.room === R[0]; }); famPlate(i, who.length ? 'La chambre de ' + who.map(function(m){ return m.n; }).join(' et ') : 'Chambre libre'); });
+  var count = {};
+  L.forEach(function(m){
+    var R = FAM_ROOMS.filter(function(x){ return x[0] === m.room; })[0] || FAM_ROOMS[7], n = count[m.room] = (count[m.room] || 0) + 1, x = X + R[2] + (n - 1)*1.4 - 1, z = Z + R[3] + (n % 2 ? 1.2 : -0.4), r = FAM_BY[m.r] || FAM_REL[0], mesh;
+    if(r[4] === 9){ mesh = animal(m.r === 'chat' ? 'chat' : 'chien', x, 0, z, Math.PI, [0xc8904a, 0x2a2a2a, 0xf4f0e8, 0x8a8f98, 0xe07b2c][m.h % 5]); if(mesh && mesh.parent) { mesh.parent.remove(mesh); FH.g.add(mesh); } }
+    else { var A = FAM_AGE[m.a] || FAM_AGE[3]; mesh = person({x:x, z:z, ry:Math.PI, shirt:FAM_SHIRTS[m.c] || 0x1f6fb8, pants:0x2a2d36, hair:m.a === 4 ? 0xd8d8d8 : FAM_HAIR[m.h] || 0x4a2a1a, h:A[1]}); root.remove(mesh); FH.g.add(mesh); }
+    if(!mesh) return;
+    LBL.dyn.push({m:mesh, fam:true, fr:m.n + ' - ' + r[1], en:r[2], dy:(FAM_AGE[m.a] || FAM_AGE[3])[1] + 0.25, r:0.6, act:function(){ famTalk(m); }});
+  });
+}
+function famTalk(m){
+  var r = FAM_BY[m.r] || FAM_REL[0], me = hasChar() ? life.eco.ch.fn : 'toi', pet = r[4] === 9;
+  var line = pet ? (m.r === 'chat' ? 'Miaou ! (' + m.n + ' est ton chat. Il dort dans ' + roomName(m.room) + '.)' : 'Ouaf ouaf ! (' + m.n + ' est ton chien. Il dort dans ' + roomName(m.room) + '.)')
+    : 'Bonjour ' + me + ' ! C\'est moi, ' + m.n + ', ' + r[1].replace(/^(mon|ma|le) /, function(a){ return a === 'mon ' ? 'ton ' : a === 'ma ' ? 'ta ' : 'le '; }) + '. ' + pickR(Math.random, ['Tu as passé une bonne journée ?', 'Tu veux jouer avec moi ?', 'On mange ensemble ce soir ?', 'Tu as fait tes devoirs de français ?', 'Viens voir ma chambre !', 'Je t\'aime beaucoup !']);
+  say(line);
+  showCard('<h3>💬 ' + esc(m.n) + ' · ' + esc(r[1]) + '</h3><div class="gc-big gc-say">« ' + esc(line) + ' »</div><div class="gc-text gc-say">' + esc(r[5]) + '</div><div class="gc-row">' + gBtn('famcard', null, '👨‍👩‍👧 ' + L2('MY FAMILY', 'MA FAMILLE')) + gBtn('close', null, 'OK', 'go') + '</div>');
+}
+GACT.famcard = function(){ famCard(); };
+(function(){
+  var o = makeInterior({id:'famille', name:'La maison de ma famille', en:'My family\'s home', w:40, d:26, h:6, wall:0xf6ecd8, floor:0xb88a5a, ceil:0xfaf6ee, light:0xfff2d8, signBg:'#8a4a1a', title:false,
+    out:{x:0, z:0, yaw:0}, door:{x:-99999, z:-99999, r:0.1}, hunt:false,
+    blurb:'Voici la maison de ta famille ! Chaque personne a sa chambre. Clique sur quelqu\'un pour lui parler, ou va au tableau de la famille pour ajouter des personnes.',
+    facts:[['En France, on dit « papi » et « mamie » pour les grands-parents, et « tonton » et « tata » pour l\'oncle et la tante.', 'In France: papi / mamie for grandparents, tonton / tata for uncle / aunt.', ['Comment dit-on souvent « grand-mère » en famille ?', 'mamie', ['tata', 'tonton', 'papi']]], ['« Mon frère » mais « ma sœur » : mon pour un homme, ma pour une femme. Avec une voyelle, on dit « mon » : mon arrière-grand-mère !', 'mon for masculine, ma for feminine, but mon before a vowel.', ['Lequel est correct ?', 'mon arrière-grand-mère', ['ma arrière-grand-mère', 'mes arrière-grand-mère', 'le arrière-grand-mère']]]],
+    spots:[{x:0, z:9.5, r:2.2, label:function(){ return '👨‍👩‍👧 ' + L2('The family board: add, name, rooms, tree, quiz', 'Le tableau de la famille : ajouter, nommer, chambres, arbre, quiz'); }, act:function(){ famCard(); }}],
+    onEnter:function(){ famBuild(); },
+    build:function(L, X, Z, B, F){
+      var W = new Lot(B, X, Z, 0), wc = 0xe8dcc0;
+      [[-20, -14.2], [-11.8, -1.2], [1.2, 11.8], [14.2, 20]].forEach(function(s){ W.box(s[1] - s[0], 6, 0.3, (s[0] + s[1])/2, 3, -3, wc); });
+      W.box(0.3, 6, 10, -6.5, 3, -8, wc); W.box(0.3, 6, 10, 6.5, 3, -8, wc);
+      [[-20, -14.2], [-11.8, -6.5], [6.5, 11.8], [14.2, 20]].forEach(function(s){ W.box(s[1] - s[0], 6, 0.3, (s[0] + s[1])/2, 3, 3, wc); });
+      W.box(0.3, 6, 10, -6.5, 3, 8, wc); W.box(0.3, 6, 10, 6.5, 3, 8, wc);
+      [[-13, -8], [0, -8], [13, -8], [-13, 8], [13, 8]].forEach(function(p, i){ var bz = p[1] < 0 ? -11.2 : 11.2;
+        F.item('lit', p[0] - 3.5, bz, p[1] < 0 ? 0 : Math.PI, FAM_SHIRTS[i]); F.item('bureau', p[0] + 3.5, bz, p[1] < 0 ? 0 : Math.PI); F.item('lampe', p[0] + 5.3, bz); F.item('tapis', p[0], p[1], 0, FAM_SHIRTS[(i + 3) % 8]); F.item('armoire', p[0] + 5.5, p[1] < 0 ? -5 : 5, p[1] < 0 ? Math.PI : 0);
+        var c = document.createElement('canvas'); c.width = 512; c.height = 128; var tex = new THREE.CanvasTexture(c), pl = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 0.65), new THREE.MeshBasicMaterial({map:tex}));
+        pl.position.set(X + p[0] + 2.4, 2.6, Z + (p[1] < 0 ? -2.82 : 2.82)); pl.rotation.y = p[1] < 0 ? 0 : Math.PI; root.add(pl); FH.plates.push({c:c, tex:tex}); });
+      F.item('canape', -3.6, 11.6, Math.PI); F.item('tele', -3.6, 4.2); F.item('tapis', -3.6, 8, 0, 0xa84a3a);
+      F.item('frigo', 5.8, 12.2, Math.PI); F.item('four', 4.4, 12.2, Math.PI); F.item('evier', 3, 12.2, Math.PI); F.item('table', 3.6, 7.6); F.item('chaise', 2.7, 7.6, -Math.PI/2); F.item('chaise', 4.5, 7.6, Math.PI/2);
+      F.tagAt(-13, 1, -8, 'la chambre', 'the bedroom', 1); F.tagAt(-3.6, 1, 8, 'le salon', 'the living room', 1); F.tagAt(3.6, 1, 9.5, 'la cuisine', 'the kitchen', 1); F.tagAt(0, 1, 0, 'le couloir', 'the hallway', 2);
+      var c2 = document.createElement('canvas'); c2.width = 512; c2.height = 256; var k = c2.getContext('2d'); k.fillStyle = '#2a3a2a'; k.fillRect(0, 0, 512, 256); k.fillStyle = '#fff'; k.font = 'bold 44px serif'; k.textAlign = 'center'; k.fillText('👨‍👩‍👧 MA FAMILLE', 256, 110); k.font = '28px serif'; k.fillText('ajouter · nommer · les chambres', 256, 170);
+      var bd = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c2)})); bd.position.set(X - 2.2, 2.2, Z + 12.8); bd.rotation.y = Math.PI; root.add(bd);
+    }});
+  FH.o = o;
+})();
+var _renderPlotPanelF = renderPlotPanel;
+renderPlotPanel = function(){
+  _renderPlotPanelF();
+  var p = panelPlot; if(!p || !p.data || panelConfirm || p.kind === 'store' || p.data.o !== net.uid) return;
+  var row = document.getElementById('pp-btns'), b = document.createElement('button');
+  b.className = 'btn'; b.textContent = '👨‍👩‍👧 ' + L2('MY FAMILY', 'MA FAMILLE'); b.addEventListener('click', function(){ closePlotPanel(false); FH.from = p; famVisit(p); });
+  row.insertBefore(b, row.firstChild.nextSibling);
+};
+/* ---------- 🐾 15 MORE PETS at the adoption centre ---------- */
+PET_KINDS.push(['perroquet', 'un perroquet', 'a parrot', '🦜'], ['perruche', 'une perruche', 'a budgie', '🐦'], ['canari', 'un canari', 'a canary', '🐤'], ['tortue', 'une tortue', 'a tortoise', '🐢'], ['poisson_rouge', 'un poisson rouge', 'a goldfish', '🐠'],
+  ['cobaye', 'un cochon d\'Inde', 'a guinea pig', '🐹'], ['furet', 'un furet', 'a ferret', '🦦'], ['souris', 'une souris', 'a mouse', '🐭'], ['chinchilla', 'un chinchilla', 'a chinchilla', '🐭'], ['herisson', 'un hérisson', 'a hedgehog', '🦔'],
+  ['gecko', 'un gecko', 'a gecko', '🦎'], ['grenouille', 'une grenouille', 'a frog', '🐸'], ['canard', 'un canard', 'a duck', '🦆'], ['axolotl', 'un axolotl', 'an axolotl', '🦎'], ['poney', 'un poney', 'a pony', '🐴']);
+PET_COLS.push(['vert', 'green', 0x3a9a3a], ['jaune', 'yellow', 0xf2c230], ['rose', 'pink', 0xf2a0b8], ['bleu', 'blue', 0x3a8ae8]);
+var _animalModelP = animalModel;
+animalModel = function(k){
+  var NEW = {
+    perruche:function(S, B){ S(0.16, 0, 0.75, 0, 0x6ad04a, 1, 1.4, 1); S(0.11, 0, 1.0, -0.03, 0xf2e23a); B(0.04, 0.06, 0.06, 0, 0.98, -0.13, 0xe8b04a); B(0.05, 0.3, 0.05, 0, 0.6, 0.16, 0x3a8ae8); B(0.03, 0.5, 0.03, 0, 0.3, 0, 0x8a5a32); B(0.4, 0.03, 0.03, 0, 0.55, 0, 0x8a5a32); },
+    canari:function(S, B){ S(0.15, 0, 0.75, 0, 0xf2d23a, 1, 1.3, 1.1); S(0.1, 0, 0.97, -0.05, 0xf2d23a); B(0.04, 0.05, 0.06, 0, 0.95, -0.15, 0xe8843a); B(0.03, 0.5, 0.03, 0, 0.3, 0, 0x8a5a32); B(0.4, 0.03, 0.03, 0, 0.55, 0, 0x8a5a32); },
+    cobaye:function(S){ S(0.22, 0, 0.2, 0, 0xc8904a, 1, 0.8, 1.4); S(0.13, 0, 0.25, -0.3, 0xf4f0e8); S(0.04, -0.08, 0.35, -0.3, 0xc8904a); S(0.04, 0.08, 0.35, -0.3, 0xc8904a); },
+    furet:function(S, B){ S(0.12, 0, 0.18, 0, 0xc8a070, 1, 0.9, 3.2); S(0.11, 0, 0.22, -0.42, 0xf4f0e8, 1, 0.9, 1.2); B(0.06, 0.06, 0.35, 0, 0.18, 0.5, 0xc8a070); [[-0.08, -0.25], [0.08, -0.25], [-0.08, 0.25], [0.08, 0.25]].forEach(function(p){ B(0.05, 0.12, 0.05, p[0], 0.06, p[1], 0x5a3a22); }); },
+    souris:function(S, B){ S(0.1, 0, 0.1, 0, 0x9a9aa0, 1, 0.8, 1.4); S(0.06, 0, 0.12, -0.16, 0x9a9aa0); S(0.04, -0.06, 0.2, -0.13, 0xf2b8c8); S(0.04, 0.06, 0.2, -0.13, 0xf2b8c8); B(0.02, 0.02, 0.3, 0, 0.06, 0.25, 0xf2b8c8); },
+    chinchilla:function(S, B){ S(0.2, 0, 0.22, 0, 0xa8a8b0, 1, 1.1, 1.1); S(0.13, 0, 0.42, -0.12, 0xa8a8b0); S(0.07, -0.1, 0.56, -0.1, 0xa8a8b0, 0.6, 1.2, 0.4); S(0.07, 0.1, 0.56, -0.1, 0xa8a8b0, 0.6, 1.2, 0.4); B(0.08, 0.08, 0.3, 0, 0.25, 0.25, 0xa8a8b0); },
+    herisson:function(S){ S(0.2, 0, 0.18, 0, 0x5a4a3a, 1.1, 0.8, 1.3); for(var i=0;i<14;i++){ var a = i*0.9; S(0.05, Math.cos(a)*0.17, 0.26 + (i % 3)*0.03, Math.sin(a)*0.2, 0x3a2a1a, 0.6, 1.6, 0.6); } S(0.09, 0, 0.14, -0.26, 0xe8d0b0); S(0.03, 0, 0.14, -0.35, 0x1b1b1d); },
+    gecko:function(S, B){ S(0.08, 0, 0.08, 0, 0x8ac83a, 1.1, 0.6, 3); S(0.07, 0, 0.09, -0.27, 0x8ac83a, 1.2, 0.7, 1.2); B(0.04, 0.03, 0.35, 0, 0.06, 0.4, 0x8ac83a); [[-0.1, -0.12], [0.1, -0.12], [-0.1, 0.12], [0.1, 0.12]].forEach(function(p){ B(0.12, 0.02, 0.03, p[0], 0.03, p[1], 0x6aa82a); }); },
+    grenouille:function(S){ S(0.15, 0, 0.12, 0, 0x3a9a3a, 1.2, 0.7, 1); S(0.05, -0.08, 0.22, -0.08, 0xf2f2f2); S(0.05, 0.08, 0.22, -0.08, 0xf2f2f2); S(0.06, -0.14, 0.06, 0.08, 0x2a7a2a, 1, 0.6, 1.6); S(0.06, 0.14, 0.06, 0.08, 0x2a7a2a, 1, 0.6, 1.6); },
+    canard:function(S, B){ S(0.22, 0, 0.3, 0, 0xf4f0e8, 1, 0.8, 1.4); S(0.13, 0, 0.55, -0.22, 0x2a7a3a); B(0.1, 0.04, 0.14, 0, 0.53, -0.38, 0xf2a03a); B(0.04, 0.2, 0.04, -0.08, 0.1, 0, 0xf2a03a); B(0.04, 0.2, 0.04, 0.08, 0.1, 0, 0xf2a03a); },
+    axolotl:function(S, B){ var c = 0xf2a8c0; S(0.09, 0, 0.12, 0, c, 1, 0.7, 2.8); S(0.1, 0, 0.13, -0.28, c, 1.4, 0.8, 1); [-1, 1].forEach(function(s){ for(var j=0;j<3;j++){ var m = B(0.02, 0.1, 0.02, s*(0.14 + j*0.02), 0.2 - j*0.03, -0.3 + j*0.03, 0xe8587a); m.rotation.z = s*(0.6 + j*0.3); } }); B(0.02, 0.1, 0.3, 0, 0.14, 0.35, c); }
+  };
+  if(k === 'poney'){ var g0 = _animalModelP('cheval'); g0.children[0].scale.set(0.62, 0.62, 0.62); return g0; }
+  if(!NEW[k]) return _animalModelP(k);
+  var g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+  function B(w, h, d, x, y, z, c){ var m = box(w, h, d, solidMat(c)); m.position.set(x, y, z); body.add(m); return m; }
+  function S(r, x, y, z, c, sx, sy, sz){ var m = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), solidMat(c)); m.position.set(x, y, z); m.scale.set(sx || 1, sy || 1, sz || 1); body.add(m); return m; }
+  NEW[k](S, B);
+  root.add(g); return g;
+};
+var PET_FACTS = {perroquet:'Un perroquet peut vivre plus de 50 ans et répéter des mots !', perruche:'La perruche aime vivre à deux : elle est très sociable.', canari:'Le canari mâle chante beaucoup, surtout le matin.', tortue:'Une tortue de terre hiberne en hiver et peut vivre 80 ans !', poisson_rouge:'Le poisson rouge a besoin d\'un grand aquarium avec un filtre, pas d\'un petit bocal.',
+  cobaye:'Le cochon d\'Inde ne vient pas d\'Inde : il vient d\'Amérique du Sud ! Il fait « couic couic ».', furet:'Le furet dort jusqu\'à 18 heures par jour et adore jouer à cache-cache.', souris:'La souris est très propre : elle se lave plusieurs fois par jour.', chinchilla:'Le chinchilla prend des bains de sable, jamais d\'eau !', herisson:'Le hérisson a environ 6 000 piquants et mange des insectes.',
+  gecko:'Le gecko peut marcher au plafond grâce à ses doigts spéciaux.', grenouille:'La grenouille respire aussi par sa peau !', canard:'Le canard a des plumes imperméables : l\'eau glisse dessus.', axolotl:'L\'axolotl peut faire repousser ses pattes ! Il vient du Mexique.', poney:'Un poney mesure moins de 1,48 mètre au garrot.'};
+var _adoptPickP = adoptPick;
+adoptPick = function(){ _adoptPickP(); var c = gcard.cur, f = c && PET_FACTS[c.k]; if(f){ var el = gcard.el.querySelector('.gc-row'); if(el){ var d = document.createElement('div'); d.className = 'gc-text gc-say'; d.textContent = '💡 ' + f; el.parentNode.insertBefore(d, el.nextSibling); } } };
+(function(){ var B = new MeshBatch(), L = new Lot(B, 0, 0, 0), news = PET_KINDS.slice(4);
+  news.forEach(function(p, i){ var x = -46 + (i % 8)*2.4, z = i < 8 ? 828 : 831.5;
+    L.box(2.2, 0.08, 2.2, x, 0.04, z, 0xd8c8a0); L.box(2.2, 0.5, 0.06, x, 0.25, z + 1.1, 0xf4e8d0); L.box(0.06, 0.5, 2.2, x - 1.1, 0.25, z, 0xf4e8d0);
+    var m = animalModel(p[0]); m.position.set(x, p[0] === 'perroquet' || p[0] === 'poisson_rouge' ? 0 : 0.08, z); m.rotation.y = Math.PI; m.scale.setScalar(p[0] === 'poney' || p[0] === 'perroquet' ? 0.8 : 1.6);
+    tag(x, p[0] === 'poney' ? 1.6 : 1.0, z, p[1].replace(/^(un|une) /, function(a){ return a === 'un ' ? 'le ' : 'la '; }).replace(/^la ([aeiouhé])/, 'l\'$1').replace(/^le ([aeiouhé])/, 'l\'$1'), p[2].replace(/^an? /, 'the '), 0.6); });
+  B.build(); airSign('🐾 15 ' + L2('NEW PETS TO ADOPT!', 'NOUVEAUX ANIMAUX À ADOPTER !'), -37.6, 2.6, 833.4, 0, 10, '#c8382f');
+})();
+/* ---------- ☕ LE CAFÉ DU LEVAIN (in front of the Sourdough Academy): picnic tables, parasols, a waiter, sourdough sandwiches ---------- */
+var CAFE_MENU = [
+  ['la tartine avocat-œuf', 'avocado & egg toast', 'Une tranche de pain au levain grillée, de l\'avocat écrasé et un œuf mollet.', 8.5, 0x8ac83a],
+  ['le croque-monsieur au levain', 'sourdough croque-monsieur', 'Jambon, fromage et béchamel entre deux tranches de levain, gratiné au four.', 9, 0xe8c070],
+  ['le jambon-beurre', 'ham & butter sandwich', 'Le classique parisien : une baguette au levain, du beurre et du jambon. C\'est tout !', 6.5, 0xf2a8b0],
+  ['le sandwich végétarien', 'vegetarian sandwich', 'Houmous, concombre, tomate, carotte râpée et roquette sur du pain aux céréales.', 8, 0x3a9a3a],
+  ['le pan bagnat', 'pan bagnat', 'Le sandwich de Nice : thon, œuf, tomate, olives et huile d\'olive dans un pain rond.', 9.5, 0xc8a050],
+  ['le grilled cheese du boulanger', 'baker\'s grilled cheese', 'Trois fromages fondus dans du pain au levain doré au beurre.', 8.5, 0xf2c230],
+  ['la tartine sucrée', 'sweet toast', 'Pain au levain, beurre salé, confiture de fraises maison... ou du chocolat !', 5, 0xc8384a],
+  ['la soupe à l\'oignon et son croûton', 'French onion soup', 'Une soupe chaude aux oignons, avec un gros croûton de levain et du fromage fondu.', 9, 0xb8823a]
+];
+var CAFE_DRINKS = [['un chocolat chaud', 3.5], ['un jus d\'orange pressé', 4], ['une limonade', 3], ['un verre d\'eau', 0]];
+var CAFE = {seat:null, order:null, waiter:null, food:null};
+(function(){
+  var v = V_BY_ID.baguette, B = new MeshBatch(), L = new Lot(B, 0, 0, 0), cols = [[0xc8382f, 0xffffff], [0x1f6fb8, 0xffffff], [0xe3b52c, 0xffffff], [0x2f8a3a, 0xffffff]];
+  CAFE.tables = [];
+  [-15, -9, 9, 15].forEach(function(dx, i){ [11, 19].forEach(function(dz, j){
+    var x = v.x + dx, z = v.z + dz, T = new Lot(B, x, z, 0), c = cols[(i + j) % 4];
+    T.box(2.2, 0.08, 1.1, 0, 0.78, 0, 0xc8904a); T.box(0.1, 0.74, 0.9, -0.9, 0.38, 0, 0x8a5a32); T.box(0.1, 0.74, 0.9, 0.9, 0.38, 0, 0x8a5a32);
+    T.box(2.2, 0.06, 0.36, 0, 0.46, 0.85, 0xc8904a); T.box(2.2, 0.06, 0.36, 0, 0.46, -0.85, 0xc8904a); [-0.9, 0.9].forEach(function(s){ T.box(0.08, 0.44, 0.3, s, 0.22, 0.85, 0x8a5a32); T.box(0.08, 0.44, 0.3, s, 0.22, -0.85, 0x8a5a32); });
+    T.cyl(0.05, 0.05, 2.6, 0, 1.3, 0, 0xf2f2f2, 8);
+    for(var s=0;s<8;s++){ T.part(new THREE.ConeGeometry(1.7, 0.7, 2, 1, true, s*Math.PI/4, Math.PI/4), 0, 2.75, 0, s % 2 ? c[0] : c[1]); }
+    T.part(new THREE.SphereGeometry(0.1, 8, 6), 0, 3.12, 0, 0xffffff);
+    T.part(new THREE.SphereGeometry(0.16, 8, 6), 0.6, 0.9, 0, 0xc8843a); T.box(0.08, 0.2, 0.08, -0.5, 0.92, 0.1, 0xd8e8f0);
+    tag(x, 1.1, z, 'la table de pique-nique', 'the picnic table', 1.2); tag(x, 3.0, z, 'le parasol', 'the parasol (umbrella)', 1.2);
+    CAFE.tables.push({x:x, z:z, n:CAFE.tables.length});
+  }); });
+  var KX = v.x - 19.5, KZ = v.z + 15, K = new Lot(B, KX, KZ, Math.PI/2);
+  K.box(8, 3.2, 3, 0, 1.6, 0, 0xf0cf8a); K.box(8.6, 0.3, 4, 0, 3.4, 0.3, 0xc8382f); for(var a=0;a<9;a++) K.box(0.9, 0.5, 0.06, -3.6 + a*0.9, 3.05, 2.32, a % 2 ? 0xffffff : 0xc8382f);
+  K.box(7.6, 0.08, 0.7, 0, 1.12, -1.8, 0xd8c8a8); K.box(7.6, 1.1, 0.06, 0, 0.55, -2.1, 0xb8823a);
+  for(var i2=0;i2<6;i2++){ K.part(new THREE.SphereGeometry(0.3, 10, 6), -3 + i2*1.2, 1.35, -1.8, 0xc8843a); }
+  K.cyl(0.6, 0.6, 0.2, 3.3, 3.75, 0.3, 0xc8843a, 16); K.box(4.4, 1.2, 0.2, 0, 4.4, 0.3, 0x5a3a22);
+  addSolid(KX - 1.5, KX + 1.5, KZ - 4, KZ + 4, 'baguette', -1, 3.4);
+  [[-20, 26], [20, 26], [-20, 4], [20, 4]].forEach(function(p){ var x = v.x + p[0], z = v.z + p[1]; L.cyl(0.07, 0.07, 3, x, 1.5, z, 0x2a2d36, 6); L.part(new THREE.SphereGeometry(0.35, 10, 8), x, 3.1, z, 0xf2e2b0); L.cyl(0.4, 0.4, 0.12, x, 3.4, z, 0xd99a45, 12); });
+  [-4, 4].forEach(function(dx){ L.part(new THREE.CylinderGeometry(0.55, 0.55, 7, 12), v.x + dx, 3.5, v.z + 6, 0xd99a45); });
+  L.part(new THREE.CylinderGeometry(0.55, 0.55, 8.8, 12), v.x, 7, v.z + 6, 0xd99a45, 0, 0, Math.PI/2);
+  [-2.5, 0, 2.5].forEach(function(dx){ L.box(1.2, 0.2, 0.5, v.x + dx, 7.5, v.z + 6, 0xf0cf8a, 0, 0.5); });
+  [-24, 24].forEach(function(dx){ var x = v.x + dx, z = v.z + 1; L.part(new THREE.TorusGeometry(1.3, 0.55, 8, 14, Math.PI*1.2), x, 0.7, z, 0xe0a04a, Math.PI/2, 0, 0); tag(x, 1.6, z, 'le croissant géant', 'the giant croissant', 1.2); });
+  B.build();
+  airSign('☕ LE CAFÉ DU LEVAIN', KX + 0.45, 4.4, KZ, Math.PI/2, 4.2, '#8a4a1a');
+  airSign('🥖 BIENVENUE AU CAFÉ DU LEVAIN 🥖', v.x, 8.4, v.z + 6.2, Math.PI, 8.5, '#c8382f');
+  tag(v.x, 7.4, v.z + 6, 'l\'arche en baguettes', 'the baguette arch', 3); tag(KX, 2, KZ, 'le comptoir du café', 'the café counter', 2);
+  CAFE.waiter = person({x:KX + 2.6, z:KZ + 1.5, ry:Math.PI/2, shirt:0x1b1b1d, pants:0x1b1b1d, hair:0x4a2a1a, h:1.78});
+  var ap = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.04), solidMat(0xffffff)); ap.position.set(0, 0.75, -0.13); CAFE.waiter.add(ap);
+  LBL.dyn.push({m:CAFE.waiter, fr:'Antoine, le serveur', en:'Antoine, the waiter', dy:2.0, r:0.6, act:function(){ cafeHome(); }});
+  CAFE.tables.forEach(function(t){ addSpot({x:t.x, z:t.z + 1.6, r:1.6, label:function(){ return '🪑 ' + L2('Sit down and be served', 'S\'asseoir et commander'); }, act:function(){ cafeSit(t); }}); });
+  addSpot({x:KX + 3.4, z:KZ, r:2.6, label:function(){ return '☕ ' + L2('Le Café du Levain: the menu', 'Le Café du Levain : la carte'); }, act:function(){ cafeHome(); }});
+  EXTRA_PLACES.push(['☕', 'Le Café du Levain (sandwichs au levain)', 'Baguetteville', v.x - 12, v.z + 15, -Math.PI/2]);
+})();
+function cafeMenuHtml(act){ return '<div class="gc-grid">' + CAFE_MENU.map(function(m, i){ return gOpt(act, i, '<b class="gc-say">' + esc(m[0]) + '</b> · ' + euroTxt(m[3]) + '<br><span class="lf-soft">' + esc(m[2]) + '</span>'); }).join('') + '</div>'; }
+function cafeHome(){ say('Bonjour et bienvenue au Café du Levain ! Installez-vous à une table, je viens prendre votre commande.'); showCard('<h3>☕ ' + L2('LE CAFÉ DU LEVAIN · THE MENU', 'LE CAFÉ DU LEVAIN · LA CARTE') + '</h3><div class="gc-big gc-say">« Bonjour ! Installez-vous à une table, je viens prendre votre commande ! »</div>' + cafeMenuHtml('cafeinfo') + '<div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); }
+GACT.cafeinfo = function(v){ var m = CAFE_MENU[v|0]; say(m[0] + '. ' + m[2]); };
+function cafeSit(t){
+  CAFE.seat = t; CAFE.order = {};
+  camera.position.set(t.x - 0.55, 1.25, t.z + 0.9); yaw = 0; pitch = -0.35; camera.rotation.set(pitch, yaw, 0, 'YXZ');
+  CAFE.waiter.position.set(t.x + 1.5, 0, t.z + 0.4); CAFE.waiter.rotation.y = Math.PI/2;
+  if(CAFE.food){ root.remove(CAFE.food); CAFE.food = null; }
+  say('Bonjour ! Voici la carte. Qu\'est-ce que vous désirez ?');
+  showCard('<h3>🧑‍🍳 ' + L2('ANTOINE, THE WAITER', 'ANTOINE, LE SERVEUR') + '</h3><div class="gc-big gc-say">« Bonjour ! Voici la carte. Qu\'est-ce que vous désirez ? »</div><div class="gc-sub">' + L2('Choose your sourdough sandwich:', 'Choisis ton sandwich au levain :') + '</div>' + cafeMenuHtml('cafeorder'));
+}
+GACT.cafeorder = function(v){ var m = CAFE_MENU[v|0]; CAFE.order.f = v|0;
+  var right = 'Je voudrais ' + m[0].replace(/^le /, 'le ').replace(/^la /, 'la ') + ', s\'il vous plaît.', mm = mc(Math.random, right, ['Donne-moi ' + m[0] + ' !', 'Je veux manger maintenant.', 'Moi, ' + m[0] + ', vite !']); CAFE.m = mm;
+  showCard('<h3>💬 ' + L2('ORDER POLITELY', 'COMMANDE POLIMENT') + '</h3><div class="gc-sub">' + L2('How do you order politely?', 'Comment commander poliment ?') + '</div><div class="gc-grid">' + mm.opts.map(function(o, k){ return gOpt('cafepol', k, '« ' + esc(o) + ' »'); }).join('') + '</div>'); };
+GACT.cafepol = function(v){ if((v|0) !== CAFE.m.ans){ say('Hum... on dit « je voudrais », et « s\'il vous plaît » !'); showToast('🙂 ' + L2('Use « Je voudrais... s\'il vous plaît »', 'Utilise « Je voudrais... s\'il vous plaît »')); return; }
+  say(CAFE.m.opts[CAFE.m.ans] + ' Très bien ! Et comme boisson ?');
+  showCard('<h3>🥤 ' + L2('A DRINK?', 'UNE BOISSON ?') + '</h3><div class="gc-big gc-say">« Très bon choix ! Et comme boisson ? »</div><div class="gc-grid">' + CAFE_DRINKS.map(function(d, i){ return gOpt('cafedrink', i, '<b class="gc-say">' + esc(d[0]) + '</b><br><span class="lf-soft">' + (d[1] ? euroTxt(d[1]) : L2('free', 'gratuit')) + '</span>'); }).join('') + '</div>'); };
+GACT.cafedrink = function(v){ CAFE.order.d = v|0; var m = CAFE_MENU[CAFE.order.f], d = CAFE_DRINKS[v|0];
+  say('Parfait ! ' + m[0] + ' et ' + d[0] + '. Ça arrive tout de suite !'); closeCard(); hudMsg('⏳ ' + L2('Antoine is preparing your order...', 'Antoine prépare ta commande...'));
+  setTimeout(function(){ if(!CAFE.seat) return; var t = CAFE.seat, g = new THREE.Group(), M = function(h){ return new THREE.MeshLambertMaterial({color:h}); };
+    var plate = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.03, 16), M(0xffffff)); g.add(plate);
+    var b1 = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.06, 0.22), M(0xc8843a)); b1.position.y = 0.05; g.add(b1); var fill = new THREE.Mesh(new THREE.BoxGeometry(0.33, 0.04, 0.21), M(m[4])); fill.position.y = 0.1; g.add(fill); var b2 = b1.clone(); b2.position.y = 0.15; g.add(b2);
+    var cup = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.14, 10), M(v == 0 ? 0x6a4030 : v == 1 ? 0xf2a03a : 0xe8f0f4)); cup.position.set(0.38, 0.07, -0.05); g.add(cup);
+    g.position.set(t.x - 0.55, 0.83, t.z + 0.3); root.add(g); CAFE.food = g;
+    CAFE.waiter.position.set(t.x + 1.2, 0, t.z + 0.4);
+    say('Voilà ! ' + m[0] + ' et ' + d[0] + '. Bon appétit !');
+    showCard('<h3>🍽 ' + L2('ENJOY YOUR MEAL!', 'BON APPÉTIT !') + '</h3><div class="gc-big gc-say">« Voilà ! ' + esc(m[0]) + ' et ' + esc(d[0]) + '. Bon appétit ! »</div><div class="gc-sub">' + L2('How is it?', 'C\'est comment ?') + '</div><div class="gc-grid">' + ['C\'est délicieux !', 'C\'est croustillant !', 'C\'est fondant !', 'Miam, c\'est trop bon !', 'C\'est un peu salé.', 'C\'est très chaud !'].map(function(s, i){ return gOpt('cafeeat', i, '😋 ' + esc(s)); }).join('') + '</div>');
+  }, 2200);
+};
+GACT.cafeeat = function(v){ var s = ['C\'est délicieux !', 'C\'est croustillant !', 'C\'est fondant !', 'Miam, c\'est trop bon !', 'C\'est un peu salé.', 'C\'est très chaud !'][v|0]; say(s);
+  var m = CAFE_MENU[CAFE.order.f], d = CAFE_DRINKS[CAFE.order.d], tot = m[3] + d[1], mm = mc(Math.random, euroWords(tot), [euroWords(tot + 1), euroWords(Math.max(1, tot - 2)), euroWords(tot + 3.5)]); CAFE.m = mm; CAFE.tot = tot;
+  if(CAFE.food) CAFE.food.children.slice(1, 4).forEach(function(c){ c.visible = false; });
+  say(s + ' L\'addition, s\'il vous plaît !');
+  showCard('<h3>🧾 ' + L2('THE BILL', 'L\'ADDITION') + '</h3><div class="gc-text gc-say">« ' + esc(s) + ' L\'addition, s\'il vous plaît ! »</div><div class="gc-text">' + esc(m[0]) + ' ' + euroTxt(m[3]) + '<br>' + esc(d[0]) + ' ' + euroTxt(d[1]) + '<br><b>Total : ' + euroTxt(tot) + '</b></div><div class="gc-sub">' + L2('Say the total in French to pay:', 'Dis le total en français pour payer :') + '</div><div class="gc-grid">' + mm.opts.map(function(o, k){ return gOpt('cafepay', k, '« Voilà ' + esc(o) + '. »'); }).join('') + '</div>'); };
+GACT.cafepay = function(v){ if((v|0) !== CAFE.m.ans){ say('Pardon ? Ça fait ' + euroWords(CAFE.tot) + '.'); showToast('✗ ' + euroWords(CAFE.tot)); return; }
+  var g = !(chal.cool.cafe > Date.now()) ? addJeton(2) : 0; if(g) chal.cool.cafe = Date.now() + 5*60000;
+  say('Merci beaucoup ! À bientôt au Café du Levain !');
+  showCard('<h3>☕ ' + L2('THANK YOU!', 'MERCI !') + '</h3><div class="gc-big gc-say">« Merci beaucoup ! À bientôt au Café du Levain ! »</div>' + (g ? '<div class="gc-big">+' + g + ' 🪙</div>' : '') + noCharLine() + '<div class="gc-text">📚 la carte · commander · je voudrais · comme boisson · bon appétit · l\'addition · le pourboire</div><div class="gc-row">' + gBtn('cafeleave', null, L2('GET UP', 'SE LEVER'), 'go') + '</div>'); };
+GACT.cafeleave = function(){ closeCard(); var t = CAFE.seat; if(t){ camera.position.set(t.x, EYE_HEIGHT, t.z + 2.4); pitch = 0; camera.rotation.set(pitch, yaw, 0, 'YXZ'); } CAFE.seat = null; if(CAFE.food){ root.remove(CAFE.food); CAFE.food = null; } var v = V_BY_ID.baguette; CAFE.waiter.position.set(v.x - 16.9, 0, v.z + 16.5); CAFE.waiter.rotation.y = Math.PI/2; };
+/* ---------- 🌾 LE MOULIN DE BAGUETTEVILLE (on the empty grass, left of the Academy): from wheat to flour ---------- */
+var MOULIN = {sails:null};
+var MILL_STEPS = [['On sème le blé en automne.', 'semer', 'to sow'], ['Au printemps, le blé pousse : il devient vert, puis doré en été.', 'pousser', 'to grow'], ['En été, c\'est la moisson : la moissonneuse-batteuse coupe le blé.', 'la moisson', 'the harvest'], ['On sépare les grains de la paille.', 'les grains', 'the grains'], ['Au moulin, les meules écrasent les grains : on moud le blé.', 'moudre', 'to grind'], ['Le tamis sépare la farine blanche et le son (l\'enveloppe du grain).', 'le tamis', 'the sieve'], ['On met la farine dans des sacs, et elle part à la boulangerie !', 'le sac de farine', 'the bag of flour']];
+var FLOURS = [['T45', 'très blanche, pour les gâteaux et les viennoiseries'], ['T65', 'blanche, pour la baguette et le pain'], ['T80', 'bise, pour le pain de campagne'], ['T110', 'semi-complète, plus de son'], ['T150', 'complète, avec tout le grain : la plus riche en fibres']];
+(function(){
+  var v = V_BY_ID.baguette, X = v.x - 58, Z = v.z - 27, B = new MeshBatch(), L = new Lot(B, X, Z, 0);
+  L.cyl(6, 7.5, 14, 0, 7, 0, 0xf2ead8, 16); L.part(new THREE.ConeGeometry(7, 5, 16), 0, 16.5, 0, 0x8a4a2a); L.box(2.4, 3.4, 0.3, 0, 1.7, 7.35, 0x6b3a1a);
+  [5, 10].forEach(function(y){ [-1, 1].forEach(function(s){ L.box(1.2, 1.4, 0.2, s*3, y, 6.9 - y*0.08, 0x8ab8d8); }); });
+  for(var f=0;f<30;f++){ var x = -20 + (f % 10)*1.2, z = 10 + Math.floor(f/10)*1.3; L.box(0.12, 1.1, 0.12, x, 0.55, z, 0xe3b52c); L.box(0.2, 0.35, 0.2, x, 1.2, z, 0xd8a830); }
+  for(var s2=0;s2<4;s2++) L.box(0.9, 1.1, 0.7, 9 + (s2 % 2)*1, 0.55, 8 + Math.floor(s2/2)*0.9, 0xf2e8d0);
+  B.build(); addSolid(X - 7.5, X + 7.5, Z - 7.5, Z + 7.2, 'baguette', -1, 19);
+  var sail = new THREE.Group(); sail.position.set(X, 12.5, Z + 7.6); for(var a=0;a<4;a++){ var arm = new THREE.Group(); arm.rotation.z = a*Math.PI/2; var bar = new THREE.Mesh(new THREE.BoxGeometry(0.4, 9, 0.3), solidMat(0x6b4a32)); bar.position.y = 4.5; arm.add(bar); var cloth = new THREE.Mesh(new THREE.BoxGeometry(2.2, 7, 0.08), solidMat(0xfaf6ee)); cloth.position.set(1.3, 5, 0); arm.add(cloth); sail.add(arm); }
+  var hub = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.8, 12), solidMat(0x5a3a22)); hub.rotation.x = Math.PI/2; sail.add(hub); root.add(sail); MOULIN.sails = sail;
+  airSign('🌾 LE MOULIN', X, 4.4, Z + 7.6, 0, 6, '#8a4a1a'); tag(X, 9, Z + 7, 'le moulin à vent', 'the windmill', 5); tag(X, 12.5, Z + 8, 'les ailes du moulin', 'the windmill sails', 4); tag(X - 15, 1.4, Z + 11, 'le champ de blé', 'the wheat field', 4); tag(X + 9.5, 1.3, Z + 8.5, 'les sacs de farine', 'the bags of flour', 1.2);
+  var o = makeInterior({id:'moulin', name:'Le Moulin de Baguetteville', en:'The Baguetteville Windmill', w:24, d:20, h:7, wall:0xe8dcc0, floor:0xa88a5a, ceil:0xc8a878, light:0xffe8c0, signBg:'#8a4a1a',
+    out:{x:X, z:Z + 10, yaw:Math.PI}, door:{x:X, z:Z + 7.6, r:2.4},
+    blurb:'Bienvenue au moulin ! Ici, on transforme le blé en farine. Je suis Marcel, le meunier. Viens tourner la meule, et découvre les types de farine !',
+    facts:[['Il y a environ 300 moulins à vent encore debout en France.', 'About 300 windmills still stand in France.', ['Que fait un moulin ?', 'il transforme le blé en farine', ['il fait de l\'électricité pour les voitures', 'il fabrique des chaussures', 'il cuit le pain']]], ['La personne qui travaille au moulin s\'appelle le meunier (ou la meunière).', 'The person who works at the mill is the miller.', ['Comment s\'appelle la personne du moulin ?', 'le meunier', ['le boulanger', 'le facteur', 'le fermier']]]],
+    spots:[{x:0, z:-3, r:3, label:function(){ return '⚙ ' + L2('Turn the millstone: make flour (+🪙)', 'Tourner la meule : faire de la farine (+🪙)'); }, act:millGame},
+      {x:-8, z:-6, r:2.6, label:function(){ return '🌾 ' + L2('From wheat to flour (Marcel the miller)', 'Du blé à la farine (Marcel le meunier)'); }, act:millStory},
+      {x:8, z:-6, r:2.6, label:function(){ return '🏷 ' + L2('The types of flour (T45 → T150)', 'Les types de farine (T45 → T150)'); }, act:flourTypes}],
+    build:function(L2_, X2, Z2, B2, F){ var W = new Lot(B2, X2, Z2, 0);
+      W.cyl(1.6, 1.6, 0.5, 0, 0.9, -5, 0x8a8f98, 20); W.cyl(1.6, 1.6, 0.5, 0, 1.45, -5, 0x9a9fa8, 20); W.cyl(0.25, 0.25, 6, 0, 3.5, -5, 0x6b4a32, 10); W.box(2.4, 0.65, 2.4, 0, 0.33, -5, 0x6b4a32);
+      F.tagAt(0, 2, -5, 'la meule', 'the millstone', 1); F.tagAt(0, 4, -5, 'l\'axe', 'the shaft', 0.6);
+      for(var s=0;s<8;s++) W.box(0.9, 1.1, 0.7, -10 + (s % 4)*1.1, 0.55, 8.5 - Math.floor(s/4)*0.9, 0xf2e8d0); F.tagAt(-8.4, 1.4, 8, 'les sacs de farine', 'flour bags', 1);
+      W.box(2, 1.2, 1.4, 8, 0.6, -6.5, 0xb88a5a); W.box(1.8, 0.1, 1.2, 8, 1.3, -6.5, 0xc8c0b0); F.tagAt(8, 1.6, -6.5, 'le tamis', 'the sieve', 0.6);
+      for(var b=0;b<5;b++){ W.box(0.6, 0.8, 0.5, 4 + b*0.8, 0.4, 8.6, [0xfaf8f0, 0xf6f0e2, 0xe8dcc0, 0xd8c0a0, 0xb8a080][b]); } F.tagAt(5.6, 1.1, 8.6, 'T45 · T65 · T80 · T110 · T150', 'flour types', 1.2);
+      for(var w=0;w<12;w++){ W.box(0.1, 1.2, 0.1, -11 + w*0.2, 0.6, -8.5, 0xe3b52c); W.box(0.16, 0.3, 0.16, -11 + w*0.2, 1.3, -8.5, 0xd8a830); } F.tagAt(-10, 1.6, -8.5, 'les épis de blé', 'ears of wheat', 0.8);
+      person({x:X2 - 8, z:Z2 - 7.6, ry:Math.PI, shirt:0xe8dcc0, pants:0x3a5a8a, hair:0xd8d8d8, hat:0xf6f2ea, h:1.75}); F.tagAt(-8, 2.1, -7.6, 'Marcel, le meunier', 'Marcel, the miller', 0.5);
+    }});
+  EXTRA_PLACES.push(['🌾', 'Le Moulin de Baguetteville (du blé à la farine)', 'Baguetteville', X, Z + 11, Math.PI]);
+})();
+function millStory(){ showCard('<h3>🌾 ' + L2('FROM WHEAT TO FLOUR', 'DU BLÉ À LA FARINE') + '</h3><div class="gc-say gc-text">« Bonjour, je suis Marcel, le meunier. Voici le voyage du blé jusqu\'à la farine ! »</div>' + MILL_STEPS.map(function(s, i){ return '<div class="gc-text gc-say" style="text-align:left">' + (i + 1) + '. ' + esc(s[0]) + ' <span class="lf-soft">(' + esc(s[1]) + ' = ' + esc(s[2]) + ')</span></div>'; }).join('') + '<div class="gc-row">' + gBtn('millorder', null, '🎯 ' + L2('PUT IN ORDER (+🪙)', 'REMETS DANS L\'ORDRE (+🪙)'), 'go') + gBtn('close', null, 'OK') + '</div>'); }
+var MO = {};
+GACT.millorder = function(){ MO = {n:0, err:0}; millOrderQ(); };
+function millOrderQ(msg){ if(MO.n >= MILL_STEPS.length){ var g = !(chal.cool.mill > Date.now()) ? addJeton(MO.err <= 1 ? 3 : 1) : 0; if(g) chal.cool.mill = Date.now() + 5*60000; showCard('<h3>🌾 ' + L2('BRAVO!', 'BRAVO !') + '</h3><div class="gc-big">' + L2('In order!', 'Dans l\'ordre !') + (g ? ' +' + g + ' 🪙' : '') + '</div>' + noCharLine() + '<div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); return; }
+  var opts = shuffleR(Math.random, MILL_STEPS.slice(MO.n)).slice(0, 3); if(opts.indexOf(MILL_STEPS[MO.n]) < 0) opts[0] = MILL_STEPS[MO.n]; opts = shuffleR(Math.random, opts); MO.opts = opts;
+  showCard('<h3>🌾 ' + L2('WHAT COMES NEXT?', 'ET ENSUITE ?') + ' ' + (MO.n + 1) + '/' + MILL_STEPS.length + '</h3>' + (msg || '') + '<div class="gc-grid">' + opts.map(function(s, k){ return gOpt('millpick', k, esc(s[0])); }).join('') + '</div>'); }
+GACT.millpick = function(v){ var s = MO.opts[v|0]; if(s === MILL_STEPS[MO.n]){ say(s[0]); MO.n++; millOrderQ('<div class="good">✓</div>'); } else { MO.err++; showToast('✗ ' + L2('Not yet!', 'Pas encore !')); } };
+function millGame(){ MOULIN.g = {n:0, t:performance.now()}; millRender(); }
+function millRender(){ var n = MOULIN.g.n; showCard('<h3>⚙ ' + L2('TURN THE MILLSTONE', 'TOURNE LA MEULE') + '</h3><div class="gc-say gc-text">Clique vite pour moudre le blé ! Il faut 20 tours pour remplir un sac de farine.</div><div class="gc-big" style="font-size:44px;display:inline-block;transform:rotate(' + n*36 + 'deg)">⚙</div><div style="height:22px;border:3px solid #23243a;margin:8px 0"><div style="height:100%;width:' + Math.min(100, n*5) + '%;background:#f2e8d0"></div></div><div class="gc-row">' + gBtn('millturn', null, '🔄 ' + L2('TURN!', 'TOURNE !'), 'go') + '</div>'); }
+GACT.millturn = function(){ var G = MOULIN.g; G.n++; if(G.n < 20){ millRender(); return; }
+  var sec = Math.round((performance.now() - G.t)/1000), g = !(chal.cool.millg > Date.now()) ? addJeton(2) : 0; if(g) chal.cool.millg = Date.now() + 5*60000; say('Bravo ! Tu as moulu un sac de farine !');
+  showCard('<h3>🎉 ' + L2('A BAG OF FLOUR!', 'UN SAC DE FARINE !') + '</h3><div class="gc-big gc-say">Bravo ! Tu as moulu un sac de farine en ' + sec + ' secondes.</div>' + (g ? '<div class="gc-big">+' + g + ' 🪙</div>' : '') + noCharLine() + '<div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); };
+function flourTypes(){ var q = pickR(Math.random, FLOURS), m = mc(Math.random, q[0], FLOURS.filter(function(f){ return f !== q; }).map(function(f){ return f[0]; })); MOULIN.m = m;
+  showCard('<h3>🏷 ' + L2('THE TYPES OF FLOUR', 'LES TYPES DE FARINE') + '</h3><div class="gc-sub">' + L2('The bigger the number, the more of the whole grain is left (and the darker the flour).', 'Plus le chiffre est grand, plus il reste de son : la farine est plus foncée et plus complète.') + '</div>' + FLOURS.map(function(f){ return '<div class="gc-text gc-say" style="text-align:left"><b>' + f[0] + '</b> : ' + esc(f[1]) + '</div>'; }).join('') + '<div class="gc-big gc-say">Quelle farine est ' + esc(q[1]) + ' ?</div><div class="gc-row">' + m.opts.map(function(o, k){ return gBtn('flourans', k, o); }).join('') + '</div>'); }
+GACT.flourans = function(v){ var ok = (v|0) === MOULIN.m.ans; if(ok){ var g = !(chal.cool.flour > Date.now()) ? addJeton(1) : 0; if(g) chal.cool.flour = Date.now() + 3*60000; showToast('✓ ' + MOULIN.m.opts[MOULIN.m.ans] + (g ? ' +1 🪙' : '')); say('Oui ! ' + MOULIN.m.opts[MOULIN.m.ans] + '.'); flourTypes(); } else { showToast('✗ ' + MOULIN.m.opts[MOULIN.m.ans]); } };
+function cafeTick(dt){ if(MOULIN.sails) MOULIN.sails.rotation.z -= (dt || 0.016)*0.6; }
+/* ---------- 🦸 MON ALTER EGO: a growth-mindset & kindness power-up mode (with your own uploaded creation as your emblem) ---------- */
+var AE_POWERS = [['la persévérance', 'perseverance', 'Je n\'abandonne jamais, même quand c\'est difficile.'], ['la gentillesse', 'kindness', 'Je suis gentil(le) avec tout le monde.'], ['le courage', 'courage', 'J\'essaie même quand j\'ai peur de me tromper.'], ['la curiosité', 'curiosity', 'J\'adore apprendre et poser des questions.'], ['l\'empathie', 'empathy', 'Je comprends ce que les autres ressentent.'], ['la patience', 'patience', 'Je prends mon temps et j\'attends calmement.'], ['la gratitude', 'gratitude', 'Je dis merci et j\'apprécie ce que j\'ai.'], ['l\'esprit d\'équipe', 'team spirit', 'J\'aide mes amis et on réussit ensemble.'], ['l\'optimisme', 'optimism', 'Je vois le bon côté des choses.'], ['la créativité', 'creativity', 'J\'invente, je dessine, je crée !'], ['le respect', 'respect', 'J\'écoute les autres et je respecte leurs idées.'], ['l\'honnêteté', 'honesty', 'Je dis la vérité.']];
+var AE_MOTTOS = ['Je ne sais pas encore... mais je vais apprendre !', 'Les erreurs m\'aident à grandir.', 'Chaque jour, je progresse un peu.', 'Ensemble, on est plus forts.', 'Un sourire peut tout changer.', 'Je suis capable de faire des choses difficiles.', 'Si je ne réussis pas, j\'essaie encore !'];
+var AE_COLS = [['doré', 0xf2c230], ['bleu ciel', 0x5ab8f2], ['rose', 0xf28ac8], ['vert', 0x5ad87a], ['violet', 0xa86af2], ['orange', 0xf2943a]];
+var AE_ICONS = ['⭐', '🌟', '💫', '🦋', '🌈', '🔥', '💖', '🌱', '🦁', '🦅', '🐉', '⚡'];
+var AE_GROWTH = [['Je suis nul(le) en français.', 'Je ne suis pas encore fort(e) en français, mais je progresse !', ['C\'est vrai, j\'arrête.', 'Le français, c\'est inutile.']], ['C\'est trop difficile.', 'C\'est difficile, mais je vais essayer une autre stratégie.', ['Je laisse tomber.', 'Je copie sur mon voisin.']], ['J\'ai fait une erreur, je suis bête.', 'Les erreurs m\'aident à apprendre !', ['Je ne parle plus jamais.', 'Je cache mon erreur.']], ['Je ne serai jamais aussi bon(ne) qu\'elle.', 'Je peux apprendre d\'elle et m\'améliorer.', ['Je suis jaloux(se).', 'Ce n\'est pas juste, j\'abandonne.']], ['Je n\'aime pas les défis.', 'Les défis m\'aident à grandir.', ['Je reste dans mon coin.', 'Les défis, c\'est pour les autres.']], ['Mon dessin est raté.', 'Je peux le recommencer et l\'améliorer !', ['Je jette tous mes crayons.', 'Je ne dessinerai plus jamais.']], ['Je ne comprends rien.', 'Je ne comprends pas encore : je vais poser une question.', ['Tant pis, je dors.', 'C\'est la faute du prof.']], ['C\'est assez bien comme ça.', 'Est-ce que c\'est vraiment mon meilleur travail ?', ['Je finis vite pour jouer.', 'Personne ne va regarder.']]];
+var AE_KIND = [['Un nouvel élève est tout seul à la récréation.', 'Je vais lui dire : « Salut ! Tu veux jouer avec nous ? »', ['Je fais semblant de ne pas le voir.', 'Je me moque de lui.']], ['Ton amie a eu une mauvaise note. Elle est triste.', '« Ne t\'inquiète pas, je peux t\'aider à réviser ! »', ['« Ha ha, moi j\'ai eu 20 ! »', 'Je ne dis rien et je pars.']], ['Quelqu\'un fait tomber ses livres dans le couloir.', 'Je l\'aide à ramasser ses livres.', ['Je marche dessus.', 'Je filme pour rigoler.']], ['Ton camarade a fait une erreur en lisant à voix haute.', 'Je l\'encourage : « Bravo, continue ! »', ['Je rigole très fort.', 'Je dis : « Tu lis mal ! »']], ['Madame a l\'air fatiguée après une longue journée.', '« Merci pour le cours, Madame ! Bonne soirée ! »', ['Je fais beaucoup de bruit.', 'Je pars sans dire au revoir.']], ['Un ami a oublié son goûter.', 'Je partage mon goûter avec lui.', ['Je mange devant lui.', 'Je dis : « Tant pis pour toi ! »']], ['Dans le jeu, un joueur est perdu.', 'Je lui montre le chemin avec la carte 🗺.', ['Je le laisse chercher tout seul.', 'Je lui donne la mauvaise direction.']], ['Ton frère a construit une tour en Lego.', '« Elle est super ! Comment tu l\'as faite ? »', ['Je la casse.', '« Elle est moche. »']]];
+var AE_COMPLIMENTS = ['Tu es super gentil(le) !', 'Bravo, tu progresses beaucoup !', 'Ton idée est géniale !', 'Merci pour ton aide !', 'Tu parles très bien français !', 'Tu es courageux(se) !', 'Continue comme ça !', 'Tu me fais sourire !'];
+var AE = {on:false, until:0, ring:null, emb:null, base:null, others:{}};
+function aeData(){ return hasChar() ? life.eco.ae : AE.tmp; }
+function aeSave(d){ if(hasChar()){ life.eco.ae = d; lifeSave(true); } else AE.tmp = d; }
+function aeCard(msg){
+  var d = aeData();
+  if(!d){ aeCreate(); return; }
+  var en = d.en|0;
+  showCard('<h3>🦸 ' + L2('MY ALTER EGO', 'MON ALTER EGO') + '</h3>' + (msg || '') + '<div style="display:flex;gap:10px;align-items:center">' + (d.img ? '<img src="' + d.img + '" style="width:84px;height:84px;object-fit:cover;border:3px solid ' + hexCss(AE_COLS[d.c|0][1]) + '">' : '<div style="font-size:60px">' + (d.i || '⭐') + '</div>') + '<div><div class="gc-big">' + esc(d.i || '⭐') + ' ' + esc(d.n) + '</div><div class="gc-say gc-text">« ' + esc(d.m) + ' »</div></div></div>' +
+    '<div class="gc-text">' + L2('Super-powers: ', 'Super-pouvoirs : ') + (d.p || []).map(function(k){ return '<span class="gc-say">' + esc(AE_POWERS[k][0]) + '</span>'; }).join(' · ') + '</div>' +
+    '<div class="gc-sub">⚡ ' + L2('Energy', 'Énergie') + ' ' + en + ' %</div><div style="height:20px;border:3px solid #23243a"><div style="height:100%;width:' + en + '%;background:' + hexCss(AE_COLS[d.c|0][1]) + '"></div></div>' +
+    '<div class="gc-sub">' + L2('Charge your energy with kindness and growth mindset, then TRANSFORM: aura, super speed, super jump for 3 minutes!', 'Recharge ton énergie avec la gentillesse et l\'état d\'esprit de croissance, puis TRANSFORME-TOI : aura, super vitesse, super saut pendant 3 minutes !') + '</div>' +
+    '<div class="gc-grid">' + gOpt('aechal', 'growth', '🌱 <b>' + L2('GROWTH MINDSET CHALLENGE', 'DÉFI : ÉTAT D\'ESPRIT DE CROISSANCE') + '</b><br><span class="lf-soft">+20 % ⚡</span>') + gOpt('aechal', 'kind', '💖 <b>' + L2('KINDNESS CHALLENGE', 'DÉFI DE GENTILLESSE') + '</b><br><span class="lf-soft">+20 % ⚡</span>') + '</div>' +
+    '<div class="gc-row">' + (AE.on ? gBtn('aecompl', null, '💬 ' + L2('SEND A COMPLIMENT', 'ENVOYER UN COMPLIMENT'), 'go') + gBtn('aeoff', null, L2('POWER DOWN', 'REDEVENIR NORMAL')) : gBtn('aego', null, '⚡ ' + L2('TRANSFORM!', 'TRANSFORMATION !'), en >= 100 ? 'go' : '')) + gBtn('aeedit', null, '✏ ' + L2('EDIT', 'MODIFIER')) + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>');
+}
+var AEN = {};
+function aeCreate(){ var d = aeData() || {}; AEN = {n:d.n || '', i:d.i || '⭐', c:d.c|0, p:(d.p || []).slice(), m:d.m || AE_MOTTOS[0], img:d.img || null, en:d.en|0}; aeForm(); }
+function aeForm(){
+  showCard('<h3>🦸 ' + L2('CREATE YOUR ALTER EGO', 'CRÉE TON ALTER EGO') + '</h3><div class="gc-sub">' + L2('Your hero name', 'Ton nom de héros') + '</div><input id="ae-n" maxlength="20" value="' + esc(AEN.n) + '" placeholder="Capitaine Gentillesse, Super Courage..." style="font-size:16px;padding:6px;width:85%">' +
+    '<div class="gc-sub">' + L2('Your symbol', 'Ton symbole') + '</div><div class="gc-row">' + AE_ICONS.map(function(i){ return gBtn('aeicon', i, i, AEN.i === i ? 'go' : ''); }).join('') + '</div>' +
+    '<div class="gc-sub">' + L2('Your aura colour', 'La couleur de ton aura') + '</div><div class="gc-row">' + AE_COLS.map(function(c, k){ return '<button class="btn' + (AEN.c === k ? ' go' : '') + '" data-g="aecol" data-v="' + k + '" style="background:' + hexCss(c[1]) + '">' + c[0] + '</button>'; }).join('') + '</div>' +
+    '<div class="gc-sub">' + L2('Choose 3 super-powers (qualities)', 'Choisis 3 super-pouvoirs (qualités)') + ' · ' + AEN.p.length + '/3</div><div class="gc-grid">' + AE_POWERS.map(function(p, k){ return gOpt('aepow', k, (AEN.p.indexOf(k) >= 0 ? '✅ ' : '') + '<b class="gc-say">' + esc(p[0]) + '</b> <span class="lf-soft">(' + esc(p[1]) + ')</span><br><span class="lf-soft">' + esc(p[2]) + '</span>'); }).join('') + '</div>' +
+    '<div class="gc-sub">' + L2('Your motto', 'Ta devise') + '</div><div class="gc-grid">' + AE_MOTTOS.map(function(m, k){ return gOpt('aemot', k, (AEN.m === m ? '✅ ' : '') + '<span class="gc-say">' + esc(m) + '</span>'); }).join('') + '</div>' +
+    '<div class="gc-sub">🖼 ' + L2('Upload YOUR OWN creation (a drawing, a craft, a painting...) as your emblem. No photos of people, please!', 'Ajoute TA PROPRE création (un dessin, un bricolage, une peinture...) comme emblème. Pas de photos de personnes, s\'il te plaît !') + '</div><input type="file" id="ae-file" accept="image/*">' + (AEN.img ? '<div><img src="' + AEN.img + '" style="width:90px;height:90px;object-fit:cover;border:3px solid #23243a"> ' + gBtn('aenoimg', null, '✕') + '</div>' : '') + '<div class="gc-sub">' + L2('Your picture is only shown on your own screen.', 'Ton image s\'affiche seulement sur ton écran.') + '</div>' +
+    '<div class="gc-row">' + gBtn('aesave', null, '💾 ' + L2('SAVE MY ALTER EGO', 'ENREGISTRER MON ALTER EGO'), 'go') + gBtn('close', null, L2('CANCEL', 'ANNULER')) + '</div>');
+  var f = document.getElementById('ae-file'); if(f) f.addEventListener('change', function(){ var file = f.files && f.files[0]; if(!file || !/^image\//.test(file.type)) return; aeKeepName(); var rd = new FileReader(); rd.onload = function(){ var im = new Image(); im.onload = function(){ var c = document.createElement('canvas'), S = 192; c.width = S; c.height = S; var k = c.getContext('2d'), sc = Math.max(S/im.width, S/im.height), w = im.width*sc, h = im.height*sc; k.fillStyle = '#fff'; k.fillRect(0, 0, S, S); k.drawImage(im, (S - w)/2, (S - h)/2, w, h); AEN.img = c.toDataURL('image/jpeg', 0.72); aeForm(); }; im.src = rd.result; }; rd.readAsDataURL(file); });
+}
+function aeKeepName(){ var n = document.getElementById('ae-n'); if(n) AEN.n = n.value.replace(/[<>]/g, '').slice(0, 20); }
+GACT.aeicon = function(v){ aeKeepName(); AEN.i = v; aeForm(); };
+GACT.aecol = function(v){ aeKeepName(); AEN.c = v|0; aeForm(); };
+GACT.aepow = function(v){ aeKeepName(); var k = v|0, i = AEN.p.indexOf(k); if(i >= 0) AEN.p.splice(i, 1); else { if(AEN.p.length >= 3) AEN.p.shift(); AEN.p.push(k); say(AE_POWERS[k][0]); } aeForm(); };
+GACT.aemot = function(v){ aeKeepName(); AEN.m = AE_MOTTOS[v|0]; say(AEN.m); aeForm(); };
+GACT.aenoimg = function(){ aeKeepName(); AEN.img = null; aeForm(); };
+GACT.aesave = function(){ aeKeepName(); if(!AEN.n.trim()){ showToast(L2('Give your hero a name!', 'Donne un nom à ton héros !')); return; } if(hasBadWord(AEN.n)){ showToast('🙅'); return; } if(AEN.p.length < 1){ showToast(L2('Choose at least one super-power!', 'Choisis au moins un super-pouvoir !')); return; }
+  aeSave({n:AEN.n.trim(), i:AEN.i, c:AEN.c, p:AEN.p, m:AEN.m, img:AEN.img, en:AEN.en}); say('Voici ' + AEN.n + ' ! Ma devise : ' + AEN.m); aeCard('<div class="good">✓ ' + L2('Your alter ego is ready!', 'Ton alter ego est prêt !') + '</div>'); };
+GACT.aeedit = aeCreate;
+var AEQ = {};
+GACT.aechal = function(kind){ AEQ = {kind:kind, n:0, ok:0, list:shuffleR(Math.random, (kind === 'growth' ? AE_GROWTH : AE_KIND).slice()).slice(0, 3)}; aeQ(); };
+function aeQ(msg){
+  var d = aeData();
+  if(AEQ.n >= AEQ.list.length){ var gain = AEQ.ok*Math.round(20/3*1.0 + 0.4); gain = AEQ.ok >= 3 ? 20 : AEQ.ok*6; d.en = Math.min(100, (d.en|0) + gain); aeSave(d); say(AEQ.ok >= 3 ? 'Super ! Ton énergie augmente !' : 'Bien essayé !'); aeCard('<div class="good">⚡ +' + gain + ' % ' + L2('energy', 'd\'énergie') + '</div>'); return; }
+  var q = AEQ.list[AEQ.n], m = mc(Math.random, q[1], q[2]); AEQ.m = m;
+  showCard('<h3>' + (AEQ.kind === 'growth' ? '🌱 ' + L2('GROWTH MINDSET', 'ÉTAT D\'ESPRIT DE CROISSANCE') : '💖 ' + L2('KINDNESS', 'GENTILLESSE')) + ' · ' + (AEQ.n + 1) + '/' + AEQ.list.length + '</h3>' + (msg || '') + '<div class="gc-big gc-say">' + (AEQ.kind === 'growth' ? '💭 « ' + esc(q[0]) + ' »' : esc(q[0])) + '</div><div class="gc-sub">' + (AEQ.kind === 'growth' ? L2('What would your alter ego say instead?', 'Qu\'est-ce que ton alter ego dirait à la place ?') : L2('What does your alter ego do?', 'Qu\'est-ce que ton alter ego fait ?')) + '</div><div class="gc-grid">' + m.opts.map(function(o, k){ return gOpt('aeans', k, esc(o)); }).join('') + '</div>');
+}
+GACT.aeans = function(v){ if(AEQ.busy) return; AEQ.busy = true; setTimeout(function(){ AEQ.busy = false; }, 350); var ok = (v|0) === AEQ.m.ans; if(ok){ AEQ.ok++; say(AEQ.m.opts[AEQ.m.ans]); } AEQ.n++; aeQ(ok ? '<div class="good">✓ ' + L2('That\'s your super-power!', 'C\'est ton super-pouvoir !') + '</div>' : '<div class="bad">✗ ' + esc(AEQ.m.opts[AEQ.m.ans]) + '</div>'); };
+GACT.aego = function(){ var d = aeData(); if(!d) return; if((d.en|0) < 100){ showToast('⚡ ' + (d.en|0) + ' % - ' + L2('do challenges to charge to 100 %!', 'fais des défis pour arriver à 100 % !')); return; }
+  d.en = 0; aeSave(d); AE.on = true; AE.until = Date.now() + 180000; if(AE.base == null){ AE.base = [walkSpeed, jumpMultiplier]; } walkSpeed = AE.base[0]*1.6; jumpMultiplier = AE.base[1]*1.5;
+  say('Transformation ! Je suis ' + d.n + ' ! ' + d.m); closeCard(); aeVisual(true); if(typeof sendPresence === 'function') sendPresence(true);
+  showToast('⚡ ' + d.i + ' ' + d.n + ' - ' + L2('3 minutes of super speed and super jump!', '3 minutes de super vitesse et de super saut !')); };
+GACT.aeoff = function(){ aeOff(); closeCard(); };
+GACT.aecompl = function(){ var c = pickR(Math.random, AE_COMPLIMENTS), d = aeData(); if(typeof sendChat === 'function') sendChat((d ? d.i + ' ' : '') + c); say(c); showToast('💬 ' + c); };
+function aeOff(){ if(!AE.on) return; AE.on = false; if(AE.base){ walkSpeed = AE.base[0]; jumpMultiplier = AE.base[1]; AE.base = null; } aeVisual(false); if(typeof sendPresence === 'function') sendPresence(true); say('Je redeviens normal. Mais je garde mes qualités !'); }
+function aeVisual(on){
+  if(AE.ring){ root.remove(AE.ring); AE.ring = null; } if(AE.badge){ AE.badge.remove(); AE.badge = null; }
+  if(!on) return; var d = aeData(), col = AE_COLS[d.c|0][1], g = new THREE.Group();
+  var r1 = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.06, 6, 30), new THREE.MeshBasicMaterial({color:col, transparent:true, opacity:0.85})); r1.rotation.x = Math.PI/2; g.add(r1);
+  var r2 = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.03, 6, 30), new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.6})); r2.rotation.x = Math.PI/2; r2.position.y = 0.4; g.add(r2);
+  for(var i=0;i<10;i++){ var sp = new THREE.Mesh(new THREE.OctahedronGeometry(0.08, 0), new THREE.MeshBasicMaterial({color:i % 2 ? 0xffffff : col})); sp.userData.a = i*0.63; g.add(sp); }
+  root.add(g); AE.ring = g;
+  var b = document.createElement('div'); b.style.cssText = 'position:fixed;left:12px;top:92px;z-index:25;background:#fffbe8;border:3px solid ' + hexCss(col) + ';box-shadow:4px 4px 0 #23243a;padding:6px 10px;font:12px "Press Start 2P",monospace;display:flex;gap:8px;align-items:center;cursor:pointer';
+  b.innerHTML = (d.img ? '<img src="' + d.img + '" style="width:42px;height:42px;object-fit:cover">' : '<span style="font-size:28px">' + esc(d.i) + '</span>') + '<div><div>' + esc(d.i + ' ' + d.n) + '</div><div id="ae-t" style="margin-top:4px;color:#8a4a1a"></div></div>';
+  b.onclick = function(){ aeCard(); }; document.body.appendChild(b); AE.badge = b;
+}
+var _presenceStateAE = presenceState;
+presenceState = function(){ var s = _presenceStateAE(); if(AE.on){ var d = aeData(); if(d) s.ae = (d.c|0) + '|' + String(d.i || '⭐'); } return s; };
+function aeTick(dt){
+  var now = performance.now();
+  if(AE.on){
+    if(Date.now() > AE.until){ aeOff(); showToast('⏱ ' + L2('Power-up over!', 'Fin de la transformation !')); }
+    else if(AE.ring){ var p = camera.position, gy = p.y - EYE_HEIGHT; AE.ring.position.set(p.x, gy + 0.05, p.z); AE.ring.children.forEach(function(c, i){ if(i < 2) c.rotation.z += 0.02*(i ? -1 : 1); else { var a = c.userData.a + now*0.002; c.position.set(Math.cos(a)*1.1, 0.3 + ((now*0.001 + i*0.3) % 2), Math.sin(a)*1.1); } });
+      var t = document.getElementById('ae-t'); if(t){ var s = Math.ceil((AE.until - Date.now())/1000); t.textContent = '⚡ ' + Math.floor(s/60) + ':' + ('0' + s % 60).slice(-2); } }
+  }
+  (mp.others || []).forEach(function(p){ var s = p.presence || {}, a = mp.avatars[p.peer], o = AE.others[p.peer];
+    if(!s.ae || !a || !a.model || !a.model.group){ if(o){ if(o.parent) o.parent.remove(o); delete AE.others[p.peer]; } return; }
+    if(!o){ var col = (AE_COLS[parseInt(s.ae, 10)|0] || AE_COLS[0])[1]; o = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.07, 6, 28), new THREE.MeshBasicMaterial({color:col})); o.rotation.x = Math.PI/2; o.position.y = 0.06; a.model.group.add(o); AE.others[p.peer] = o; }
+    o.rotation.z += 0.03; });
+}
+(function(){
+  var s = document.getElementById('search-toggle'), b = document.createElement('button');
+  b.className = 'bar-btn'; b.id = 'ae-toggle'; b.textContent = '🦸'; b.title = L2('My alter ego (power-up)', 'Mon alter ego (super-pouvoirs)');
+  s.parentNode.insertBefore(b, s); b.addEventListener('click', function(){ if(!aeData()) aeCreate(); else aeCard(); });
+})();
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
@@ -16875,7 +17273,7 @@ function animate(){
   updateSpeedo();
   lifeTick(dt);
   jailTick();
-  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick();
+  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt);
   if(!ICE.t || performance.now() - ICE.t > 1000){ ICE.t = performance.now(); if(Math.hypot(camera.position.x - QC.x, camera.position.z - QC.z) < 800) iceSync(); }
   villageTick();
   sendPresence(false);
