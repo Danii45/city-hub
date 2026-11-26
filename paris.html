@@ -18948,7 +18948,8 @@ function renderMadameTab(){ var btn = document.getElementById('tab-btn-madame'),
 setInterval(function(){ var p = document.getElementById('tab-madame'); renderMadameTabBtn(); if(p && !p.classList.contains('hidden')) renderMadameTab(); }, 3000);
 function renderMadameTabBtn(){ var b = document.getElementById('tab-btn-madame'); if(!b) return; var ok = mtCan(); b.classList.toggle('hidden', !ok); var n = Object.keys(MDP.list || {}).length + jailedList().length; b.textContent = '👩‍🏫 MADAME' + (ok && n ? ' (' + n + ')' : ''); }
 /* "the person signed in as Madame": a teacher account called Madame counts as Madame even before Daniel taps 👑 */
-amMadame = function(){ var m = net && net.uid && net.members[net.uid]; return !!(m && (m.madame || (m.teacher && m.key === 'madame'))); };
+amMadame = function(){ var m = net && net.uid && net.members[net.uid]; return !!(m && (m.madame || m.key === 'madame')); };
+isMadameUid = function(u){ var m = net.members && net.members[u]; return !!(m && (m.madame || m.key === 'madame')); };
 /* ---------- 📚 LA BIBLIOTHÈQUE & LA LIBRAIRIE (in the Learning Centre): read short French books, quiz, buy books to keep ---------- */
 var BOOKS = [
   {id:'chat', icon:'🐱', t:'Le chat de Madame', lv:'A1', p:4, pages:['Madame a un chat. Il s\'appelle Croissant.', 'Croissant est orange et blanc. Il est très gourmand.', 'Le matin, il mange du poisson. L\'après-midi, il dort sur le lit.', 'Le soir, il regarde les oiseaux par la fenêtre. Il est content !'], g:[['gourmand', 'greedy (loves food)'], ['dormir', 'to sleep'], ['la fenêtre', 'the window'], ['les oiseaux', 'the birds']], q:[['Comment s\'appelle le chat ?', 'Croissant', ['Baguette', 'Mika', 'Minou']], ['Qu\'est-ce qu\'il mange le matin ?', 'du poisson', ['du pain', 'des pommes', 'du fromage']], ['Où dort-il l\'après-midi ?', 'sur le lit', ['dans le jardin', 'sous la table', 'dans la voiture']]]},
@@ -19201,7 +19202,7 @@ function pleaSelfTick(){ if(PLEA.done && signedIn() && !amJailed()){ PLEA.done =
    jailed, and get the ÉLITE tab: make players elite 🥖, and send them to / let them out of the Public Shame Chamber.
    Their changes go in paris/mod (jail, elite), which Daniel's account and teachers can write. */
 var mod = {jail:{}, elite:{}, on:false, ok:true};
-function isTeacherUid(uid){ var m = net.members && net.members[uid]; return !!(m && m.teacher); }
+function isTeacherUid(uid){ var m = net.members && net.members[uid]; return !!(m && (m.teacher || m.madame || m.key === 'madame')); }
 function amTeacher(){ return !!(net && net.uid && isTeacherUid(net.uid)); }
 function isStaff(){ return !!(net && (net.isOwner || amTeacher())); }
 function eliteOf(uid){ var m = net.members && net.members[uid]; return !!((m && m.elite) || mod.elite[uid]); }
