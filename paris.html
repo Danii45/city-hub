@@ -18634,6 +18634,89 @@ var _lcPassDQ = lcPass; lcPass = function(){ var r = _lcPassDQ.apply(this, argum
 /* the 📋 button, and the list pops up at the first login of the day */
 function dqBtn(){ var b = document.getElementById('dq-btn'); if(!b){ var s = document.getElementById('search-toggle'); if(!s) return; b = document.createElement('button'); b.className = 'bar-btn'; b.id = 'dq-btn'; s.parentNode.insertBefore(b, s); b.addEventListener('click', dqCard); } var d = hasChar() ? dqState() : null; b.textContent = '📋' + (d ? (d.paid ? '✅' : ' ' + d.t.filter(dqDone).length + '/5') : ''); b.title = L2('Today\'s tasks (your daily pay)', 'Les tâches du jour (ta paie)'); }
 setInterval(function(){ dqBtn(); if(!hasChar() || !net.uid || (titleScreen && !titleScreen.classList.contains('hidden')) || (gcard.el && !gcard.el.classList.contains('hidden'))) return; var k = 'paris.dq.' + net.uid, day = todayKey(), seen = ''; try { seen = localStorage.getItem(k); } catch(e){} if(seen === day) return; try { localStorage.setItem(k, day); } catch(e){} say('Bonjour ! Voici tes tâches du jour.'); dqCard('<div class="gc-big">☀ ' + L2('Good morning! Here are your tasks for today.', 'Bonjour ! Voici tes tâches du jour.') + '</div>'); }, 3000);
+/* ---------- 🗺 THE BIRD'S-EYE MAP: a real top-down picture of the city, every place pinned on it ----------
+   Drag to move, scroll / pinch to zoom, tap a pin → its card (go there, hear its name). 📋 LIST shows every place in boxes. */
+var BM = {reg:'paris', z:1, ox:0, oy:0, shots:{}, el:null};
+var BM_REG = {
+  paris:{fr:'Paris', en:'Paris', x0:-800, x1:640, z0:-760, z1:1010},
+  baguette:{fr:'Baguetteville', en:'Baguetteville', x0:-260, x1:260, z0:-2820, z1:-2380},
+  quebec:{fr:'Québec', en:'Québec City', x0:-3020, x1:-2240, z0:-2860, z1:-2140}
+};
+function bmRegionOf(x, z){ for(var k in BM_REG){ var r = BM_REG[k]; if(x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1) return k; } return null; }
+function bmCat(it){ if(it.icon === '🏛') return ['#c8382f', L2('Monuments', 'Les monuments')]; if(it.cat === 'new') return ['#8a3ad6', L2('Activities & new places', 'Activités et nouveaux lieux')]; if(it.icon === '🛍') return ['#1f6fb8', L2('Shops', 'Les magasins')]; if(it.sub === 'Zoo' || /🦁|🐒|🐧|🐬|🦫|🐄|🐶|🏠/.test(it.icon)) return ['#2f8a3a', L2('The zoo', 'Le zoo')]; if(it.icon === '🛣') return ['#5a5f6a', L2('Streets', 'Les rues')]; if(it.icon === '📜') return ['#b8822e', L2('Culture panels', 'Les panneaux culturels')]; return ['#e3762c', L2('Places to go', 'Les sorties')]; }
+function bmItems(){ var L = searchIndex(), seen = {}, out = []; srch.list = L;
+  L.forEach(function(it, i){ if(typeof it.x !== 'number' || typeof it.z !== 'number') return; var key = Math.round(it.x) + ',' + Math.round(it.z); if(it.act && !it.x && !it.z) return; seen[key] = (seen[key] || 0) + 1; if(seen[key] > 1) return; out.push({it:it, i:i}); });
+  if(typeof VILLAGES !== 'undefined') VILLAGES.forEach(function(v){ out.push({it:{icon:v.elite ? '🥖' : '🏘', name:v.q || tx(v.t), sub:L2('Class village', 'Village de classe'), x:v.x, z:v.z + 20, act:function(){ goVillage(v); }}, v:v}); });
+  return out; }
+/* the photo from above: an orthographic camera looking straight down, rendered once per region */
+function bmShot(k){ var R = BM_REG[k], c = BM.shots[k]; if(c && performance.now() - c.t < 90000) return c.cv;
+  var wW = R.x1 - R.x0, wH = R.z1 - R.z0, S = 1600 / Math.max(wW, wH), w = Math.round(wW*S), h = Math.round(wH*S);
+  var cam = new THREE.OrthographicCamera(-wW/2, wW/2, wH/2, -wH/2, 1, 600); cam.position.set((R.x0 + R.x1)/2, 400, (R.z0 + R.z1)/2); cam.up.set(0, 0, -1); cam.lookAt(cam.position.x, 0, cam.position.z);
+  var rt = new THREE.WebGLRenderTarget(w, h), buf = new Uint8Array(w*h*4), fog = scene.fog, amb = new THREE.AmbientLight(0xffffff, 0.25), skyV = sky.visible, tpV = typeof TP !== 'undefined' && TP.model ? TP.model.group.visible : null;
+  scene.fog = null; sky.visible = false; scene.add(amb); if(tpV != null) TP.model.group.visible = false;
+  try { renderer.setRenderTarget(rt); renderer.setClearColor(0x6fae5a, 1); renderer.clear(); renderer.render(scene, cam); renderer.readRenderTargetPixels(rt, 0, 0, w, h, buf); } catch(e){}
+  renderer.setRenderTarget(null); scene.fog = fog; sky.visible = skyV; scene.remove(amb); if(tpV != null) TP.model.group.visible = tpV; rt.dispose();
+  var cv = document.createElement('canvas'); cv.width = w; cv.height = h; var k2 = cv.getContext('2d'), img = k2.createImageData(w, h);
+  for(var y=0;y<h;y++) img.data.set(buf.subarray((h - 1 - y)*w*4, (h - y)*w*4), y*w*4);
+  k2.putImageData(img, 0, 0); BM.shots[k] = {cv:cv, t:performance.now(), w:w, h:h, S:S}; return cv; }
+(function(){ var st = document.createElement('style'); st.textContent =
+  '#bmap{position:fixed;inset:0;z-index:60;background:#0f121c;display:flex;flex-direction:column;font-family:"VT323",monospace;color:#fff;touch-action:none}' +
+  '#bmap.hidden{display:none}#bm-top{display:flex;flex-wrap:wrap;gap:6px;padding:8px;align-items:center;background:#1b1f2e;border-bottom:3px solid #ffd23a}' +
+  '#bm-top .btn{margin:0;font-size:10px}#bm-top .on{background:#ffd23a;color:#1b1b1d}#bm-top b{font-family:"Press Start 2P",monospace;font-size:10px;color:#ffd23a;margin-right:6px}' +
+  '#bm-view{position:relative;flex:1;overflow:hidden;cursor:grab}#bm-world{position:absolute;left:0;top:0;transform-origin:0 0}#bm-world canvas{display:block;image-rendering:auto;box-shadow:0 0 0 4px #ffd23a}' +
+  '.bm-pin{position:absolute;transform-origin:50% 100%;display:flex;flex-direction:column;align-items:center;cursor:pointer;pointer-events:auto}' +
+  '.bm-pin i{font-style:normal;font-size:20px;width:30px;height:30px;line-height:28px;text-align:center;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.5)}.bm-pin i span{display:inline-block;transform:rotate(45deg)}' +
+  '.bm-pin u{text-decoration:none;margin-top:3px;background:rgba(20,22,34,.85);padding:1px 5px;border-radius:4px;font-size:15px;white-space:nowrap;max-width:190px;overflow:hidden;text-overflow:ellipsis}' +
+  '.bm-pin.st i{display:none}.bm-pin.st u{background:rgba(255,255,255,.75);color:#23243a;font-size:13px}.bm-pin:hover{z-index:5}.bm-pin:hover u{max-width:none}' +
+  '#bm-me{position:absolute;width:18px;height:18px;border-radius:50%;background:#3ab8ff;border:3px solid #fff;box-shadow:0 0 0 6px rgba(58,184,255,.35);pointer-events:none}' +
+  '#bm-pop{position:absolute;z-index:9;background:#fbf6ea;color:#23243a;border:3px solid #23243a;box-shadow:4px 4px 0 #23243a;padding:10px 12px;min-width:210px;max-width:min(320px,80vw);font-size:18px}#bm-pop .btn{margin:6px 6px 0 0;font-size:10px}' +
+  '#bm-zoom{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:6px}#bm-zoom .btn{margin:0;font-size:16px;width:44px;height:44px}' +
+  '#bm-leg{position:absolute;left:10px;bottom:10px;background:rgba(20,22,34,.85);padding:6px 8px;font-size:15px;border-radius:6px;max-width:60vw}#bm-leg span{display:inline-block;width:10px;height:10px;border-radius:50%;margin:0 4px 0 8px}' +
+  '#g-card .bm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;margin-top:6px}#g-card .bm-grid .lf-opt{height:auto;min-height:56px;white-space:normal;overflow-wrap:anywhere;word-break:normal;line-height:1.15}';
+  document.head.appendChild(st);
+  var el = document.createElement('div'); el.id = 'bmap'; el.className = 'hidden'; el.innerHTML = '<div id="bm-top"></div><div id="bm-view"><div id="bm-world"></div><div id="bm-zoom"><button class="btn" data-z="1.4">＋</button><button class="btn" data-z="0.7">－</button><button class="btn" data-z="0">⌂</button></div><div id="bm-leg"></div></div>';
+  document.body.appendChild(el); BM.el = el;
+  el.addEventListener('keydown', function(e){ e.stopPropagation(); if(e.key === 'Escape') bmClose(); });
+  el.querySelector('#bm-zoom').addEventListener('click', function(e){ var b = e.target.closest('[data-z]'); if(!b) return; var f = +b.dataset.z; if(!f) bmFit(); else bmZoomAt(f, BM.vw/2, BM.vh/2); });
+  var view = el.querySelector('#bm-view'), P = {}, drag = null, moved = 0;
+  view.addEventListener('pointerdown', function(e){ if(e.target.closest('#bm-pop,#bm-zoom,.bm-pin')) return; view.setPointerCapture(e.pointerId); P[e.pointerId] = {x:e.clientX, y:e.clientY}; drag = {x:e.clientX, y:e.clientY, ox:BM.ox, oy:BM.oy}; moved = 0; var pp = document.getElementById('bm-pop'); if(pp) pp.remove(); });
+  view.addEventListener('pointermove', function(e){ if(!P[e.pointerId]) return; var ids = Object.keys(P);
+    if(ids.length === 2){ var o = ids.filter(function(i){ return +i !== e.pointerId; })[0], a = P[o], d0 = Math.hypot(P[e.pointerId].x - a.x, P[e.pointerId].y - a.y), d1 = Math.hypot(e.clientX - a.x, e.clientY - a.y); P[e.pointerId] = {x:e.clientX, y:e.clientY}; if(d0 > 10){ var r = view.getBoundingClientRect(); bmZoomAt(d1/d0, (e.clientX + a.x)/2 - r.left, (e.clientY + a.y)/2 - r.top); } return; }
+    P[e.pointerId] = {x:e.clientX, y:e.clientY}; if(!drag) return; moved += Math.abs(e.movementX || 0) + Math.abs(e.movementY || 0); BM.ox = drag.ox + e.clientX - drag.x; BM.oy = drag.oy + e.clientY - drag.y; bmApply(); });
+  var up = function(e){ delete P[e.pointerId]; if(!Object.keys(P).length) drag = null; }; view.addEventListener('pointerup', up); view.addEventListener('pointercancel', up);
+  view.addEventListener('wheel', function(e){ e.preventDefault(); var r = view.getBoundingClientRect(); bmZoomAt(e.deltaY < 0 ? 1.18 : 1/1.18, e.clientX - r.left, e.clientY - r.top); }, {passive:false});
+  el.addEventListener('click', function(e){ var b = e.target.closest('[data-g]'); if(!b) return; var a = b.dataset.g, v = b.dataset.v; if(a === 'bmreg'){ bmShow(v); } else if(a === 'bmlist'){ bmClose(); openMapList(); } else if(a === 'bmclose'){ bmClose(); } else if(a === 'bmgo'){ bmGo(+v); } else if(a === 'bmsay'){ say(BM.pins[+v].it.name); } });
+})();
+function bmClose(){ BM.el.classList.add('hidden'); }
+function bmApply(){ var w = document.getElementById('bm-world'); if(!w) return; var s = BM.base*BM.z; w.style.transform = 'translate(' + BM.ox + 'px,' + BM.oy + 'px) scale(' + s + ')';
+  var inv = 1/s; w.querySelectorAll('.bm-pin').forEach(function(p){ p.style.transform = 'translate(-50%,-100%) scale(' + inv + ')'; var u = p.querySelector('u'), need = p.dataset.big === '2' ? 1 : p.dataset.big ? 1.7 : 2.6; if(u) u.style.display = BM.z >= need ? '' : 'none'; });
+  var me = document.getElementById('bm-me'); if(me) me.style.transform = 'translate(-50%,-50%) scale(' + inv + ')'; }
+function bmFit(){ var sh = BM.shots[BM.reg]; BM.base = Math.min(BM.vw / sh.w, BM.vh / sh.h); BM.z = 1; BM.ox = (BM.vw - sh.w*BM.base)/2; BM.oy = (BM.vh - sh.h*BM.base)/2; bmApply(); }
+function bmZoomAt(f, cx, cy){ var nz = Math.max(1, Math.min(10, BM.z*f)); f = nz / BM.z; if(f === 1) return; BM.ox = cx - (cx - BM.ox)*f; BM.oy = cy - (cy - BM.oy)*f; BM.z = nz; bmApply(); }
+function bmShow(k){ BM.reg = k; var R = BM_REG[k], view = document.getElementById('bm-view'), world = document.getElementById('bm-world');
+  document.getElementById('bm-top').innerHTML = '<b>🗺 ' + L2('MAP', 'CARTE') + '</b>' + Object.keys(BM_REG).map(function(r){ return '<button class="btn' + (r === k ? ' on' : '') + '" data-g="bmreg" data-v="' + r + '">' + esc(L2(BM_REG[r].en, BM_REG[r].fr)) + '</button>'; }).join('') + '<button class="btn" data-g="bmlist">📋 ' + L2('LIST', 'LISTE') + '</button><button class="btn" data-g="bmclose" style="margin-left:auto">✕ ' + L2('CLOSE', 'FERMER') + '</button>';
+  var cv = bmShot(k), sh = BM.shots[k], op = document.getElementById('bm-pop'); if(op) op.remove(); world.innerHTML = ''; ['width', 'height', 'max-width', 'max-height', 'position', 'left', 'top', 'transform'].forEach(function(pr){ cv.style.setProperty(pr, pr === 'width' ? sh.w + 'px' : pr === 'height' ? sh.h + 'px' : pr === 'position' ? 'static' : 'none', 'important'); }); world.appendChild(cv);
+  var pins = BM.pins = [], cats = {};
+  bmItems().forEach(function(o){ var it = o.it; if(bmRegionOf(it.x, it.z) !== k) return; var c = bmCat(it); cats[c[1]] = c[0]; var n = pins.length; pins.push(o);
+    var p = document.createElement('div'), st = it.icon === '🛣'; p.className = 'bm-pin' + (st ? ' st' : ''); p.style.left = ((it.x - R.x0)*sh.S) + 'px'; p.style.top = ((it.z - R.z0)*sh.S) + 'px'; if(it.icon === '🏛') p.dataset.big = 2; else if(it.cat === 'new' || o.v) p.dataset.big = 1;
+    p.innerHTML = '<i style="background:' + c[0] + '"><span>' + it.icon + '</span></i><u>' + esc(it.name) + '</u>'; p.title = it.name;
+    p.addEventListener('click', function(e){ e.stopPropagation(); bmPop(n, e); }); world.appendChild(p); });
+  var cp = INT.cur && INT.cur.out ? INT.cur.out : camera.position; if(bmRegionOf(cp.x, cp.z) === k){ var me = document.createElement('div'); me.id = 'bm-me'; me.style.left = ((cp.x - R.x0)*sh.S) + 'px'; me.style.top = ((cp.z - R.z0)*sh.S) + 'px'; me.title = L2('You are here', 'Tu es ici'); world.appendChild(me); }
+  document.getElementById('bm-leg').innerHTML = '<span style="background:#3ab8ff"></span>' + L2('You', 'Toi') + Object.keys(cats).map(function(n){ return '<span style="background:' + cats[n] + '"></span>' + esc(n); }).join('');
+  var r = view.getBoundingClientRect(); BM.vw = r.width; BM.vh = r.height; bmFit(); }
+function bmPop(n, e){ var o = BM.pins[n], it = o.it, old = document.getElementById('bm-pop'); if(old) old.remove(); var view = document.getElementById('bm-view'), r = view.getBoundingClientRect(), p = document.createElement('div'); p.id = 'bm-pop';
+  p.innerHTML = '<div style="font-size:30px">' + it.icon + '</div><b>' + esc(it.name) + '</b>' + (it.sub ? '<div class="lf-soft">' + esc(it.sub) + '</div>' : '') + '<div><button class="btn go" data-g="bmgo" data-v="' + n + '">🚶 ' + L2('GO THERE', 'Y ALLER') + '</button><button class="btn" data-g="bmsay" data-v="' + n + '">🔊</button></div>';
+  view.appendChild(p); var x = Math.min(r.width - p.offsetWidth - 8, Math.max(8, e.clientX - r.left + 12)), y = Math.min(r.height - p.offsetHeight - 8, Math.max(8, e.clientY - r.top - 20)); p.style.left = x + 'px'; p.style.top = y + 'px'; say(it.name); }
+function bmGo(n){ var o = BM.pins[n]; bmClose(); if(!o) return; if(o.i != null){ GACT.srchgo(o.i); return; } if(o.it.act) o.it.act(); }
+openMap = function(){ closeCard(); if(document.pointerLockElement) try { document.exitPointerLock(); } catch(e){} BM.el.classList.remove('hidden'); var cp = INT.cur && INT.cur.out ? INT.cur.out : camera.position; bmShow(bmRegionOf(cp.x, cp.z) || 'paris'); };
+/* 📋 the list: every place, in boxes that fit their names */
+function openMapList(){ srch.list = searchIndex(); var groups = {}, order = [];
+  bmItems().forEach(function(o){ if(o.i == null) return; var c = bmCat(o.it)[1]; if(!groups[c]){ groups[c] = []; order.push(c); } groups[c].push(o); });
+  srch.list.forEach(function(it, i){ if(it.act && !it.x && !it.z){ var c = L2('The class villages', 'Les villages des classes'); if(!groups[c]){ groups[c] = []; order.push(c); } groups[c].push({it:it, i:i}); } });
+  var h = '<h3>🗺 ' + L2('EVERY PLACE - WHERE DO YOU WANT TO GO?', 'TOUS LES LIEUX - OÙ VEUX-TU ALLER ?') + '</h3><div class="gc-row">' + gBtn('bmopen', null, '🗺 ' + L2('BIRD\'S-EYE MAP', 'LA CARTE VUE DU CIEL'), 'go') + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>';
+  order.forEach(function(c, gi){ h += '<details' + (gi < 2 ? ' open' : '') + ' style="margin:6px 0"><summary style="cursor:pointer;font-family:\'Press Start 2P\',monospace;font-size:9px;padding:6px 0">' + esc(c) + ' (' + groups[c].length + ')</summary><div class="bm-grid">' + groups[c].map(function(o){ return gOpt('srchgo', o.i, o.it.icon + ' <b>' + esc(o.it.name) + '</b>' + (o.it.sub ? '<br><span class="lf-soft">' + esc(o.it.sub) + '</span>' : '')); }).join('') + '</div></details>'; });
+  showCard(h); }
+GACT.bmopen = function(){ openMap(); };
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
