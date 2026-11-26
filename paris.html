@@ -5353,15 +5353,15 @@ function playEvent(e, t){
 setInterval(function(){
   var ctx = sfx.ctx;
   if(!music.on || !ctx || ctx.state !== 'running') return;
-  if(!music.gain){ music.gain = ctx.createGain(); music.gain.gain.value = 0.09; music.gain.connect(ctx.destination); }
+  if(!music.gain){ music.gain = ctx.createGain(); music.gain.gain.value = 0.09*(typeof VOL !== 'undefined' ? VOL.music : 1); music.gain.connect(ctx.destination); }
   var now = ctx.currentTime;
-  if(!music.cur){ music.cur = music.compiled[music.song]; music.start = now + 0.15; music.i = 0; }
+  if(!music.cur){ var mset = typeof MUSIC_AREA !== 'undefined' && MUSIC_AREA.qc ? QC_MUSIC : music.compiled; music.cur = mset[music.song % mset.length]; music.start = now + 0.15; music.i = 0; }
   var c = music.cur;
   while(music.i < c.ev.length && music.start + c.ev[music.i].t < now + 0.35){
     var e = c.ev[music.i++], at = music.start + e.t;
     if(at >= now - 0.02) playEvent(e, Math.max(at, now));   // (anything missed while the tab slept is skipped)
   }
-  if(music.i >= c.ev.length && now > music.start + c.len){ music.song = (music.song + 1) % music.compiled.length; music.cur = null; }
+  if(music.i >= c.ev.length && now > music.start + c.len){ music.song = (music.song + 1) % 12; music.cur = null; }
 }, 60);
 function setMusic(on){
   music.on = on;
@@ -5370,7 +5370,7 @@ function setMusic(on){
     var t = sfx.ctx.currentTime;
     music.gain.gain.cancelScheduledValues(t);
     music.gain.gain.setValueAtTime(music.gain.gain.value, t);
-    music.gain.gain.linearRampToValueAtTime(on ? 0.09 : 0, t + 0.3);
+    music.gain.gain.linearRampToValueAtTime(on ? 0.09*(typeof VOL !== 'undefined' ? VOL.music : 1) : 0, t + 0.3);
   }
   if(on){ music.cur = null; unlockAudio(); }
 }
@@ -11127,11 +11127,11 @@ function startRide(kind){
   closeEditors(); if(!flying) requestFirstPerson('walk');
   var legs = kind === 'sled' ? [{path:QC_SLIDE, sp:4, acc:14, max:20, m:'sled'}] :
              kind === 'ski' ? [{path:QC_SKI_UP, sp:7, m:'chair'}, {path:QC_SKI_DOWN, sp:6, acc:8, max:17, m:'ski'}] :
-             kind === 'dogs' ? [{path:QC_DOG, sp:9, m:'dogs'}] : kind === 'train' ? [{path:QC_TRAIN, sp:13, m:'train'}] : kind === 'yacht' ? [{path:QC_YACHT, sp:8, m:'yacht'}] : null;
+             kind === 'dogs' ? [{path:QC_DOG, sp:9, m:'dogs'}] : kind === 'train' || kind === 'qtrain' ? [{path:QC_TRAIN, sp:13, m:'train'}] : kind === 'yacht' ? [{path:QC_YACHT, sp:8, m:'yacht'}] : null;
   if(DRIVE[kind]){ startDrive(kind, qx(120), qz(165), 0); return; }
   ride = {on:true, kind:kind, legs:legs, leg:0, s:0, v:legs[0].sp, models:ride.models || {}};
   ride.legs.forEach(function(l){ l.cum = [0]; for(var i=1;i<l.path.length;i++) l.cum.push(l.cum[i-1] + Math.hypot(l.path[i][0] - l.path[i-1][0], l.path[i][1] - l.path[i-1][1], l.path[i][2] - l.path[i-1][2])); l.len = l.cum[l.cum.length - 1]; });
-  showToast({train:L2('🚆 All aboard! A ride all around Québec.', '🚆 En voiture ! Une balade tout autour de Québec.'), yacht:L2('🛥 A yacht tour of the basin!', '🛥 Une balade en yacht dans le bassin !'), sled:L2('🛷 Wheee! Down the ice slide!', '🛷 Youpi ! On descend la glissade !'), ski:L2('🎿 Up the chairlift, then ski down the slalom!', '🎿 On monte en télésiège, puis on descend en slalom !'), dogs:L2('🐕 Mush! The dogs are running!', '🐕 Allez les chiens ! En avant !')}[kind]);
+  showToast({qtrain:'🚆', train:L2('🚆 All aboard! A ride all around Québec.', '🚆 En voiture ! Une balade tout autour de Québec.'), yacht:L2('🛥 A yacht tour of the basin!', '🛥 Une balade en yacht dans le bassin !'), sled:L2('🛷 Wheee! Down the ice slide!', '🛷 Youpi ! On descend la glissade !'), ski:L2('🎿 Up the chairlift, then ski down the slalom!', '🎿 On monte en télésiège, puis on descend en slalom !'), dogs:L2('🐕 Mush! The dogs are running!', '🐕 Allez les chiens ! En avant !')}[kind]);
 }
 function pathAt(l, s){
   var P = l.path, i = 1; while(i < P.length - 1 && l.cum[i] < s) i++;
@@ -11149,11 +11149,12 @@ function updateRide(dt){
   if(DRIVE[ride.kind]){ driveTick(dt); return; }
   var l = ride.legs[ride.leg];
   if(l.acc){ var p0 = pathAt(l, ride.s), p1 = pathAt(l, ride.s + 1), slope = Math.max(0, p0.y - p1.y); ride.v = Math.min(l.max, ride.v + (l.acc*slope - 1.5)*dt); ride.v = Math.max(3, ride.v); }
-  ride.s += ride.v*dt;
+  ride.s += ride.v*dt; if(ride.onTick) ride.onTick();
   if(ride.s >= l.len){
     if(ride.leg < ride.legs.length - 1){ ride.leg++; ride.s = 0; ride.v = ride.legs[ride.leg].sp; return; }
-    var end = pathAt(l, l.len); endRide(); camera.position.set(qx(end.x), surfaceAt(qx(end.x), qz(end.z), 0) + EYE_HEIGHT, qz(end.z));
-    showToast(ride.kind === 'dogs' ? L2('What a ride! Merci les chiens !', 'Quelle balade ! Merci les chiens !') : L2('Bravo ! Encore ? (press E at the start)', 'Bravo ! Encore ? (E au départ)'));
+    var oe = ride.onEnd, rk = ride.kind; var end = pathAt(l, l.len); endRide(); camera.position.set(qx(end.x), surfaceAt(qx(end.x), qz(end.z), 0) + EYE_HEIGHT, qz(end.z));
+    if(oe){ oe(); return; }
+    showToast(rk === 'dogs' ? L2('What a ride! Merci les chiens !', 'Quelle balade ! Merci les chiens !') : L2('Bravo ! Encore ? (press E at the start)', 'Bravo ! Encore ? (E au départ)'));
     return;
   }
   var p = pathAt(l, ride.s), ahead = pathAt(l, Math.min(l.len, ride.s + 4));
@@ -11721,7 +11722,7 @@ var SINGERS = [
    fr:'Ce chanteur belge est l\'un des plus grands auteurs de la chanson française. Ses chansons racontent l\'amour, la Belgique et la vie de tous les jours avec beaucoup d\'émotion.', en:'This Belgian singer is one of the greatest songwriters of French chanson. His songs tell of love, Belgium and everyday life with lots of emotion.'},
   {nm:'Céline Dion', from:'Charlemagne, Québec (Canada)', yrs:L2('born 1968', 'née en 1968'), songs:['Pour que tu m\'aimes encore (1995)', 'My Heart Will Go On (1997)'],
    fr:'La plus jeune de 14 enfants, elle a enregistré sa première chanson à 12 ans. Elle chante en français et en anglais. En 2024, elle a chanté sur la tour Eiffel pour l\'ouverture des Jeux olympiques de Paris.', en:'The youngest of 14 children, she recorded her first song at 12. She sings in French and English. In 2024 she sang on the Eiffel Tower at the opening of the Paris Olympic Games.'},
-  {nm:'Stromae', from:'Bruxelles, Belgique', yrs:L2('born 1985', 'né en 1985'), songs:['Alors on danse (2009)', 'Papaoutai (2013)', 'Formidable (2013)', 'L\'enfer (2022)'],
+  {nm:'Stromae', from:'Bruxelles, Belgique', yrs:L2('born 1985', 'né en 1985'), songs:['Alors on danse (2009)', 'Papaoutai (2013)', 'Formidable (2013)'],
    fr:'Paul Van Haver, alias Stromae, mélange la musique électronique, le hip-hop et la chanson française. Son nom de scène vient de « maestro » en verlan (les syllabes à l\'envers).', en:'Paul Van Haver, known as Stromae, mixes electronic music, hip-hop and French chanson. His stage name is "maestro" in verlan (French slang that swaps syllables).'},
   {nm:'Zaz', from:'Tours, France', yrs:L2('born 1980', 'née en 1980'), songs:['Je veux (2010)', 'On ira (2014)', 'Paris sera toujours Paris (2014)'],
    fr:'Avant d\'être célèbre, elle chantait dans les rues de Montmartre. Sa musique mélange la chanson française, le jazz et la musique manouche.', en:'Before she was famous she sang in the streets of Montmartre. Her music mixes French chanson, jazz and gypsy jazz.'},
@@ -11729,7 +11730,7 @@ var SINGERS = [
    fr:'Avec « Dernière danse », elle est devenue célèbre dans le monde entier, même dans des pays où on ne parle pas français.', en:'With "Dernière danse" she became famous all over the world, even in countries where people don\'t speak French.'},
   {nm:'Angèle', from:'Bruxelles, Belgique', yrs:L2('born 1995', 'née en 1995'), songs:['Balance ton quoi (2018)', 'Tout oublier (2018)', 'Bruxelles je t\'aime (2021)'],
    fr:'Chanteuse et pianiste belge, elle écrit des chansons pop pleines d\'humour qui parlent aussi de sujets sérieux, comme le respect et l\'égalité.', en:'A Belgian singer and pianist, she writes funny pop songs that also talk about serious topics, like respect and equality.'},
-  {nm:'Aya Nakamura', from:'Bamako, Mali → Aulnay-sous-Bois, France', yrs:L2('born 1995', 'née en 1995'), songs:['Djadja (2018)', 'Pookie (2019)', 'Copines (2018)'],
+  {nm:'Aya Nakamura', from:'Bamako, Mali → Aulnay-sous-Bois, France', yrs:L2('born 1995', 'née en 1995'), songs:['Copines (2018)'],
    fr:'C\'est l\'une des chanteuses francophones les plus écoutées au monde. En 2024, elle a chanté avec la Garde républicaine lors de la cérémonie d\'ouverture des Jeux olympiques de Paris.', en:'She is one of the most-streamed French-speaking singers in the world. In 2024 she performed with the Republican Guard at the opening ceremony of the Paris Olympic Games.'},
   {nm:'Cœur de pirate', from:'Montréal, Québec (Canada)', yrs:L2('born 1989', 'née en 1989'), songs:['Comme des enfants (2008)', 'Place de la République (2012)', 'Oublie-moi (2014)'],
    fr:'Béatrice Martin, alias Cœur de pirate, est une pianiste et chanteuse québécoise. Elle a appris le piano dès l\'âge de 3 ans.', en:'Béatrice Martin, known as Cœur de pirate, is a pianist and singer from Québec. She started learning the piano at age 3.'},
@@ -12529,11 +12530,11 @@ var VIDS = {'Papaoutai':'oiKj0Z_Xnjc', 'Dernière danse':'K5KAc5CoCuk', 'Balance
   'La Bohème':'1LocIXZvHdg', 'Emmenez-moi':'0OrKMaeQUx0', 'Hier encore':'6gqF3Tu5Ly4',
   'Ne me quitte pas':'n0ehZeWGXW0', 'Amsterdam':'bkC7WCpJfYY', 'Quand on n\'a que l\'amour':'WXnvi9R5KvQ',
   'Pour que tu m\'aimes encore':'AzaTyxMduH4', 'My Heart Will Go On':'DfWxUrAZh7o',
-  'Alors on danse':'VHoT4N43jK8', 'Formidable':'S_xH7noaqTA', 'L\'enfer':'DO8NSL5Wyeg',
+  'Alors on danse':'VHoT4N43jK8', 'Formidable':'S_xH7noaqTA',
   'Je veux':'0TFNGRYMz1U', 'On ira':'8IjWHBGzsu4', 'Paris sera toujours Paris':'tmiI98EG1Fo',
   'Tourner dans le vide':'vtNJMAyeP0s', 'S.O.S':'m65jhGwtWrg',
   'Tout oublier':'Fy1xQSiLx8U', 'Bruxelles je t\'aime':'a79iLjV-HKw',
-  'Djadja':'iPGgnzc34tY', 'Pookie':'_bPa-VG0AWo', 'Copines':'EkGiGf8utCM',
+  'Copines':'EkGiGf8utCM',
   'Comme des enfants':'U-fU_V7Boic', 'Place de la République':'qyuPn4DPCdA', 'Oublie-moi':'76EwKm5oL2Y',
   'Andalouse':'FndmvPkI1Ms', 'Color Gitano':'63K5VMx2BZM', 'Cool':'NbVnbwCKigo',
   'Avenir':'niyGWxVE-e4', 'Si t\'étais là':'yo-CCYzm_SQ'};
@@ -12580,7 +12581,7 @@ function playSong(title, artist){
     if(player.yt && player.yt.loadVideoById){ player.yt.loadVideoById(id); return; }
     player.yt = new YT.Player('yp-frame', {videoId:id, host:'https://www.youtube-nocookie.com', playerVars:{autoplay:1, rel:0, playsinline:1, modestbranding:1},
       events:{
-        onReady:function(e){ try{ e.target.playVideo(); }catch(x){} },
+        onReady:function(e){ try{ e.target.setVolume(typeof VOL !== 'undefined' ? VOL.songs : 80); e.target.playVideo(); }catch(x){} },
         onStateChange:function(e){ if(e.data === 0) songStep(1); },   // ended -> next song
         onError:function(){ var s = SONGS[player.cur]; if(s) player.failed[s.t] = 1; document.getElementById('yp-m').textContent = L2('That video can\'t play here - skipping to the next song.', 'Cette vidéo ne peut pas jouer ici - chanson suivante.'); setTimeout(function(){ songStep(1); }, 1500); }
       }});
@@ -12675,7 +12676,7 @@ function say(text){
   var t = String(text).replace(/<[^>]*>/g, ' ').replace(/[\u{1F000}-\u{1FFFF}☀-➿️‍⟶→←↗▶⏮⏭⏹✓✗🪙]/gu, ' ').replace(/\s+/g, ' ').trim();
   if(!t) return;
   speechSynthesis.cancel();
-  var u = new SpeechSynthesisUtterance(t); u.lang = 'fr-FR'; u.rate = 0.88; var v = frVoice(); if(v) u.voice = v;
+  var u = new SpeechSynthesisUtterance(t); u.lang = 'fr-FR'; u.rate = 0.88; u.volume = typeof VOL !== 'undefined' ? VOL.voice : 1; var v = frVoice(); if(v) u.voice = v;
   speechSynthesis.speak(u);
 }
 /* is this text French? (so we only offer to read French aloud) */
@@ -13460,7 +13461,7 @@ GACT.anthem = function(v){
 var MUSIC = {i:0};
 (function(){
   var s = document.getElementById('anthem-toggle'), b = document.createElement('button');
-  b.className = 'bar-btn'; b.id = 'music-toggle'; b.textContent = '🎵'; b.title = 'Musique / Music';
+  b.className = 'bar-btn'; b.id = 'songs-toggle'; b.textContent = '🎵'; b.title = 'Musique / Music';
   s.parentNode.insertBefore(b, s.nextSibling);
   b.addEventListener('click', function(){ openMusic(); });
 })();
@@ -13667,7 +13668,7 @@ function startDrive(kind, x, z, h){
   var P = DRIVE[kind], models = ride.models || {};
   models[kind] = models[kind] || (P.model ? P.model() : VEH_MODEL[kind]());
   ride = {on:true, kind:kind, model:models[kind], models:models, v:0, h:h || 0, start:{x:x, z:z}, pos:null};
-  camera.position.set(x, P.eye, z); yaw = ride.h; ride.model.visible = true;
+  ride.px = x; ride.pz = z; camera.position.set(x, P.eye, z); yaw = ride.h; ride.model.visible = true;
   showToast(P.nm() + (P.water ? L2(': W = sail in, S = slow, A/D = steer. Watch the wind! E = back to the dock', ' : W = border la voile, S = ralentir, A/D = barrer. Attention au vent ! E = retour au quai') : L2(': W/S to go, A/D to steer, E to get off', ' : W/S avancer, A/D tourner, E pour descendre')));
   if(P.water){ ride.wind = 0; sailInfo(true); }
 }
@@ -13680,7 +13681,7 @@ function sailInfo(force){
   return a < 40 ? 0.08 : a < 70 ? 0.6 : a < 110 ? 1 : a < 160 ? 0.85 : 0.7;
 }
 function driveTick(dt){
-  var P = DRIVE[ride.kind];
+  var P = DRIVE[ride.kind]; if(ride.px == null){ ride.px = camera.position.x; ride.pz = camera.position.z; }
   var acc = keyFwd() ? P.acc : keyBack() ? -P.acc*0.7 : 0;
   if(!acc && stickAmount() > STICK_DEAD) acc = stick.y*P.acc;
   var top = P.max;
@@ -13688,18 +13689,17 @@ function driveTick(dt){
   ride.v = Math.max(P.back, Math.min(top + 0.01, (ride.v + acc*dt)*(acc ? 1 : Math.pow(P.water ? 0.7 : 0.4, dt))));
   var turn = (keyLeft() ? 1 : 0) - (keyRight() ? 1 : 0); if(!turn && stickAmount() > STICK_DEAD) turn = -stick.x;
   ride.h += turn*dt*P.turn*Math.min(1, Math.abs(ride.v)/4 + (P.water ? 0.35 : 0.2));
-  var nx = camera.position.x - Math.sin(ride.h)*ride.v*dt, nz = camera.position.z - Math.cos(ride.h)*ride.v*dt;
+  var nx = ride.px - Math.sin(ride.h)*ride.v*dt, nz = ride.pz - Math.cos(ride.h)*ride.v*dt;
   if(P.water){
-    if(nx > WATER.x0 + 3 && nx < WATER.x1 - 1 && nz > WATER.z0 + 3 && nz < WATER.z1 - 3){ camera.position.x = nx; camera.position.z = nz; } else ride.v *= -0.3;
+    if(nx > WATER.x0 + 3 && nx < WATER.x1 - 1 && nz > WATER.z0 + 3 && nz < WATER.z1 - 3){ ride.px = nx; ride.pz = nz; } else ride.v *= -0.3;
   } else {
-    if(!hitSolid(nx, nz, 0.8, 0.3, 1.6)){ camera.position.x = nx; camera.position.z = nz; } else ride.v *= -0.3;
-    var out = boundsContact(camera.position.x, camera.position.z, 0.8); if(out){ camera.position.x += out.ex; camera.position.z += out.ez; ride.v *= 0.5; }
+    if(!hitSolid(nx, nz, 0.8, 0.3, 1.6)){ ride.px = nx; ride.pz = nz; } else ride.v *= -0.3;
+    var out = boundsContact(ride.px, ride.pz, 0.8); if(out){ ride.px += out.ex; ride.pz += out.ez; ride.v *= 0.5; }
   }
   var now = performance.now();
-  camera.position.y = P.eye + (P.water ? Math.sin(now*0.002)*0.12 : Math.sin(now*0.02)*0.03*Math.abs(ride.v)/P.max);
-  yaw = ride.h; camera.rotation.set(pitch, yaw, P.water ? Math.sin(now*0.0015)*0.03 : 0);
+  rideCamera(P, now);
   var m = ride.model, back = ride.kind === 'croissant' ? -0.3 : ride.kind === 'sail' ? 1.2 : 0.2;
-  m.position.set(camera.position.x + Math.sin(ride.h)*back, P.water ? Math.sin(now*0.002)*0.1 : 0, camera.position.z + Math.cos(ride.h)*back); m.rotation.y = ride.h; m.visible = true;
+  m.position.set(ride.px + Math.sin(ride.h)*back, P.water ? Math.sin(now*0.002)*0.1 : 0, ride.pz + Math.cos(ride.h)*back); m.rotation.y = ride.h; m.visible = true;
   if(ride.kind === 'sail' && m.userData.sail){ var rel = Math.atan2(Math.sin(SAIL.from - ride.h), Math.cos(SAIL.from - ride.h)); m.userData.sail.rotation.y = Math.max(-1.2, Math.min(1.2, -rel*0.5)); }
 }
 /* the rentals in Baguetteville */
@@ -13978,7 +13978,7 @@ function furnishHome(F, o){
   tag(X, 5, Z - 10, 'la gare', 'the train station', 8); tag(X - 20, 15, Z - 6, 'l\'horloge de la gare', 'the station clock', 2); tag(X, 1, Z + 26, 'le quai', 'the platform', 4);
   var tr = VEH_MODEL.train(); tr.visible = true; tr.position.set(qx(110), 0.4, qz(455)); tr.rotation.y = -Math.PI/2; tag(qx(118), 2, qz(455), 'le train', 'the train', 4);
   QV.trainParked = tr;
-  addSpot({x:X, z:Z + 31.5, r:5, label:function(){ return '🚆 ' + L2('Board the train (scenic ride around Québec)', 'Monter dans le train (balade autour de Québec)'); }, act:function(){ if(!QV.ticket){ hudMsg('🎟 ' + L2('You need a ticket! Buy one inside the station (le guichet).', 'Il te faut un billet ! Achète-le au guichet, dans la gare.')); say('Il te faut un billet !'); return; } QV.ticket = false; tr.visible = false; startRide('train'); }});
+  addSpot({x:X, z:Z + 31.5, r:5, label:function(){ return '🚆 ' + L2('Board the train (scenic ride around Québec)', 'Monter dans le train (balade autour de Québec)'); }, act:function(){ if(!QV.ticket){ hudMsg('🎟 ' + L2('You need a ticket! Buy one inside the station (le guichet).', 'Il te faut un billet ! Achète-le au guichet, dans la gare.')); say('Il te faut un billet !'); return; } qTrainChoose(0); }});
   makeInterior({id:'gare', name:'La Gare du Palais', en:'The Gare du Palais (train station)', w:34, d:20, h:9, wall:0xe8dcc0, floor:0xc8b89a, ceil:0xf2ece0, signBg:'#1f4fa0',
     out:{x:X, z:Z - 14, yaw:0}, door:{x:X, z:Z - 11, r:2.6},
     facts:[['La Gare du Palais a été construite en 1915. Avec ses tourelles, elle ressemble à un château !', 'The Gare du Palais was built in 1915. With its turrets it looks like a castle!', ['Quand la gare a-t-elle été construite ?', 'en 1915', ['en 1608', 'en 1789', 'en 2015']]],
@@ -14158,7 +14158,7 @@ var _mapPlacesX = mapPlaces;
 mapPlaces = function(){ var g = _mapPlacesX(), L = srch.list || searchIndex(); g.unshift(['⭐ ' + L2('New places', 'Nouveaux lieux'), L.filter(function(x){ return x.cat === 'new'; })]); return g; };
 /* the rides: give the parked train and yacht back, and bring sailors back to the pier */
 var _endRideX = endRide;
-endRide = function(){ var k = ride.kind; _endRideX(); if(QV.trainParked) QV.trainParked.visible = true; if(QV.yacht) QV.yacht.visible = true;
+endRide = function(){ var k = ride.kind, px = ride.px, pz = ride.pz; _endRideX(); if(DRIVE[k] && px != null){ camera.position.set(px, EYE_HEIGHT, pz); camera.rotation.set(pitch, yaw, 0); } if(QV.trainParked) QV.trainParked.visible = true; if(QV.yacht) QV.yacht.visible = true;
   if(k === 'sail'){ camera.position.set(qx(-338), EYE_HEIGHT, qz(200)); hudBox.classList.add('hidden'); } };
 /* ---------- 👆 BROWSE MODE: point at any building (even far away) and click to go straight to its door ---------- */
 var BROWSE = {on:false, list:null, cur:null, t:0};
@@ -14236,6 +14236,541 @@ function concertPlay(){
   hudMsg('🎤 ' + L2('LIVE IN CONCERT: ', 'EN CONCERT : ') + SINGERS[CONCERT.si].nm + ' · ⏭ ' + L2('next song', 'chanson suivante'));
   say('En concert : ' + SINGERS[CONCERT.si].nm);
 }
+/* ---------- 🚇 LE MÉTRO: buy a ticket, validate it, plan your route, choose the right direction, ride ----------
+   Three lines like the real Paris network: Ligne 1 (yellow), Ligne 4 (purple) and the RER B (blue) to the airport.
+   You change lines at Concorde and Tour Eiffel ("la correspondance"). */
+var MSTA = {
+  eiffel:{nm:'Tour Eiffel', x:30, z:42}, louvre:{nm:'Louvre', x:66, z:110}, concorde:{nm:'Concorde', x:232, z:-503}, champs:{nm:'Champs-Élysées', x:-111, z:-514},
+  opera:{nm:'Opéra', x:-280, z:-612}, stade:{nm:'Stade', x:424, z:-497}, superm:{nm:'Supermarché du Monde', x:172, z:662}, zoo:{nm:'Zoo de Paris', x:-232, z:604}, cdg:{nm:'Aéroport Charles-de-Gaulle', x:CDG.x + 24, z:CDG.z - 30}
+};
+var MLINES = [
+  {id:'1', nm:'Ligne 1', col:'#f2c230', hex:0xf2c230, st:['eiffel', 'louvre', 'concorde', 'champs', 'opera']},
+  {id:'4', nm:'Ligne 4', col:'#a04ab8', hex:0xa04ab8, st:['concorde', 'stade', 'superm', 'zoo']},
+  {id:'B', nm:'RER B', col:'#3a7ad8', hex:0x3a7ad8, st:['eiffel', 'cdg']}
+];
+var MET = {ticket:0, valid:false, at:null, trip:null};
+function metroRoute(a, b){   // the fewest stops, changing lines if needed: [{line, from, to, stops, dir}]
+  var best = null;
+  MLINES.forEach(function(L1){ var i = L1.st.indexOf(a), j = L1.st.indexOf(b); if(i >= 0 && j >= 0){ var r = [{line:L1, from:a, to:b, stops:Math.abs(j - i), dir:L1.st[j > i ? L1.st.length - 1 : 0]}]; if(!best || r[0].stops < best.n) best = {legs:r, n:r[0].stops}; } });
+  if(best) return best.legs;
+  MLINES.forEach(function(L1){ var i = L1.st.indexOf(a); if(i < 0) return; L1.st.forEach(function(x, xi){ if(x === a) return; MLINES.forEach(function(L2){ if(L2 === L1) return; var k = L2.st.indexOf(x), j = L2.st.indexOf(b); if(k < 0 || j < 0) return;
+    var n = Math.abs(xi - i) + Math.abs(j - k); if(!best || n < best.n) best = {n:n, legs:[{line:L1, from:a, to:x, stops:Math.abs(xi - i), dir:L1.st[xi > i ? L1.st.length - 1 : 0]}, {line:L2, from:x, to:b, stops:Math.abs(j - k), dir:L2.st[j > k ? L2.st.length - 1 : 0]}]}; }); }); });
+  return best ? best.legs : null;
+}
+function lineOf(id){ return MLINES.filter(function(l){ return l.st.indexOf(id) >= 0; }); }
+function metroMapHtml(here){
+  var h = '<div style="text-align:left; font-family:VT323,monospace; font-size:18px">';
+  MLINES.forEach(function(L){ h += '<div style="margin:6px 0"><b style="background:' + L.col + '; color:#fff; padding:0 6px; border-radius:4px">' + L.nm + '</b> ';
+    h += L.st.map(function(id){ var me = id === here, tr = lineOf(id).length > 1; return '<span style="white-space:nowrap">' + (me ? '📍<b><u>' : tr ? '🔁' : '● ') + esc(MSTA[id].nm) + (me ? '</u></b>' : '') + '</span>'; }).join(' <span style="color:' + L.col + '">━━</span> ') + '</div>'; });
+  return h + '<div class="lf-soft">📍 ' + L2('you are here', 'tu es ici') + ' · 🔁 ' + L2('change lines here (correspondance)', 'correspondance (changer de ligne)') + '</div></div>';
+}
+/* the street entrances */
+function metroStation(id){
+  var st = MSTA[id], B = new MeshBatch(), E = new Lot(B, st.x, st.z, 0), green = 0x2f6a4a;
+  E.box(4.2, 0.9, 0.12, 0, 0.45, -1.6, green); E.box(0.12, 0.9, 3.2, -2.1, 0.45, 0, green); E.box(0.12, 0.9, 3.2, 2.1, 0.45, 0, green);
+  for(var i=0;i<5;i++) E.box(3.6, 0.2, 0.6, 0, -0.1 - i*0.25, -1.1 + i*0.55, 0x8a8478);
+  [-2.1, 2.1].forEach(function(x){ E.box(0.18, 3.6, 0.18, x, 1.8, 1.6, green); E.part(new THREE.SphereGeometry(0.28, 8, 6), x, 3.7, 1.6, 0xff8a2a); }); E.box(4.4, 0.25, 0.25, 0, 3.2, 1.6, green);
+  B.build();
+  airSign('Ⓜ MÉTRO · ' + st.nm.toUpperCase(), st.x, 3.75, st.z + 1.65, 0, 5.2, '#2f6a4a'); airSign('Ⓜ MÉTRO · ' + st.nm.toUpperCase(), st.x, 3.75, st.z + 1.55, Math.PI, 5.2, '#2f6a4a');
+  tag(st.x, 2.6, st.z + 1.6, 'la bouche de métro', 'the metro entrance', 1.6);
+  st.room = makeInterior({id:'met-' + id, name:'Station ' + st.nm, en:st.nm + ' station', w:32, d:22, h:6, wall:0xf2f2ec, floor:0x8a8a84, ceil:0xe8e8e2, light:0xfff6e8, signBg:'#1f3f8f', title:false, trim:0x1f3f8f,
+    out:{x:st.x, z:st.z + 4.2, yaw:Math.PI}, door:{x:st.x, z:st.z + 1.8, r:2.2},
+    facts:[['Le métro de Paris a ouvert en 1900, pour l\'Exposition universelle. Aujourd\'hui, il a 16 lignes et plus de 300 stations !', 'The Paris Métro opened in 1900 for the World\'s Fair. Today it has 16 lines and more than 300 stations!', ['Quand le métro de Paris a-t-il ouvert ?', 'en 1900', ['en 1608', 'en 1789', 'en 2024']]],
+           ['Dans le métro, la « direction », c\'est le nom de la dernière station de la ligne (le terminus). On cherche toujours la bonne direction !', 'In the Métro, the "direction" is the name of the last station on the line (the terminus). Always look for the right direction!', ['Dans le métro, la direction, c\'est...', 'le nom du terminus de la ligne', ['le nom du conducteur', 'le numéro du ticket', 'la couleur du train']]],
+           ['Les entrées du métro de style Art nouveau ont été dessinées par l\'architecte Hector Guimard.', 'The Art Nouveau Métro entrances were designed by architect Hector Guimard.', ['Qui a dessiné les entrées du métro ?', 'Hector Guimard', ['Gustave Eiffel', 'Coco Chanel', 'Napoléon']]]],
+    spots:[{x:-11, z:5, r:2.6, label:function(){ return '🎫 ' + L2('Ticket machine: buy a ticket', 'Le distributeur : acheter un ticket'); }, act:function(){ ticketMachine(id); }},
+           {x:0, z:1.6, r:2.4, label:function(){ return '🚧 ' + L2('Turnstile: validate your ticket', 'Le tourniquet : valider ton ticket'); }, act:function(){ turnstile(id); }},
+           {x:11, z:5, r:2.6, label:function(){ return '🗺 ' + L2('The metro map: plan your route', 'Le plan du métro : prépare ton trajet'); }, act:function(){ metroMap(id); }},
+           {x:0, z:-5.5, r:4, label:function(){ return '🚇 ' + L2('Platform: take the metro', 'Le quai : prendre le métro'); }, act:function(){ boardMetro(id); }}],
+    build:function(L, X, Z, B2, F){
+      for(var ty=0; ty<6; ty++) L.box(32, 0.04, 0.04, 0, 0.8 + ty*0.9, -10.75, 0xd8d8d0);
+      F.tagAt(-6, 3, -10.7, 'le carrelage blanc', 'the white tiles', 1.5);
+      airSign(st.nm.toUpperCase(), X - 7, 3.2, Z - 10.7, 0, 7, '#1f3f8f'); airSign(st.nm.toUpperCase(), X + 7, 3.2, Z - 10.7, 0, 7, '#1f3f8f'); F.tagAt(7, 3.2, -10.7, 'le nom de la station', 'the station name', 1.2);
+      L.box(32, 0.06, 0.5, 0, 0.03, -6.6, 0xf2c230); F.tagAt(4, 0.2, -6.6, 'la ligne jaune (ne pas dépasser !)', 'the yellow line (stay behind it!)', 0.8);
+      L.box(32, 0.05, 4, 0, -0.01, -8.9, 0x3a3634); [-9.6, -8.2].forEach(function(z){ L.box(32, 0.12, 0.12, 0, 0.06, z, 0x9a9aa0); }); F.tagAt(-4, 0.2, -8.9, 'les rails', 'the rails', 1);
+      for(var t=-6; t<=6; t+=6){ var T = new Lot(B2, X + t, Z + 1.6, 0); T.box(0.3, 1, 1, 0, 0.5, 0, 0x8a8f98); T.box(0.06, 0.06, 1.1, 0.4, 0.9, 0, 0xb8c0c8); }
+      F.tagAt(0, 1, 1.6, 'le tourniquet', 'the turnstile', 1.2);
+      var D = new Lot(B2, X - 11, Z + 6.5, 0); D.box(1.4, 2, 0.8, 0, 1, 0, 0x2f6a4a); D.box(1, 0.7, 0.05, 0, 1.4, -0.42, 0x5aa0c8); F.tagAt(-11, 1.4, 6.5, 'le distributeur de tickets', 'the ticket machine', 0.8);
+      var P = new Lot(B2, X + 11, Z + 10.7, Math.PI); P.box(4, 2.6, 0.08, 0, 2, 0, 0xffffff); MLINES.forEach(function(Ln, i){ P.box(3.4, 0.12, 0.02, 0, 2.7 - i*0.5, -0.05, Ln.hex); }); F.tagAt(11, 2, 10.7, 'le plan du métro', 'the metro map', 1.2);
+      var S = new Lot(B2, X, Z - 6, 0); S.box(3, 0.6, 0.08, 0, 3.4, 0, 0x1b1b1d); S.box(2.6, 0.12, 0.02, 0, 3.45, -0.05, 0xf2c230); F.tagAt(0, 3.4, -6, 'le panneau d\'affichage (prochain train)', 'the display board (next train)', 0.8);
+      for(var b=-1; b<=1; b+=2){ F.item('banc', b*9, -4.5, 0, 0xc8382f); F.wallItem('affiche', b*13, 2.4, -10.75, 0, b < 0 ? 0x3a8ab8 : 0xe86a3a); }
+      F.item('poubelle', 14, -4); F.tagAt(-15, 2.6, 0, 'la sortie', 'the exit', 0.8);
+      lineOf(id).forEach(function(Ln, i){ airSign(Ln.nm + ' →', X - 12 + i*7, 4.8, Z - 6.4, 0, 5, Ln.col); });
+    }});
+}
+Object.keys(MSTA).forEach(metroStation);
+function ticketMachine(id){
+  showCard('<h3>🎫 ' + L2('TICKET MACHINE', 'LE DISTRIBUTEUR') + '</h3><div class="gc-text">« Bienvenue ! Choisissez votre titre de transport. »</div><div class="gc-big">' + L2('What do you need for one trip?', 'Que te faut-il pour un trajet ?') + '</div><div class="gc-grid">' +
+    [['ticket', '🎫 un ticket (un trajet)'], ['carnet', '🎫🎫 un carnet de 10 tickets'], ['velo', '🚲 un vélo'], ['pizza', '🍕 une pizza']].map(function(o){ return gOpt('metbuy', o[0], esc(o[1])); }).join('') + '</div><div class="gc-row">' + gBtn('close', null, L2('CANCEL', 'ANNULER')) + '</div>');
+}
+GACT.metbuy = function(v){
+  if(v === 'velo' || v === 'pizza'){ showCard('<h3>🎫</h3><div class="bad">✗ ' + L2('The machine only sells tickets!', 'Le distributeur ne vend que des tickets !') + '</div><div class="gc-row">' + gBtn('metagain', null, L2('TRY AGAIN', 'RÉESSAYER'), 'go') + '</div>'); return; }
+  MET.ticket += v === 'carnet' ? 10 : 1; say(v === 'carnet' ? 'Voici votre carnet de dix tickets.' : 'Voici votre ticket. Bon voyage !');
+  showCard('<h3>🎫 ' + L2('PAID!', 'PAYÉ !') + '</h3><div class="gc-emoji">🎫</div><div class="gc-big">' + L2('Tickets: ', 'Tickets : ') + MET.ticket + '</div><div class="gc-text">' + L2('Now validate a ticket at the turnstile (le tourniquet) to get onto the platform.', 'Maintenant, valide un ticket au tourniquet pour aller sur le quai.') + '</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go', ' data-enter="1"') + '</div>');
+};
+GACT.metagain = function(){ ticketMachine(MET.at); };
+function turnstile(id){
+  if(MET.valid){ hudMsg('✓ ' + L2('Your ticket is already validated. Go to the platform!', 'Ton ticket est déjà validé. Va sur le quai !')); return; }
+  if(!MET.ticket){ say('Il te faut un ticket !'); hudMsg('🎫 ' + L2('You need a ticket! Buy one at the ticket machine (le distributeur).', 'Il te faut un ticket ! Achète-le au distributeur.')); return; }
+  MET.ticket--; MET.valid = true; say('Ticket validé. Bip !'); hudMsg('🚧 « Bip ! » ' + L2('Ticket validated - go to the platform (le quai).', 'Ticket validé - va sur le quai.'));
+}
+function metroMap(id){
+  var others = Object.keys(MSTA).filter(function(k){ return k !== id; }), dest = others[Math.floor(Math.random()*others.length)], r = metroRoute(id, dest), total = r.reduce(function(n, l){ return n + l.stops; }, 0);
+  var wrong = [total + 1, total + 2, Math.max(1, total - 1) === total ? total + 3 : Math.max(1, total - 1)].map(String);
+  infoCard('🗺 ' + L2('THE METRO MAP', 'LE PLAN DU MÉTRO'), '', '', ['De ' + MSTA[id].nm + ' à ' + MSTA[dest].nm + ', combien d\'arrêts en tout ?', String(total), wrong], 'map' + id + dest);
+  gcard.el.querySelector('.gc-text').outerHTML = metroMapHtml(id);
+}
+function boardMetro(id){
+  if(!MET.valid){ say('Il faut valider ton ticket !'); hudMsg('🚧 ' + L2('Validate your ticket at the turnstile first!', 'Valide d\'abord ton ticket au tourniquet !')); return; }
+  MET.at = id;
+  showCard('<h3>🚇 ' + L2('WHERE ARE YOU GOING?', 'OÙ VAS-TU ?') + '</h3>' + metroMapHtml(id) + '<div class="gc-grid">' + Object.keys(MSTA).filter(function(k){ return k !== id; }).map(function(k){ return gOpt('metdest', k, '🚇 ' + esc(MSTA[k].nm)); }).join('') + '</div><div class="gc-row">' + gBtn('close', null, L2('CANCEL', 'ANNULER')) + '</div>');
+}
+GACT.metdest = function(dest){
+  var r = metroRoute(MET.at, dest), L0 = r[0], dirs = MLINES.map(function(l){ return [MSTA[l.st[0]].nm, MSTA[l.st[l.st.length - 1]].nm]; }).reduce(function(a, b){ return a.concat(b); }, []).filter(function(n, i, a){ return a.indexOf(n) === i; });
+  var right = MSTA[L0.dir].nm, m = mc(Math.random, right, dirs.filter(function(d){ return d !== right; })); MET.pend = {dest:dest, route:r, m:m};
+  var plan = r.map(function(l, i){ return (i ? '🔁 ' + L2('change at ', 'correspondance à ') + MSTA[l.from].nm + ' → ' : '') + '<b style="background:' + l.line.col + '; color:#fff; padding:0 5px">' + l.line.nm + '</b> ' + l.stops + ' ' + L2('stop(s)', 'arrêt(s)') + ', ' + L2('get off at ', 'descends à ') + MSTA[l.to].nm; }).join('<br>');
+  showCard('<h3>🚇 ' + esc(MSTA[MET.at].nm) + ' → ' + esc(MSTA[dest].nm) + '</h3><div class="gc-text" style="text-align:left">' + plan + '</div><div class="gc-big">' + L2('Which DIRECTION do you take first on the ' + L0.line.nm + '?', 'Quelle DIRECTION prends-tu d\'abord sur la ' + L0.line.nm + ' ?') + '</div><div class="gc-sub">' + L2('(the direction = the last station of the line)', '(la direction = la dernière station de la ligne)') + '</div><div class="gc-grid">' + m.opts.map(function(o, k){ return gOpt('metdir', k, '➡ Direction ' + esc(o)); }).join('') + '</div>');
+};
+GACT.metdir = function(v){
+  var P = MET.pend; if((v|0) !== P.m.ans){ say('Non, ce n\'est pas la bonne direction.'); showCard('<h3>🚇</h3><div class="bad">✗ ' + L2('Wrong platform! The ' + P.route[0].line.nm + ' to ' + MSTA[P.dest].nm + ' goes in direction ', 'Mauvais quai ! Pour aller vers ' + MSTA[P.dest].nm + ', la ' + P.route[0].line.nm + ' va direction ') + esc(P.m.opts[P.m.ans]) + '.</div><div class="gc-row">' + gBtn('metdest', P.dest, L2('TRY AGAIN', 'RÉESSAYER'), 'go') + '</div>'); return; }
+  closeCard(); startMetroTrip(MET.at, P.dest, P.route);
+};
+/* the carriage: you ride inside it, stop by stop */
+var RAME = makeInterior({id:'rame', name:'La rame de métro', en:'The metro carriage', w:7, d:24, h:3.2, wall:0xe8ecf0, floor:0x5a6a7a, ceil:0xf2f4f6, light:0xffffff, title:false, noExit:true, hunt:true,
+  out:{x:MSTA.eiffel.x, z:MSTA.eiffel.z + 4.2, yaw:Math.PI},
+  build:function(L, X, Z, B, F){
+    for(var z=-10; z<=10; z+=2.5){ [-3, 3].forEach(function(x){ var S = new Lot(B, X + x, Z + z, x < 0 ? Math.PI/2 : -Math.PI/2); S.box(0.9, 0.45, 0.55, 0, 0.45, 0, 0x2a5aa8); S.box(0.9, 0.7, 0.12, 0, 0.95, 0.27, 0x2a5aa8); }); }
+    F.tagAt(-3, 0.7, 0, 'le siège', 'the seat', 0.6);
+    for(var p=-9; p<=9; p+=6) L.cyl(0.04, 0.04, 3.2, 0, 1.6, p, 0xc8c8c8, 6); F.tagAt(0, 1.6, -3, 'la barre', 'the pole', 0.3);
+    [-6, 6].forEach(function(z){ [-3.45, 3.45].forEach(function(x){ L.box(0.06, 2.4, 1.6, x, 1.2, z, 0x8a8f98); L.box(0.07, 0.3, 0.06, x, 1.4, z, 0x2a8a4a); }); }); F.tagAt(-3.4, 1.2, 6, 'les portes', 'the doors', 0.8); F.tagAt(-3.4, 1.4, -6, 'le bouton pour ouvrir', 'the door button', 0.25);
+    var c = document.createElement('canvas'); c.width = 256; c.height = 64; var k = c.getContext('2d'); k.fillStyle = '#0b0b10'; k.fillRect(0, 0, 256, 64); k.fillStyle = '#ffe8a0'; for(var i=0;i<4;i++) k.fillRect(10 + i*64, 22, 30, 6);
+    var tex = new THREE.CanvasTexture(c); tex.wrapS = THREE.RepeatWrapping; tex.repeat.set(6, 1); RAME.tex = tex;
+    var c2 = document.createElement('canvas'); c2.width = 256; c2.height = 64; var k2 = c2.getContext('2d'); k2.fillStyle = '#f2f2ec'; k2.fillRect(0, 0, 256, 64); k2.strokeStyle = '#cfcfc6'; for(var tx=0; tx<256; tx+=16) for(var ty=0; ty<64; ty+=8){ k2.strokeRect(tx + (ty % 16 ? 8 : 0), ty, 16, 8); } k2.fillStyle = '#1f3f8f'; k2.fillRect(80, 20, 96, 24);
+    RAME.tex2 = new THREE.CanvasTexture(c2); RAME.tex2.wrapS = THREE.RepeatWrapping; RAME.tex2.repeat.set(3, 1);
+    RAME.winMat = new THREE.MeshBasicMaterial({map:tex});
+    [-3.42, 3.42].forEach(function(x){ var w = new THREE.Mesh(new THREE.PlaneGeometry(9, 0.9), RAME.winMat); w.position.set(X + x, 1.8, Z - 6 + 12 - 6); w.rotation.y = x < 0 ? Math.PI/2 : -Math.PI/2; root.add(w); });
+    F.tagAt(3.4, 1.8, 0, 'la fenêtre', 'the window', 1.2);
+    var bc = document.createElement('canvas'); bc.width = 1024; bc.height = 64; RAME.bandC = bc; RAME.bandTex = new THREE.CanvasTexture(bc);
+    var band = new THREE.Mesh(new THREE.PlaneGeometry(10, 0.6), new THREE.MeshBasicMaterial({map:RAME.bandTex})); band.position.set(X - 3.4, 2.75, Z); band.rotation.y = Math.PI/2; root.add(band);
+    F.tagAt(-3.4, 2.75, 0, 'le plan de la ligne', 'the line map', 1);
+    var cols = [0xc8382f, 0x1f6fb8, 0x2f8a3a, 0xe3b52c, 0x8a3ad6];
+    person({x:X + 2.6, z:Z - 3.5, ry:-Math.PI/2, shirt:cols[0], pants:0x2a3a5a, sit:true, h:1.7}); person({x:X - 2.6, z:Z + 1.5, ry:Math.PI/2, shirt:cols[1], pants:0x3a2a1a, sit:true, h:1.65, hair:0xe8c070}); person({x:X + 0.5, z:Z + 4, ry:0.4, shirt:cols[2], pants:0x1b1b1d, h:1.75, arm:'up'});
+    F.tagAt(0.5, 1.6, 4, 'le passager', 'the passenger', 0.5);
+  }});
+function drawLineBand(trip){
+  var c = RAME.bandC, k = c.getContext('2d'), leg = trip.route[trip.leg], L = leg.line, st = L.st, n = st.length;
+  k.fillStyle = '#ffffff'; k.fillRect(0, 0, 1024, 64); k.fillStyle = L.col; k.fillRect(40, 26, 944, 10);
+  k.font = 'bold 18px sans-serif'; k.textAlign = 'center';
+  st.forEach(function(id, i){ var x = 60 + i*(904/Math.max(1, n - 1)), here = id === trip.cur; k.fillStyle = here ? '#c8382f' : '#1b1b1d'; k.beginPath(); k.arc(x, 31, here ? 11 : 7, 0, Math.PI*2); k.fill(); k.fillStyle = '#1b1b1d'; k.fillText(MSTA[id].nm, x, 60, 200); });
+  k.textAlign = 'left'; k.fillStyle = L.col; k.fillText(L.nm + ' - direction ' + MSTA[leg.dir].nm, 8, 18);
+  RAME.bandTex.needsUpdate = true;
+}
+function startMetroTrip(from, dest, route){
+  MET.valid = false;
+  var stops = [];
+  route.forEach(function(leg, li){ var st = leg.line.st, i = st.indexOf(leg.from), j = st.indexOf(leg.to), d = j > i ? 1 : -1; for(var k = i + d; d > 0 ? k <= j : k >= j; k += d) stops.push({id:st[k], leg:li, last:k === j}); });
+  MET.trip = {from:from, dest:dest, route:route, stops:stops, idx:0, leg:0, cur:from, phase:'go', t:performance.now(), moving:false};
+  enterInterior(RAME, {x:0, z:-2, yaw:Math.PI});
+  setTimeout(function(){ drawLineBand(MET.trip); metroDepart(); }, 900);
+}
+function metroDepart(){
+  var T = MET.trip, nx = T.stops[T.idx]; if(!nx) return;
+  T.moving = true; T.t = performance.now(); RAME.winMat.map = RAME.tex; RAME.winMat.needsUpdate = true;
+  var leg = T.route[nx.leg];
+  say('Prochaine station : ' + MSTA[nx.id].nm); hudMsg('🚇 ' + leg.line.nm + ' · ' + L2('Next station: ', 'Prochaine station : ') + MSTA[nx.id].nm, true);
+}
+RAME.anim = function(dt, now){
+  var T = MET.trip; if(!T || INT.cur !== RAME) return;
+  if(T.moving){ RAME.tex.offset.x += dt*3.2; camera.rotation.z = Math.sin(now*0.01)*0.004;
+    if(now - T.t > 6500){ T.moving = false; T.t = now; var s = T.stops[T.idx]; T.cur = s.id; drawLineBand(T); RAME.winMat.map = RAME.tex2; RAME.winMat.needsUpdate = true;
+      var final = T.idx === T.stops.length - 1, change = s.last && !final;
+      if(final){ say(MSTA[s.id].nm + '. Terminus du voyage. Merci et bonne journée !'); hudMsg('🚇 ' + MSTA[s.id].nm + ' · ' + L2('You have arrived! Getting off...', 'Tu es arrivé ! On descend...'), true); }
+      else if(change){ var nl = T.route[s.leg + 1]; say(MSTA[s.id].nm + '. Correspondance avec la ' + nl.line.nm + ', direction ' + MSTA[nl.dir].nm); hudMsg('🔁 ' + MSTA[s.id].nm + ' · ' + L2('Change for the ', 'Correspondance : ') + nl.line.nm + ' direction ' + MSTA[nl.dir].nm, true); }
+      else { say(MSTA[s.id].nm); hudMsg('🚇 ' + MSTA[s.id].nm + ' · ' + L2('doors opening', 'ouverture des portes'), true); } } }
+  else if(now - T.t > 3500){
+    var s2 = T.stops[T.idx];
+    if(T.idx === T.stops.length - 1){ MET.trip = null; var st = MSTA[s2.id], g = addJeton(1); hudBox.classList.add('hidden'); INT.cur = RAME; leaveInterior(RAME); RAME.out = {x:st.x, z:st.z + 4.2, yaw:Math.PI}; setTimeout(function(){ showToast('🚇 ' + st.nm + (g ? ' · +1 🪙' : '')); }, 1000); return; }
+    T.idx++; if(s2.last){ T.leg = s2.leg + 1; drawLineBand(T); } metroDepart();
+  }
+};
+INT.anim.push(function(dt, now){ RAME.anim(dt, now); });
+/* leaving the carriage drops you at the right street entrance */
+var _leaveIntM = leaveInterior;
+leaveInterior = function(o){ if(o === RAME && MET.trip === null && RAME.out){ } _leaveIntM(o); };
+/* ---------- 🚆 the Québec train: four stops, choose where to get off ---------- */
+var QSTOPS = [{nm:'Gare du Palais', at:[150, 455]}, {nm:'Village Est', at:[372, 350]}, {nm:'Aéroport Jean-Lesage', at:[-110, 239]}, {nm:'Vieux-Port (la marina)', at:[-292, 300]}];
+var QLOOP = [[150, 455], [360, 455], [372, 442], [372, 350], [372, 252], [360, 239], [-110, 239], [-280, 239], [-292, 252], [-292, 300], [-292, 442], [-280, 455]];
+function qStopIdx(i){ var a = QSTOPS[i].at; for(var k=0;k<QLOOP.length;k++) if(QLOOP[k][0] === a[0] && QLOOP[k][1] === a[1]) return k; return 0; }
+function qTrainPath(from, to){ var p = [], k = qStopIdx(from), end = qStopIdx(to), n = QLOOP.length, guard = 0; p.push(QLOOP[k]); do { k = (k + 1) % n; p.push(QLOOP[k]); } while(k !== end && ++guard < 40); return p.map(function(q){ return [q[0], 1.75, q[1]]; }); }
+(function(){
+  QSTOPS.forEach(function(s, i){
+    if(i){ var B = new MeshBatch(), S = new Lot(B, qx(s.at[0]) + (i === 1 ? -5 : 0), qz(s.at[1]) + (i === 1 ? 0 : i === 2 ? -5 : 0), 0); S.box(6, 0.3, 3, 0, 2.8, 0, 0x1f4fa0); S.box(0.15, 2.8, 0.15, -2.8, 1.4, -1.3, 0x2a2d36); S.box(0.15, 2.8, 0.15, 2.8, 1.4, -1.3, 0x2a2d36); S.box(5, 0.1, 0.6, 0, 0.5, -1, 0x8a5a32); B.build(); }
+    var sx = qx(s.at[0]) + (i === 1 ? -5 : i === 3 ? 5 : 0), sz = qz(s.at[1]) + (i === 2 ? -5 : i === 0 ? -3.5 : 0);
+    if(i){ airSign('🚆 ' + s.nm.toUpperCase(), sx, 3.6, sz, i === 2 ? 0 : i === 1 ? -Math.PI/2 : Math.PI/2, 6, '#1f4fa0'); tag(sx, 2, sz, 'l\'arrêt de train : ' + s.nm, 'the train stop', 1.5);
+      addSpot({x:sx, z:sz + (i === 2 ? 1.5 : 0), r:3.5, label:function(){ return '🚆 ' + L2('Take the train from here', 'Prendre le train ici') + ' (' + s.nm + ')'; }, act:function(){ qTrainChoose(i); }}); }
+  });
+})();
+function qTrainChoose(from){
+  QV.from = from;
+  if(!QV.ticket){ ticketCardQ(from); return; }
+  showCard('<h3>🚆 ' + L2('WHERE ARE YOU GOING?', 'OÙ VAS-TU ?') + '</h3><div class="gc-sub">' + L2('The train goes all the way round Québec. Choose your stop.', 'Le train fait le tour de Québec. Choisis ton arrêt.') + '</div><div class="gc-grid">' + QSTOPS.map(function(s, i){ return i === from ? '' : gOpt('qgo', i, '🚆 ' + esc(s.nm)); }).join('') + '</div><div class="gc-row">' + gBtn('close', null, L2('CANCEL', 'ANNULER')) + '</div>');
+}
+function ticketCardQ(from){ QV.from = from; var m = mc(Math.random, 'Un aller simple, s\'il vous plaît.', ['Une poutine, s\'il vous plaît.', 'Je suis le train.', 'Bonne nuit, la gare !']); gcard.cur = {kind:'qt', m:m};
+  showCard('<h3>🎟 ' + L2('BUY A TICKET', 'ACHETER UN BILLET') + '</h3><div class="gc-text">« Bonjour ! Un billet pour où ? »</div><div class="gc-big">' + L2('What do you say?', 'Que dis-tu ?') + '</div><div class="gc-grid">' + m.opts.map(function(o, k){ return gOpt('qtick', k, esc(o)); }).join('') + '</div>'); }
+GACT.qtick = function(v){ if((v|0) !== gcard.cur.m.ans){ say('Pardon ?'); ticketCardQ(QV.from); return; } QV.ticket = true; say('Voici votre billet. Bon voyage !'); qTrainChoose(QV.from); };
+GACT.qgo = function(v){
+  var to = v|0, from = QV.from || 0; QV.ticket = false; closeCard(); QV.trainParked.visible = false;
+  var path = qTrainPath(from, to), stopsOnWay = [];
+  var cum = 0; for(var i=1;i<path.length;i++){ cum += Math.hypot(path[i][0] - path[i-1][0], path[i][2] - path[i-1][2]); QSTOPS.forEach(function(s, si){ if(si !== from && s.at[0] === path[i][0] && s.at[1] === path[i][2]) stopsOnWay.push({s:si, at:cum, done:false}); }); }
+  startRide('qtrain');
+  ride.legs = [{path:path, sp:13, m:'train'}]; ride.legs.forEach(function(l){ l.cum = [0]; for(var i=1;i<l.path.length;i++) l.cum.push(l.cum[i-1] + Math.hypot(l.path[i][0] - l.path[i-1][0], l.path[i][1] - l.path[i-1][1], l.path[i][2] - l.path[i-1][2])); l.len = l.cum[l.cum.length - 1]; });
+  ride.leg = 0; ride.s = 0; ride.v = 13;
+  var dest = QSTOPS[to]; say('En voiture ! Destination : ' + dest.nm); hudMsg('🚆 ' + L2('To: ', 'Destination : ') + dest.nm, true);
+  ride.onTick = function(){ stopsOnWay.forEach(function(w){ if(w.done) return; if(ride.s > w.at - 60 && !w.ann){ w.ann = true; say(w.s === to ? 'Prochain arrêt : ' + QSTOPS[w.s].nm + '. Terminus.' : 'Prochain arrêt : ' + QSTOPS[w.s].nm); hudMsg('🚆 ' + L2('Next stop: ', 'Prochain arrêt : ') + QSTOPS[w.s].nm, true); }
+    if(ride.s >= w.at && w.s !== to){ w.done = true; ride.hold = performance.now() + 3000; ride.v = 0; } });
+    if(ride.hold){ if(performance.now() > ride.hold){ ride.hold = 0; ride.v = 13; } else ride.v = 0; } };
+  ride.onEnd = function(){ hudBox.classList.add('hidden'); var a = dest.at; camera.position.set(qx(a[0]) + (to === 1 ? -5 : to === 3 ? 5 : 0), EYE_HEIGHT, qz(a[1]) + (to === 2 ? -5 : to === 0 ? -9 : 0)); say(dest.nm + '. Merci d\'avoir voyagé avec nous !'); showToast('🚆 ' + dest.nm); };
+};
+/* ---------- 🎥 VIEWS: behind, inside (first person) or bird's-eye - for cars and every ride you drive ---------- */
+var RIDEVIEW = 'behind';
+try { var rv0 = localStorage.getItem('paris.rideView'); if(rv0) RIDEVIEW = rv0; } catch(e){}
+var VIEW_NAMES = {behind:['🎥 View: behind', '🎥 Vue : derrière'], inside:['🎥 View: inside (first person)', '🎥 Vue : à l\'intérieur'], bird:['🎥 View: bird\'s-eye', '🎥 Vue : à vol d\'oiseau']};
+var _toggleCarViewV = toggleCarView;
+toggleCarView = function(){
+  if(ride.on && DRIVE[ride.kind]){ RIDEVIEW = RIDEVIEW === 'behind' ? 'inside' : RIDEVIEW === 'inside' ? 'bird' : 'behind'; try { localStorage.setItem('paris.rideView', RIDEVIEW); } catch(e){} showToast(L2(VIEW_NAMES[RIDEVIEW][0], VIEW_NAMES[RIDEVIEW][1])); return; }
+  if(!flying || !driving){ showToast(L2('🎥 Get in a car or a ride first (V changes the view).', '🎥 Monte d\'abord dans une voiture ou un véhicule (V change la vue).')); return; }
+  carView = carView === 'behind' ? 'inside' : carView === 'inside' ? 'bird' : 'behind';
+  try { localStorage.setItem('paris.carView', carView); } catch(e){}
+  applyCarView(); showToast(L2(VIEW_NAMES[carView][0], VIEW_NAMES[carView][1]));
+  if(carView !== 'inside') updateDriveCamera(true);
+};
+var _updateDriveCameraV = updateDriveCamera;
+updateDriveCamera = function(snap){
+  if(carView !== 'bird'){ _updateDriveCameraV(snap); return; }
+  var k = snap ? 1 : 0.12, dx = carPos.x - Math.sin(carYaw)*0, dz = carPos.z + 16;
+  camera.position.x += (dx - camera.position.x)*k; camera.position.y += (carPos.y + 60 - camera.position.y)*k; camera.position.z += (dz - camera.position.z)*k;
+  camera.lookAt(carPos.x, carPos.y, carPos.z);
+};
+(function(){
+  var s = document.getElementById('search-toggle'), b = document.createElement('button');
+  b.className = 'bar-btn'; b.id = 'view-toggle'; b.textContent = '🎥'; b.title = L2('Change the view (V)', 'Changer la vue (V)');
+  s.parentNode.insertBefore(b, s); b.addEventListener('click', function(){ toggleCarView(); });
+})();
+/* where the camera goes when you ride (the vehicle itself is at ride.px / ride.pz) */
+function rideCamera(P, now){
+  var x = ride.px, z = ride.pz, h = ride.h, fx = -Math.sin(h), fz = -Math.cos(h);
+  if(RIDEVIEW === 'inside'){ camera.position.set(x, P.eye + (P.water ? Math.sin(now*0.002)*0.12 : 0), z); yaw = h; camera.rotation.set(pitch, yaw, P.water ? Math.sin(now*0.0015)*0.03 : 0); return; }
+  if(RIDEVIEW === 'bird'){ camera.position.set(x, 50, z + 14); camera.lookAt(x, 0, z); return; }
+  var back = ride.kind === 'sail' ? 12 : ride.kind === 'croissant' ? 8 : 5.5, up = ride.kind === 'sail' ? 6 : 3;
+  camera.position.set(x - fx*back, up, z - fz*back); camera.lookAt(x + fx*4, 1, z + fz*4);
+}
+/* ---------- 🔊 SOUND: game music on/off and volumes (music, songs, voice) ---------- */
+var VOL = {music:1, songs:80, voice:1};
+try { var v0 = JSON.parse(localStorage.getItem('paris.vol') || 'null'); if(v0) Object.keys(v0).forEach(function(k){ VOL[k] = v0[k]; }); } catch(e){}
+function saveVol(){ try { localStorage.setItem('paris.vol', JSON.stringify(VOL)); } catch(e){} }
+function applyVol(){
+  if(music.gain && sfx.ctx){ var t = sfx.ctx.currentTime; music.gain.gain.cancelScheduledValues(t); music.gain.gain.setValueAtTime(music.on ? 0.09*VOL.music : 0, t); }
+  try{ if(player.yt && player.yt.setVolume) player.yt.setVolume(VOL.songs); }catch(e){}
+}
+(function(){
+  var s = document.getElementById('search-toggle'), b = document.createElement('button');
+  b.className = 'bar-btn'; b.id = 'sound-toggle'; b.textContent = '🔊'; b.title = L2('Sound', 'Son');
+  s.parentNode.insertBefore(b, s); b.addEventListener('click', function(){ openSound(); });
+})();
+function openSound(){
+  function slider(k, max, val, label){ return '<div class="gc-text" style="text-align:left">' + label + '<br><input type="range" min="0" max="' + max + '" value="' + val + '" data-vol="' + k + '" style="width:100%"></div>'; }
+  showCard('<h3>🔊 ' + L2('SOUND', 'LE SON') + '</h3>' +
+    '<div class="gc-row">' + gBtn('musonoff', null, music.on ? '🎵 ' + L2('GAME MUSIC: ON', 'MUSIQUE DU JEU : OUI') : '🔇 ' + L2('GAME MUSIC: OFF', 'MUSIQUE DU JEU : NON'), music.on ? 'go' : '') + '</div>' +
+    slider('music', 100, Math.round(VOL.music*100), '🎵 ' + L2('Game music volume', 'Volume de la musique du jeu')) +
+    slider('songs', 100, VOL.songs, '🎤 ' + L2('Songs & concert volume', 'Volume des chansons et du concert')) +
+    slider('voice', 100, Math.round(VOL.voice*100), '🗣 ' + L2('Voice (French words) volume', 'Volume de la voix (les mots en français)')) +
+    '<div class="gc-sub">' + L2('In Québec the game music changes to Carnaval music.', 'À Québec, la musique du jeu devient une musique de Carnaval.') + '</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>');
+  gcard.el.querySelectorAll('input[data-vol]').forEach(function(inp){ inp.addEventListener('input', function(){ var k = inp.getAttribute('data-vol'), v = +inp.value; VOL[k] = k === 'songs' ? v : v/100; saveVol(); applyVol(); if(k === 'voice') say('Bonjour !'); }); inp.addEventListener('keydown', function(e){ e.stopPropagation(); }); });
+}
+GACT.musonoff = function(){ setMusic(!music.on); if(typeof musicToggle !== 'undefined') setToggle(musicToggle, music.on); applyVol(); openSound(); };
+/* ---------- 🎻 CARNAVAL MUSIC in Québec (played by the game's own music box) ---------- */
+CHORDS.F = {bass:41, notes:[57, 60, 65]}; CHORDS.A7 = {bass:45, notes:[55, 61, 64]}; CHORDS.Em = {bass:40, notes:[55, 59, 64]}; CHORDS.Bm = {bass:47, notes:[54, 59, 62]}; CHORDS.D7 = {bass:50, notes:[54, 57, 60]};
+var QC_SONGS = [
+  {name:'Alouette (chanson traditionnelle)', bpm:132, beats:4,
+   mel:[[72,1],[74,0.5],[76,0.5],[76,1],[74,0.5],[72,0.5],[74,0.5],[76,0.5],[72,1],[67,1],
+        [72,1],[74,0.5],[76,0.5],[76,1],[74,0.5],[72,0.5],[74,0.5],[76,0.5],[72,2],
+        [79,0.5],[79,0.5],[79,0.5],[79,0.5],[79,1],[77,0.5],[76,0.5],[74,1],[74,1],[72,2],
+        [72,1],[74,0.5],[76,0.5],[76,1],[74,0.5],[72,0.5],[74,0.5],[76,0.5],[72,1],[67,1],[72,4]],
+   chords:['C','G','C','C','C','G','C','G','C','G','C','C'], times:2},
+  {name:'Le Reel du Carnaval', bpm:184, beats:4,
+   mel:[[74,0.5],[78,0.5],[81,0.5],[78,0.5],[74,0.5],[78,0.5],[81,0.5],[86,0.5], [85,0.5],[81,0.5],[76,0.5],[81,0.5],[85,0.5],[88,0.5],[85,0.5],[81,0.5],
+        [83,0.5],[79,0.5],[74,0.5],[79,0.5],[83,0.5],[86,0.5],[83,0.5],[79,0.5], [81,0.5],[78,0.5],[76,0.5],[73,0.5],[74,1],[74,1],
+        [78,0.5],[79,0.5],[81,0.5],[83,0.5],[81,0.5],[79,0.5],[78,0.5],[76,0.5], [74,0.5],[76,0.5],[78,0.5],[79,0.5],[81,1],[81,1],
+        [83,0.5],[81,0.5],[79,0.5],[78,0.5],[76,0.5],[78,0.5],[79,0.5],[76,0.5], [74,0.5],[73,0.5],[71,0.5],[73,0.5],[74,2]],
+   chords:['D','A7','G','D','D','D','G','D'], times:3},
+  {name:'La Valse des Neiges', bpm:150, beats:3,
+   mel:[[67,1],[71,1],[74,1], [79,2],[78,1], [76,1],[74,1],[72,1], [71,3], [69,1],[72,1],[76,1], [78,2],[76,1], [74,1],[72,1],[71,1], [69,3],
+        [67,1],[71,1],[74,1], [79,2],[81,1], [83,1],[81,1],[79,1], [76,3], [74,1],[78,1],[81,1], [79,2],[78,1], [76,1],[78,1],[74,1], [79,3]],
+   chords:['G','G','C','G','D','D','D7','D','G','G','C','Em','D','D7','D','G'], times:2}
+];
+var QC_MUSIC = QC_SONGS.map(compileSong), MUSIC_AREA = {qc:false};
+function inQuebec(){ var x = camera.position.x, z = camera.position.z; return x > QC.x - 750 && x < QC.x + 750 && z > QC.z - 700 && z < QC.z + 600; }
+function musicAreaTick(){ var q = inQuebec(); if(q !== MUSIC_AREA.qc){ MUSIC_AREA.qc = q; music.cur = null; music.song = 0; if(q && music.on) hudMsg('🎻 ' + L2('Carnaval music: ', 'Musique du Carnaval : ') + QC_SONGS[0].name); } }
+/* ---------- 💬 CONVERSATION PARTNERS: people everywhere to practise real conversations with ---------- */
+var CONVOS = {
+  intro:{t:['Introduce yourself', 'Se présenter'], turns:[
+    ['Salut ! Je m\'appelle {n}. Et toi, comment tu t\'appelles ?', 'Hi! My name is {n}. What\'s your name?', [['Je m\'appelle {me}.', 1], ['J\'ai treize ans.', 0], ['Il fait beau.', 0]]],
+    ['Enchanté(e) ! Tu as quel âge ?', 'Nice to meet you! How old are you?', [['J\'ai treize ans.', 1], ['Je suis canadien.', 0], ['Il est trois heures.', 0]]],
+    ['Tu viens d\'où ?', 'Where are you from?', [['Je viens du Canada, de l\'Ontario.', 1], ['Je vais au cinéma.', 0], ['Je suis une pomme.', 0]]],
+    ['Super ! Tu parles bien français ! À bientôt !', 'Great! You speak French well! See you soon!', [['Merci ! À bientôt !', 1], ['Bonne nuit, le chat.', 0]]]]},
+  directions:{t:['Ask for directions', 'Demander son chemin'], turns:[
+    ['Bonjour ! Tu as l\'air perdu(e). Je peux t\'aider ?', 'Hello! You look lost. Can I help you?', [['Oui, s\'il vous plaît. Où est le métro ?', 1], ['Non, je mange une pizza.', 0], ['Oui, j\'ai deux chats.', 0]]],
+    ['Va tout droit, puis tourne à gauche au feu. C\'est à côté de la boulangerie.', 'Go straight on, then turn left at the traffic lights. It\'s next to the bakery.', [['Je tourne à gauche au feu, c\'est ça ?', 1], ['Je tourne à droite au cinéma ?', 0], ['Le métro est dans la boulangerie ?', 0]]],
+    ['Oui, c\'est ça ! C\'est à cinq minutes à pied.', 'Yes, that\'s it! It\'s five minutes on foot.', [['Merci beaucoup ! Bonne journée !', 1], ['Cinq heures en avion ?', 0]]],
+    ['De rien ! Bonne journée à toi aussi !', 'You\'re welcome! Have a nice day too!', [['Au revoir !', 1]]]]},
+  cafe:{t:['Order at a café', 'Commander au café'], turns:[
+    ['Bonjour ! Qu\'est-ce que vous désirez ?', 'Hello! What would you like?', [['Je voudrais un chocolat chaud, s\'il vous plaît.', 1], ['Je voudrais un éléphant.', 0], ['Je suis désolé, je dors.', 0]]],
+    ['Très bien. Et avec ça ? Un croissant ?', 'Very good. Anything else? A croissant?', [['Oui, un croissant, merci.', 1], ['Non, je n\'ai pas de croissant.', 0], ['Le croissant est bleu.', 0]]],
+    ['Sur place ou à emporter ?', 'To eat in or to take away?', [['Sur place, s\'il vous plaît.', 1], ['À la piscine.', 0], ['Demain matin.', 0]]],
+    ['Ça fait six euros, s\'il vous plaît.', 'That\'s six euros, please.', [['Voilà. Merci !', 1], ['Six chiens ?', 0], ['C\'est gratuit !', 0]]],
+    ['Merci à vous ! Bon appétit !', 'Thank you! Enjoy your meal!', [['Merci, bonne journée !', 1]]]]},
+  meteo:{t:['Talk about the weather', 'Parler de la météo'], turns:[
+    ['Quel temps fait-il aujourd\'hui, à ton avis ?', 'What\'s the weather like today, do you think?', [['Il fait froid et il neige.', 1], ['Il est midi et demi.', 0], ['J\'aime les frites.', 0]]],
+    ['Brrr ! Tu préfères l\'été ou l\'hiver ?', 'Brrr! Do you prefer summer or winter?', [['Je préfère l\'été, parce qu\'il fait chaud.', 1], ['Je préfère le mardi.', 0], ['L\'hiver est un fromage.', 0]]],
+    ['Moi aussi ! Demain, il va faire du soleil, je crois.', 'Me too! Tomorrow it\'s going to be sunny, I think.', [['Super ! On va aller au parc !', 1], ['Le soleil est dans mon sac.', 0]]],
+    ['Bonne idée ! À demain !', 'Good idea! See you tomorrow!', [['À demain !', 1]]]]},
+  loisirs:{t:['Hobbies', 'Les loisirs'], turns:[
+    ['Qu\'est-ce que tu aimes faire le week-end ?', 'What do you like doing at the weekend?', [['J\'aime jouer au hockey et lire des BD.', 1], ['J\'ai un frère.', 0], ['Il fait beau.', 0]]],
+    ['Ah, cool ! Tu fais du sport souvent ?', 'Oh cool! Do you do sport often?', [['Oui, deux fois par semaine.', 1], ['Oui, je mange un sport.', 0], ['Non, je suis une voiture.', 0]]],
+    ['Moi, je joue de la guitare. Tu joues d\'un instrument ?', 'I play the guitar. Do you play an instrument?', [['Oui, je joue du piano.', 1], ['Oui, je joue au piano de foot.', 0], ['Non, je joue de la pizza.', 0]]],
+    ['Génial ! On pourrait faire de la musique ensemble !', 'Great! We could make music together!', [['Avec plaisir !', 1]]]]},
+  famille:{t:['Family', 'La famille'], turns:[
+    ['Tu as des frères et sœurs ?', 'Do you have brothers and sisters?', [['Oui, j\'ai un frère et une sœur.', 1], ['Oui, j\'ai un frère et une table.', 0], ['Non, j\'ai trois heures.', 0]]],
+    ['Ton frère, il a quel âge ?', 'How old is your brother?', [['Il a dix ans.', 1], ['Il a dix frères.', 0], ['Il est dix heures.', 0]]],
+    ['Et tes parents, qu\'est-ce qu\'ils font ?', 'And your parents, what do they do?', [['Ma mère est médecin et mon père est professeur.', 1], ['Ma mère est une baguette.', 0], ['Mes parents font beau.', 0]]],
+    ['Quelle belle famille ! Salut !', 'What a lovely family! Bye!', [['Salut !', 1]]]]},
+  heure:{t:['Telling the time', 'L\'heure'], turns:[
+    ['Excuse-moi, quelle heure est-il ?', 'Excuse me, what time is it?', [['Il est trois heures et demie.', 1], ['Il fait trois degrés.', 0], ['J\'ai trois ans.', 0]]],
+    ['Oh non ! Mon train part à quatre heures moins le quart !', 'Oh no! My train leaves at a quarter to four!', [['Dépêche-toi ! Tu as quinze minutes.', 1], ['Ton train est un gâteau.', 0], ['Il est minuit, au revoir.', 0]]],
+    ['Merci ! Je cours !', 'Thanks! I\'m running!', [['Bon voyage !', 1]]]]},
+  courses:{t:['Shopping at the market', 'Faire les courses'], turns:[
+    ['Bonjour ! Qu\'est-ce qu\'il vous faut aujourd\'hui ?', 'Hello! What do you need today?', [['Un kilo de pommes, s\'il vous plaît.', 1], ['Un kilo de chaussures, merci.', 0], ['Je m\'appelle Pomme.', 0]]],
+    ['Voilà ! Et avec ceci ?', 'There you go! Anything else?', [['Une baguette aussi, s\'il vous plaît.', 1], ['Avec ceci, je dors.', 0], ['Non, je suis une baguette.', 0]]],
+    ['Très bien. Ce sera tout ?', 'Very good. Will that be all?', [['Oui, c\'est tout. Ça fait combien ?', 1], ['Non, je veux la boutique.', 0]]],
+    ['Ça fait quatre euros vingt.', 'That\'s four euros twenty.', [['Voici cinq euros.', 1], ['Voici quatre chats.', 0]]],
+    ['Et voici votre monnaie : quatre-vingts centimes. Merci et bonne journée !', 'And here\'s your change: eighty cents. Thank you and have a nice day!', [['Merci, au revoir !', 1]]]]},
+  ecole:{t:['School', 'L\'école'], turns:[
+    ['Tu es en quelle année à l\'école ?', 'What grade are you in at school?', [['Je suis en huitième année.', 1], ['Je suis en vacances au zoo.', 0], ['Je suis en avion.', 0]]],
+    ['Quelle est ta matière préférée ?', 'What\'s your favourite subject?', [['Ma matière préférée, c\'est le français !', 1], ['Ma matière préférée, c\'est la cuisine de ma mère.', 0], ['C\'est le jeudi.', 0]]],
+    ['Pourquoi ?', 'Why?', [['Parce que c\'est intéressant et le prof est sympa.', 1], ['Parce que il pleut des chats.', 0], ['Pourquoi pas une pizza ?', 0]]],
+    ['Bravo ! Continue comme ça !', 'Well done! Keep it up!', [['Merci !', 1]]]]},
+  invitation:{t:['An invitation', 'Une invitation'], turns:[
+    ['Samedi, c\'est mon anniversaire ! Tu veux venir à ma fête ?', 'Saturday is my birthday! Do you want to come to my party?', [['Oui, avec plaisir ! C\'est à quelle heure ?', 1], ['Oui, j\'ai mal aux dents.', 0], ['Non, je suis un anniversaire.', 0]]],
+    ['À deux heures, chez moi. On va jouer à des jeux et manger du gâteau.', 'At two o\'clock at my place. We\'re going to play games and eat cake.', [['Génial ! J\'apporte un cadeau !', 1], ['Le gâteau joue à deux heures ?', 0]]],
+    ['Merci ! À samedi !', 'Thanks! See you Saturday!', [['À samedi !', 1]]]]},
+  medecin:{t:['At the doctor\'s', 'Chez le médecin'], turns:[
+    ['Bonjour ! Qu\'est-ce qui ne va pas ?', 'Hello! What\'s wrong?', [['J\'ai mal à la tête et à la gorge.', 1], ['J\'ai une voiture rouge.', 0], ['Je vais très bien, merci, au revoir.', 0]]],
+    ['Depuis quand ?', 'Since when?', [['Depuis deux jours.', 1], ['Depuis la boulangerie.', 0], ['Depuis demain.', 0]]],
+    ['Ce n\'est pas grave. Bois beaucoup d\'eau et repose-toi. Bon rétablissement !', 'It\'s not serious. Drink lots of water and rest. Get well soon!', [['Merci, docteur !', 1]]]]},
+  vacances:{t:['Holidays in Québec', 'Les vacances à Québec'], turns:[
+    ['Allô ! Tu es en vacances à Québec ?', 'Hi! Are you on holiday in Québec?', [['Oui, je visite le Carnaval !', 1], ['Non, je suis une tuque.', 0], ['Oui, je suis à Paris.', 0]]],
+    ['As-tu goûté la tire d\'érable sur la neige ?', 'Have you tasted maple taffy on snow?', [['Oui, c\'est délicieux !', 1], ['Oui, la neige est un chat.', 0], ['Non, je n\'ai pas de neige dans ma poche.', 0]]],
+    ['Qu\'est-ce que tu as fait aujourd\'hui ?', 'What did you do today?', [['J\'ai fait du traîneau et du patin.', 1], ['Je fais demain.', 0], ['J\'ai mangé la glissade.', 0]]],
+    ['Wow ! Profite bien de ton séjour !', 'Wow! Enjoy your stay!', [['Merci, bonne journée !', 1]]]]}
+};
+var NPCS = [];
+function freeAt(x, z){ if(!hitSolid(x, z, 0.6, 0.3, 1.6) && !boundsContact(x, z, 0.8)) return [x, z]; for(var r=2; r<=14; r+=2) for(var a=0; a<8; a++){ var xx = x + Math.cos(a*Math.PI/4)*r, zz = z + Math.sin(a*Math.PI/4)*r; if(!hitSolid(xx, zz, 0.6, 0.3, 1.6) && !boundsContact(xx, zz, 0.8)) return [xx, zz]; } return [x, z]; }
+var NPC_BUBBLE = null;
+function addNPC(nm, conv, x, z, look){
+  var p = freeAt(x, z); x = p[0]; z = p[1];
+  if(!NPC_BUBBLE){ var c = document.createElement('canvas'); c.width = 256; c.height = 80; var k = c.getContext('2d'); k.fillStyle = '#ffffff'; k.beginPath(); if(k.roundRect) k.roundRect(4, 4, 248, 60, 18); else k.rect(4, 4, 248, 60); k.fill(); k.beginPath(); k.moveTo(110, 62); k.lineTo(128, 78); k.lineTo(146, 62); k.fill(); k.strokeStyle = '#2f6a3a'; k.lineWidth = 4; k.stroke(); k.fillStyle = '#2f6a3a'; k.font = 'bold 32px sans-serif'; k.textAlign = 'center'; k.textBaseline = 'middle'; k.fillText('💬 Parle-moi !', 128, 35, 236); NPC_BUBBLE = new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c), transparent:true}); }
+  var cols = [0xc8382f, 0x1f6fb8, 0x2f8a3a, 0xe3b52c, 0x8a3ad6, 0xe86a8a, 0x2a8a8a, 0xd8782a], i = NPCS.length;
+  var g = person({x:x, z:z, ry:0, shirt:look && look.shirt || cols[i % 8], pants:look && look.pants || [0x2a3a5a, 0x3a2a1a, 0x1b1b1d, 0x6a6a7a][i % 4], hair:look && look.hair || [0x4a2a1a, 0xe8c070, 0x1b1b1d, 0x8a4a1a, 0xc8c8c8][i % 5], h:1.6 + (i % 4)*0.06, hat:look && look.hat});
+  var b = new THREE.Sprite(NPC_BUBBLE); b.scale.set(2.2, 0.7, 1); b.position.set(x, 2.55, z); root.add(b);
+  var n = {nm:nm, conv:conv, x:x, z:z, g:g, b:b, done:false};
+  NPCS.push(n);
+  tag(x, 1.5, z, nm + ' - ' + L2(CONVOS[conv].t[0], CONVOS[conv].t[1]).toLowerCase(), L2('a person to talk to', 'une personne à qui parler'), 0.6);
+  addSpot({x:x, z:z, r:3, label:function(){ return '💬 ' + L2('Talk with ', 'Parler avec ') + nm + ' (' + L2(CONVOS[conv].t[0], CONVOS[conv].t[1]).toLowerCase() + ')'; }, act:function(){ startConvo(n); }});
+  return n;
+}
+var CV = null;
+function cvText(t, n){ var me = (life.eco && life.eco.ch && life.eco.ch.fn) || net.name || 'Alex'; return t.replace(/\{n\}/g, n.nm).replace(/\{me\}/g, me); }
+function startConvo(n){ CV = {n:n, i:0, ok:0, miss:0}; convoTurn(); }
+function convoTurn(msg){
+  var n = CV.n, T = CONVOS[n.conv].turns[CV.i], line = cvText(T[0], n);
+  CV.opts = shuffleR(Math.random, T[2].map(function(o){ return [cvText(o[0], n), o[1]]; }));
+  say(line);
+  showCard('<h3>💬 ' + esc(n.nm.toUpperCase()) + ' · ' + esc(L2(CONVOS[n.conv].t[0], CONVOS[n.conv].t[1])) + '</h3>' + (msg || '') +
+    '<div class="gc-big gc-say">« ' + esc(line) + ' »</div>' + (LANG === 'en' ? '<div class="gc-sub">' + esc(T[1].replace(/\{n\}/g, n.nm)) + '</div>' : '') +
+    '<div class="gc-sub">' + L2('Your answer:', 'Ta réponse :') + '</div><div class="gc-grid">' + CV.opts.map(function(o, k){ return gOpt('cvans', k, '🗨 ' + esc(o[0])); }).join('') + '</div>' +
+    '<div class="gc-row">' + gBtn('close', null, L2('LEAVE', 'PARTIR')) + '</div>');
+}
+GACT.cvans = function(v){
+  var o = CV.opts[v|0], n = CV.n, turns = CONVOS[n.conv].turns;
+  if(!o[1]){ CV.miss++; say('Pardon ? Je n\'ai pas compris.'); convoTurn('<div class="bad">✗ « Pardon ? Je n\'ai pas compris. » ' + L2('Try another answer.', 'Essaie une autre réponse.') + '</div>'); return; }
+  say(o[0]); CV.ok++; CV.i++;
+  if(CV.i >= turns.length){
+    var got = !n.done ? addJeton(2) : 0; n.done = true;
+    showCard('<h3>💬 ' + esc(n.nm.toUpperCase()) + '</h3><div class="gc-emoji">' + (CV.miss === 0 ? '🌟' : '😊') + '</div><div class="gc-big">' + L2('Conversation complete!', 'Conversation réussie !') + (got ? ' +' + got + ' 🪙' : '') + '</div><div class="gc-sub">' + (CV.miss === 0 ? L2('Perfect - no mistakes!', 'Parfait - aucune erreur !') : L2('Mistakes: ', 'Erreurs : ') + CV.miss) + '</div>' + noCharLine() + '<div class="gc-row">' + gBtn('cvagain', null, L2('TALK AGAIN', 'RECOMMENCER')) + gBtn('close', null, 'OK', 'go', ' data-enter="1"') + '</div>');
+    return;
+  }
+  setTimeout(function(){ convoTurn('<div class="good">✓ « ' + esc(o[0]) + ' »</div>'); }, 900);
+};
+GACT.cvagain = function(){ startConvo(CV.n); };
+function npcTick(){
+  var cx = camera.position.x, cz = camera.position.z, t = performance.now();
+  for(var i=0;i<NPCS.length;i++){ var n = NPCS[i], dx = cx - n.x, dz = cz - n.z, d = dx*dx + dz*dz;
+    n.b.visible = d < 3600; if(d < 225) n.g.rotation.y = Math.atan2(-dx, -dz) + Math.PI; n.b.position.y = 2.55 + Math.sin(t*0.003 + i)*0.08; }
+}
+(function(){
+  var V = V_BY_ID;
+  [['Chloé', 'intro', 20, 30], ['Hugo', 'directions', -25, 35], ['Inès', 'meteo', 40, -40], ['Lucas', 'loisirs', -40, -45],
+   ['Madame Lefèvre', 'directions', -300, -517], ['Antoine (le serveur)', 'cafe', -380, -514], ['Camille', 'heure', 100, -517], ['Théo', 'ecole', 0, -517],
+   ['Léa', 'famille', -250, 590], ['Monsieur Dubois', 'courses', 150, 652], ['Jade', 'invitation', 420, -505], ['Nathan', 'famille', MHOME.x + 4, MHOME.z + 28],
+   ['Docteure Martin', 'medecin', 60, 100]
+  ].forEach(function(a){ addNPC(a[0], a[1], a[2], a[3]); });
+  [['mani', 'Emma', 'intro'], ['baglieri', 'Louis', 'invitation'], ['sadiki', 'Zoé', 'ecole'], ['chitiz', 'Arthur', 'heure'], ['clancy', 'Manon', 'meteo']].forEach(function(a){ var v = V[a[0]]; if(v) addNPC(a[1], a[2], v.x + 26, v.z + 50); });
+  if(V.baguette) addNPC('Pierre (le boulanger)', 'courses', V.baguette.x - 30, V.baguette.z + 50, {shirt:0xffffff, pants:0xf2f2f2, hat:0xffffff});
+  [['Gabrielle', 'vacances', 6, 150], ['Félix', 'meteo', -20, 312], ['Mathis', 'directions', 150, 395], ['Rosalie', 'cafe', -160, 290]].forEach(function(a){ addNPC(a[0], a[1], qx(a[2]), qz(a[3]), {hat:0xc8382f}); });
+})();
+/* ---------- the Arc de Triomphe: its real details ---------- */
+(function(){
+  var x = -47, z = -133, B = new MeshBatch(), A = new Lot(B, x, z, 0), STN = 0xe8dcc0, LT = 0xf2e8d0, DK = 0x9a8f7c;
+  A.part(new THREE.CylinderGeometry(4, 4, 12.2, 20, 1, false, 0, Math.PI).rotateX(Math.PI/2).rotateZ(Math.PI/2), 0, 14.8, 0, 0xcfc4ae);
+  for(var cz=-5; cz<=5; cz+=2.5) for(var ca=-2; ca<=2; ca++){ var a = ca/2*1.2; A.box(0.7, 0.2, 0.7, Math.sin(a)*3.7, 14.8 + Math.cos(a)*3.7, cz, LT, 0, 0, -a); }
+  [-6.15, 6.15].forEach(function(f){
+    var s = f > 0 ? 1 : -1;
+    // the four great sculpture groups on the pillars (raised panels with figures)
+    [-8, 8].forEach(function(px){
+      A.box(6, 7.4, 0.5, px, 7.4, f + s*0.25, LT);
+      for(var k=0;k<5;k++){ var fx = px - 2.2 + k*1.1, fh = 1.6 + (k % 2)*0.4; A.box(0.6, fh, 0.4, fx, 5.2 + fh/2, f + s*0.55, 0xfaf2e0); A.part(new THREE.SphereGeometry(0.28, 8, 6), fx, 5.4 + fh, f + s*0.55, 0xfaf2e0); }
+      A.box(2.8, 0.25, 0.3, px - 0.6, 9.8, f + s*0.6, 0xfaf2e0, 0, 0, 0.5); A.box(2.8, 0.25, 0.3, px + 0.6, 9.8, f + s*0.6, 0xfaf2e0, 0, 0, -0.5); A.part(new THREE.SphereGeometry(0.35, 8, 6), px, 10.4, f + s*0.6, 0xfaf2e0);
+    });
+    // the frieze, the shields on the attic, the winged figures above the arch, the trophies on the side faces
+    A.box(24.2, 1.2, 0.3, 0, 19, f + s*0.2, LT); for(var fr=-11; fr<=11; fr+=0.9) A.box(0.35, 0.8, 0.2, fr, 19, f + s*0.42, 0xfaf2e0);
+    for(var sh=-10.5; sh<=10.5; sh+=1.5) A.part(new THREE.CylinderGeometry(0.5, 0.5, 0.15, 12).rotateX(Math.PI/2), sh, 24.2, f + s*0.12, 0xd8ccb0);
+    [-1, 1].forEach(function(w){ A.box(3, 0.3, 0.25, w*2.6, 16.4, f + s*0.3, 0xfaf2e0, 0, 0, w*0.35); A.part(new THREE.SphereGeometry(0.3, 8, 6), w*1.4, 16.9, f + s*0.35, 0xfaf2e0); });
+  });
+  [-12.15, 12.15].forEach(function(sx){ var s = sx > 0 ? 1 : -1; A.box(0.4, 5, 4, sx + s*0.2, 13, 0, LT); A.box(0.3, 3, 1.4, sx + s*0.45, 13, 0, 0xfaf2e0); });
+  // the Tomb of the Unknown Soldier and its flame under the arch, a wreath, the big flag
+  A.box(1.8, 0.12, 3, 0, 0.06, 0, 0x6a6a6a); A.box(1.4, 0.05, 2.6, 0, 0.14, 0, 0x8a8a8a);
+  A.part(new THREE.TorusGeometry(0.45, 0.12, 6, 14).rotateX(Math.PI/2), 0.5, 0.2, 1.8, 0x2f6a3a);
+  B.build();
+  var fl = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.7, 8), new THREE.MeshBasicMaterial({color:0xff8a2a})); fl.position.set(x, 0.55, z - 1.6); root.add(fl);
+  var cv = document.createElement('canvas'); cv.width = 384; cv.height = 256; var k = cv.getContext('2d'); k.fillStyle = '#1f3f8f'; k.fillRect(0, 0, 128, 256); k.fillStyle = '#ffffff'; k.fillRect(128, 0, 128, 256); k.fillStyle = '#c8382f'; k.fillRect(256, 0, 128, 256);
+  var flag = new THREE.Mesh(new THREE.PlaneGeometry(6, 4), new THREE.MeshLambertMaterial({map:new THREE.CanvasTexture(cv), side:THREE.DoubleSide})); flag.position.set(x, 12.6, z); flag.rotation.y = Math.PI/2; root.add(flag);
+  var c2 = document.createElement('canvas'); c2.width = 512; c2.height = 256; var k2 = c2.getContext('2d'); k2.fillStyle = '#7a7a7a'; k2.fillRect(0, 0, 512, 256); k2.fillStyle = '#e8d8a0'; k2.font = 'bold 30px Georgia, serif'; k2.textAlign = 'center';
+  ['ICI REPOSE', 'UN SOLDAT FRANÇAIS', 'MORT POUR LA PATRIE', '1914 - 1918'].forEach(function(l, i){ k2.fillText(l, 256, 58 + i*50); });
+  var ins = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.65), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c2)})); ins.rotation.x = -Math.PI/2; ins.position.set(x, 0.17, z + 0.4); root.add(ins);
+  water.push({jet:fl, base:0.55});
+  var T = [['« Le Départ des volontaires de 1792 » (« La Marseillaise ») - François Rude', 'The Departure of the Volunteers of 1792 ("La Marseillaise") - Rude', 8, 6.15], ['« Le Triomphe de 1810 » - Jean-Pierre Cortot', 'The Triumph of 1810 - Cortot', -8, 6.15],
+           ['« La Résistance de 1814 » - Antoine Étex', 'The Resistance of 1814 - Étex', 8, -6.15], ['« La Paix de 1815 » - Antoine Étex', 'The Peace of 1815 - Étex', -8, -6.15]];
+  T.forEach(function(t){ tag(x + t[2], 7.4, z + t[3], 'le haut-relief : ' + t[0], t[1], 2.6); });
+  tag(x, 19, z + 6.3, 'la frise (les soldats de la Révolution et de l\'Empire)', 'the frieze', 3); tag(x, 24.2, z + 6.2, 'les boucliers (les noms des grandes batailles)', 'the shields (names of battles)', 3);
+  tag(x, 15, z, 'la voûte (le plafond à caissons)', 'the vault (the coffered ceiling)', 3); tag(x, 12.6, z, 'le drapeau français (bleu, blanc, rouge)', 'the French flag', 2.5);
+  tag(x, 0.3, z, 'la tombe du Soldat inconnu', 'the Tomb of the Unknown Soldier', 1.4); tag(x, 0.6, z - 1.6, 'la flamme du souvenir', 'the eternal flame', 0.5); tag(x + 0.5, 0.3, z + 1.8, 'la gerbe de fleurs', 'the wreath', 0.5);
+  tag(x, 16.5, z + 6.5, 'les Renommées (les figures ailées)', 'the winged Fames', 2);
+  addSpot({x:x, z:z + 3.2, r:2.6, label:function(){ return '🗿 ' + L2('The sculptures of the Arc', 'Les sculptures de l\'Arc'); }, act:function(){ infoCard('🗿 LES SCULPTURES DE L\'ARC', 'Sur les piliers, il y a quatre grands groupes sculptés. Le plus célèbre est « Le Départ des volontaires de 1792 » de François Rude, qu\'on appelle aussi « La Marseillaise ». En haut, 30 boucliers portent les noms de grandes batailles. Sous l\'arc, la flamme du Soldat inconnu est ranimée chaque soir depuis 1923.', 'On the pillars there are four great sculpture groups. The most famous is "The Departure of the Volunteers of 1792" by François Rude, also called "La Marseillaise". At the top, 30 shields bear the names of great battles. Under the arch, the flame of the Unknown Soldier has been rekindled every evening since 1923.', ['Comment appelle-t-on aussi la sculpture de Rude ?', 'La Marseillaise', ['La Joconde', 'La Liberté', 'Le Penseur']], 'arcsc'); }});
+})();
+/* ---------- 🙋 GREETERS: someone at the door of every building welcomes you (in French, out loud) ---------- */
+var GREET_OPEN = ['Bonjour et bienvenue', 'Salut ! Bienvenue', 'Bonjour, bonjour ! Entrez, entrez ! Bienvenue', 'Coucou ! Bienvenue', 'Bienvenue, bienvenue', 'Bonjour ! Ça me fait plaisir de te voir ! Bienvenue', 'Ah, un visiteur ! Bienvenue'];
+var GREET_END = ['Bonne visite !', 'Amuse-toi bien !', 'Regarde partout : chaque objet a son nom en français !', 'N\'hésite pas à poser des questions !', 'Profite bien de ta visite !', 'Fais la chasse aux mots si tu veux gagner des jetons !'];
+function greetBlurb(o){
+  if(o.blurb) return o.blurb;
+  if(o.ty && GOODS[o.ty]) return 'Ici, on trouve : ' + GOODS[o.ty].slice(0, 3).map(function(g){ return g[0]; }).join(', ') + '...';
+  return '';
+}
+function greetText(o){
+  var f = o.facts && o.facts.length ? o.facts[Math.floor(Math.random()*o.facts.length)] : null;
+  var name = o.name.replace(/^.* - /, '').replace(/^(Le|La|Les|L')\s/, function(a){ return a.toLowerCase(); });
+  var parts = [GREET_OPEN[Math.floor(Math.random()*GREET_OPEN.length)] + ' : ' + o.name + ' !', greetBlurb(o)];
+  if(f) parts.push('Le saviez-vous ? ' + f[0]);
+  parts.push(GREET_END[Math.floor(Math.random()*GREET_END.length)]);
+  return {fr:parts.filter(Boolean).join(' '), en:f ? f[1] : ''};
+}
+var greetBox = (function(){
+  var el = document.createElement('div'); el.id = 'greet'; el.className = 'card hidden';
+  var st = document.createElement('style'); st.textContent = '#greet{position:fixed; left:12px; bottom:calc(120px + env(safe-area-inset-bottom,0px)); z-index:32; width:min(420px, 86vw); padding:8px 10px; font-family:"VT323", monospace; font-size:19px; line-height:1.15;} #greet.hidden{display:none;} #greet .gh{display:flex; justify-content:space-between; align-items:center; font-family:"Press Start 2P", monospace; font-size:8px; margin-bottom:5px; color:var(--accent);} #greet button{font-family:inherit; font-size:15px; border:2px solid var(--panel-border); background:var(--panel); color:var(--ink); cursor:pointer; margin-left:4px;} #greet .en{color:var(--ink-soft); font-size:16px; margin-top:4px;}';
+  document.head.appendChild(st); document.body.appendChild(el);
+  el.addEventListener('click', function(e){ var b = e.target.closest('button'); if(!b) return; if(b.getAttribute('data-g') === 'x') el.classList.add('hidden'); else say(el.getAttribute('data-say')); });
+  return el;
+})();
+function greet(o){
+  var g = greetText(o); greetBox.setAttribute('data-say', g.fr);
+  greetBox.innerHTML = '<div class="gh"><span>🙋 ' + L2('THE GREETER', 'L\'ACCUEIL') + '</span><span><button data-g="s">🔊</button><button data-g="x">✕</button></span></div>' + esc(g.fr) + (LANG === 'en' && g.en ? '<div class="en">' + esc(g.en) + '</div>' : '');
+  greetBox.classList.remove('hidden'); clearTimeout(greetBox.tm); greetBox.tm = setTimeout(function(){ greetBox.classList.add('hidden'); }, 26000);
+  say(g.fr);
+}
+var _enterIntG = enterInterior;
+enterInterior = function(o, at){ var fromOut = !INT.cur; _enterIntG(o, at); if(fromOut && o.greeter !== false && !o.noExit) setTimeout(function(){ greet(o); }, 1200); };
+var _leaveIntG = leaveInterior;
+leaveInterior = function(o){ greetBox.classList.add('hidden'); _leaveIntG(o); };
+var _buildIntG = buildInterior;
+buildInterior = function(o){
+  var first = !o.built; _buildIntG(o);
+  if(!first || o.greeter === false || o.noExit) return;
+  var gx = o.X + Math.min(3, o.w/2 - 1.5), gz = o.Z + o.d/2 - 6.2, w = INTERIORS.indexOf(o) % 2;
+  person({x:gx, z:gz, ry:Math.PI, shirt:[0x1f3f8f, 0x8a1c2c][w], pants:0x2a2a2a, hair:[0x4a2a1a, 0x8a5a2a][w], h:1.72});
+  tag(gx, 1.6, gz, w ? 'l\'hôtesse d\'accueil' : 'l\'hôte d\'accueil', 'the greeter', 0.5); o.words.push(w ? 'l\'hôtesse d\'accueil' : 'l\'hôte d\'accueil');
+  addSpot({x:gx, z:gz + 1.2, r:2, label:function(){ return '🙋 ' + L2('Ask the greeter about this place', 'Parler à l\'accueil'); }, act:function(){ greet(o); }});
+};
+/* shop interiors know their kind (for the greeter's blurb) */
+INTERIORS.forEach(function(o){ var m = /^ce(\d+)$/.exec(o.id); if(m) o.ty = CE_SHOPS[+m[1]][1]; var q = /^qv(\d+)$/.exec(o.id); if(q) o.ty = QV_SHOPS[+q[1]][1]; if(/^mall/.test(o.id)) o.ty = o.n === 1 ? 'sport' : 'fashion'; });
+INTERIORS.forEach(function(o){ var l = {'int-eiffel':'eiffel', 'int-arc':'arc', 'int-notredame':'notredame', 'int-louvre':'louvre', 'int-moulin':'moulin', 'int-grandpalais':'grandpalais', 'int-opera':'opera', 'int-pantheon':'pantheon', 'int-invalides':'invalides', 'int-pompidou':'pompidou'}[o.id]; if(l && LM[l] && LM[l].tfr) o.blurb = LM[l].tfr.split('. ')[0] + '.'; });
+MH.rdc.greeter = false; RAME.greeter = false;
+/* conversations: wait for the answer to be said before the next line */
+var _cvansE = GACT.cvans;
+GACT.cvans = function(v){ if(CV.wait) return; var before = CV.i; _cvansE(v); if(CV.i !== before && CV.i < CONVOS[CV.n.conv].turns.length){ CV.wait = true; setTimeout(function(){ CV.wait = false; }, 950); } };
+/* ---------- ✋ EASY TO PLAY: click the prompt instead of pressing E ---------- */
+(function(){
+  var st = document.createElement('style'); st.textContent = '#prompt{cursor:pointer; pointer-events:auto;} #prompt .pk{display:inline-block; margin-left:8px; padding:0 6px; border:2px solid currentColor; border-radius:4px; font-size:0.8em;}'; document.head.appendChild(st);
+  promptEl.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); interact(); promptKey = null; });
+  var _sp = setPrompt;
+  setPrompt = function(html, key){ _sp(html ? html + '<span class="pk">👆 ' + L2('click', 'clique') + '</span>' : html, key); };
+})();
+/* the people to talk to are in 👆 browse mode too: click one and start talking */
+var _browseListE = browseList;
+browseList = function(){ var L = _browseListE(); NPCS.forEach(function(n){ L.push({icon:'💬', name:n.nm + ' - ' + L2(CONVOS[n.conv].t[0], CONVOS[n.conv].t[1]), x:n.x, z:n.z + 2.5, yaw:0, px:n.x, pz:n.z, act:function(){ goNear(n.x, n.z + 2.5, 0, function(){ startConvo(n); }); }}); }); return L; };
+function goNear(x, z, yaw, then){
+  closeCard(); titleScreen.classList.add('hidden'); if(INT.cur){ INT.lamps.forEach(function(l){ l.intensity = 0; }); INT.cur = null; greetBox.classList.add('hidden'); }
+  var fade = flyCard.fade; fade.style.opacity = 1;
+  setTimeout(function(){ goTo({x:x, z:z, yaw:yaw || 0}); setTimeout(function(){ fade.style.opacity = 0; if(then) setTimeout(then, 300); }, 250); }, 350);
+}
+/* ---------- 🗺 THE MAP, organised by topic: click anything to go there (buildings: straight inside) ---------- */
+var MAPF = [];
+function mapGroups(){
+  var G = [], byId = {}; INTERIORS.forEach(function(o){ byId[o.id] = o; });
+  function g(title, items){ if(items.length) G.push([title, items]); }
+  function inside(o, icon){ return {icon:icon || '🚪', name:o.name, sub:L2('go inside', 'entrer'), go:function(){ closeCard(); if(INT.cur){ INT.cur = null; } enterInterior(o); }}; }
+  function place(icon, name, sub, x, z, yaw, then){ return {icon:icon, name:name, sub:sub || '', go:function(){ goNear(x, z, yaw, then); }}; }
+  var ints = INTERIORS.filter(function(o){ return o.door && o.door.x > -9e4; });
+  g('⭐ ' + L2('New places', 'Nouveaux lieux'), EXTRA_PLACES.map(function(p){ return place(p[0], p[1], p[2], p[3], p[4], p[5]); }));
+  g('🏛 ' + L2('Paris monuments (go inside)', 'Les monuments de Paris (entrer)'), ints.filter(function(o){ return /^int-/.test(o.id); }).map(function(o){ return inside(o, '🏛'); }).concat(LANDMARK_INFO.filter(function(l){ return l.view; }).map(function(l){ return place('🏛', L2(l.en, l.fr), L2('view', 'à voir'), l.x, l.z + l.r + 6, 0); })));
+  g('🛍 ' + L2('The Champs-Élysées: 28 shops', 'Les Champs-Élysées : 28 boutiques'), [place('🛍', 'Avenue des Champs-Élysées', '', -420, -520, -Math.PI/2)].concat(ints.filter(function(o){ return /^ce\d/.test(o.id); }).map(function(o){ return inside(o, '🛍'); })));
+  g('🛒 ' + L2('The shopping centre (mall)', 'Le centre commercial'), [place('🛒', MALL.name, L2('the entrance', 'l\'entrée'), MALL.door.x, MALL.door.z, MALL.door.yaw)].concat(ints.filter(function(o){ return /^mall/.test(o.id); }).map(function(o){ return inside(o, '👗'); })));
+  g('🥦 ' + L2('Supermarket & chefs\' centre', 'Le supermarché et le Centre des Chefs'), [place('🛒', 'Supermarché du Monde', L2('entrance', 'l\'entrée'), GROC.x, GROC.z - 36, Math.PI), place('👨‍🍳', 'Le Centre des Chefs', L2('cooking classes, recipes', 'cours de cuisine, recettes'), CHEF.x, CHEF.z - 29, Math.PI)]
+    .concat(AISLES.map(function(a, i){ var col = i % 5, row = Math.floor(i/5); return place(a.icon, L2('Aisle: ', 'Rayon : ') + a.fr, 'Supermarché', GROC.x - 30 + col*15, GROC.z - 14 + row*14 - 3.5, Math.PI, function(){ openAisle(i); }); }))
+    .concat(RECIPES.map(function(r){ return place(r.icon, r.nm, L2('recipe', 'recette'), CHEF.x, CHEF.z - 29, Math.PI); })));
+  g('🎤 ' + L2('The stadium & the arcade', 'Le stade et l\'arcade'), [place('🎤', STAD.name, L2('live concerts', 'concerts en direct'), STAD.door.x, STAD.door.z, STAD.door.yaw), place('🕹', ARC.name, L2('verb and vocabulary games', 'jeux de verbes et de vocabulaire'), ARC.door.x, ARC.door.z, ARC.door.yaw)]);
+  g('🦁 ' + L2('The zoo and its habitats', 'Le zoo et ses habitats'), [place('🦁', 'Zoo de Paris', L2('the entrance', 'l\'entrée'), -250, 606, Math.PI), place('🏠', L2('Adoption centre', 'Centre d\'adoption'), 'Zoo', -40, 820, -Math.PI/2)]
+    .concat(HABITATS.map(function(h){ var o = byId['zoo-' + h.id]; return place(h.icon, h.fr, L2('the habitat', 'l\'habitat'), h.x, h.z < 750 ? h.z + h.d/2 + 6 : h.z - h.d/2 - 6, h.z < 750 ? Math.PI : 0); }))
+    .concat(HABITATS.map(function(h){ var o = byId['zoo-' + h.id]; return o ? inside(o, '📖') : null; }).filter(Boolean)));
+  g('🚇 ' + L2('The Métro (stations)', 'Le métro (les stations)'), Object.keys(MSTA).map(function(k){ return inside(MSTA[k].room, 'Ⓜ'); }));
+  g('🏡 ' + L2('Madame\'s family home', 'La maison de Madame'), [place('🏡', L2('The garden (outside)', 'Le jardin (dehors)'), '', MHOME.x, MHOME.z + 27, 0), inside(MH.rdc, '🛋')].concat([[MH.etage, '🛏', {x:3.4, z:4, yaw:Math.PI}], [MH.grenier, '🧸', {x:0, z:3.5, yaw:0}], [MH.cave, '📦', {x:0, z:-3, yaw:Math.PI}]].map(function(f){ return {icon:f[1], name:f[0].name, sub:L2('go inside', 'entrer'), go:function(){ closeCard(); INT.cur = null; enterInterior(f[0], f[2]); }}; })));
+  g('🏘 ' + L2('The class villages', 'Les villages des classes'), VILLAGES.filter(function(v){ return !v.main; }).map(function(v){ return {icon:v.elite ? '🥖' : '🏘', name:v.q, sub:v.elite ? L2('Madame\'s elite village', 'le village d\'élite') : t('vgClassOf', {t:tx(v.t)}), go:function(){ closeCard(); goVillage(v); }}; }));
+  var V = V_BY_ID.baguette;
+  g('🥖 ' + L2('Baguetteville', 'Baguetteville'), [place('🥖', 'Village de la Baguette', '', V.x, V.z + 66, Math.PI), {icon:'🍞', name:'L\'Académie du Levain', sub:L2('make sourdough', 'faire du pain au levain'), go:function(){ closeCard(); INT.cur = null; enterInterior(ACAD); }}, inside(MUSEE, '📜'),
+    place('🥐', L2('Croissant-mobiles', 'Croissant-mobiles'), '', V.x - 82, V.z + 64, Math.PI), place('🛹', L2('Baguette skateboards & scooters', 'Skates et trottinettes-baguettes'), '', V.x + 82, V.z + 64, Math.PI)]);
+  g('❄ ' + L2('Québec - the Carnaval', 'Québec - le Carnaval'), srch.list.filter(function(x){ return x.sub && (x.sub.indexOf('Québec') >= 0 || /Carnaval|Glissade|Ski|Traîneau|Patinoire|Motoneige|Givre|Palais|Bain|Sculptures/.test(x.name)) && x.cat !== 'new' && x.icon !== '📜'; }).map(function(x){ return place(x.icon, x.name, x.sub, x.x, x.z, x.yaw); }).concat([inside(byId.palais, '🏰'), inside(byId.chateau, '🏨')]));
+  g('⚜ ' + L2('Québec - the village', 'Québec - le village'), [inside(byId.gare, '🚆'), inside(byId.capit, '⛵'), inside(byId.yqb, '✈')].concat(ints.filter(function(o){ return /^qv\d/.test(o.id); }).map(function(o){ return inside(o, /^Maison/.test(o.name) ? '🏠' : '🛍'); })));
+  g('💬 ' + L2('People to talk to (conversations)', 'Des gens à qui parler (conversations)'), NPCS.map(function(n){ return place('💬', n.nm, L2(CONVOS[n.conv].t[0], CONVOS[n.conv].t[1]), n.x, n.z + 2.5, 0, function(){ startConvo(n); }); }));
+  g('✈ ' + L2('Airports', 'Les aéroports'), [place('✈', 'Aéroport Paris-CDG', '', CDG.x + 6, CDG.z - 25, 0), inside(byId.yqb, '✈')]);
+  return G;
+}
+openMap = function(){
+  srch.list = searchIndex(); MAPF = [];
+  var groups = mapGroups(), h = '<h3>🗺 ' + L2('MAP - WHERE DO YOU WANT TO GO?', 'CARTE - OÙ VEUX-TU ALLER ?') + '</h3><div class="gc-sub">' + L2('Open a topic, then click a place: you go straight there. Buildings: straight inside!', 'Ouvre un thème, puis clique sur un lieu : tu y vas directement. Les bâtiments : directement à l\'intérieur !') + '</div>';
+  groups.forEach(function(gr, gi){ h += '<details style="margin:5px 0; border:2px solid var(--panel-border); padding:2px 6px"' + (gi === 0 ? ' open' : '') + '><summary style="cursor:pointer; font-family:\'Press Start 2P\',monospace; font-size:9px; padding:7px 0">' + esc(gr[0]) + ' (' + gr[1].length + ')</summary><div class="gc-grid">' +
+    gr[1].map(function(it){ MAPF.push(it); return gOpt('mapgo', MAPF.length - 1, it.icon + ' <b>' + esc(it.name) + '</b>' + (it.sub ? '<br><span class="lf-soft">' + esc(it.sub) + '</span>' : '')); }).join('') + '</div></details>'; });
+  h += '<div class="gc-row">' + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>';
+  showCard(h);
+};
+GACT.mapgo = function(v){ var it = MAPF[v|0]; if(!it) return; gcard.resume = false; if(typeof amJailed === 'function' && amJailed()){ showToast(t('vgJail')); return; } if(BROWSE.on) setBrowse(false); it.go(); };
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
@@ -14719,7 +15254,7 @@ function animate(){
   updateSpeedo();
   lifeTick(dt);
   jailTick();
-  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick();
+  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick();
   if(!ICE.t || performance.now() - ICE.t > 1000){ ICE.t = performance.now(); if(Math.hypot(camera.position.x - QC.x, camera.position.z - QC.z) < 800) iceSync(); }
   villageTick();
   sendPresence(false);
