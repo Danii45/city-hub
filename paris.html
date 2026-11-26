@@ -2723,8 +2723,16 @@ var SHOP_TYPES = [
   {id:'chocolate', en:'CHOCOLATE', fr:'CHOCOLATIER', awn:6},
   {id:'grocery', en:'GROCERY', fr:'ÉPICERIE', awn:2},
   {id:'music', en:'MUSIC', fr:'MUSIQUE', awn:7},
-  {id:'candy', en:'CANDY', fr:'CONFISERIE', awn:4}
+  {id:'candy', en:'CANDY', fr:'CONFISERIE', awn:4},
+  {id:'crepes', en:'CRÊPERIE', fr:'CRÊPERIE', awn:2}, {id:'pizza', en:'PIZZERIA', fr:'PIZZERIA', awn:3}, {id:'sushi', en:'SUSHI BAR', fr:'BAR À SUSHIS', awn:5},
+  {id:'burger', en:'BURGERS', fr:'BURGERS', awn:0}, {id:'tea', en:'TEA ROOM', fr:'SALON DE THÉ', awn:4}, {id:'butcher', en:'BUTCHER', fr:'BOUCHERIE', awn:0},
+  {id:'fish', en:'FISHMONGER', fr:'POISSONNERIE', awn:1}, {id:'pharmacy', en:'PHARMACY', fr:'PHARMACIE', awn:2}, {id:'perfume', en:'PERFUMERY', fr:'PARFUMERIE', awn:7},
+  {id:'jewel', en:'JEWELLER', fr:'BIJOUTERIE', awn:5}, {id:'shoes', en:'SHOE SHOP', fr:'CHAUSSURES', awn:5}, {id:'sport', en:'SPORTS SHOP', fr:'MAGASIN DE SPORT', awn:1},
+  {id:'games', en:'VIDEO GAMES', fr:'JEUX VIDÉO', awn:7}, {id:'pets', en:'PET SHOP', fr:'ANIMALERIE', awn:2}, {id:'hair', en:'HAIR SALON', fr:'SALON DE COIFFURE', awn:4},
+  {id:'cinema', en:'CINEMA', fr:'CINÉMA', awn:5}, {id:'gym', en:'GYM', fr:'SALLE DE SPORT', awn:1}, {id:'bike', en:'BIKE SHOP', fr:'MAGASIN DE VÉLOS', awn:2},
+  {id:'custom', en:'✏ CUSTOM', fr:'✏ PERSONNALISÉ', awn:8}
 ];
+function shopLabel(d){ if(d && d.ty === 'custom' && d.cty) return String(d.cty).toUpperCase(); return tx(shopType(d && d.ty)); }
 function shopType(id){ for(var i=0;i<SHOP_TYPES.length;i++) if(SHOP_TYPES[i].id === id) return SHOP_TYPES[i]; return SHOP_TYPES[0]; }
 function pick(list, i, dflt){ return list[(i >= 0 && i < list.length) ? i : dflt || 0]; }
 function lum(hex){ var c = new THREE.Color(hex); return 0.299*c.r + 0.587*c.g + 0.114*c.b; }
@@ -3327,7 +3335,7 @@ function drawPlotSigns(p, d){
   var trim = pick(TRIM_COLORS, d.ct), awn = pick(AWNING_COLORS, d.ca);
   if(p.kind === 'store'){
     drawSlot(p.slot, d.nm || '...', hexCss(trim), lum(trim) > 0.6 ? '#1f2233' : '#f6e7b0', lum(trim) > 0.6 ? '#1f2233' : '#d9b44a', 'serif');
-    drawSlot(p.slot + 1, tx(shopType(d.ty)), hexCss(awn), lum(awn) > 0.6 ? '#1f2233' : '#ffffff', null, 'sans');
+    drawSlot(p.slot + 1, shopLabel(d), hexCss(awn), lum(awn) > 0.6 ? '#1f2233' : '#ffffff', null, 'sans');
   } else drawSlot(p.slot, d.nm || '...', '#2b4c9b', '#ffffff', '#ffffff', 'serif');
 }
 
@@ -6158,7 +6166,7 @@ function plotInFront(){
   if(!flying || driving) return null;
   return plotAt(camera.position.x, camera.position.z, 4.5);
 }
-function plotTitle(p){ var d = p.data; return d ? (d.nm || (p.kind === 'store' ? tx(shopType(d.ty)) : '...')) : t('forSale'); }
+function plotTitle(p){ var d = p.data; return d ? (d.nm || (p.kind === 'store' ? shopLabel(d) : '...')) : t('forSale'); }
 function updatePrompt(){
   if(!flying || driving || panelPlot || builder.on || decor.on || blk.on || !titleScreen.classList.contains('hidden')){ setPrompt('', ''); return; }
   if(nearMika()){ setPrompt('<b>E</b>' + esc(t('petMika')), 'mika|' + LANG); return; }
@@ -6281,7 +6289,7 @@ function renderPlotPanel(){
   } else if(mine){
     tag.textContent = t(p.kind === 'store' ? 'yourShop' : 'yourHouse');
     title.textContent = plotTitle(p);
-    sub.textContent = (p.kind === 'store' ? tx(shopType(d.ty)) + ' - ' : '') + plotLabel(p);
+    sub.textContent = (p.kind === 'store' ? shopLabel(d) + ' - ' : '') + plotLabel(p);
     if(isBlockHouse(p, d)){
       ppButton(row, 'goInside', 'go', function(){ goInside(p); });
       ppButton(row, 'modeBlocks', 'go', function(){ closePlotPanel(false); openBlocks(p, 'out'); });
@@ -6295,7 +6303,7 @@ function renderPlotPanel(){
   } else {
     tag.textContent = plotLabel(p);
     title.textContent = plotTitle(p);
-    sub.textContent = (p.kind === 'store' ? tx(shopType(d.ty)) + ' - ' : '') + t('ownedBy', {name:memberName(d.o)});
+    sub.textContent = (p.kind === 'store' ? shopLabel(d) + ' - ' : '') + t('ownedBy', {name:memberName(d.o)});
     if(isBlockHouse(p, d)) ppButton(row, 'goInside', 'go', function(){ goInside(p); });
     if(p.kind === 'store') ppButton(row, 'shopHere', 'go', function(){ closePlotPanel(false); openChallenge('shop', p, 's' + p.id); });
     if(net.isOwner) ppButton(row, 'ownerRemove', 'danger', function(){ panelConfirm = 'remove'; renderPlotPanel(); });
@@ -6445,6 +6453,9 @@ function renderBuilder(){
   if(store){
     bdBody.appendChild(optLabel('shopType'));
     bdBody.appendChild(chipRow(SHOP_TYPES.map(tx), SHOP_TYPES.indexOf(shopType(d.ty)), function(i){ d.ty = SHOP_TYPES[i].id; builderChanged(); }));
+    if(d.ty === 'custom'){ var ci = document.createElement('input'); ci.className = 'login-input'; ci.maxLength = 18; ci.placeholder = L2('Your own kind of shop (in French!) e.g. Boutique de skate', 'Ton type de commerce (en français !) ex. Boutique de skate'); ci.value = d.cty || ''; ci.style.cssText = 'width:100%;margin:6px 0'; ci.addEventListener('change', function(){ var v = ci.value.replace(/[<>]/g, '').trim().slice(0, 18); if(v && hasBadWord(v)){ badJail(v); ci.value = ''; return; } d.cty = v; builderChanged(); }); bdBody.appendChild(ci);
+      var cs = document.createElement('div'); cs.className = 'msg'; cs.textContent = L2('Works like: ', 'Fonctionne comme : '); bdBody.appendChild(cs); var kinds = ['restaurant', 'cafe', 'grocery', 'fashion', 'toys', 'books', 'art', 'music'];
+      bdBody.appendChild(chipRow(kinds.map(function(k){ return tx(shopType(k)); }), Math.max(0, kinds.indexOf(d.cbase || 'restaurant')), function(i){ d.cbase = kinds[i]; builderChanged(); })); }
   }
   bdBody.appendChild(optLabel(store ? 'style' : 'houseType'));
   bdBody.appendChild(chipRow((store ? STYLES : HOUSE_TYPES).map(tx), d.st, function(i){ d.st = i; builderChanged(); }));
@@ -13049,7 +13060,7 @@ var SHOP_FACTS = {
   candy:[['Les calissons d\'Aix-en-Provence sont des bonbons en forme de bateau, faits avec du melon confit et des amandes.', 'Calissons from Aix-en-Provence are boat-shaped sweets made with candied melon and almonds.', ['Comment dit-on « sweets » en français ?', 'des bonbons', ['des boutons', 'des bateaux', 'des bonnets']]]]
 };
 var SHOP_WALL = {cafe:0xf2e2c8, pastry:0xf8e0ea, bakery:0xf2dcb0, perfume:0xf0e6f6, cinema:0x2a1b2a, chocolate:0xe8d2c0, books:0xe8e0c8, fashion:0xf2f2f2, restaurant:0xf0dcc8, icecream:0xe6f2f8, cheese:0xf6eccc, toys:0xe8f0f8, music:0x2a2a3a, art:0xf6f6f6, crepes:0xe6eef8, flowers:0xe8f4e0, grocery:0xf2ecd8, souvenirs:0xf6e6e6, sport:0xe6eef6, candy:0xfbe6f2};
-var SEATED = {cafe:1, pastry:1, restaurant:1, crepes:1, icecream:1};
+var SEATED = {cafe:1, pastry:1, restaurant:1, crepes:1, icecream:1, pizza:1, sushi:1, burger:1, tea:1};
 /* furnish a shop room (22 x 16, the door at +z) */
 function furnishShop(F, ty, o){
   var g = GOODS[ty] || GOODS.grocery;
@@ -20216,6 +20227,65 @@ var BUILD_ID = '1795715992';
   setTimeout(check, 20000); setInterval(check, 60000); })();
 /* ---------- ⬭ ROUNDER SHAPES: softer, rounded panels, buttons, cards ---------- */
 (function(){ var st = document.createElement('style'); st.textContent = '.card,#g-card,.side-panel,#status-panel,.bar-drop,#hint,#title-card{border-radius:14px !important}.bar-btn,.lf-opt,#g-card button,.gc-row button,.btn,button.bar-btn{border-radius:10px !important}.card,#g-card{box-shadow:0 6px 18px rgba(0,0,0,.28) !important}.bar-btn{box-shadow:0 3px 8px rgba(0,0,0,.22) !important}.lf-opt{box-shadow:0 2px 6px rgba(0,0,0,.15) !important}input,textarea,select{border-radius:8px !important}'; document.head.appendChild(st); })();
+/* ---------- 👁 SPECTATOR (menu camera) no longer shows the whole map to students: close zoom, low camera, fog ---------- */
+var SPEC = {was:null};
+function specTick(){ var lim = !flying && !(typeof blk !== 'undefined' && blk.on) && !(typeof editing !== 'undefined' && editing) && !isStaff();
+  if(lim && scene.fog){ if(SPEC.was !== 'lim'){ SPEC.was = 'lim'; SPEC.fog = scene.fog.far; } controls.maxDistance = 70; controls.maxPolarAngle = Math.PI*0.42; if(!scene.fog) return; var t = controls.target, d = camera.position.distanceTo(t); if(d > 70){ camera.position.sub(t).setLength(70).add(t); } if(t.y > 20) t.y = 20; if(camera.position.y > 55) camera.position.y = 55; scene.fog.far = 140; scene.fog.near = 30; }
+  else if(SPEC.was === 'lim'){ SPEC.was = null; controls.maxDistance = 480; controls.maxPolarAngle = Math.PI*0.49; scene.fog.near = 180; try { gfxApply(); } catch(e){ scene.fog.far = SPEC.fog || 820; } } }
+/* ---------- 🗿 LES GRANDS FRANÇAIS: statues of famous French figures around Paris, each with a bilingual plaque + a question ---------- */
+var FIGS = [
+  ['🔬', 'Marie Curie', '1867-1934', 'scientifique', 'Physicienne et chimiste née à Varsovie, elle a travaillé à Paris. Elle a étudié la radioactivité et découvert le polonium et le radium. Elle est la première femme à recevoir un prix Nobel, et la seule personne à en avoir deux dans deux sciences différentes (physique 1903, chimie 1911).', 'Physicist and chemist; first woman to win a Nobel Prize, and winner of two (physics and chemistry).', ['Combien de prix Nobel a-t-elle reçus ?', 'deux', ['un', 'trois', 'aucun']]],
+  ['💉', 'Louis Pasteur', '1822-1895', 'scientifique', 'Chimiste et biologiste. Il a créé le vaccin contre la rage en 1885 et inventé la pasteurisation : on chauffe un aliment (comme le lait) pour tuer les microbes.', 'Created the rabies vaccine and invented pasteurization.', ['Pasteur a créé un vaccin contre...', 'la rage', ['la grippe', 'le rhume', 'la varicelle']]],
+  ['⚗', 'Antoine Lavoisier', '1743-1794', 'scientifique', 'On l\'appelle le père de la chimie moderne. Il a montré que la matière ne disparaît pas pendant une réaction chimique : « Rien ne se perd, rien ne se crée, tout se transforme. »', 'The father of modern chemistry: matter is conserved in chemical reactions.', ['« Rien ne se perd, rien ne se crée, tout se... »', 'transforme', ['mange', 'casse', 'cache']]],
+  ['⠿', 'Louis Braille', '1809-1852', 'inventeur', 'Devenu aveugle à 3 ans, il a inventé à 15 ans une écriture faite de petits points en relief : le braille. Les personnes aveugles du monde entier lisent avec les doigts grâce à lui.', 'Blind from age 3, he invented the raised-dot braille writing system as a teenager.', ['Le braille, on le lit avec...', 'les doigts', ['les oreilles', 'le nez', 'les pieds']]],
+  ['🗼', 'Gustave Eiffel', '1832-1923', 'ingénieur', 'Ingénieur, il a construit la tour Eiffel pour l\'Exposition universelle de 1889. Il a aussi conçu la structure métallique intérieure de la statue de la Liberté.', 'Engineer of the Eiffel Tower (1889) and of the Statue of Liberty\'s inner frame.', ['La tour Eiffel a été construite pour l\'Exposition universelle de...', '1889', ['1789', '1900', '1969']]],
+  ['🎞', 'Les frères Lumière', 'Auguste 1862-1954 · Louis 1864-1948', 'inventeurs', 'Auguste et Louis Lumière ont inventé le cinématographe. Le 28 décembre 1895, à Paris, ils ont fait la première projection publique payante de films : c\'est la naissance du cinéma.', 'The Lumière brothers invented the cinematograph and held the first paid public film screening in Paris in 1895.', ['Les frères Lumière ont inventé...', 'le cinéma (le cinématographe)', ['le téléphone', 'l\'avion', 'la radio']]],
+  ['🧭', 'Jacques Cartier', '1491-1557', 'explorateur', 'Explorateur de Saint-Malo. En 1534, il fait son premier voyage vers le Canada. En 1535, il remonte le fleuve Saint-Laurent. Le mot « Canada » vient du mot iroquoien « kanata », qui veut dire village.', 'Explorer from Saint-Malo; reached Canada in 1534 and sailed up the St. Lawrence in 1535.', ['Le mot « kanata » veut dire...', 'village', ['rivière', 'montagne', 'neige']]],
+  ['⚜', 'Samuel de Champlain', 'vers 1570-1635', 'explorateur', 'Explorateur et cartographe. Il a fondé la ville de Québec en 1608. On l\'appelle « le père de la Nouvelle-France ».', 'Founded Quebec City in 1608; "the father of New France".', ['Champlain a fondé Québec en...', '1608', ['1534', '1759', '1867']]],
+  ['🌊', 'Jacques-Yves Cousteau', '1910-1997', 'explorateur', 'Officier de marine et explorateur des océans. Il a coinventé le scaphandre autonome (pour respirer sous l\'eau) et fait des films sur la mer avec son bateau, la Calypso.', 'Ocean explorer; co-invented the Aqua-Lung and filmed the sea from his ship Calypso.', ['Le bateau de Cousteau s\'appelait...', 'la Calypso', ['le Titanic', 'la Santa María', 'le Nautilus']]],
+  ['👨‍🍳', 'Auguste Escoffier', '1846-1935', 'chef', 'On l\'appelait « le roi des cuisiniers et le cuisinier des rois ». Il a modernisé la cuisine française et organisé la cuisine en « brigade » : chaque cuisinier a un poste. Il a créé la pêche Melba.', 'Modernized French cuisine and created the kitchen "brigade" system.', ['Escoffier a organisé les cuisines en...', 'brigade', ['équipe de foot', 'école', 'famille']]],
+  ['🍲', 'Paul Bocuse', '1926-2018', 'chef', 'Grand chef de Lyon, symbole de la gastronomie française et de la « nouvelle cuisine ». Il a créé le Bocuse d\'Or, un grand concours de cuisine.', 'Legendary chef from Lyon; created the Bocuse d\'Or cooking competition.', ['Paul Bocuse était un chef de...', 'Lyon', ['Marseille', 'Québec', 'Lille']]],
+  ['📖', 'Victor Hugo', '1802-1885', 'écrivain', 'Écrivain et poète. Il a écrit « Notre-Dame de Paris » (1831) et « Les Misérables » (1862). Il est enterré au Panthéon.', 'Author of The Hunchback of Notre-Dame and Les Misérables.', ['Victor Hugo a écrit...', 'Les Misérables', ['Le Petit Prince', 'Harry Potter', 'Astérix']]],
+  ['🎭', 'Molière', '1622-1673', 'écrivain', 'Jean-Baptiste Poquelin, dit Molière, a écrit des comédies de théâtre très drôles. On appelle le français « la langue de Molière ».', 'Great comic playwright; French is called "the language of Molière".', ['« La langue de Molière », c\'est...', 'le français', ['l\'anglais', 'le latin', 'l\'italien']]],
+  ['🚀', 'Jules Verne', '1828-1905', 'écrivain', 'Il a écrit des romans d\'aventure et de science : « Vingt mille lieues sous les mers » et « Le Tour du monde en quatre-vingts jours ». Il a imaginé des sous-marins et des voyages dans l\'espace.', 'Adventure and science-fiction author (Twenty Thousand Leagues Under the Seas).', ['Le tour du monde en combien de jours ?', 'quatre-vingts', ['quarante', 'cent', 'soixante']]],
+  ['🎨', 'Claude Monet', '1840-1926', 'peintre', 'Peintre de l\'impressionnisme. Son tableau « Impression, soleil levant » a donné son nom à ce mouvement. Il a peint les nymphéas de son jardin à Giverny.', 'Impressionist painter; his painting gave the movement its name.', ['Le mouvement de Monet s\'appelle...', 'l\'impressionnisme', ['le cubisme', 'le pop art', 'le gothique']]],
+  ['👗', 'Coco Chanel', '1883-1971', 'créatrice de mode', 'Créatrice de mode. Elle a rendu les vêtements des femmes plus simples et confortables, avec la petite robe noire, et a lancé le parfum N°5 en 1921.', 'Fashion designer: the little black dress and Chanel N°5.', ['Coco Chanel a rendu célèbre la petite robe...', 'noire', ['rouge', 'blanche', 'verte']]],
+  ['⚔', 'Jeanne d\'Arc', 'vers 1412-1431', 'héroïne', 'Jeune paysanne, elle a mené l\'armée française pendant la guerre de Cent Ans et libéré la ville d\'Orléans en 1429. On l\'appelle « la Pucelle d\'Orléans ».', 'Led the French army in the Hundred Years\' War and freed Orléans in 1429.', ['Jeanne d\'Arc a libéré la ville de...', 'Orléans', ['Paris', 'Lyon', 'Nice']]],
+  ['⚖', 'Simone Veil', '1927-2017', 'femme politique', 'Survivante d\'Auschwitz, ministre de la Santé, puis première présidente élue du Parlement européen (1979). Elle a défendu les droits des femmes. Elle repose au Panthéon.', 'Holocaust survivor; first elected President of the European Parliament.', ['Simone Veil a été la première présidente élue du...', 'Parlement européen', ['Canada', 'Louvre', 'Tour de France']]],
+  ['🌟', 'Joséphine Baker', '1906-1975', 'artiste et résistante', 'Chanteuse et danseuse née aux États-Unis, devenue française en 1937. Pendant la Seconde Guerre mondiale, elle a aidé la Résistance. Elle est entrée au Panthéon en 2021.', 'Singer and dancer who became French and helped the Resistance in WWII.', ['Pendant la guerre, elle a aidé...', 'la Résistance', ['les pirates', 'les Romains', 'les Vikings']]],
+  ['𓂀', 'Jean-François Champollion', '1790-1832', 'savant', 'Il a déchiffré les hiéroglyphes égyptiens en 1822 grâce à la pierre de Rosette, qui avait le même texte en trois écritures.', 'Deciphered Egyptian hieroglyphs in 1822 using the Rosetta Stone.', ['Champollion a déchiffré...', 'les hiéroglyphes', ['le braille', 'le morse', 'les emojis']]]
+];
+var FIG = {list:[]};
+(function(){ var spots = [[-30, -40], [30, -40], [-30, 40], [30, 40], [-110, -20], [110, 20], [-110, 60], [110, -60], [0, -100], [0, 100], [-150, -560], [-30, -560], [60, -560], [180, -560], [300, -560], [-240, -575], [-180, -640], [20, -650], [130, -640], [280, -640]];
+  FIGS.forEach(function(f, i){ var sp = spots[i % spots.length], p = freeAt(sp[0], sp[1]), x = p[0], z = p[1], B = new MeshBatch(), L = new Lot(B, x, z, 0);
+    L.box(2.2, 0.4, 2.2, 0, 0.2, 0, 0xd8d0c0); L.box(1.6, 1.6, 1.6, 0, 1.2, 0, 0xe8e0d0); L.box(1.9, 0.18, 1.9, 0, 2.08, 0, 0xd8d0c0); L.box(1.2, 0.5, 0.05, 0, 1.25, 0.83, 0x7a5a2a); B.build(); addSolidC(x, z, 2.2, 2.2, 'static', -1, 2.2);
+    var st = person({x:x, y:2.17, z:z, ry:Math.PI, shirt:0x4f7a68, pants:0x4f7a68, hair:0x456b5c, skin:0x5c8a76, h:1.9, noRig:true}); st.traverse(function(o){ if(o.isMesh) o.material = solidMat(0x5c8a76); });
+    airSign(f[0] + ' ' + f[1].toUpperCase(), x, 4.6, z + 0.9, Math.PI, 3.6, '#4a3a1a'); FIG.list.push({x:x, z:z});
+    addSpot({x:x, z:z + 1.8, r:2.8, label:function(){ return '🗿 ' + f[1] + ' · ' + L2('read the plaque', 'lire la plaque'); }, act:function(){ GACT.figo(i); }});
+    tag(x, 1.3, z + 0.9, 'la statue de ' + f[1], 'the statue of ' + f[1], 1); });
+  EXTRA_PLACES.push(['🗿', 'Les Grands Français (' + FIGS.length + ' statues)', L2('Scientists, explorers, chefs, writers, artists', 'Scientifiques, explorateurs, chefs, écrivains, artistes'), FIG.list[0].x, FIG.list[0].z + 4, Math.PI]); })();
+GACT.figo = function(i){ var f = FIGS[i|0], e = hasChar() ? life.eco : null, seen = (e && e.figs) || {}; FIG.cur = i; FIG.m = mc(Math.random, f[6][1], f[6][2]); say(f[1] + '. ' + f[4]);
+  showCard('<h3>' + f[0] + ' ' + esc(f[1].toUpperCase()) + '</h3><div class="gc-sub">' + esc(f[2]) + ' · ' + esc(f[3]) + ' · ' + L2('statues visited: ', 'statues visitées : ') + Object.keys(seen).length + '/' + FIGS.length + '</div><div class="gc-text gc-say" style="text-align:left">' + esc(f[4]) + '</div>' + (LANG === 'en' ? '<div class="gc-sub">' + esc(f[5]) + '</div>' : '') + '<div class="gc-big">' + esc(f[6][0]) + '</div><div class="gc-grid">' + FIG.m.opts.map(function(o, k){ return gOpt('figa', k, esc(o)); }).join('') + '</div>'); };
+GACT.figa = function(v){ var i = FIG.cur, f = FIGS[i], ok = (v|0) === FIG.m.ans, e = hasChar() ? life.eco : null, got = 0; if(ok && e){ e.figs = e.figs || {}; if(!e.figs[i]){ e.figs[i] = 1; got = addJeton(2); lifeSave(true); } }
+  var n = e && e.figs ? Object.keys(e.figs).length : 0; showCard('<h3>' + f[0] + ' ' + esc(f[1]) + '</h3><div class="gc-big ' + (ok ? 'good' : 'bad') + '">' + (ok ? '✓ ' : '✗ ') + esc(f[6][1]) + (got ? ' · +' + got + ' 🪙' : '') + '</div><div class="gc-text">' + L2('Statues learned: ', 'Statues apprises : ') + n + '/' + FIGS.length + (n >= FIGS.length ? ' 🏅 ' + L2('You know all the Grands Français!', 'Tu connais tous les Grands Français !') : '') + '</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); };
+/* ---------- 💸 MONEY SPREAD: over 1 000 € you can fan your bills and make it rain ---------- */
+var MSPR = {parts:[], tex:null};
+GACT.mspread = function(){ var e = hasChar() ? life.eco : null, cash = e ? +e.cash || 0 : 0; if(cash < 1000){ showToast('💸 ' + L2('You need over 1 000 € for the money spread! (you have ', 'Il faut plus de 1 000 € pour faire le money spread ! (tu as ') + Math.round(cash) + ' €)'); return; } closeDrops && closeDrops();
+  if(!MSPR.tex){ var c = document.createElement('canvas'); c.width = 96; c.height = 48; var k = c.getContext('2d'); k.fillStyle = '#7fbf6a'; k.fillRect(0, 0, 96, 48); k.strokeStyle = '#2f6a2a'; k.lineWidth = 4; k.strokeRect(3, 3, 90, 42); k.fillStyle = '#1f4a1a'; k.font = 'bold 26px Arial'; k.textAlign = 'center'; k.textBaseline = 'middle'; k.fillText('100 €', 48, 25); MSPR.tex = new THREE.CanvasTexture(c); }
+  var cp = camera.position, fx = -Math.sin(yaw), fz = -Math.cos(yaw), y0 = cp.y - EYE_HEIGHT + 1.4; for(var i=0;i<40;i++){ var s = new THREE.Sprite(new THREE.SpriteMaterial({map:MSPR.tex, transparent:true})); s.scale.set(0.5, 0.25, 1); var ax = cp.x + fx*(TP.on ? 0.6 : 1.4), az = cp.z + fz*(TP.on ? 0.6 : 1.4); s.position.set(ax, y0, az); root.add(s); MSPR.parts.push({s:s, v:new THREE.Vector3((Math.random() - 0.5)*5 + fx*2, 3 + Math.random()*4, (Math.random() - 0.5)*5 + fz*2), t:0, sp:(Math.random() - 0.5)*8, d:i*0.04}); }
+  // fan of bills in your hands (third person)
+  if(TP.model){ var g = TP.model.group, fan = new THREE.Group(); for(var b=0;b<7;b++){ var bill = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.16), new THREE.MeshBasicMaterial({map:MSPR.tex, side:THREE.DoubleSide})); bill.position.set(0, 0.08, 0); bill.rotation.z = -0.9 + b*0.3; bill.geometry.translate(0.12, 0, 0); fan.add(bill); } fan.position.set(0.42, 1.15, -0.35); g.add(fan); var rg = g.userData.rig; if(rg && rg.A[1]){ rg.A[1].rotation.x = -1.3; } setTimeout(function(){ g.remove(fan); }, 4000); }
+  say('Regardez-moi ça ! ' + Math.round(cash) + ' euros !'); try { playNotes([[72, 0.1], [76, 0.1], [79, 0.1], [84, 0.3]], 'triangle', 0.12, 160); } catch(x){} if(typeof sendChat === 'function') sendChat('💸 ' + L2('makes it rain! (money spread)', 'fait pleuvoir les billets ! (money spread)')); };
+function msprTick(dt){ if(!MSPR.parts.length) return; MSPR.parts = MSPR.parts.filter(function(p){ if(p.d > 0){ p.d -= dt; return true; } p.t += dt; p.v.y -= 6*dt; p.v.multiplyScalar(0.985); p.s.position.addScaledVector(p.v, dt); p.s.material.rotation += p.sp*dt; if(p.t > 3.5 || p.s.position.y < 0.05){ root.remove(p.s); p.s.material.dispose(); return false; } return true; }); }
+(function(){ var G = BAR_GROUPS.filter(function(g){ return g.id === 'me'; })[0] || BAR_GROUPS[0]; if(!G || !G.d) return; var x = document.createElement('button'); x.className = 'bar-btn'; x.innerHTML = '<span>💸</span><span class="dl">' + esc(L2('Money spread (over 1 000 €)', 'Money spread (plus de 1 000 €)')) + '</span>'; x.addEventListener('click', function(){ closeDrops(); GACT.mspread(); }); G.d.appendChild(x); })();
+window.addEventListener('keydown', function(e){ if(e.code !== 'KeyM' || !e.shiftKey || e.repeat) return; var t = e.target; if(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return; if(flying) GACT.mspread(); });
+/* ---------- 🏪 CUSTOM COMMERCIAL BUILDINGS: d.cty = the student's own kind of shop, d.cbase = what it works like ---------- */
+var CBASES = ['restaurant', 'cafe', 'grocery', 'fashion', 'toys', 'books', 'art', 'music'];
+function cleanCty(v){ v = typeof v === 'string' ? v.replace(/[<>]/g, '').trim().slice(0, 18) : ''; return v && !hasBadWord(v) ? v : ''; }
+var _cleanPlotCT = cleanPlot; cleanPlot = function(d, p){ var c = _cleanPlotCT(d, p); if(c && d){ c.cty = cleanCty(d.cty); c.cbase = CBASES.indexOf(d.cbase) >= 0 ? d.cbase : 'restaurant'; } return c; };
+var _plotRecordCT = plotRecord; plotRecord = function(p, d){ var r = _plotRecordCT(p, d); r.cty = cleanCty(d.cty); r.cbase = CBASES.indexOf(d.cbase) >= 0 ? d.cbase : 'restaurant'; return r; };
+if(typeof claudeRecord === 'function'){ var _claudeRecordCT = claudeRecord; claudeRecord = function(p, d, at){ var r = _claudeRecordCT(p, d, at); if(r && typeof r === 'object'){ r.cty = cleanCty(d.cty); r.cbase = CBASES.indexOf(d.cbase) >= 0 ? d.cbase : 'restaurant'; } return r; }; }
+var _shopOfCT = shopOf; shopOf = function(p){ if(p && p.data && p.data.ty === 'custom') return shopType(p.data.cbase || 'restaurant'); return _shopOfCT(p); };
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
@@ -20792,7 +20862,7 @@ function animate(){
   updateSpeedo();
   lifeTick(dt);
   jailTick();
-  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt); ambTrainTick(dt); wearOthersTick(); jamTick(); pkTick(dt); bumpTick(dt); cullTick(dt); rigTick(dt); crouchTick(dt); metroTick(dt); copTick(dt);
+  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt); ambTrainTick(dt); wearOthersTick(); jamTick(); pkTick(dt); bumpTick(dt); cullTick(dt); rigTick(dt); crouchTick(dt); metroTick(dt); copTick(dt); specTick(); msprTick(dt);
   if(!ICE.t || performance.now() - ICE.t > 1000){ ICE.t = performance.now(); if(Math.hypot(camera.position.x - QC.x, camera.position.z - QC.z) < 800) iceSync(); }
   villageTick();
   sendPresence(false);
