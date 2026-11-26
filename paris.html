@@ -4697,9 +4697,10 @@ function leaveFirstPerson(){
 }
 document.addEventListener('mousemove', function(e){
   if(!flying) return;
-  if(FREECUR && !touchPlay && document.pointerLockElement !== canvasEl && !MDRAG.on) return;
+  var hov = typeof hoverLookOK === 'function' && hoverLookOK(e);
+  if(FREECUR && !touchPlay && document.pointerLockElement !== canvasEl && !MDRAG.on && !hov) return;
   lastMouseMove = performance.now();
-  var sens = 0.0022;
+  var sens = hov && !MDRAG.on ? 0.0032 : 0.0022;
   yaw -= e.movementX*sens; pitch -= e.movementY*sens;
   var lim = driving ? 0.75 : (Math.PI/2 - 0.05), lo = driving ? -0.2 : -lim;
   pitch = Math.max(lo, Math.min(lim, pitch));
@@ -16142,7 +16143,7 @@ requestFirstPerson = function(mode){
   if(!FREECUR || IS_TOUCH || PILOT || flying){ _requestFP5(mode); return; }
   if(!signedIn()){ openMenu(); showToast(t('signInFirst')); return; }
   closeEditors(); pendingMode = mode; enterFirstPerson(); applyModeUI();
-  if(!MDRAG.told){ MDRAG.told = true; hudMsg('🖱 ' + L2('Hold the mouse button and drag to look around · click on things to use them · WASD to walk · Esc to stop', 'Maintiens le clic et glisse pour regarder · clique sur les choses pour les utiliser · ZQSD/WASD pour marcher · Échap pour arrêter')); }
+  if(!MDRAG.told){ MDRAG.told = true; hudMsg('🖱 ' + L2(HOVERLOOK.on ? 'Move the mouse to look around (no clicking needed) · push the mouse to the screen edge to keep turning · click on things to use them · WASD to walk · Esc to stop' : 'Hold the mouse button and drag to look around · click on things to use them · WASD to walk · Esc to stop', 'Maintiens le clic et glisse pour regarder · clique sur les choses pour les utiliser · ZQSD/WASD pour marcher · Échap pour arrêter')); }
 };
 var _exitFP5 = exitFirstPerson;
 exitFirstPerson = function(){ if(FREECUR && flying && !touchPlay && document.pointerLockElement !== canvasEl){ leaveFirstPerson(); applyModeUI(); return; } _exitFP5(); };
@@ -20956,6 +20957,19 @@ function undBar(){ if(!UND.bar){ var b = document.createElement('div'); b.style.
   var on = !!undMode(); UND.bar.style.display = on ? 'flex' : 'none'; var n = document.getElementById('und-n'); if(n) n.textContent = UND.stack.length ? '(' + UND.stack.length + ')' : ''; }
 window.addEventListener('keydown', function(e){ if(!undMode()) return; var t = e.target; if(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return; if((e.ctrlKey || e.metaKey) && e.code === 'KeyZ'){ e.preventDefault(); GACT.undo(); } });
 setInterval(function(){ undTrack(); undBar(); }, 400);
+
+/* ---------- 🖱 LOOK WITHOUT CLICKING: the view follows the mouse; push it against the left/right edge to keep turning.
+   Clicking still uses things. Menus, cards and buttons don't move the camera. (⚙ Settings → mouse: follow / drag) ---------- */
+var HOVERLOOK = {on:true, x:-1, y:-1, t:0};
+try { HOVERLOOK.on = localStorage.getItem('paris.hoverlook') !== '0'; } catch(e){}
+function hoverLookOK(e){ if(!HOVERLOOK.on || !FREECUR || touchPlay || !flying || document.pointerLockElement === canvasEl) return false; if(e.target !== canvasEl) return false; if(gcard && gcard.el && !gcard.el.classList.contains('hidden')) return false; if(document.querySelector('.bar-drop.open, .bar-drop[style*="block"]')) return false; if(typeof builder !== 'undefined' && builder.on) return false; return true; }
+document.addEventListener('mousemove', function(e){ HOVERLOOK.x = e.clientX; HOVERLOOK.y = e.clientY; HOVERLOOK.t = performance.now(); HOVERLOOK.overCanvas = e.target === canvasEl; }, true);
+document.addEventListener('mouseleave', function(){ HOVERLOOK.overCanvas = false; });
+window.addEventListener('blur', function(){ HOVERLOOK.overCanvas = false; });
+function hoverEdgeTick(dt){ if(!HOVERLOOK.on || !FREECUR || touchPlay || !flying || !HOVERLOOK.overCanvas || document.pointerLockElement === canvasEl || driving) return; if(gcard && gcard.el && !gcard.el.classList.contains('hidden')) return; if(performance.now() - HOVERLOOK.t > 8000) return;
+  var w = window.innerWidth, edge = Math.max(30, w*0.07), x = HOVERLOOK.x, turn = 0; if(x < edge) turn = (edge - x)/edge; else if(x > w - edge) turn = -(x - (w - edge))/edge; if(!turn) return; yaw += turn*1.6*dt; camera.rotation.set(pitch, yaw, 0); lastMouseMove = performance.now(); }
+GACT.hoverlook = function(){ HOVERLOOK.on = !HOVERLOOK.on; try { localStorage.setItem('paris.hoverlook', HOVERLOOK.on ? '1' : '0'); } catch(e){} showToast('🖱 ' + (HOVERLOOK.on ? L2('The view follows your mouse (no clicking)', 'La vue suit ta souris (sans cliquer)') : L2('Hold and drag to look around', 'Maintiens et glisse pour regarder'))); };
+(function(){ var G = BAR_GROUPS.filter(function(g){ return g.id === 'snd'; })[0]; if(!G || !G.d) return; var x = document.createElement('button'); x.className = 'bar-btn'; x.innerHTML = '<span>🖱</span><span class="dl">' + esc(L2('Mouse: follow (no click) / drag', 'Souris : suivre (sans clic) / glisser')) + '</span>'; x.addEventListener('click', function(){ closeDrops(); GACT.hoverlook(); }); G.d.insertBefore(x, G.d.firstChild); })();
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
@@ -21532,7 +21546,7 @@ function animate(){
   updateSpeedo();
   lifeTick(dt);
   jailTick();
-  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt); ambTrainTick(dt); wearOthersTick(); jamTick(); pkTick(dt); bumpTick(dt); cullTick(dt); rigTick(dt); crouchTick(dt); metroTick(dt); copTick(dt); specTick(); msprTick(dt); haloTick(dt); nitroTick(dt); f1Tick(dt); shadowTick(); rdTick(); poolTick(); tlTick(dt); tcarsTick(dt); fpTick(dt);
+  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt); ambTrainTick(dt); wearOthersTick(); jamTick(); pkTick(dt); bumpTick(dt); cullTick(dt); rigTick(dt); crouchTick(dt); metroTick(dt); copTick(dt); specTick(); msprTick(dt); haloTick(dt); nitroTick(dt); f1Tick(dt); shadowTick(); rdTick(); poolTick(); tlTick(dt); tcarsTick(dt); fpTick(dt); hoverEdgeTick(dt);
   if(!ICE.t || performance.now() - ICE.t > 1000){ ICE.t = performance.now(); if(Math.hypot(camera.position.x - QC.x, camera.position.z - QC.z) < 800) iceSync(); }
   villageTick();
   sendPresence(false);
