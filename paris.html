@@ -590,6 +590,17 @@ body.touch-play #prompt{bottom:calc(205px + env(safe-area-inset-bottom,0px));}
   </div>
 </div>
 <script>
+
+/* ⬤ SMOOTHER SHAPES: every round shape (spheres, cylinders, cones, rings) gets more sides. Shapes that are meant to be
+   polygons (3-6 sides: prisms, pyramids, hexagons) are left alone. LOW graphics keeps the lighter originals. */
+(function(){ var low = false; try { low = localStorage.getItem('paris.gfx') === 'low'; } catch(e){} if(low || !window.THREE) return;
+  function up(v, min, keepBelow){ if(v == null) return min; return v >= keepBelow ? Math.max(v, min) : v; }
+  var S = THREE.SphereGeometry, C = THREE.CylinderGeometry, K = THREE.ConeGeometry, T = THREE.TorusGeometry;
+  THREE.SphereGeometry = class extends S { constructor(r, w, h, a, b, c, d){ super(r, up(w, 24, 7), up(h, 16, 5), a, b, c, d); } };
+  THREE.CylinderGeometry = class extends C { constructor(a, b, h, rs, hs, o, ts, tl){ super(a, b, h, up(rs, 24, 7), hs, o, ts, tl); } };
+  THREE.ConeGeometry = class extends K { constructor(r, h, rs, hs, o, ts, tl){ super(r, h, up(rs, 24, 7), hs, o, ts, tl); } };
+  THREE.TorusGeometry = class extends T { constructor(r, t, rs, ts, arc){ super(r, t, up(rs, 10, 5), up(ts, 36, 7), arc); } };
+})();
 /* 🛡 signed saved timers (anti-cheat) */
 (function(){ var SALT = 'pq-paris-7919';
   function h(s){ var x = 2166136261; for(var i=0;i<s.length;i++){ x ^= s.charCodeAt(i); x = Math.imul(x, 16777619) >>> 0; } return x.toString(36); }
@@ -10174,10 +10185,20 @@ canvasEl.addEventListener('pointermove', function(e){
 });
 canvasEl.addEventListener('pointerleave', hideLmTip);
 var pendingLandmark = null;
+
+/* 🎯 TELEPORTS FACE THE PLACE: look around the arrival spot for the nearest building / monument (solid boxes of a real
+   size) and turn to face it, unless the place's own direction already looks at one. */
+function aimBoxHit(x, z, y0, y1){ var k = solidKey(Math.floor(x/SOLID_CELL), Math.floor(z/SOLID_CELL)), cell = solidGrid[k]; if(!cell) return null; for(var i=0;i<cell.length;i++){ var b = cell[i]; if(x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1 && y1 >= b.y0 && y0 <= b.y1 && (b.x1 - b.x0)*(b.z1 - b.z0) >= 6 && b.owner !== 'fence' && String(b.owner).indexOf('fence:') !== 0) return b; } return null; }
+function aimRay(x, z, a, y0, y1, max){ var dx = -Math.sin(a), dz = -Math.cos(a); for(var r=1;r<=max;r+=0.75){ if(aimBoxHit(x + dx*r, z + dz*r, y0, y1)) return r; } return Infinity; }
+function aimYaw(x, z, yaw0){ var y0 = surfaceAt(x, z, 0) + 0.6, y1 = y0 + 2.5, base = aimRay(x, z, yaw0 || 0, y0, y1, 30); if(base < 30) return yaw0 || 0;
+  var best = yaw0 || 0, bd = Infinity; for(var i=0;i<48;i++){ var a = i/48*Math.PI*2, r = aimRay(x, z, a, y0, y1, 45); if(r < bd - 0.5){ bd = r; best = a; } } if(bd < Infinity) return best;
+  // open places (gardens, squares, statues, the paddock): face the nearest labelled thing instead
+  var tb = null, td = 30; for(var ci=-2;ci<=2;ci++) for(var cj=-2;cj<=2;cj++){ var c = LBL.cells[(Math.floor(x/16) + ci) + ',' + (Math.floor(z/16) + cj)]; if(c) c.forEach(function(o){ var d = Math.hypot(o.x - x, o.z - z); if(d > 2.5 && d < td){ td = d; tb = o; } }); }
+  return tb ? Math.atan2(-(tb.x - x), -(tb.z - z)) : (yaw0 || 0); }
 function placeAtLandmark(l){
   var g = l.go;
   camera.position.set(g.x, (g.y || surfaceAt(g.x, g.z, 0)) + EYE_HEIGHT, g.z);
-  yaw = g.yaw || 0; pitch = 0; vertVelocity = 0; grounded = true;
+  yaw = g.aim ? aimYaw(g.x, g.z, g.yaw || 0) : (g.yaw || 0); if(!g.aim && l.x != null && l.go && Math.hypot(l.x - g.x, l.z - g.z) > 4) yaw = Math.atan2(-(l.x - g.x), -(l.z - g.z)); pitch = 0; vertVelocity = 0; grounded = true;
   camera.rotation.set(pitch, yaw, 0);
 }
 /* click a monument: walk there (or look at it, for the far-off Sacré-Cœur); its story stays at the top for a while */
@@ -12716,7 +12737,7 @@ GACT.srchgo = function(v){
   if(it.act){ it.act(); return; }
   if(driving){ exitDriveMode(); driving = false; applyModeUI(); }
   var fade = flyCard.fade; fade.style.opacity = 1;
-  setTimeout(function(){ goTo({x:it.x, z:it.z, yaw:it.yaw}); setTimeout(function(){ fade.style.opacity = 0; }, 300); }, 500);
+  setTimeout(function(){ goTo({x:it.x, z:it.z, yaw:it.yaw, aim:true}); setTimeout(function(){ fade.style.opacity = 0; }, 300); }, 500);
   showToast('📍 ' + it.name);
 };
 /* ---------- 🔊 SAY IT: hear any French word, label or card spoken (the browser's own French voice) ---------- */
@@ -14376,7 +14397,7 @@ function browseTravel(it, inside){
   if(inside && it.io){ if(INT.cur && INT.cur !== it.io){ INT.cur = null; } enterInterior(it.io); return; }
   if(it.act){ it.act(); return; }
   var fade = flyCard.fade; fade.style.opacity = 1;
-  setTimeout(function(){ goTo({x:it.x, z:it.z, yaw:it.yaw}); setTimeout(function(){ fade.style.opacity = 0; }, 250); showToast('📍 ' + it.name); }, 350);
+  setTimeout(function(){ goTo({x:it.x, z:it.z, yaw:it.yaw, aim:true}); setTimeout(function(){ fade.style.opacity = 0; }, 250); showToast('📍 ' + it.name); }, 350);
 }
 function browseTick(){
   if(!BROWSE.on || LBL.mx < 0) return;
@@ -20274,7 +20295,7 @@ var FIG = {list:[]};
     airSign(f[0] + ' ' + f[1].toUpperCase(), x, 4.6, z + 0.9, Math.PI, 3.6, '#4a3a1a'); FIG.list.push({x:x, z:z});
     addSpot({x:x, z:z + 1.8, r:2.8, label:function(){ return '🗿 ' + f[1] + ' · ' + L2('read the plaque', 'lire la plaque'); }, act:function(){ GACT.figo(i); }});
     tag(x, 1.3, z + 0.9, 'la statue de ' + f[1], 'the statue of ' + f[1], 1); });
-  EXTRA_PLACES.push(['🗿', 'Les Grands Français (' + FIGS.length + ' statues)', L2('Scientists, explorers, chefs, writers, artists', 'Scientifiques, explorateurs, chefs, écrivains, artistes'), FIG.list[0].x, FIG.list[0].z + 4, Math.PI]); })();
+  EXTRA_PLACES.push(['🗿', 'Les Grands Français (' + FIGS.length + ' statues)', L2('Scientists, explorers, chefs, writers, artists', 'Scientifiques, explorateurs, chefs, écrivains, artistes'), FIG.list[0].x, FIG.list[0].z + 4, 0]); })();
 GACT.figo = function(i){ var f = FIGS[i|0], e = hasChar() ? life.eco : null, seen = (e && e.figs) || {}; FIG.cur = i; FIG.m = mc(Math.random, f[6][1], f[6][2]); say(f[1] + '. ' + f[4]);
   showCard('<h3>' + f[0] + ' ' + esc(f[1].toUpperCase()) + '</h3><div class="gc-sub">' + esc(f[2]) + ' · ' + esc(f[3]) + ' · ' + L2('statues visited: ', 'statues visitées : ') + Object.keys(seen).length + '/' + FIGS.length + '</div><div class="gc-text gc-say" style="text-align:left">' + esc(f[4]) + '</div>' + (LANG === 'en' ? '<div class="gc-sub">' + esc(f[5]) + '</div>' : '') + '<div class="gc-big">' + esc(f[6][0]) + '</div><div class="gc-grid">' + FIG.m.opts.map(function(o, k){ return gOpt('figa', k, esc(o)); }).join('') + '</div>'); };
 GACT.figa = function(v){ var i = FIG.cur, f = FIGS[i], ok = (v|0) === FIG.m.ans, e = hasChar() ? life.eco : null, got = 0; if(ok && e){ e.figs = e.figs || {}; if(!e.figs[i]){ e.figs[i] = 1; got = addJeton(2); lifeSave(true); } }
@@ -20527,7 +20548,7 @@ MC.cp = [[0, 40, 'Ligne de départ'], [0, -60], [8, -92], [40, -104, 'Sainte-Dé
   airSign('🏎 PADDOCK · FORMULE 1', MC.pad.x, 4.5, MC.pad.z - 2, -Math.PI/2, 9, '#c8382f'); var pg2 = person({x:MC.pad.x - 2, z:MC.pad.z, ry:-Math.PI/2, shirt:0xc8382f, pants:0x1b1b1d, hair:0x2a1d14, h:1.75}); LBL.dyn.push({m:pg2, fr:'la directrice de course', en:'the race director', dy:2.3, r:0.7, act:function(){ GACT.f1(); }});
   // the stunt park next door
   var sp = [[300, 170, 0], [330, 170, 0], [360, 210, Math.PI], [300, 250, -Math.PI/2], [400, 260, Math.PI/2], [450, 190, 0]]; sp.forEach(function(r2, i){ addRamp(X + r2[0], Z + r2[1], r2[2], 8 + i, 2 + (i % 3)*1.2, 7); }); airSign('🛫 LE PARC DE CASCADES', X + 360, 5, Z + 140, 0, 12, '#ff7f00');
-  EXTRA_PLACES.push(['🏎', 'Le Circuit de Monaco (Formule 1)', L2('Grand Prix for 10, time trial, coin rush, pit-stop quiz, leaderboards', 'Grand Prix à 10, contre-la-montre, chasse aux pièces, quiz des stands, classements'), MC.pad.x + 4, MC.pad.z, -Math.PI/2]);
+  EXTRA_PLACES.push(['🏎', 'Le Circuit de Monaco (Formule 1)', L2('Grand Prix for 10, time trial, coin rush, pit-stop quiz, leaderboards', 'Grand Prix à 10, contre-la-montre, chasse aux pièces, quiz des stands, classements'), MC.pad.x + 4, MC.pad.z, Math.PI/2]);
   EXTRA_PLACES.push(['🛫', 'Le Parc de cascades (tremplins)', L2('Ramps - make your car fly!', 'Des tremplins - fais voler ta voiture !'), X + 330, Z + 300, 0]); })();
 /* the race engine */
 var F1 = {mode:null, idx:0, lap:0, lapT0:0, best:0, cps:{}, laps:0, gp:null, frozen:false, coins:[], got:0, tEnd:0};
@@ -20650,6 +20671,27 @@ function poolTick(){ if(!mp || !mp.others) return; var cp = camera.position;
     if(!p || !a || !p.presence || p.presence.mode !== 'drive' || !(p.presence.po > 0) || !flying){ showToast('🚗 ' + L2('The ride is over', 'Fin du trajet')); poolLeave(); POOL.btn.style.display = 'none'; return; }
     var yw = a.yaw || 0, so = [[0.45, 0], [-0.45, 1.0], [0.45, 1.0]][Math.min(2, POOL.seat - 1)], c = Math.cos(yw), sn = Math.sin(yw); cp.set(a.pos.x + so[0]*c + so[1]*sn, a.pos.y + 1.3, a.pos.z - so[0]*sn + so[1]*c); vertVelocity = 0; POOL.btn.style.display = ''; POOL.btn.textContent = '🚪 ' + L2('Get out of ', 'Descendre de la voiture de ') + playerName(p); return; }
   POOL.cand = null; if(flying && !driving){ var best = null, bd = 6; mp.others.forEach(function(p){ var s = p.presence || {}; if(s.mode === 'drive' && s.po > 0 && finite(s.x)){ var d = Math.hypot(s.x - cp.x, s.z - cp.z); if(d < bd && Math.abs(s.speed || 0) < 3){ bd = d; best = p; } } }); if(best){ POOL.cand = best; var used = poolRiders(best.peer).length; POOL.btn.style.display = ''; POOL.btn.textContent = '🚗 ' + L2('Carpool with ', 'Covoiturage avec ') + playerName(best) + ' (' + used + '/' + best.presence.po + ')'; return; } } POOL.btn.style.display = 'none'; }
+/* ---------- 👑 MADAME'S ADMIN COMMANDS in the chat: /ban /unban /jail /free /tp /bring /who /help (staff only) ---------- */
+function cmdFind(q){ q = String(q || '').trim().toLowerCase(); if(!q) return []; var ids = Object.keys(net.members || {}); var all = ids.map(function(u){ var r = (typeof RST !== 'undefined' && RST.all && RST.all[u]) || {}, e = life.all && life.all[u], names = [cleanNick(memberName(u)), r.real || r.n || '', e && e.ch ? (e.ch.fn || '') + ' ' + (e.ch.ln || '') : ''].join(' | ').toLowerCase(); return {u:u, names:names, nick:cleanNick(memberName(u))}; });
+  var exact = all.filter(function(x){ return x.names.split(' | ').some(function(n){ return n.trim() === q; }); }); return exact.length ? exact : all.filter(function(x){ return x.names.indexOf(q) >= 0; }); }
+function cmdMsg(t){ addChatLine('👑', t, 'gold', false, null); }
+function runCmd(text){ var m = /^\/(\w+)\s*(.*)$/.exec(text.trim()); if(!m) return false; var c = m[1].toLowerCase(), arg = m[2];
+  if(c === 'help'){ cmdMsg('/ban ' + L2('name', 'nom') + ' · /unban · /jail · /free · /tp ' + L2('name (go to them)', 'nom (aller vers lui)') + ' · /bring ' + L2('name (bring them to you)', 'nom (l\'amener à toi)') + ' · /who'); return true; }
+  if(c === 'who'){ cmdMsg(L2('Online: ', 'En ligne : ') + (mp.others.map(function(p){ return playerName(p); }).join(', ') || '—')); return true; }
+  if(['ban', 'unban', 'jail', 'free', 'tp', 'bring'].indexOf(c) < 0){ cmdMsg(L2('Unknown command - type /help', 'Commande inconnue - tape /help')); return true; }
+  var F = cmdFind(arg); if(!F.length){ cmdMsg(L2('No player called "', 'Aucun joueur « ') + arg + L2('"', ' »')); return true; } if(F.length > 1){ cmdMsg(L2('Which one? ', 'Lequel ? ') + F.slice(0, 8).map(function(x){ return x.nick; }).join(', ')); return true; }
+  var u = F[0].u, nm = F[0].nick, fail = function(){ cmdMsg('⚠ ' + L2('Not allowed - publish the new Firebase rules', 'Refusé - publie les nouvelles règles Firebase')); };
+  if(u === net.uid && c !== 'tp'){ cmdMsg(L2('Not on yourself!', 'Pas sur toi-même !')); return true; }
+  if(c === 'ban'){ net.db.ref('paris/mod/ban/' + u).set({at:Date.now(), by:net.uid}).then(function(){ if(typeof RST !== 'undefined') RST.ban[u] = 1; cmdMsg('⛔ ' + nm + L2(' is banned (signed out, can\'t play).', ' est exclu(e) (déconnecté, ne peut plus jouer).')); }).catch(fail); }
+  else if(c === 'unban'){ net.db.ref('paris/mod/ban/' + u).remove().then(function(){ if(typeof RST !== 'undefined') delete RST.ban[u]; cmdMsg('✅ ' + nm + L2(' can play again.', ' peut rejouer.')); }).catch(fail); }
+  else if(c === 'jail'){ Promise.resolve(jailUid(u, 'Madame')).then(function(){ sendChat('🚔 ' + t('jailSent', {name:nm})); }).catch(fail); }
+  else if(c === 'free'){ releaseUid(u).then(function(){ sendChat('🔓 ' + t('jailFree', {name:nm})); }).catch(fail); }
+  else if(c === 'tp'){ var p = mp.others.filter(function(x){ return x.peer === u; })[0], s = p && p.presence; if(!s || !finite(s.x)){ cmdMsg(nm + L2(' is not in the city right now.', ' n\'est pas dans la ville en ce moment.')); return true; } if(driving){ exitDriveMode(); driving = false; applyModeUI(); } if(INT.cur){ INT.cur = null; INT.lamps.forEach(function(l){ l.intensity = 0; }); } var yw = s.yaw || 0; goTo({x:s.x - Math.sin(yw)*-3, z:s.z - Math.cos(yw)*-3, yaw:yw + Math.PI}); cmdMsg('📍 ' + L2('Teleported to ', 'Téléporté(e) vers ') + nm); }
+  else if(c === 'bring'){ var cp = camera.position; net.db.ref('paris/mod/tp/' + u).set({x:r2(cp.x - Math.sin(yaw)*3), z:r2(cp.z - Math.cos(yaw)*3), yaw:r2(yaw + Math.PI), at:Date.now(), by:net.uid}).then(function(){ cmdMsg('🧲 ' + nm + L2(' is coming to you.', ' arrive vers toi.')); }).catch(fail); }
+  return true; }
+var _runCommandCMD = runCommand; runCommand = function(text){ var c = (/^\/(\w+)/.exec(String(text).trim()) || [])[1]; c = c ? c.toLowerCase() : ''; if(['ban', 'unban', 'jail', 'free', 'tp', 'bring', 'who'].indexOf(c) >= 0){ if(isStaff()) runCmd(String(text)); else systemLine('👑 ' + L2('Only Madame can use /' + c + '.', 'Seule Madame peut utiliser /' + c + '.')); return; } _runCommandCMD.apply(this, arguments); if((c === 'help' || c === 'aide') && isStaff()) runCmd('/help'); };
+/* students: Madame's /bring moves them */
+(function(){ var hooked = null; setInterval(function(){ if(!net.db || !net.uid || hooked === net.uid) return; hooked = net.uid; try { net.db.ref('paris/mod/tp/' + net.uid).on('value', function(s){ var v = s.val(); if(!v || !(v.at > Date.now() - 60000)) return; if(driving){ exitDriveMode(); driving = false; applyModeUI(); } if(INT.cur){ INT.cur = null; INT.lamps.forEach(function(l){ l.intensity = 0; }); } goTo({x:v.x, z:v.z, yaw:v.yaw}); showToast('👑 ' + L2('Madame brought you to her.', 'Madame t\'a fait venir.')); net.db.ref('paris/mod/tp/' + net.uid).remove().catch(function(){}); }, function(){}); } catch(e){} }, 3000); })();
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
