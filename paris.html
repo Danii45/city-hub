@@ -603,7 +603,7 @@ en: {
   tabPlay:'PLAY', tabSettings:'SETTINGS', tabPlayers:'PLAYERS', tabHelp:'HOW TO PLAY', tabLog:'CHANGELOG', tabCredits:'CREDITS',
   subtitle:"Claim a plot, build your shop and your house, then visit everyone else's.",
   name:'NAME', password:'PASSWORD', namePh:'Your name', pwPh:'Your password', newPwPh:'Their password (6+ letters)',
-  loginNote:"Don't have a password? Request an account below.", enter:'ENTER PARIS', backHub:'< BACK TO CITY HUB',
+  loginNote:"No account yet? Make one below and play right away.", enter:'ENTER PARIS', backHub:'< BACK TO CITY HUB',
   signedInAs:'Signed in as {name}', signOut:'SIGN OUT', signingIn:'Signing in...',
   loginEmpty:'Type your name and your password.', loginWrong:'Wrong name or password.',
   loginTooMany:'Too many tries - wait a minute, then try again.', loginNotListed:"You're not on the list yet - ask Daniel to add you.",
@@ -676,7 +676,7 @@ fr: {
   tabPlay:'JOUER', tabSettings:'RÉGLAGES', tabPlayers:'JOUEURS', tabHelp:'COMMENT JOUER', tabLog:'NOUVEAUTÉS', tabCredits:'CRÉDITS',
   subtitle:'Choisis un terrain, construis ta boutique et ta maison, puis visite celles des autres.',
   name:'NOM', password:'MOT DE PASSE', namePh:'Ton nom', pwPh:'Ton mot de passe', newPwPh:'Son mot de passe (6+ lettres)',
-  loginNote:'Pas de mot de passe ? Demande un compte ci-dessous.', enter:'ENTRER DANS PARIS', backHub:'< RETOUR AU CITY HUB',
+  loginNote:'Pas encore de compte ? Crées-en un ci-dessous et joue tout de suite.', enter:'ENTRER DANS PARIS', backHub:'< RETOUR AU CITY HUB',
   signedInAs:'Connecté : {name}', signOut:'SE DÉCONNECTER', signingIn:'Connexion...',
   loginEmpty:'Écris ton nom et ton mot de passe.', loginWrong:'Nom ou mot de passe incorrect.',
   loginTooMany:'Trop d\'essais - attends une minute, puis réessaie.', loginNotListed:'Tu n\'es pas encore sur la liste - demande à Daniel de t\'ajouter.',
@@ -7432,11 +7432,11 @@ function processPending(v){
 
 /* REQUEST AN ACCOUNT (website): on the sign-in screen, a student picks a name and password; it goes on the waiting list
    (paris/pending) and the next time Daniel's account has the game open it becomes a real account (see AUTO-ADD). */
-STR.en.reqOpen = 'NO ACCOUNT? REQUEST ONE'; STR.fr.reqOpen = 'PAS DE COMPTE ? DEMANDES-EN UN';
-STR.en.reqTitle = 'REQUEST AN ACCOUNT'; STR.fr.reqTitle = 'DEMANDER UN COMPTE';
+STR.en.reqOpen = 'NO ACCOUNT? MAKE ONE'; STR.fr.reqOpen = 'PAS DE COMPTE ? CRÉES-EN UN';
+STR.en.reqTitle = 'MAKE YOUR ACCOUNT'; STR.fr.reqTitle = 'CRÉE TON COMPTE';
 STR.en.reqNamePh = 'Your name (first name + last initial)'; STR.fr.reqNamePh = 'Ton nom (prénom + initiale du nom)';
 STR.en.reqPwPh = 'Pick a password (6+)'; STR.fr.reqPwPh = 'Choisis un mot de passe (6+)';
-STR.en.reqSend = 'SEND REQUEST'; STR.fr.reqSend = 'ENVOYER';
+STR.en.reqSend = 'CREATE MY ACCOUNT & PLAY'; STR.fr.reqSend = 'CRÉER MON COMPTE ET JOUER';
 STR.en.reqBadName = 'Type your name (at least 2 letters).'; STR.fr.reqBadName = 'Écris ton nom (au moins 2 lettres).';
 STR.en.reqBadPw = 'Your password needs 6 or more letters or numbers.'; STR.fr.reqBadPw = 'Ton mot de passe doit avoir au moins 6 lettres ou chiffres.';
 STR.en.reqMismatch = 'The two passwords are different.'; STR.fr.reqMismatch = 'Les deux mots de passe sont différents.';
@@ -7455,6 +7455,8 @@ function fillClassPickers(){
     sel.value = was;
   });
 }
+STR.en.reqIn = 'Your account is ready - welcome to Paris! Remember your name and password.'; STR.fr.reqIn = 'Ton compte est prêt - bienvenue à Paris ! Retiens ton nom et ton mot de passe.';
+STR.en.reqTaken = 'That name already has an account. Sign in with it, or add your last initial to make a new one.'; STR.fr.reqTaken = 'Ce nom a déjà un compte. Connecte-toi avec, ou ajoute l\'initiale de ton nom pour en créer un nouveau.';
 STR.en.reqFail = 'Could not send - check your connection and try again.'; STR.fr.reqFail = 'Envoi impossible - vérifie ta connexion et réessaie.';
 (function(){
   if(CLAUDE_MODE) return;
@@ -7474,14 +7476,25 @@ STR.en.reqFail = 'Could not send - check your connection and try again.'; STR.fr
     if(!cls){ say('reqNeedCls', true); return; }
     var last = 0; try { last = +localStorage.getItem('paris.reqAt') || 0; } catch(e){}
     if(Date.now() - last < 5*60*1000){ say('reqWait', true); return; }
-    var btn = this; btn.disabled = true;
-    startFirebase().then(function(){
-      // (if the database rules don't allow the class yet, send without it - Madame can set it in PLAYERS)
-      return net.db.ref('paris/pending').push({name:name, pw:pw.slice(0, 64), cls:cls, at:Date.now()}).catch(function(){ return net.db.ref('paris/pending').push({name:name, pw:pw.slice(0, 64), at:Date.now()}); });
-    }).then(function(){
+    var btn = this, key = nameKey(name); btn.disabled = true;
+    /* sign-up right away: the student makes their own account, puts themself on the list and goes straight in.
+       If the database rules don't allow that yet, it falls back to the waiting list (Daniel's account adds it). */
+    function queue(){ return net.db.ref('paris/pending').push({name:name, pw:pw.slice(0, 64), cls:cls, at:Date.now()}).catch(function(){ return net.db.ref('paris/pending').push({name:name, pw:pw.slice(0, 64), at:Date.now()}); }).then(function(){
       try { localStorage.setItem('paris.reqAt', String(Date.now())); } catch(e){}
-      say('reqDone'); document.getElementById('login-name').value = name;
-      document.getElementById('req-pw').value = ''; document.getElementById('req-pw2').value = '';
+      say('reqDone'); document.getElementById('login-name').value = name; document.getElementById('req-pw').value = ''; document.getElementById('req-pw2').value = ''; }); }
+    startFirebase().then(function(){ return firebase.auth().createUserWithEmailAndPassword(key + EMAIL_DOMAIN, pw); }).then(function(cred){
+      var uid = cred.user.uid;
+      return net.db.ref('paris/members/' + uid).set({name:name, key:key, at:firebase.database.ServerValue.TIMESTAMP, self:true}).then(function(){
+        return net.db.ref('paris/owners/' + uid + '/cls').set(cls).catch(function(){}).then(function(){ return afterSignIn(cred.user, name); }).then(function(ok){
+          if(!ok){ say('reqFail', true); return; }
+          say('reqIn'); document.getElementById('req-pw').value = ''; document.getElementById('req-pw2').value = '';
+          form.classList.add('hidden'); titleScreen.classList.add('hidden'); systemLine(t('joined')); showToast('🎉 ' + t('reqIn'));
+        });
+      }, function(){ return queue().then(function(){ return firebase.auth().signOut(); }); });
+    }, function(err){
+      if(err && err.code === 'auth/email-already-in-use'){ say('reqTaken', true); return; }
+      if(err && /operation-not-allowed|network|unavailable/.test(err.code || '')) return queue();
+      say('reqFail', true);
     }).catch(function(){ say('reqFail', true); }).then(function(){ btn.disabled = false; });
   });
 })();
