@@ -7441,8 +7441,8 @@ STR.en.reqBadName = 'Type your name (at least 2 letters).'; STR.fr.reqBadName = 
 STR.en.reqBadPw = 'Your password needs 6 or more letters or numbers.'; STR.fr.reqBadPw = 'Ton mot de passe doit avoir au moins 6 lettres ou chiffres.';
 STR.en.reqMismatch = 'The two passwords are different.'; STR.fr.reqMismatch = 'Les deux mots de passe sont différents.';
 STR.en.reqWait = 'You already sent a request - wait a few minutes.'; STR.fr.reqWait = 'Tu as déjà envoyé une demande - attends quelques minutes.';
-STR.en.reqDone = 'Request sent! Your account will be ready soon (when Daniel or Madame opens the game). Then sign in with this name and password - remember them!';
-STR.fr.reqDone = 'Demande envoyée ! Ton compte sera bientôt prêt (quand Daniel ou Madame ouvre le jeu). Ensuite connecte-toi avec ce nom et ce mot de passe - retiens-les !';
+STR.en.reqDone = 'Request sent! Madame (or Daniel) will accept you soon. Then sign in with this name and password - remember them!';
+STR.fr.reqDone = 'Demande envoyée ! Madame (ou Daniel) va bientôt t\'accepter. Ensuite connecte-toi avec ce nom et ce mot de passe - retiens-les !';
 STR.en.reqNeedCls = 'Pick your French class.'; STR.fr.reqNeedCls = 'Choisis ta classe de français.';
 STR.en.clsPick = 'Your French class...'; STR.fr.clsPick = 'Ta classe de français...';
 STR.en.clsPickOwner = 'Their class...'; STR.fr.clsPickOwner = 'Sa classe...';
@@ -18248,7 +18248,7 @@ function wOwned(id){ return hasChar() && (life.eco.wown || []).indexOf(id) >= 0;
 GACT.stars = function(){ starsCard(); };
 function starsCard(msg){ var u = net.uid, e = hasChar() ? life.eco : {}, recs = dojoRecs(u), c = {};
   recs.forEach(function(x){ c[x.s] = (c[x.s]|0) + (x.v|0); });
-  if(canReward()){ return tmCard(msg); }
+  if(canReward() || (amTeacher() && !net.isOwner)){ return tmCard(msg); }
   showCard('<h3>🌟 ' + L2('MY STARS (good behaviour)', 'MES ÉTOILES (bon comportement)') + '</h3>' + (msg || '') + '<div class="gc-big">⭐ ' + dojoPts(u) + ' ' + L2('this week', 'cette semaine') + ' · ' + dojoAll(u) + ' ' + L2('in total', 'au total') + '</div>' +
     '<div class="gc-text">' + (Object.keys(c).length ? Object.keys(c).map(function(k){ var d = DOJO_BY[k]; return d ? d[1] + ' ' + esc(d[2]) + ' : <b>' + (c[k] > 0 ? '+' : '') + c[k] + '</b>' : ''; }).join('<br>') : L2('Be kind, help others and speak French - Madame gives points for being a good human!', 'Sois gentil(le), aide les autres et parle français - Madame donne des points aux bons citoyens !')) + '</div>' +
     '<div class="gc-sub">🏆 ' + L2('My prizes', 'Mes prix') + '</div><div class="gc-text">' + ((e.prizes || []).length ? e.prizes.slice().reverse().map(function(p){ var P = PRIZE_BY[p.id]; return (P ? P[1] + ' ' + esc(P[2]) : '🎁 ' + esc(p.t || '')) + ' <span class="lf-soft">' + esc(cleanNick(memberName(p.by))) + '</span>'; }).join('<br>') : '-') + '</div>' +
@@ -18272,7 +18272,7 @@ GACT.wldel = function(i){ if(!hasChar()) return; life.eco.wl.splice(i|0, 1); lif
 /* ---------- the teacher's card (ClassDojo) ---------- */
 function tmSelList(){ return Object.keys(TM.sel).filter(function(u){ return TM.sel[u]; }); }
 function tmCard(msg){
-  if(!canReward()){ showCard('<h3>👩‍🏫 ' + L2('TEACHER MODE', 'MODE ENSEIGNANT') + '</h3><div class="gc-text">' + (amTeacher() ? L2('Only Madame can give rewards. Ask her to unite you (she opens 🌟 → 🤝 TEACHERS).', 'Seule Madame peut donner des récompenses. Demande-lui de t\'ajouter (🌟 → 🤝 ENSEIGNANTS).') : L2('Teacher mode is for Madame.', 'Le mode enseignant est pour Madame.')) + '</div><div class="gc-row">' + gBtn('close', null, 'OK') + '</div>'); return; }
+  if(!canReward()){ showCard('<h3>👩‍🏫 ' + L2('TEACHER MODE', 'MODE ENSEIGNANT') + '</h3><div class="gc-text">' + (amTeacher() ? L2('Only Madame can give rewards. Ask her to unite you (she opens 🌟 → 🤝 TEACHERS).', 'Seule Madame peut donner des récompenses. Demande-lui de t\'ajouter (🌟 → 🤝 ENSEIGNANTS).') : L2('Teacher mode is for Madame.', 'Le mode enseignant est pour Madame.')) + '</div><div class="gc-row">' + (isStaff() ? gBtn('jaillist', null, '🚔 ' + L2('SHAME CHAMBER', 'CHAMBRE DE LA HONTE') + ' (' + jailedList().length + ')') : '') + gBtn('close', null, 'OK') + '</div>'); return; }
   var S = tmStudents(), sel = tmSelList(), g = TM.goal || {n:100, t:'une fête en classe'}, cw = classWeek(), pct = Math.min(100, Math.round(cw / Math.max(1, g.n) * 100));
   var h = '<h3>🌟 ' + L2('TEACHER MODE · CLASS POINTS', 'MODE ENSEIGNANT · POINTS DE LA CLASSE') + '</h3>' + (msg || '') +
     '<div class="gc-sub">🎯 ' + L2('Class goal', 'Objectif de classe') + ' : ' + esc(g.t) + ' · ' + cw + '/' + g.n + '</div><div style="height:12px;background:#ddd;border:2px solid #23243a;margin:4px 0"><div style="height:100%;width:' + pct + '%;background:#3ab87a"></div></div>' +
@@ -18286,7 +18286,7 @@ function tmCard(msg){
       '<div class="gc-row">' + gBtn('tmclothes', null, '👕 ' + L2('CLOTHES', 'VÊTEMENTS')) + gBtn('tmprizes', null, '🏆 ' + L2('PRIZES', 'PRIX')) + (sel.length === 1 ? gBtn('tmwl', sel[0], '📝 ' + L2('WISH LIST', 'LISTE DE SOUHAITS'), 'go') : '') + '</div>' +
       '<div class="gc-row">' + gBtn('tmshout', null, (TM.shout ? '📢 ' + L2('Shout-out in chat: ON', 'Annonce dans le chat : OUI') : '🔇 ' + L2('Shout-out in chat: OFF', 'Annonce dans le chat : NON'))) + '</div>';
   }
-  h += '<div class="gc-sub">🧰 ' + L2('Toolkit', 'Boîte à outils') + '</div><div class="gc-row">' + gBtn('tmgroups', 2, '👥 ' + L2('GROUPS', 'GROUPES')) + gBtn('tmtimer', 60, '⏱ 1 min') + gBtn('tmtimer', 300, '⏱ 5 min') + gBtn('tmgoal', null, '🎯 ' + L2('CLASS GOAL', 'OBJECTIF')) + gBtn('top6', null, '🏆 TOP 6') + (amMadame() ? gBtn('tmunite', null, '🤝 ' + L2('TEACHERS', 'ENSEIGNANTS'), 'go') : '') + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>';
+  h += '<div class="gc-sub">🧰 ' + L2('Toolkit', 'Boîte à outils') + '</div><div class="gc-row">' + gBtn('tmgroups', 2, '👥 ' + L2('GROUPS', 'GROUPES')) + gBtn('tmtimer', 60, '⏱ 1 min') + gBtn('tmtimer', 300, '⏱ 5 min') + gBtn('tmgoal', null, '🎯 ' + L2('CLASS GOAL', 'OBJECTIF')) + gBtn('top6', null, '🏆 TOP 6') + (amMadame() ? gBtn('tmunite', null, '🤝 ' + L2('TEACHERS', 'ENSEIGNANTS'), 'go') : '') + gBtn('jaillist', null, '🚔 ' + L2('SHAME CHAMBER', 'CHAMBRE DE LA HONTE') + ' (' + jailedList().length + ')') + (amMadame() && !net.isOwner ? gBtn('mdopen', null, '🙋 ' + L2('NEW PLAYERS', 'NOUVEAUX JOUEURS') + (Object.keys(MDP.list || {}).length ? ' (' + Object.keys(MDP.list).length + ')' : '')) : '') + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>';
   showCard(h); }
 function tmKeep(){ var n = document.getElementById('tm-n'); if(n) TM.note = n.value; }
 GACT.tmsel = function(u){ tmKeep(); TM.sel[u] = !TM.sel[u]; tmCard(); };
@@ -18730,6 +18730,44 @@ function openMapList(){ srch.list = searchIndex(); var groups = {}, order = [];
   order.forEach(function(c, gi){ h += '<details' + (gi < 2 ? ' open' : '') + ' style="margin:6px 0"><summary style="cursor:pointer;font-family:\'Press Start 2P\',monospace;font-size:9px;padding:6px 0">' + esc(c) + ' (' + groups[c].length + ')</summary><div class="bm-grid">' + groups[c].map(function(o){ return gOpt('srchgo', o.i, o.it.icon + ' <b>' + esc(o.it.name) + '</b>' + (o.it.sub ? '<br><span class="lf-soft">' + esc(o.it.sub) + '</span>' : '')); }).join('') + '</div></details>'; });
   showCard(h); }
 GACT.bmopen = function(){ openMap(); };
+/* ---------- 🙋 MADAME ACCEPTS NEW PLAYERS: when her account is online, new sign-ups are accepted by themselves (like Daniel's);
+   the 🙋 card still shows anyone waiting, with ACCEPT / DECLINE. Needs a database rule letting Madame read paris/pending and add members. */
+var MDP = {list:{}, on:false, err:false, seen:{}};
+function mdListen(){ if(MDP.on || (typeof CLAUDE_MODE !== 'undefined' && CLAUDE_MODE) || !net.db || !net.uid || net.isOwner || !amMadame()) return; MDP.on = true;
+  net.db.ref('paris/pending').on('value', function(s){ MDP.err = false; var v = s.val() || {}, fresh = Object.keys(v).filter(function(k){ return !MDP.seen[k]; }); MDP.list = v; fresh.forEach(function(k){ MDP.seen[k] = 1; }); mdBtn(); if(Object.keys(v).length) processPending(v);
+    if(fresh.length && MDP.ready){ var n = fresh.map(function(k){ return cleanNick((v[k] || {}).name) || '?'; }).join(', '); showToast('🙋 ' + L2('Wants to join: ', 'Veut jouer : ') + n); try { playNotes([[79, 0.5], [84, 1]], 'sine', 0.15, 240); } catch(e){} }
+    MDP.ready = true; if(gcard.el && !gcard.el.classList.contains('hidden') && gcard.el.querySelector('[data-g="mdacc"],[data-g="mdall"],.md-wait')) mdCard(); },
+  function(){ MDP.on = false; MDP.err = true; mdBtn(); }); }
+function mdBtn(){ var b = document.getElementById('md-btn'), n = Object.keys(MDP.list || {}).length, show = amMadame() && !net.isOwner && (n > 0 || MDP.err);
+  if(!b){ if(!show) return; var s = document.getElementById('search-toggle'); if(!s) return; b = document.createElement('button'); b.className = 'bar-btn'; b.id = 'md-btn'; s.parentNode.insertBefore(b, s); b.addEventListener('click', function(){ mdCard(); }); }
+  b.classList.toggle('hidden', !show); b.textContent = '🙋' + (n ? ' ' + n : ''); b.title = L2('New players waiting to join', 'Nouveaux joueurs qui attendent'); }
+function mdCard(msg){ var v = MDP.list || {}, ids = Object.keys(v).sort(function(a, b){ return ((v[a] || {}).at || 0) - ((v[b] || {}).at || 0); });
+  var h = '<h3>🙋 ' + L2('NEW PLAYERS WAITING', 'NOUVEAUX JOUEURS EN ATTENTE') + '</h3>' + (msg || '');
+  if(MDP.err) h += '<div class="gc-text bad">' + L2('Madame\'s account can\'t see the waiting list yet - Daniel needs to add the Madame rule to the database.', 'Le compte de Madame ne peut pas encore voir la liste d\'attente - Daniel doit ajouter la règle de Madame dans la base de données.') + '</div>';
+  else if(!ids.length) h += '<div class="gc-text md-wait">' + L2('Nobody is waiting right now. New requests pop up here.', 'Personne n\'attend pour l\'instant. Les nouvelles demandes apparaîtront ici.') + '</div>';
+  else h += '<div class="gc-text md-wait">' + ids.map(function(id){ var r = v[id] || {}, V = r.cls && V_BY_ID[r.cls], mins = r.at ? Math.max(0, Math.round((Date.now() - r.at)/60000)) : null;
+      return '<div style="margin:6px 0;padding:6px;border:2px solid #23243a">🧑 <b>' + esc(cleanNick(r.name) || '?') + '</b>' + (V ? ' · ' + esc(tx(V.t)) : '') + (mins != null ? ' <span class="lf-soft">· ' + (mins < 60 ? mins + ' min' : Math.round(mins/60) + ' h') + '</span>' : '') + '<br>' + gBtn('mdacc', id, '✅ ' + L2('ACCEPT', 'ACCEPTER'), 'go') + gBtn('mddec', id, '❌ ' + L2('DECLINE', 'REFUSER')) + '</div>'; }).join('') + '</div>' + (ids.length > 1 ? '<div class="gc-row">' + gBtn('mdall', null, '✅ ' + L2('ACCEPT EVERYONE', 'TOUT ACCEPTER') + ' (' + ids.length + ')', 'go') + '</div>' : '');
+  h += '<div class="gc-row">' + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>'; showCard(h); }
+function mdAccept(id){ var r = (MDP.list || {})[id]; if(!r) return Promise.resolve(null); var name = cleanNick(r.name), key = nameKey(name), pw = String(r.pw || '').trim(), taken = false;
+  Object.keys(net.members || {}).forEach(function(u){ if(net.members[u] && net.members[u].key === key) taken = true; });
+  var why = key.length < 2 ? t('whyName') : pw.length < 6 ? t('whyPw') : taken ? t('whyTaken') : hasBadWord(name) ? '🙅' : '';
+  function drop(){ return net.db.ref('paris/pending/' + id).remove().catch(function(){}); }
+  if(why) return drop().then(function(){ return '❌ ' + name + ' (' + why + ')'; });
+  return makeAccount(name, key, pw).then(function(uid){ return Promise.resolve(setClassOf(uid, r.cls)).then(drop).then(function(){ if(typeof sendChat === 'function') sendChat('🙋 ' + L2('Welcome to Paris, ', 'Bienvenue à Paris, ') + name + ' !'); return '✅ ' + name; }); },
+    function(err){ if(err && err.code === 'exists') return drop().then(function(){ return '✅ ' + name + ' (' + t('whyExists') + ')'; }); return '⚠ ' + name + ' (' + ((err && (err.code || err.message)) || '?') + ')'; }); }
+GACT.mdacc = function(id){ mdCard('<div class="gc-sub">⏳ ' + L2('Adding...', 'Ajout...') + '</div>'); mdAccept(id).then(function(m){ if(m) showToast(m); mdCard(m ? '<div class="' + (m[0] === '✅' ? 'good' : 'bad') + '">' + esc(m) + '</div>' : ''); }); };
+GACT.mddec = function(id){ var r = (MDP.list || {})[id] || {}; net.db.ref('paris/pending/' + id).remove().then(function(){ mdCard('<div class="bad">❌ ' + esc(cleanNick(r.name) || '?') + ' ' + L2('declined', 'refusé(e)') + '</div>'); }).catch(function(){ showToast(t('etNeedRules')); }); };
+GACT.mdall = function(){ var ids = Object.keys(MDP.list || {}), out = []; mdCard('<div class="gc-sub">⏳ ' + L2('Adding everyone...', 'Ajout de tout le monde...') + '</div>');
+  (function next(i){ if(i >= ids.length){ mdCard('<div class="gc-text">' + out.map(esc).join('<br>') + '</div>'); return; } mdAccept(ids[i]).then(function(m){ if(m) out.push(m); setTimeout(function(){ next(i + 1); }, 400); }); })(0); };
+GACT.mdopen = function(){ mdCard(); };
+setInterval(function(){ mdListen(); mdBtn(); }, 2500);
+/* ---------- 🚔 for Madame and the teachers: who is in the Public Shame Chamber right now (with LET OUT) ---------- */
+function jailedList(){ var ids = {}; Object.keys(net.members || {}).forEach(function(u){ if(isJailedUid(u)) ids[u] = 1; }); Object.keys(mod.jail || {}).forEach(function(u){ ids[u] = 1; }); Object.keys(jail.all || {}).forEach(function(u){ ids[u] = 1; }); return Object.keys(ids).filter(function(u){ return !isTeacherUid(u); }); }
+function jailRec(u){ var m = net.members[u]; return (mod.jail || {})[u] || (jail.all || {})[u] || (m && m.jail) || {}; }
+GACT.jaillist = function(msg){ if(!isStaff()) return; var L = jailedList().sort(function(a, b){ return (jailRec(b).at || 0) - (jailRec(a).at || 0); });
+  showCard('<h3>🚔 ' + L2('IN THE PUBLIC SHAME CHAMBER', 'DANS LA CHAMBRE DE LA HONTE') + ' (' + L.length + ')</h3>' + (typeof msg === 'string' ? msg : '') + '<div class="gc-text">' + (L.length ? L.map(function(u){ var r = jailRec(u), mins = r.at ? Math.max(0, Math.round((Date.now() - r.at)/60000)) : null;
+      return '<div style="margin:6px 0;padding:6px;border:2px solid #23243a">🧑 <b>' + esc(cleanNick(memberName(u)) || '?') + '</b>' + (mins != null ? ' <span class="lf-soft">· ' + (mins < 60 ? mins + ' min' : mins < 1440 ? Math.round(mins/60) + ' h' : Math.round(mins/1440) + ' ' + L2('days', 'jours')) + '</span>' : '') + (r.why ? '<br><span class="lf-soft">' + esc(r.why) + '</span>' : '') + '<br>' + gBtn('jailout', u, '🔓 ' + L2('LET OUT', 'LIBÉRER'), 'go') + '</div>'; }).join('') : L2('Nobody is in the Shame Chamber. 🎉', 'Personne n\'est dans la chambre de la honte. 🎉')) + '</div><div class="gc-row">' + (canReward() ? gBtn('stars', null, '🌟 ' + L2('BACK', 'RETOUR')) : '') + gBtn('close', null, L2('CLOSE', 'FERMER')) + '</div>'); };
+GACT.jailout = function(u){ releaseUid(u).then(function(){ if(typeof sendChat === 'function') sendChat('🔓 ' + t('jailFree', {name:cleanNick(memberName(u))})); GACT.jaillist('<div class="good">🔓 ' + esc(cleanNick(memberName(u))) + '</div>'); }).catch(function(){ showToast(t('etNeedRules')); }); };
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
