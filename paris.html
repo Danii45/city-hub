@@ -20564,10 +20564,17 @@ GACT.spda = function(v){ var ok = (v|0) === SPD.q.ans; SPD.cool = Date.now() + (
   showCard('<h3>🏎</h3><div class="gc-big ' + (ok ? 'good' : 'bad') + '">' + (ok ? '✓ ' + L2('LEVEL UP! ', 'NIVEAU SUPÉRIEUR ! ') + '×' + spdMul() : '✗ ' + esc(SPD.q.opts[SPD.q.ans])) + '</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); };
 (function(){ var G = BAR_GROUPS.filter(function(g){ return g.id === 'snd'; })[0]; if(!G || !G.d) return; var x = document.createElement('button'); x.className = 'bar-btn'; x.innerHTML = '<span>🏎</span><span class="dl">' + esc(L2('Vehicle speed (French question)', 'Vitesse des véhicules (question)')) + '</span>'; x.addEventListener('click', function(){ closeDrops(); GACT.spd(); }); G.d.insertBefore(x, G.d.firstChild); })();
 /* ---------- 🔄 FORCED UPDATES: every open game checks for a newer version every minute and reloads itself (after saving) ---------- */
-var BUILD_ID = '1795787151';
+var BUILD_ID = '1795787520';
 (function(){ var busy = false; function check(){ if(busy || document.hidden) return; busy = true; fetch(location.href.split('#')[0], {cache:'no-store'}).then(function(r){ return r.ok ? r.text() : ''; }).then(function(t){ busy = false; var m = /var BUILD_ID = '([^']+)'/.exec(t || ''); if(m && m[1] !== BUILD_ID && m[1] !== '__' + 'BUILD__') upd(); }).catch(function(){ busy = false; }); }
-  function upd(){ if(upd.on) return; upd.on = true; try { if(typeof lifeSave === 'function') lifeSave(true); } catch(e){} var n = 10, d = document.createElement('div'); d.style.cssText = 'position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:99999;background:#16245c;color:#fff;padding:18px 24px;border-radius:14px;font:700 18px Arial,sans-serif;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.5)'; document.body.appendChild(d);
-    (function tick(){ d.innerHTML = '🔄 ' + L2('New update from Madame! The game reloads in ', 'Nouvelle mise à jour ! Le jeu redémarre dans ') + n + ' s'; if(n-- <= 0){ location.reload(); return; } setTimeout(tick, 1000); })(); }
+  function creating(){ try { return !!editing || builder.on || decor.on || blk.on; } catch(e){ return false; } }
+  function upd(){ if(upd.on) return;
+    /* never reload while a student is building or decorating: their creation stays exactly as they left it. They press REFRESH themselves (or it reloads after they close the editor). */
+    if(creating()){ if(!upd.bar){ var bb = upd.bar = document.createElement('div'); bb.style.cssText = 'position:fixed;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:99998;background:#16245c;color:#fff;padding:8px 14px;border-radius:14px;font:700 14px Arial,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.4);display:flex;gap:10px;align-items:center';
+        bb.innerHTML = '<span>🔄 ' + L2('Update ready! Your creation is safe and saved. Press REFRESH when you are ready.', 'Mise à jour prête ! Ta création est sauvegardée. Appuie sur ACTUALISER quand tu veux.') + '</span>'; var rb = document.createElement('button'); rb.className = 'btn go'; rb.textContent = L2('REFRESH', 'ACTUALISER'); rb.addEventListener('click', function(){ try { closeEditors(); } catch(e){} try { lifeSave(true); } catch(e){} setTimeout(function(){ location.reload(); }, 900); }); bb.appendChild(rb); document.body.appendChild(bb); }
+      clearTimeout(upd.w); upd.w = setTimeout(upd, 3000); return; }
+    if(upd.bar){ upd.bar.remove(); upd.bar = null; }
+    upd.on = true; try { if(typeof lifeSave === 'function') lifeSave(true); } catch(e){} var n = 10, d = document.createElement('div'); d.style.cssText = 'position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:99999;background:#16245c;color:#fff;padding:18px 24px;border-radius:14px;font:700 18px Arial,sans-serif;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.5)'; document.body.appendChild(d);
+    (function tick(){ if(creating()){ d.remove(); upd.on = false; upd(); return; } d.innerHTML = '🔄 ' + L2('New update from Madame! The game reloads in ', 'Nouvelle mise à jour ! Le jeu redémarre dans ') + n + ' s'; if(n-- <= 0){ location.reload(); return; } setTimeout(tick, 1000); })(); }
   setTimeout(check, 20000); setInterval(check, 60000); })();
 /* ---------- ⬭ ROUNDER SHAPES: softer, rounded panels, buttons, cards ---------- */
 (function(){ var st = document.createElement('style'); st.textContent = '.card,#g-card,.side-panel,#status-panel,.bar-drop,#hint,#title-card{border-radius:14px !important}.bar-btn,.lf-opt,#g-card button,.gc-row button,.btn,button.bar-btn{border-radius:10px !important}.card,#g-card{box-shadow:0 6px 18px rgba(0,0,0,.28) !important}.bar-btn{box-shadow:0 3px 8px rgba(0,0,0,.22) !important}.lf-opt{box-shadow:0 2px 6px rgba(0,0,0,.15) !important}input,textarea,select{border-radius:8px !important}'; document.head.appendChild(st); })();
@@ -21653,14 +21660,14 @@ GACT.ranks = function(){ var x = hasChar() ? xpOf(life.eco) : 0, t = xpTier(x); 
 var _showCardLB = showCard; showCard = function(){ LB2.open = false; return _showCardLB.apply(this, arguments); };
 function lbHash(){ return LB_CATS.map(function(c){ return lbRows(c[0]).slice(0, 12).map(function(r){ return r.u + ':' + r.v; }).join(','); }).join('|'); }
 /* ---- the banner everybody sees ---- */
-(function(){ var st = document.createElement('style'); st.textContent = '#lb-banner{position:fixed;left:50%;top:calc(64px + env(safe-area-inset-top,0px));transform:translate(-50%,-180%);z-index:60;min-width:min(560px,92vw);max-width:94vw;text-align:center;color:#2a1a00;background:linear-gradient(135deg,#fff3a6,#ffd23a 45%,#ffb01a);border:3px solid #fff;border-radius:18px;padding:10px 18px;box-shadow:0 10px 30px rgba(0,0,0,.35),0 0 0 4px rgba(255,210,58,.35);font:800 18px Arial,sans-serif;transition:transform .55s cubic-bezier(.2,1.4,.4,1);pointer-events:none}#lb-banner.show{transform:translate(-50%,0)}#lb-banner small{display:block;font-weight:600;font-size:14px;margin-top:3px;color:#5a3a00}#lb-banner .cf{position:absolute;top:-14px;font-size:22px}#lb-banner.me{background:linear-gradient(135deg,#d9fbe0,#6fe08a 45%,#2fbf5a)}'; document.head.appendChild(st);
+(function(){ var st = document.createElement('style'); st.textContent = '#lb-banner{position:fixed;left:50%;top:calc(64px + env(safe-area-inset-top,0px));transform:translate(-50%,-24px);opacity:0;visibility:hidden;z-index:60;max-width:min(520px,92vw);text-align:center;color:#2a1a00;background:linear-gradient(135deg,#fff3a6,#ffd23a 45%,#ffb01a);border:2px solid #fff;border-radius:14px;padding:7px 14px;box-shadow:0 6px 18px rgba(0,0,0,.3);font:800 15px Arial,sans-serif;transition:transform .35s ease,opacity .35s ease,visibility 0s linear .35s;pointer-events:none}#lb-banner.show{transform:translate(-50%,0);opacity:1;visibility:visible;transition:transform .35s ease,opacity .35s ease,visibility 0s}#lb-banner small{display:block;font-weight:600;font-size:12px;margin-top:3px;color:#5a3a00}#lb-banner .cf{display:none}#lb-banner.me{background:linear-gradient(135deg,#d9fbe0,#6fe08a 45%,#2fbf5a)}'; document.head.appendChild(st);
   var b = document.createElement('div'); b.id = 'lb-banner'; document.body.appendChild(b); LB2.el = b; })();
 function lbBanner(fr, en, me){ LB2.q.push({fr:fr, en:en, me:!!me}); if(LB2.q.length > 6) LB2.q.splice(0, LB2.q.length - 6); lbNext(); }
 function lbNext(){ if(LB2.busy || !LB2.q.length) return; var m = LB2.q.shift(), b = LB2.el; LB2.busy = true;
-  b.className = m.me ? 'me' : ''; b.innerHTML = '<span class="cf" style="left:12px">🎉</span><span class="cf" style="right:12px">🎊</span>' + esc(m.fr) + '<small>' + esc(m.en) + '</small>';
+  b.className = m.me ? 'me' : ''; b.innerHTML = '🎉 ' + esc(m.fr) + '<small>' + esc(m.en) + '</small>';
   requestAnimationFrame(function(){ b.classList.add('show'); });
   try { playNotes(m.me ? [[72, 0.12], [76, 0.12], [79, 0.12], [84, 0.3]] : [[67, 0.1], [72, 0.2]], 'triangle', 0.07, 130); } catch(e){}
-  setTimeout(function(){ b.classList.remove('show'); setTimeout(function(){ LB2.busy = false; lbNext(); }, 650); }, 6500); }
+  setTimeout(function(){ b.classList.remove('show'); setTimeout(function(){ LB2.busy = false; lbNext(); }, 500); }, 7000); }
 /* watch the boards: everyone's game sees the same data, so everyone gets the same banners */
 function lbWatch(){ if(!life.all || !Object.keys(life.all).length) return;
   var snap = {}; ['xp', 'cash', 'tok', 'sp'].forEach(function(k){ snap[k] = lbRows(k).filter(function(r){ return r.v > 0; }).slice(0, 10).map(function(r){ return {u:r.u, n:r.n}; }); });
@@ -21681,6 +21688,32 @@ function lbWatch(){ if(!life.all || !Object.keys(life.all).length) return;
   B.forEach(function(r){ var e = r.u === net.uid ? null : life.all[r.u]; if(!e) return; var t = xpTier(xpOf(e)); LB2.tier = LB2.tier || {}; if(LB2.tier[r.u] != null && t > LB2.tier[r.u]) showToast('🎖 ' + r.n + ' → ' + XPT[t][1] + ' ' + XPT[t][2]); LB2.tier[r.u] = t; }); }
 setInterval(function(){ try { lbWatch(); } catch(e){} try { var gc = document.getElementById('g-card'); if(LB2.open && gc && !gc.classList.contains('hidden') && lbHash() !== LB2.hash) lbCard(); } catch(e){}
   try { var chip = document.querySelector('#hp-bar .sp[data-k=lb]'); if(chip && hasChar()){ var rows = lbRows('xp'), i = rows.findIndex(function(r){ return r.u === net.uid; }), x = xpOf(life.eco), txt = XPT[xpTier(x)][1] + ' 🏆' + (i >= 0 ? ' #' + (i + 1) : ''); if(chip.textContent !== txt){ chip.textContent = txt; chip.title = x + ' ⭐ · ' + xpBadge(x); } } } catch(e){} }, 2000);
+/* ---------- 🛟 CREATIONS ARE SAFE: nothing changes unless the student changes it ----------
+   · upper floors are saved with the plot (plotRecord keeps fx)
+   · claiming a plot double-checks the server first, so a slow connection can never replace a creation with a new random one
+   · the last 5 versions of each of your creations are kept on this device: 🛟 RESTORE in your plot panel (only when YOU press it) */
+var _plotRecordFX = plotRecord; plotRecord = function(p, d){ var r = _plotRecordFX(p, d); if(d && d.fx && typeof d.fx === 'object' && d.md !== 'b'){ var c = cleanPlot({o:net.uid, k:p.kind, fx:d.fx, fl:d.fl, md:''}, p); if(c && c.fx) r.fx = c.fx; } return r; };
+function safeClaimWrap(){ if(!net.claimPlot || net.claimPlot.__safe) return; var orig = net.claimPlot;
+  net.claimPlot = function(p, d){ var self = this, args = arguments;
+    var chk = (typeof CLAUDE_MODE !== 'undefined' && CLAUDE_MODE && net.cdb) ? net.cdb.doc('plots/' + net.uid).get().then(function(doc){ var x = doc.exists ? doc.data() : null; return !!(x && x[p.kind]); })
+      : net.db ? Promise.all([net.db.ref('paris/plots/' + p.id).once('value'), net.db.ref('paris/owners/' + net.uid + '/' + p.kind).once('value')]).then(function(r){ var v = r[0].val(), mine = r[1].val(); if(v && v.o && v.o !== net.uid) throw new Error('taken'); return !!(v || mine); }) : Promise.resolve(false);
+    return chk.then(function(has){ if(has){ showToast('🛟 ' + L2('You already have a creation here: it was kept exactly as it was.', 'Tu as déjà une création ici : elle est gardée telle quelle.')); throw new Error('notAllowed'); } return orig.apply(self, args); }); };
+  net.claimPlot.__safe = true; }
+setInterval(safeClaimWrap, 1000);
+/* local backups of your own creations */
+function bakKey(p){ return 'paris.bak.' + (net.uid || '') + '.' + p.id; }
+function bakList(p){ try { return JSON.parse(localStorage.getItem(bakKey(p)) || '[]') || []; } catch(e){ return []; } }
+setInterval(function(){ if(!net.uid || typeof PLOTS === 'undefined') return; ['store', 'house'].forEach(function(k){ var p = myPlot(k); if(!p || !p.data || p.data.o !== net.uid) return; if(editing && editing.p === p) return;
+  var d = JSON.parse(JSON.stringify(p.data)); delete d.at; var js = JSON.stringify(d), L = bakList(p); if(L.length && L[L.length - 1].j === js) return;
+  if(!(d.it || d.bk || d.ib || d.fx || d.nm)) return; L.push({t:Date.now(), j:js}); while(L.length > 5) L.shift(); try { localStorage.setItem(bakKey(p), JSON.stringify(L)); } catch(e){ try { L.splice(0, L.length - 2); localStorage.setItem(bakKey(p), JSON.stringify(L)); } catch(e2){} } }); }, 10000);
+var _renderPlotPanelB = renderPlotPanel; renderPlotPanel = function(){ var r = _renderPlotPanelB.apply(this, arguments); try { var p = panelPlot, row = document.getElementById('pp-btns');
+    if(p && p.data && p.data.o === net.uid && row && !panelConfirm && bakList(p).length > 1){ var b = document.createElement('button'); b.className = 'btn'; b.textContent = '🛟 ' + L2('RESTORE AN EARLIER VERSION', 'RETROUVER UNE ANCIENNE VERSION'); b.addEventListener('click', function(){ closePlotPanel(false); bakCard(p); }); row.appendChild(b); } } catch(e){} return r; };
+function bakCard(p){ var L = bakList(p).slice().reverse(); BAK.p = p;
+  showCard('<h3>🛟 ' + L2('EARLIER VERSIONS', 'LES ANCIENNES VERSIONS') + '</h3><div class="gc-text">' + L2('Your creation is never changed unless you change it. If you want to go back to an earlier version, pick it here:', 'Ta création ne change jamais si tu ne la changes pas. Pour revenir à une ancienne version, choisis-la ici :') + '</div>' +
+    L.map(function(x, i){ var d = JSON.parse(x.j), n = (d.it ? d.it.split(' ').length : 0); return '<div class="gc-row">' + gBtn('bakgo', String(L.length - 1 - i), (i === 0 ? '📍 ' + L2('Now', 'Maintenant') + ' · ' : '') + new Date(x.t).toLocaleString() + ' · ' + esc(d.nm || '') + (d.md === 'b' ? ' · 🧱' : ' · 🛋 ' + n), i === 0 ? '' : 'go') + '</div>'; }).join('') + '<div class="gc-row">' + gBtn('close', null, L2('CANCEL', 'ANNULER')) + '</div>'); }
+var BAK = {};
+GACT.bakgo = function(v){ var p = BAK.p, L = p ? bakList(p) : [], x = L[v|0]; if(!x) return; var d = JSON.parse(x.j); d.o = net.uid;
+  net.savePlot(p, d).then(function(){ p.data = cleanPlot(d, p); if(p.row) p.row.dirty = true; showToast('🛟 ' + L2('Restored!', 'Version retrouvée !')); closeCard(); }).catch(function(){ showToast(L2('Could not restore right now (is building open?).', 'Impossible pour l\'instant (la construction est-elle ouverte ?).')); }); };
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
