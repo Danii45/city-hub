@@ -19583,7 +19583,6 @@ function spmBuildArena(P, X, Z){
   // two big screens with the live score
   var cv = document.createElement('canvas'); cv.width = 512; cv.height = 200; var tex = new THREE.CanvasTexture(cv); SPM.jumbo = {cv:cv, tex:tex, t:0};
   [cx, bx].forEach(function(x){ var m = new THREE.Mesh(new THREE.PlaneGeometry(9, 3.5), new THREE.MeshBasicMaterial({map:tex})); m.position.set(X + x, 10.2, Z - 31.7); root.add(m); var fr = new THREE.Mesh(new THREE.BoxGeometry(9.5, 4, 0.3), solidMat(0x1b1b1d)); fr.position.set(X + x, 10.2, Z - 31.9); root.add(fr); });
-  SPM.lamps = [[cx, -16], [bx, -16], [0, 14]].map(function(q){ var l = new THREE.PointLight(0xfff6e8, 0, 70, 1.2); l.position.set(X + q[0], 13, Z + q[1]); scene.add(l); return l; });
   spmJumbo();
 }
 function spmJumbo(){ var J = SPM.jumbo; if(!J) return; var c = J.cv.getContext('2d'); c.fillStyle = '#0d1020'; c.fillRect(0, 0, 512, 200); c.fillStyle = '#ffd23a'; c.font = 'bold 26px Arial'; c.textAlign = 'center';
@@ -19750,7 +19749,7 @@ function spmHud(dt){ var A = SPM.A, t = Math.max(0, SPM.t), mm = Math.floor(t/60
   document.getElementById('spm-st').style.width = Math.round(SPM.stam*100) + '%'; var sb = document.getElementById('spm-shotbar'); sb.style.visibility = SPM.charge >= 0 ? 'visible' : 'hidden'; document.getElementById('spm-sh').style.width = Math.round(Math.max(0, SPM.charge)*100) + '%';
   if(SPM.subT > 0){ SPM.subT -= dt; if(SPM.subT <= 0) SPM.sub.style.opacity = 0; }
   SPM.jt = (SPM.jt || 0) + dt; if(SPM.jt > 0.5){ SPM.jt = 0; spmJumbo(); } }
-function spmTick(dt){ if(SPM.lamps){ var lit = INT.cur === SPORT_INT ? 0.75 : 0; if(SPM.lamps[0].intensity !== lit) SPM.lamps.forEach(function(l){ l.intensity = lit; }); } if(!SPM.on) return; dt = Math.min(dt || 0.016, 0.05);
+function spmTick(dt){ if(!SPM.on) return; dt = Math.min(dt || 0.016, 0.05);
   if(!flying || driving){ spmStop(true); return; }
   if(SPM.pause > 0) SPM.pause -= dt;
   else { SPM.t -= dt; if(SPM.t <= 0){ spmEnd(); return; } spmInput(dt); spmAI(dt);
@@ -20564,7 +20563,7 @@ GACT.spda = function(v){ var ok = (v|0) === SPD.q.ans; SPD.cool = Date.now() + (
   showCard('<h3>🏎</h3><div class="gc-big ' + (ok ? 'good' : 'bad') + '">' + (ok ? '✓ ' + L2('LEVEL UP! ', 'NIVEAU SUPÉRIEUR ! ') + '×' + spdMul() : '✗ ' + esc(SPD.q.opts[SPD.q.ans])) + '</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); };
 (function(){ var G = BAR_GROUPS.filter(function(g){ return g.id === 'snd'; })[0]; if(!G || !G.d) return; var x = document.createElement('button'); x.className = 'bar-btn'; x.innerHTML = '<span>🏎</span><span class="dl">' + esc(L2('Vehicle speed (French question)', 'Vitesse des véhicules (question)')) + '</span>'; x.addEventListener('click', function(){ closeDrops(); GACT.spd(); }); G.d.insertBefore(x, G.d.firstChild); })();
 /* ---------- 🔄 FORCED UPDATES: every open game checks for a newer version every minute and reloads itself (after saving) ---------- */
-var BUILD_ID = '1795791088';
+var BUILD_ID = '1795791710';
 (function(){ var busy = false; function check(){ if(busy || document.hidden) return; busy = true; fetch(location.href.split('#')[0], {cache:'no-store'}).then(function(r){ return r.ok ? r.text() : ''; }).then(function(t){ busy = false; var m = /var BUILD_ID = '([^']+)'/.exec(t || ''); if(m && m[1] !== BUILD_ID && m[1] !== '__' + 'BUILD__') upd(); }).catch(function(){ busy = false; }); }
   function creating(){ try { return !!editing || builder.on || decor.on || blk.on; } catch(e){ return false; } }
   function upd(){ if(upd.on) return;
@@ -21209,6 +21208,7 @@ function fpTick(dt){ var on = fpWalk(); if(on) fpBuildArms(); if(FP.arms) FP.arm
    flavours, invent your own flavours (shell + filling colour, your French name), buy, eat, give.
    ===================================================================================================================== */
 var MW = {x:-2600, z:2400, R:170};
+function safeTick(f, dt){ try { f(dt); } catch(e){ safeTick.n = (safeTick.n || 0) + 1; if(safeTick.n < 6) console.warn('tick error', e); } }
 function inMac(x, z){ return Math.abs(x - MW.x) < 180 && Math.abs(z - MW.z) < 180; }
 var MACF = [['framboise', 'raspberry', 0xe84a6a, 0xb81a3a], ['pistache', 'pistachio', 0xa8d88a, 0x6aa84a], ['chocolat', 'chocolate', 0x6a3a22, 0x3a1a0a], ['vanille', 'vanilla', 0xf6ecd0, 0xf0d890], ['citron', 'lemon', 0xf8e86a, 0xf0c830], ['caramel au beurre salé', 'salted butter caramel', 0xd8a05a, 0xa86a2a], ['café', 'coffee', 0xa87a5a, 0x6a4a2a], ['rose', 'rose', 0xf8b8c8, 0xe888a8], ['violette', 'violet', 0xb898d8, 0x8868b8], ['cassis', 'blackcurrant', 0x7a3a7a, 0x4a1a4a], ['noix de coco', 'coconut', 0xf8f8f4, 0xe8e8e0], ['fleur d\'oranger', 'orange blossom', 0xfbd8a8, 0xf8b878], ['lavande', 'lavender', 0xc8b8e8, 0x9888c8], ['fraise', 'strawberry', 0xf8889a, 0xe84858], ['mangue-passion', 'mango-passion fruit', 0xf8b830, 0xf08818], ['myrtille', 'blueberry', 0x6a7ad8, 0x3a4aa8]];
 function macFlavours(){ var e = hasChar() ? life.eco : null; return MACF.concat((e && e.macf || []).map(function(f){ return [f.n, f.n + ' (' + L2('your flavour', 'ta saveur') + ')', f.s, f.f, true]; })); }
@@ -21573,7 +21573,7 @@ var _buildRoomF = buildRoom; buildRoom = function(E, I, d, L, wall, trim, opts){
 /* ---- the upstairs rooms: built one at a time, far away (like the other interiors) ---- */
 var FLR = {X:8000, Z:7400, p:null, f:0, mesh:null, cardP:null};
 PLAY_AREAS.push({x0:FLR.X - 7, x1:FLR.X + 7, z0:FLR.Z - 9, z1:FLR.Z + 9});
-FLR.lamp = new THREE.PointLight(0xfff0d8, 0, 16, 1.2); FLR.lamp.position.set(FLR.X, 2.9, FLR.Z); scene.add(FLR.lamp);
+
 function flrBuild(p, f){ var d = p.data, L = layoutOf(p.kind), F = dflOf(d, f), B = new MeshBatch(), oz = FLR.Z - L.cz, R = new Lot(B, FLR.X, oz, 0);
   if(FLR.mesh){ if(FLR.mesh.parent) FLR.mesh.parent.remove(FLR.mesh); FLR.mesh.geometry.dispose(); FLR.mesh = null; } removeSolidsOf('flrroom');
   var rd = {k:p.kind, dp:d.dp, iw:F.iw|0, 'if':F['if']|0, it:F.it || '', fl:dflFloors(d)}, wall = pick(WALL_COLORS, d.cw), trim = pick(TRIM_COLORS, d.ct), dx = L.doors[d.dp], zf = L.cz + L.d/2;
@@ -21599,7 +21599,7 @@ GACT.flrgo = function(v){ flrGo(FLR.cardP, parseInt(v, 10) || 0); };
 FLR.up = addSpot({x:-1e7, z:-1e7, r:2.7, label:function(){ return '🪜 ' + L2('The stairs (l\'escalier): up / down', 'L\'escalier : monter / descendre'); }, act:function(){ flrStairsCard(FLR.p, FLR.f); }, when:function(){ return !!FLR.p && Math.abs(camera.position.x - FLR.X) < 10; }});
 FLR.dec = addSpot({x:-1e7, z:-1e7, r:2.2, label:function(){ return '🎨 ' + L2('Decorate this floor', 'Décorer cet étage'); }, act:function(){ var p = FLR.p, f = FLR.f; flrGo(p, 0); setTimeout(function(){ openDecor(p); setTimeout(function(){ dflSwitch(f); }, 150); }, 450); }, when:function(){ return !!FLR.p && FLR.p.data && FLR.p.data.o === net.uid && Math.abs(camera.position.x - FLR.X) < 10; }});
 FLR.gs = addSpot({x:-1e7, z:-1e7, r:1.9, label:function(){ return '🪜 ' + L2('The stairs: go upstairs (monter)', 'L\'escalier : monter à l\'étage'); }, act:function(){ flrStairsCard(FLR.gs.p, 0); }, when:function(){ return !!FLR.gs.p; }});
-setInterval(function(){ var lit = FLR.p && Math.abs(camera.position.x - FLR.X) < 10 && Math.abs(camera.position.z - FLR.Z) < 10 ? 0.9 : 0; if(FLR.lamp.intensity !== lit) FLR.lamp.intensity = lit; var gs = FLR.gs; gs.p = null; gs.x = gs.z = -1e7; if(!flying || driving || camera.position.y > 4 || camera.position.y < 0) return;
+setInterval(function(){ var inF = FLR.p && !INT.cur && Math.abs(camera.position.x - FLR.X) < 10 && Math.abs(camera.position.z - FLR.Z) < 10, l0 = INT.lamps[0]; if(inF){ if(l0.intensity !== 0.9 || l0.position.x !== FLR.X){ l0.position.set(FLR.X, 2.9, FLR.Z); l0.distance = 16; l0.intensity = 0.9; } FLR.lit = true; } else if(FLR.lit && !INT.cur){ l0.intensity = 0; FLR.lit = false; } var gs = FLR.gs; gs.p = null; gs.x = gs.z = -1e7; if(!flying || driving || camera.position.y > 4 || camera.position.y < 0) return;
   var cx = camera.position.x, cz = camera.position.z, p = plotAtFast(cx, cz); if(!p || !p.data || !p.data.o || dflFloors(p.data) < 2) return;
   var L = layoutOf(p.kind), l = worldToPlot(p, cx, cz), hw = L.w/2, zb = L.cz - L.d/2, zf = L.cz + L.d/2; if(Math.abs(l.x) > hw || l.z < zb || l.z > zf) return;
   var S = flrStairsBox(L), w = plotToWorld(p, S.x, S.z + 1.0); gs.x = w.x; gs.z = w.z; gs.p = p; }, 250);
@@ -22526,6 +22526,76 @@ setInterval(function(){ if(!life.all) return; var now = {}; Object.keys(life.all
   if(RDW.prev){ Object.keys(now).forEach(function(u){ if(u === net.uid) return; var a = (RDW.prev[u] || {b:[]}).b; now[u].b.forEach(function(i){ if(a.indexOf(i) < 0 && typeof lbBanner === 'function') lbBanner(i === 24 ? '👑 ' + now[u].n + ' est devenu(e) une LÉGENDE du français !' : '⚔️ ' + now[u].n + ' a vaincu ' + RS[i].t.replace(/^BOSS[^:]*: /, '') + ' !', i === 24 ? now[u].n + ' became a LEGEND of French!' : now[u].n + ' defeated a boss on the Road to Legend!'); }); }); }
   RDW.prev = now; }, 5000);
 GACT.road = function(){ closeCard(); rdOpen(); };
+/* ---------- 📋 DAILY TASKS 2.0: clearer tasks, step-by-step instructions, a GO button, an always-visible tracker,
+   an instant prompt when you arrive at a task's place (to do / already done), and a big ✅ when a task is completed ---------- */
+var DQX = {prev:null, shown:{}};
+function dqHow(t){ var T = DQ_T[t.k], nm = (t.l || '').replace(/^\S+ /, '');
+  var H = {lc2:['Va au Centre d\'apprentissage 🎓 (bouton ALLER).', 'Choisis une tâche (grammaire, lecture, écriture ou oral) et réussis-la.', 'Fais-en 2 aujourd\'hui.'],
+    read:['Va au Centre d\'apprentissage 🎓.', 'Choisis une tâche de LECTURE 📖 et réponds aux questions.'], oral:['Va au Centre d\'apprentissage 🎓.', 'Choisis une tâche d\'ORAL 🗣 et parle en français (micro ou bouton).'], write:['Va au Centre d\'apprentissage 🎓.', 'Choisis une tâche d\'ÉCRITURE ✍ et écris tes phrases en français.'],
+    chat:['Ouvre le chat (touche T ou bouton ALLER).', 'Écris « Bonjour ! » ou « Salut la classe ! » et envoie.'], wear:['Ouvre ta garde-robe 👕 (bouton ALLER).', 'Choisis un vêtement et appuie sur « JE PORTE ».'],
+    drama:['Va au Centre des Arts de la Scène 🎭 (bouton ALLER).', 'Fais une activité de théâtre et écris ta réflexion.'], jet:['Gagne 6 jetons 🪙 aujourd\'hui : l\'arcade, les quiz, les activités…', 'Tu vois ton compteur ici : ' + (DQ_T.jet.n ? DQ_T.jet.n(life.eco) : '')],
+    place:['Va à : ' + nm + ' (bouton ALLER).', 'À l\'intérieur, fais UNE activité : clique sur un panneau, une personne ou un jeu et participe.'], visit:['Va à : ' + nm + ' (bouton ALLER).', 'Entre à l\'intérieur : c\'est tout ! La tâche se coche toute seule.'],
+    healthy:['Va manger quelque chose de très sain 🥗 (un fruit, une salade…).', 'Au restaurant, au marché ou dans ton frigo 🧊.']};
+  var E = {lc2:'Go to the Learning Centre and pass 2 tasks.', read:'Do a reading task at the Learning Centre.', oral:'Do a speaking task at the Learning Centre.', write:'Do a writing task at the Learning Centre.', chat:'Open the chat (T) and say hello in French.', wear:'Open your wardrobe and wear something.', drama:'Do a drama activity at the Performing Arts Centre.', jet:'Earn 6 tokens today from any activity.', place:'Go there and do one activity inside.', visit:'Go there and step inside.', healthy:'Eat something very healthy.'};
+  return {fr:H[t.k] || [T.fr], en:E[t.k] || T.en}; }
+function dqFindInt(id){ for(var i=0;i<INTERIORS.length;i++) if(INTERIORS[i].id === id) return INTERIORS[i]; return null; }
+function dqGo(t){ closeCard(); var k = t.k;
+  if(k === 'lc2' || k === 'read' || k === 'oral' || k === 'write'){ var A = dqFindInt('apprendre'); if(A){ enterInterior(A); return; } GACT.lchome(); return; }
+  if(k === 'chat'){ try { openChat('Bonjour la classe ! '); } catch(e){ showToast(L2('Press T to open the chat', 'Appuie sur T pour ouvrir le chat')); } return; }
+  if(k === 'wear'){ try { wardrobeCard(); } catch(e){ try { GACT.hwar(); } catch(e2){} } return; }
+  if(k === 'drama'){ var Th = dqFindInt('theatre'); if(Th) enterInterior(Th); return; }
+  if(k === 'jet'){ GACT.sidequests(); return; }
+  if(k === 'healthy'){ try { fridge(net.uid); } catch(e){} return; }
+  if(t.p){ var I = dqFindInt(t.p); if(I){ enterInterior(I); return; } var nm = rdNA((t.l || '').replace(/^\S+ /, '').replace(/^(le |la |les |l')/, '')), L = searchIndex(); for(var i=0;i<L.length;i++){ var s = rdNA(String(L[i].name || '')); if(nm && (s.indexOf(nm) >= 0 || nm.indexOf(s) >= 0) && s.length > 3){ if(L[i].act) L[i].act(); else goTo({x:L[i].x, z:L[i].z, yaw:L[i].yaw || 0}); return; } } }
+  showToast(L2('Use the map 🗺 to find it!', 'Utilise la carte 🗺 pour le trouver !')); }
+GACT.dqgo = function(v){ var d = dqState(); if(d && d.t[v|0]) dqGo(d.t[v|0]); };
+GACT.dqhow = function(v){ var d = dqState(), t = d && d.t[v|0]; if(!t) return; var H = dqHow(t), ok = dqDone(t), T = DQ_T[t.k];
+  showCard('<h3>' + T.i + ' ' + L2('TASK ', 'TÂCHE ') + ((v|0) + 1) + ' / ' + d.t.length + '</h3><div class="gc-big gc-say" style="font-size:19px">' + esc(dqLabel(t).replace(/^\S+ /, '')) + '</div><div class="gc-text" style="text-align:left">' + H.fr.map(function(s, i){ return '<div style="margin:6px 0"><b>' + (i + 1) + '.</b> ' + esc(s) + '</div>'; }).join('') + '<div class="lf-soft">🇬🇧 ' + esc(H.en) + '</div></div><div class="gc-big ' + (ok ? 'good' : '') + '">' + (ok ? '✅ ' + L2('DONE!', 'C\'EST FAIT !') : '⬜ ' + L2('Not done yet', 'Pas encore fait') + (T.n ? ' · ' + T.n(life.eco) : '')) + '</div><div class="gc-row">' + (ok ? '' : gBtn('dqgo', String(v|0), '🧭 ' + L2('GO THERE', 'Y ALLER'), 'go')) + gBtn('daily', null, '📋 ' + L2('ALL TASKS', 'TOUTES LES TÂCHES')) + gBtn('close', null, 'OK') + '</div>'); try { say(H.fr[0]); } catch(e){} };
+/* the task list card: each task has its own HOW and GO buttons */
+var _dqCardX = dqCard; dqCard = function(msg){ _dqCardX.apply(this, arguments); try { var d = dqState(); if(!d) return; var box = gcard.el.querySelector('.gc-text'); if(!box) return; var e = life.eco, firstTodo = d.t.findIndex(function(t){ return !dqDone(t); });
+    box.innerHTML = d.t.map(function(t, i){ var T = DQ_T[t.k], ok = dqDone(t), H = dqHow(t); return '<div style="display:flex;gap:8px;align-items:center;padding:8px;margin:6px 0;border-radius:12px;border:3px solid ' + (ok ? '#3ab87a' : i === firstTodo ? '#e3b52c' : '#c9cbd3') + ';background:' + (ok ? '#e6f6ea' : i === firstTodo ? '#fff7d6' : '#fff') + ';text-align:left"><span style="font-size:26px">' + (ok ? '✅' : T.i) + '</span><span style="flex:1"><b class="gc-say">' + (i + 1) + '. ' + esc(dqLabel(t).replace(/^\S+ /, '')) + '</b>' + (T.n && !ok ? ' <b>(' + T.n(e) + ')</b>' : '') + '<br><span class="lf-soft">' + esc(ok ? L2('Done! ✔', 'C\'est fait ! ✔') : H.fr[0]) + '</span>' + (i === firstTodo ? '<br><b style="color:#b07a00">👉 ' + L2('Do this one next!', 'Fais celle-ci maintenant !') + '</b>' : '') + '</span>' + (ok ? '' : '<span style="display:flex;flex-direction:column;gap:4px">' + gBtn('dqgo', String(i), '🧭 ' + L2('GO', 'ALLER'), 'go') + gBtn('dqhow', String(i), '❓ ' + L2('HOW?', 'COMMENT ?')) + '</span>') + '</div>'; }).join(''); } catch(err){} };
+/* the tracker: always on screen, shows the tasks and the next one */
+(function(){ var st = document.createElement('style'); st.textContent = '#dq-track{position:fixed;left:12px;top:calc(150px + env(safe-area-inset-top,0px));z-index:31;width:250px;background:rgba(255,250,240,.96);border:3px solid #23243a;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.25);font-size:13px;overflow:hidden}#dq-track .h{display:flex;align-items:center;gap:6px;padding:6px 8px;background:#23243a;color:#fff;font-weight:bold;cursor:pointer}#dq-track .h .mn{margin-left:auto;opacity:.8}#dq-track .b{padding:6px 8px}#dq-track .r{display:flex;gap:6px;align-items:flex-start;padding:4px 2px;cursor:pointer;border-radius:8px}#dq-track .r:hover{background:#fff2b0}#dq-track .r.ok{opacity:.55;text-decoration:line-through}#dq-track .r.nx{background:#fff7d6;font-weight:bold}#dq-track.min .b{display:none}#dq-pop{position:fixed;left:50%;top:calc(110px + env(safe-area-inset-top,0px));transform:translate(-50%,-20px);opacity:0;visibility:hidden;z-index:61;max-width:min(560px,92vw);background:#fffaf0;border:4px solid #e3b52c;border-radius:18px;padding:12px 16px;box-shadow:0 10px 30px rgba(0,0,0,.35);transition:transform .3s,opacity .3s,visibility 0s linear .3s;text-align:center}#dq-pop.show{transform:translate(-50%,0);opacity:1;visibility:visible;transition:transform .3s,opacity .3s}#dq-pop.done{border-color:#3ab87a;background:#eefbf1}#dq-pop h4{margin:0 0 6px;font-size:18px}#dq-pop .x{position:absolute;right:8px;top:6px;cursor:pointer;font-weight:bold}body.spm-on #dq-track{display:none}';
+  document.head.appendChild(st); var tr = document.createElement('div'); tr.id = 'dq-track'; tr.style.display = 'none'; document.body.appendChild(tr); DQX.tr = tr; var mini = false; try { mini = localStorage.getItem('paris.dqmini') === '1'; } catch(e){} if(mini) tr.classList.add('min');
+  tr.addEventListener('click', function(e){ e.stopPropagation(); var h = e.target.closest('.h'), r = e.target.closest('.r'); if(h){ if(e.target.closest('.mn')){ tr.classList.toggle('min'); try { localStorage.setItem('paris.dqmini', tr.classList.contains('min') ? '1' : '0'); } catch(x){} } else dqCard(); return; } if(r) GACT.dqhow(r.getAttribute('data-i')); }, true);
+  var pop = document.createElement('div'); pop.id = 'dq-pop'; document.body.appendChild(pop); DQX.pop = pop; pop.addEventListener('click', function(e){ e.stopPropagation(); if(e.target.closest('.x')){ pop.classList.remove('show'); return; } var b = e.target.closest('[data-dq]'); if(b){ pop.classList.remove('show'); GACT.dqhow(b.getAttribute('data-dq')); } }, true); })();
+function dqTrack(){ var tr = DQX.tr; if(!tr) return; var d = hasChar() ? dqState() : null; if(!d || !net.uid || (titleScreen && !titleScreen.classList.contains('hidden'))){ tr.style.display = 'none'; return; } tr.style.display = '';
+  var n = d.t.filter(dqDone).length, nx = d.t.findIndex(function(t){ return !dqDone(t); }), e = life.eco;
+  var html = '<div class="h">📋 ' + L2('Today\'s tasks', 'Tâches du jour') + ' ' + n + '/' + d.t.length + (d.paid ? ' ✅' : '') + '<span class="mn">' + (tr.classList.contains('min') ? '▾' : '▴') + '</span></div><div class="b">' + (d.paid ? '<div style="color:#1d6a2a;font-weight:bold">💶 ' + L2('All done! Paid: ', 'Tout est fait ! Paie : ') + d.paid + ' €</div>' : '') + d.t.map(function(t, i){ var T = DQ_T[t.k], ok = dqDone(t); return '<div class="r' + (ok ? ' ok' : i === nx ? ' nx' : '') + '" data-i="' + i + '"><span>' + (ok ? '✅' : i === nx ? '👉' : '⬜') + '</span><span>' + esc(dqLabel(t).replace(/^\S+ /, '')) + (T.n && !ok ? ' (' + T.n(e) + ')' : '') + '</span></div>'; }).join('') + '</div>';
+  if(tr.innerHTML !== html) tr.innerHTML = html; }
+function dqPop(html, done){ var p = DQX.pop; p.className = done ? 'done' : ''; p.innerHTML = '<span class="x">✖</span>' + html; requestAnimationFrame(function(){ p.classList.add('show'); }); clearTimeout(DQX.pt); DQX.pt = setTimeout(function(){ p.classList.remove('show'); }, done ? 7000 : 12000); }
+/* tasks that belong to a place */
+function dqTasksFor(id){ var d = dqState(); if(!d) return []; return d.t.map(function(t, i){ return {t:t, i:i}; }).filter(function(x){ var k = x.t.k; return x.t.p === id || (id === 'apprendre' && /^(lc2|read|oral|write)$/.test(k)) || (id === 'theatre' && k === 'drama'); }); }
+var _enterDQX = enterInterior; enterInterior = function(o){ var r = _enterDQX.apply(this, arguments); try { if(hasChar() && o && o.id){ setTimeout(function(){ var L = dqTasksFor(o.id); if(!L.length) return; var x = L[0], ok = dqDone(x.t), H = dqHow(x.t);
+      if(ok) dqPop('<h4>✅ ' + L2('Task already done here!', 'Tâche déjà faite ici !') + '</h4><div>' + esc(dqLabel(x.t).replace(/^\S+ /, '')) + '</div>', true);
+      else { dqPop('<h4>📋 ' + L2('Your daily task is HERE!', 'Ta tâche du jour est ICI !') + '</h4><div style="font-weight:bold">' + esc(dqLabel(x.t).replace(/^\S+ /, '')) + '</div><div style="text-align:left;margin-top:6px">' + H.fr.map(function(s, i){ return (i + 1) + '. ' + esc(s); }).join('<br>') + '</div><div class="lf-soft">🇬🇧 ' + esc(H.en) + '</div><div style="margin-top:8px"><button class="btn" data-dq="' + x.i + '">❓ ' + L2('MORE HELP', 'PLUS D\'AIDE') + '</button></div>'); try { say('Ta tâche du jour est ici ! ' + H.fr[H.fr.length - 1]); } catch(e){} } }, 2800); } } catch(e){} return r; };
+/* a big ✅ the moment a task gets done */
+setInterval(function(){ dqTrack(); var d = hasChar() ? dqState() : null; if(!d){ DQX.prev = null; return; } var now = d.t.map(dqDone), key = d.day;
+  if(DQX.prev && DQX.prev.day === key){ now.forEach(function(ok, i){ if(ok && !DQX.prev.s[i]){ var n = now.filter(Boolean).length, nx = d.t.findIndex(function(t){ return !dqDone(t); });
+      dqPop('<h4>✅ ' + L2('Daily task completed!', 'Tâche du jour réussie !') + ' (' + n + '/' + d.t.length + ')</h4><div style="font-weight:bold">' + esc(dqLabel(d.t[i]).replace(/^\S+ /, '')) + '</div>' + (nx >= 0 ? '<div style="margin-top:6px">👉 ' + L2('Next: ', 'Prochaine tâche : ') + '<b>' + esc(dqLabel(d.t[nx]).replace(/^\S+ /, '')) + '</b></div><div style="margin-top:8px"><button class="btn go" data-dq="' + nx + '">🧭 ' + L2('HOW / GO', 'COMMENT / ALLER') + '</button></div>' : '<div style="margin-top:6px">🎉 ' + L2('All tasks done: your pay is coming!', 'Toutes les tâches sont faites : voici ta paie !') + '</div>'), true);
+      try { playNotes([[72, 0.1], [76, 0.1], [79, 0.2]], 'triangle', 0.07, 120); say('Bravo ! Tâche réussie !'); } catch(e){} } }); }
+  DQX.prev = {day:key, s:now}; }, 1000);
+/* ---------- 🔁 PICK UP WHERE YOU LEFT OFF: after a refresh / update / crash you come back exactly where you were ----------
+   Every 2 s we remember: where you stand and look, inside which building / upstairs room, if you're driving (and which car),
+   and if the Road to Legend or the online arcade was open. When the game loads again (within 3 hours), you're put back. */
+var RSM = {done:false};
+function rsmKey(){ return 'paris.resume.' + (net.uid || 'guest'); }
+function rsmSave(){ if(!net.uid || !hasChar() || !flying || (titleScreen && !titleScreen.classList.contains('hidden')) || !RSM.done) return; try {
+    var c = camera.position, s = {t:Date.now(), x:+c.x.toFixed(2), y:+c.y.toFixed(2), z:+c.z.toFixed(2), yaw:+(yaw || 0).toFixed(3), int:INT.cur ? INT.cur.id : null, flr:FLR.p ? {p:FLR.p.id, f:FLR.f} : null, drive:driving ? {car:carName, x:+carPos.x.toFixed(2), z:+carPos.z.toFixed(2), yaw:+carYaw.toFixed(3)} : null, rd:RD.on ? 1 : 0, ax:AX.on ? (AX.g || 'menu') : null};
+    if(RIDEX.on || (typeof SPM !== 'undefined' && SPM.on)) return; localStorage.setItem(rsmKey(), JSON.stringify(s)); } catch(e){} }
+setInterval(rsmSave, 2000);
+window.addEventListener('beforeunload', function(){ rsmSave(); try { lifeSave(true); } catch(e){} });
+function rsmRestore(){ var s = null; try { s = JSON.parse(localStorage.getItem(rsmKey()) || 'null'); } catch(e){} RSM.done = true; if(!s || Date.now() - s.t > 3*3600000) return;
+  var back = function(){ try { if(s.rd) rdOpen(); else if(s.ax) axOpen(s.ax === 'menu' ? null : s.ax); } catch(e){} showToast('🔁 ' + L2('Welcome back! You\'re right where you left off.', 'Re-bonjour ! Tu reprends exactement où tu étais.')); };
+  try {
+    if(s.drive && s.drive.car && cars[s.drive.car]){ requestFirstPerson('drive'); setTimeout(function(){ try { if(carName !== s.drive.car && typeof setCarModel === 'function') setCarModel(s.drive.car); carPos.set(s.drive.x, 0, s.drive.z); carYaw = camBase = yaw = s.drive.yaw; } catch(e){} back(); }, 700); return; }
+    if(s.int){ var I = dqFindInt(s.int); if(I){ enterInterior(I); setTimeout(function(){ camera.position.set(s.x, s.y, s.z); yaw = s.yaw; camera.rotation.set(0, yaw, 0, 'YXZ'); back(); }, 1400); return; } }
+    if(s.flr){ var P = PLOTS.filter(function(p){ return p.id === s.flr.p; })[0]; if(P && P.data){ flrGo(P, s.flr.f); setTimeout(function(){ camera.position.set(s.x, s.y, s.z); yaw = s.yaw; camera.rotation.set(0, yaw, 0, 'YXZ'); back(); }, 900); return; } }
+    if(!flying) requestFirstPerson('walk'); setTimeout(function(){ camera.position.set(s.x, Math.max(s.y, EYE_HEIGHT), s.z); yaw = s.yaw; camera.rotation.set(0, yaw, 0, 'YXZ'); try { vertVelocity = 0; } catch(e){} back(); }, 500);
+  } catch(e){ console.warn(e); } }
+setInterval(function(){ if(RSM.done || RSM.wait) return; if(!net.uid || !hasChar() || (titleScreen && !titleScreen.classList.contains('hidden'))) return; RSM.wait = true; setTimeout(rsmRestore, 2500); }, 700);
+/* if the graphics card drops the 3D picture (a black screen on some laptops), reload automatically - and come back where you were */
+(function(){ var cv = renderer && renderer.domElement; if(!cv) return; cv.addEventListener('webglcontextlost', function(e){ e.preventDefault(); rsmSave(); try { lifeSave(true); } catch(x){} showToast('🔄 ' + L2('The graphics stopped: reloading…', 'L\'affichage s\'est arrêté : on recharge…')); setTimeout(function(){ location.reload(); }, 1500); }, false); })();
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
@@ -23087,6 +23157,7 @@ langHooks.push(renderEliteTab);
 function animate(){
   requestAnimationFrame(animate);
   var dt = Math.min(clock.getDelta(), 0.1);
+  try {   // whatever happens in one part of the game, the picture is always drawn (no black screens)
   if(shinyPaints.length) updateShinyPaints(performance.now()/1000);
   controls.autoRotate = !titleScreen.classList.contains('hidden') && !flying;
   controls.autoRotateSpeed = 0.35;
@@ -23102,7 +23173,7 @@ function animate(){
   updateSpeedo();
   lifeTick(dt);
   jailTick();
-  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt); ambTrainTick(dt); wearOthersTick(); jamTick(); pkTick(dt); bumpTick(dt); cullTick(dt); rigTick(dt); crouchTick(dt); metroTick(dt); copTick(dt); specTick(); msprTick(dt); haloTick(dt); nitroTick(dt); f1Tick(dt); shadowTick(); rdTick(); poolTick(); tlTick(dt); tcarsTick(dt); fpTick(dt); hoverEdgeTick(dt); miniTick(); frzTick(dt); pgpTick(dt); spmTick(dt); stwTick(dt); rideTick(dt); mpTick(dt);
+  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt); ambTrainTick(dt); wearOthersTick(); jamTick(); pkTick(dt); bumpTick(dt); cullTick(dt); rigTick(dt); crouchTick(dt); metroTick(dt); copTick(dt); specTick(); msprTick(dt); haloTick(dt); nitroTick(dt); f1Tick(dt); shadowTick(); rdTick(); poolTick(); tlTick(dt); tcarsTick(dt); fpTick(dt); hoverEdgeTick(dt); miniTick(); safeTick(frzTick, dt); safeTick(pgpTick, dt); safeTick(spmTick, dt); safeTick(stwTick, dt); safeTick(rideTick, dt); safeTick(mpTick, dt);
   if(!ICE.t || performance.now() - ICE.t > 1000){ ICE.t = performance.now(); if(Math.hypot(camera.position.x - QC.x, camera.position.z - QC.z) < 800) iceSync(); }
   villageTick();
   sendPresence(false);
@@ -23110,6 +23181,7 @@ function animate(){
   var wantNear = flying ? (insideView() ? 0.08 : 0.3) : 1.0;   // a closer near distance only when you're on foot, so depth stays precise
   if(camera.near !== wantNear){ camera.near = wantNear; camera.updateProjectionMatrix(); }
   updateQuality(dt);
+  } catch(err){ animate.err = (animate.err || 0) + 1; if(animate.err < 8) console.warn('frame error', err); }
   var shx = 0, shy = 0, shz = 0;
   if(screenShake > 0){
     screenShake = Math.max(0, screenShake - dt);
@@ -23117,7 +23189,7 @@ function animate(){
     shx = (Math.random() - 0.5)*amp; shy = (Math.random() - 0.5)*amp; shz = (Math.random() - 0.5)*amp;
     camera.position.x += shx; camera.position.y += shy; camera.position.z += shz;
   }
-  renderer.render(scene, camera);
+  try { renderer.render(scene, camera); } catch(err){ animate.rerr = (animate.rerr || 0) + 1; if(animate.rerr < 5) console.warn('render error', err); }
   camera.position.x -= shx; camera.position.y -= shy; camera.position.z -= shz;   // the shake is only for the picture
 }
 animate();
