@@ -20563,7 +20563,7 @@ GACT.spda = function(v){ var ok = (v|0) === SPD.q.ans; SPD.cool = Date.now() + (
   showCard('<h3>🏎</h3><div class="gc-big ' + (ok ? 'good' : 'bad') + '">' + (ok ? '✓ ' + L2('LEVEL UP! ', 'NIVEAU SUPÉRIEUR ! ') + '×' + spdMul() : '✗ ' + esc(SPD.q.opts[SPD.q.ans])) + '</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); };
 (function(){ var G = BAR_GROUPS.filter(function(g){ return g.id === 'snd'; })[0]; if(!G || !G.d) return; var x = document.createElement('button'); x.className = 'bar-btn'; x.innerHTML = '<span>🏎</span><span class="dl">' + esc(L2('Vehicle speed (French question)', 'Vitesse des véhicules (question)')) + '</span>'; x.addEventListener('click', function(){ closeDrops(); GACT.spd(); }); G.d.insertBefore(x, G.d.firstChild); })();
 /* ---------- 🔄 FORCED UPDATES: every open game checks for a newer version every minute and reloads itself (after saving) ---------- */
-var BUILD_ID = '1795792100';
+var BUILD_ID = '1795792110';
 (function(){ var busy = false; function check(){ if(busy || document.hidden) return; busy = true; fetch(location.href.split('#')[0], {cache:'no-store'}).then(function(r){ return r.ok ? r.text() : ''; }).then(function(t){ busy = false; var m = /var BUILD_ID = '([^']+)'/.exec(t || ''); if(m && m[1] !== BUILD_ID && m[1] !== '__' + 'BUILD__') upd(); }).catch(function(){ busy = false; }); }
   function creating(){ try { return !!editing || builder.on || decor.on || blk.on; } catch(e){ return false; } }
   function upd(){ if(upd.on) return;
@@ -23160,6 +23160,26 @@ function evPlay(v, host){ var T = EV_TY[v.ty]; JSIMS.ev = {icon:T[0], fr:T[1] + 
   var seen = {}; setInterval(function(){ if(!hasChar()) return; var e = life.eco, L = evInvites().filter(function(x){ return !(e.rsvp || {})[x.key]; }); b.textContent = L.length ? '🎉🔴' : '🎉'; L.forEach(function(x){ if(seen[x.key]) return; seen[x.key] = 1; try { if(Date.now() - x.v.t < 3600000*6) showToast('💌 ' + evName(x.u) + L2(' invited you: ', ' t\'invite : ') + EV_TY[x.v.ty][1].toLowerCase() + ' ! (🎉)'); } catch(err){} }); }, 4000); })();
 var _famCardEV = famCard; famCard = function(){ _famCardEV.apply(this, arguments); try { var r = gcard.el.querySelectorAll('.gc-row'); r[r.length - 1].insertAdjacentHTML('afterbegin', gBtn('evhub', null, '🎉 ' + L2('PLAN A FAMILY EVENT', 'ORGANISER UNE FÊTE'), 'go')); } catch(e){} };
 var _homeHubEV = homeHub; homeHub = function(){ var r = _homeHubEV.apply(this, arguments); try { var g = gcard.el.querySelector('.gc-grid'); if(g) g.insertAdjacentHTML('beforeend', gOpt('evhub', null, '🎉 <b>' + L2('Parties & sleepovers', 'Fêtes et soirées pyjama') + '</b><br><span class="lf-soft">' + L2('plan, invite, celebrate', 'organiser, inviter, fêter') + '</span>')); } catch(e){} return r; };
+
+/* ---------- 🛡 BLACK-SCREEN GUARD: before every frame, anything that would draw a black world (NaN sun / sky / fog / lights / camera)
+   is repaired on the spot; a frame that throws is retried; and a self-check at start-up proves the core globals are intact. ---------- */
+var BSG = {fix:0, last:''};
+function bsgOk(v){ return typeof v === 'number' && isFinite(v); }
+function bsgCol(c, def){ if(c && !(bsgOk(c.r) && bsgOk(c.g) && bsgOk(c.b))){ c.setHex(def); BSG.fix++; BSG.last = 'colour'; } }
+function bsgVec(v, def){ if(v && !(bsgOk(v.x) && bsgOk(v.y) && bsgOk(v.z))){ v.set(def[0], def[1], def[2]); BSG.fix++; BSG.last = 'vector'; } }
+function bsgCheck(){ try {
+  if(typeof RSUN === 'object' && RSUN && (!bsgOk(RSUN.lat) || !bsgOk(RSUN.lon))){ RSUN.lat = 43.84; RSUN.lon = -79.5; BSG.fix++; BSG.last = 'sun'; }
+  if(scene.background && scene.background.isColor) bsgCol(scene.background, 0xa8d4f0);
+  if(scene.fog){ bsgCol(scene.fog.color, 0xa8d4f0); if(!bsgOk(scene.fog.near) || !bsgOk(scene.fog.far) || scene.fog.far <= 1){ scene.fog.near = 60; scene.fog.far = 420; BSG.fix++; BSG.last = 'fog'; } }
+  [sun, hemi].forEach(function(L){ if(!L) return; if(!bsgOk(L.intensity) || L.intensity < 0){ L.intensity = L === sun ? 0.9 : 0.75; BSG.fix++; BSG.last = 'light'; } bsgCol(L.color, 0xffffff); if(L.groundColor) bsgCol(L.groundColor, 0xb8b0a0); bsgVec(L.position, [80, 160, 60]); });
+  bsgVec(camera.position, [0, 40, 60]); if(!bsgOk(camera.rotation.x) || !bsgOk(camera.rotation.y)){ camera.rotation.set(0, 0, 0); BSG.fix++; BSG.last = 'camera'; }
+  if(!bsgOk(camera.far) || camera.far < 50){ camera.far = 2000; camera.updateProjectionMatrix(); BSG.fix++; BSG.last = 'far'; }
+  if(typeof yaw !== 'undefined' && !bsgOk(yaw)) yaw = 0; if(typeof pitch !== 'undefined' && !bsgOk(pitch)) pitch = 0;
+  if(renderer.toneMappingExposure != null && !bsgOk(renderer.toneMappingExposure)) renderer.toneMappingExposure = 1;
+} catch(e){} }
+(function(){ var _r = renderer.render.bind(renderer), n = 0; renderer.render = function(sc, cam){ if(sc === scene && (n++ % 10 === 0 || BSG.fix)) bsgCheck(); try { return _r(sc, cam); } catch(e){ BSG.err = String(e && e.message || e); bsgCheck(); try { return _r(sc, cam); } catch(e2){} } }; })();
+/* start-up self-check: core globals other modules rely on must still be the right kind of thing */
+setTimeout(function(){ var bad = []; try { if(typeof RSUN !== 'object' || !bsgOk(RSUN.lat)) bad.push('RSUN'); if(typeof RDIST !== 'object') bad.push('RDIST'); if(!Array.isArray(RS)) bad.push('RS'); if(!FH || !('o' in FH)) bad.push('FH'); if(!(scene && renderer && camera)) bad.push('3D'); } catch(e){ bad.push(String(e)); } BSG.boot = bad; if(bad.length) try { console.warn('[paris] global clash:', bad.join(',')); } catch(e){} }, 4000);
 
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
