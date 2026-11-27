@@ -20565,7 +20565,7 @@ GACT.spda = function(v){ var ok = (v|0) === SPD.q.ans; SPD.cool = Date.now() + (
   showCard('<h3>🏎</h3><div class="gc-big ' + (ok ? 'good' : 'bad') + '">' + (ok ? '✓ ' + L2('LEVEL UP! ', 'NIVEAU SUPÉRIEUR ! ') + '×' + spdMul() : '✗ ' + esc(SPD.q.opts[SPD.q.ans])) + '</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); };
 (function(){ var G = BAR_GROUPS.filter(function(g){ return g.id === 'snd'; })[0]; if(!G || !G.d) return; var x = document.createElement('button'); x.className = 'bar-btn'; x.innerHTML = '<span>🏎</span><span class="dl">' + esc(L2('Vehicle speed (French question)', 'Vitesse des véhicules (question)')) + '</span>'; x.addEventListener('click', function(){ closeDrops(); GACT.spd(); }); G.d.insertBefore(x, G.d.firstChild); })();
 /* ---------- 🔄 FORCED UPDATES: every open game checks for a newer version every minute and reloads itself (after saving) ---------- */
-var BUILD_ID = '1795792120';
+var BUILD_ID = '1795792130';
 (function(){ var busy = false; function check(){ if(busy || document.hidden) return; busy = true; fetch(location.href.split('#')[0], {cache:'no-store'}).then(function(r){ return r.ok ? r.text() : ''; }).then(function(t){ busy = false; var m = /var BUILD_ID = '([^']+)'/.exec(t || ''); if(m && m[1] !== BUILD_ID && m[1] !== '__' + 'BUILD__') upd(); }).catch(function(){ busy = false; }); }
   function creating(){ try { return !!editing || builder.on || decor.on || blk.on; } catch(e){ return false; } }
   function upd(){ if(upd.on) return;
@@ -23279,6 +23279,26 @@ var _f1MenuX = GACT.f1; GACT.f1 = function(){ F1X.allow = true; try { _f1MenuX.a
   var all = life.all || {}, rows = Object.keys(all).map(function(k){ var x = all[k] && all[k].f1; return x && x.pts ? {n:(all[k].ch && all[k].ch.fn) || memberName(k), v:x.pts} : null; }).filter(Boolean).sort(function(a, b){ return b.v - a.v; }).slice(0, 5); var sub = gcard.el.querySelectorAll('.gc-text'); var last = sub[sub.length - 1]; if(last) last.parentNode.insertAdjacentHTML('afterend', '<div class="gc-text" style="text-align:left;margin-top:6px"><b>🏆 ' + L2('Championship (points)', 'Championnat (points)') + '</b><br>' + (rows.map(function(r, i){ return (['🥇', '🥈', '🥉'][i] || (i + 1) + '.') + ' ' + esc(r.n) + ' · ' + r.v + ' pts'; }).join('<br>') || '—') + '<br><span class="lf-soft">' + L2('Pit stop record: ', 'Record aux stands : ') + (f1e().ps ? (f1e().ps/1000).toFixed(1) + ' s' : '—') + ' · ' + L2('stop in the yellow PIT box on the main straight', 'arrête-toi dans la zone jaune PIT de la ligne droite') + '</span></div>'); } catch(e){} };
 
 var _f1ResultsX = f1Results; f1Results = function(){ if(F1X.ai.length || F1X.myFin) return; return _f1ResultsX.apply(this, arguments); };
+
+/* ---------- 🔓 FREE REALLY MEANS FREE: when Madame/Daniel presses "free", the student is released for good, even if they are
+   offline, refresh, or their old records come back from another copy. A "free" stamp beats every jail record older than it;
+   only a NEW jail (after the stamp) counts. The jail list only shows students who are really still jailed. ---------- */
+var JFX = {mine:null, loaded:false, on:false};
+function jfxMyAt(){ var at = 0, m = net.members && net.members[net.uid]; [m && m.jail, mod.jail && mod.jail[net.uid], jail.all[net.uid]].forEach(function(r){ if(r && typeof r === 'object') at = Math.max(at, r.at || 0); }); try { at = Math.max(at, parseInt(localStorage.getItem('paris.jailAt'), 10) || 0); } catch(e){} return at; }
+function jfxVoided(){ var f = JFX.mine || (JF.all && JF.all[net.uid]); return !!(f && (f.at || 0) >= jfxMyAt()); }
+setInterval(function(){ if(!net.db || !net.uid || isStaff()) return;
+  if(!JFX.on){ JFX.on = true; try { net.db.ref('paris/mod/jfree/' + net.uid).on('value', function(s){ JFX.mine = s.val(); JFX.loaded = true; }, function(){ JFX.on = false; }); } catch(e){ JFX.on = false; } return; }
+  if(!JFX.loaded) { JF.justFreed = true; return; }   // never re-jail yourself before we know whether Madame freed you
+  if(!jfxVoided()){ if(Date.now() > (JFX.freedAt || 0) + 20000) JF.justFreed = false; return; }
+  { JF.justFreed = true; var stillIn = jail.local || jail.all[net.uid] || (typeof amJailed === 'function' && amJailed());
+    if(stillIn){ JFX.freedAt = Date.now(); try { jfFreeMe(JFX.mine || JF.all[net.uid]); } catch(e){} jail.local = false; delete jail.all[net.uid]; try { localStorage.removeItem('paris.jail'); localStorage.removeItem('paris.jailAt'); } catch(e){} try { net.db.ref('paris/owners/' + net.uid + '/jail').remove().catch(function(){}); } catch(e){} } }
+}, 2000);
+/* the anti-refresh rule must not fight a release */
+var _amJailedJFX = amJailed; amJailed = function(){ if(!isStaff() && JFX.loaded && jfxVoided()) return false; return _amJailedJFX.apply(this, arguments); };
+/* staff: the list only shows students who are really jailed; voided records are cleaned up */
+var _jailedListJFX = jailedList; jailedList = function(){ return _jailedListJFX.apply(this, arguments).filter(function(u){ var f = JF.all && JF.all[u]; if(!f) return true; var at = 0, m = net.members && net.members[u]; [m && m.jail, mod.jail && mod.jail[u], jail.all && jail.all[u]].forEach(function(r){ if(r && typeof r === 'object') at = Math.max(at, r.at || 0); }); if(at > (f.at || 0)) return true; if(isStaff() && net.db){ try { if(mod.jail && mod.jail[u]){ delete mod.jail[u]; net.db.ref('paris/mod/jail/' + u).remove().catch(function(){}); } if(jail.all && jail.all[u]){ net.db.ref('paris/owners/' + u + '/jail').remove().catch(function(){}); } } catch(e){} } return false; }); };
+var _releaseUidJFX = releaseUid; releaseUid = function(uid){ var p = _releaseUidJFX.apply(this, arguments); try { if(jail.all) delete jail.all[uid]; if(mod.jail) delete mod.jail[uid]; } catch(e){} return p; };
+/* "free everyone": also frees anyone whose record is in the members list only */
 
 /* ---------- 🛡 BLACK-SCREEN GUARD: before every frame, anything that would draw a black world (NaN sun / sky / fog / lights / camera)
    is repaired on the spot; a frame that throws is retried; and a self-check at start-up proves the core globals are intact. ---------- */
