@@ -20004,13 +20004,15 @@ GACT.dark = function(){ darkToggle.click(); showToast((darkMode ? '🌙 ' : '☀
 var CULL = {t:0, k:1, v:new THREE.Vector3(), list:null, at:0};
 function cullK(){ return GFX.mode === 'fast' ? 0.65 : GFX.mode === 'pretty' ? 1.6 : 1; }
 function cullScan(){ var L = []; scene.traverse(function(o){ if(!(o.isMesh || o.isSprite || o.isPoints || o.isLine) || !o.geometry) return; if(!o.geometry.boundingSphere) o.geometry.computeBoundingSphere(); var bs = o.geometry.boundingSphere; if(!bs || !isFinite(bs.radius)) return; L.push(o); }); CULL.list = L; CULL.at = performance.now(); }
-function cullTick(dt){ CULL.t += dt; if(CULL.t < 0.3) return; CULL.t = 0; if(!CULL.list || performance.now() - CULL.at > 4000) cullScan();
-  var cp = camera.position, k = cullK(), v = CULL.v, inside = !!(typeof INT !== 'undefined' && INT.cur), fly = !flying, up = Math.max(0, cp.y - 30);
-  for(var i=0;i<CULL.list.length;i++){ var o = CULL.list[i]; if(!o.parent || !o.geometry){ continue; } if(!o.geometry.boundingSphere){ try { o.geometry.computeBoundingSphere(); } catch(e){} if(!o.geometry.boundingSphere || !isFinite(o.geometry.boundingSphere.radius)) continue; } var bs = o.geometry.boundingSphere, s = o.matrixWorld.elements, sc = Math.max(Math.hypot(s[0], s[1], s[2]), Math.hypot(s[8], s[9], s[10]), Math.hypot(s[4], s[5], s[6])), r = bs.radius*sc;
+function cullTick(dt){ if(!CULL.list || performance.now() - CULL.at > 6000){ cullScan(); CULL.i = 0; }
+  // a slice of the objects each frame (no big hitch every 0.3 s)
+  var cp = camera.position, k = cullK(), v = CULL.v, fly = !flying, up = Math.max(0, cp.y - 30), L = CULL.list, n = Math.min(L.length, 900), start = CULL.i || 0;
+  for(var j=0;j<n;j++){ var i = (start + j) % L.length, o = L[i]; if(!o.parent || !o.geometry) continue; if(!o.geometry.boundingSphere){ try { o.geometry.computeBoundingSphere(); } catch(e){} if(!o.geometry.boundingSphere || !isFinite(o.geometry.boundingSphere.radius)) continue; }
+    var bs = o.geometry.boundingSphere, s = o.matrixWorld.elements, sc = Math.max(Math.hypot(s[0], s[1], s[2]), Math.hypot(s[8], s[9], s[10]), Math.hypot(s[4], s[5], s[6])), r = bs.radius*sc;
     if(r > 120 || o.userData.noCull){ if(o.layers.mask === 2) o.layers.set(0); continue; }
     v.copy(bs.center).applyMatrix4(o.matrixWorld); var d = v.distanceTo(cp) - r, lim = k*(70 + r*24) + up*2; if(fly) lim *= 1.6;
-    var hide = d > lim; if(hide && o.layers.mask === 1) o.layers.set(1); else if(!hide && o.layers.mask === 2) o.layers.set(0); } }
-/* the player list (and the title card it lives in) can be folded away */
+    var hide = d > lim; if(hide && o.layers.mask === 1) o.layers.set(1); else if(!hide && o.layers.mask === 2) o.layers.set(0); }
+  CULL.i = (start + n) % Math.max(1, L.length); }
 (function(){ var css = document.createElement('style'); css.textContent = '#players{pointer-events:auto}#players .players-head{cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px}#players .players-head .pl-fold{margin-left:auto;font-size:10px;opacity:.8}#players.pl-min #players-list{display:none}#title-card.tc-play p[data-t="tagline"]{display:none}#title-card.tc-play h1{font-size:14px;margin:0}#title-card.tc-play{padding:8px 10px}#title-card.tc-play.pl-min-card #players{margin-top:4px;padding-top:4px}#hint-bar.hint-fade,.hint-fade{opacity:0!important;transition:opacity .8s;pointer-events:none}';
   document.head.appendChild(css);
   var P = document.getElementById('players'), H = P && P.querySelector('.players-head'); if(!H) return; var f = document.createElement('span'); f.className = 'pl-fold'; H.appendChild(f);
@@ -20306,7 +20308,7 @@ GACT.spda = function(v){ var ok = (v|0) === SPD.q.ans; SPD.cool = Date.now() + (
   showCard('<h3>🏎</h3><div class="gc-big ' + (ok ? 'good' : 'bad') + '">' + (ok ? '✓ ' + L2('LEVEL UP! ', 'NIVEAU SUPÉRIEUR ! ') + '×' + spdMul() : '✗ ' + esc(SPD.q.opts[SPD.q.ans])) + '</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); };
 (function(){ var G = BAR_GROUPS.filter(function(g){ return g.id === 'snd'; })[0]; if(!G || !G.d) return; var x = document.createElement('button'); x.className = 'bar-btn'; x.innerHTML = '<span>🏎</span><span class="dl">' + esc(L2('Vehicle speed (French question)', 'Vitesse des véhicules (question)')) + '</span>'; x.addEventListener('click', function(){ closeDrops(); GACT.spd(); }); G.d.insertBefore(x, G.d.firstChild); })();
 /* ---------- 🔄 FORCED UPDATES: every open game checks for a newer version every minute and reloads itself (after saving) ---------- */
-var BUILD_ID = '1795715992';
+var BUILD_ID = '1795740459';
 (function(){ var busy = false; function check(){ if(busy || document.hidden) return; busy = true; fetch(location.href.split('#')[0], {cache:'no-store'}).then(function(r){ return r.ok ? r.text() : ''; }).then(function(t){ busy = false; var m = /var BUILD_ID = '([^']+)'/.exec(t || ''); if(m && m[1] !== BUILD_ID && m[1] !== '__' + 'BUILD__') upd(); }).catch(function(){ busy = false; }); }
   function upd(){ if(upd.on) return; upd.on = true; try { if(typeof lifeSave === 'function') lifeSave(true); } catch(e){} var n = 10, d = document.createElement('div'); d.style.cssText = 'position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);z-index:99999;background:#16245c;color:#fff;padding:18px 24px;border-radius:14px;font:700 18px Arial,sans-serif;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.5)'; document.body.appendChild(d);
     (function tick(){ d.innerHTML = '🔄 ' + L2('New update from Madame! The game reloads in ', 'Nouvelle mise à jour ! Le jeu redémarre dans ') + n + ' s'; if(n-- <= 0){ location.reload(); return; } setTimeout(tick, 1000); })(); }
@@ -20929,7 +20931,6 @@ function fpBuildArms(){ var e = hasChar() ? life.eco : null, ch = e && e.ch || {
 function fpTick(dt){ var on = fpWalk(); if(on) fpBuildArms(); if(FP.arms) FP.arms.visible = on && !document.body.classList.contains('photo-mode');
   // field of view: 72° walking in first person; 62° inside a car; 45° otherwise
   var want = on ? 72 : (typeof insideView === 'function' && insideView() ? 62 : 45); if(Math.abs(camera.fov - want) > 0.05){ camera.fov += (want - camera.fov)*Math.min(1, dt*8); if(Math.abs(camera.fov - want) < 0.1) camera.fov = want; camera.updateProjectionMatrix(); }
-  var nearW = on ? 0.1 : 0.3; if(camera.near !== nearW){ camera.near = nearW; camera.updateProjectionMatrix(); }
   if(!on || !FP.arms) return; var moving = keyFwd() || keyBack() || keyLeft() || keyRight() || stickAmount() > STICK_DEAD; FP.t += dt*(moving ? (CROUCH && CROUCH.on ? 6 : 10) : 1.5);
   var dy = Math.atan2(Math.sin(yaw - FP.lastYaw), Math.cos(yaw - FP.lastYaw)); FP.lastYaw = yaw; FP.sway += (Math.max(-0.08, Math.min(0.08, dy*1.5)) - FP.sway)*Math.min(1, dt*8);
   FP.arms.children.forEach(function(a){ var sd = a.userData.sd, b = moving ? Math.sin(FP.t + (sd > 0 ? 0 : Math.PI))*0.018 : Math.sin(FP.t)*0.004; a.position.set(sd*0.3 + FP.sway, -0.33 + b - (CROUCH && CROUCH.on ? 0.02 : 0), -0.62 + (moving ? Math.cos(FP.t)*0.01 : 0)); }); }
@@ -21206,6 +21207,72 @@ function pingDraw(){ var c = document.getElementById('ping-c'); if(!c) return; v
   [[-1.2, -0.6], [1.2, -0.6], [-1.2, 0.6], [1.2, 0.6]].forEach(function(p){ L.box(0.06, 0.74, 0.06, p[0], 0.37, p[1], 0x2a2d32); }); [[-1.6, 0.3], [1.6, -0.3]].forEach(function(p){ L.box(0.03, 0.18, 0.16, p[0], 0.82, p[1], 0xc8382f); L.cyl(0.08, 0.08, 0.02, p[0], 0.95, p[1], 0xc8382f, 14); }); L.part(new THREE.SphereGeometry(0.02, 10, 8), 0.4, 0.9, 0.2, 0xffffff); B.build(); addSolid(X - 1.4, X + 1.4, Z - 0.8, Z + 0.8, 'champs', -1, 0.9);
   airSign('🏓 PING-PONG · 2 / 4 JOUEURS', X, 2.6, Z - 1.4, 0, 5, '#1f5fa0'); addSpot({x:X, z:Z + 1.8, r:2.6, label:function(){ var n = pingPeers().length; return '🏓 ' + L2('Play ping-pong (2 or 4 players)', 'Jouer au ping-pong (2 ou 4 joueurs)') + (n ? ' · ' + n + L2(' playing', ' en jeu') : ''); }, act:function(){ GACT.pinglobby(); }});
   tag(X, 1, Z, 'la table de ping-pong', 'the ping-pong table', 1.4); tag(X - 1.6, 1, Z + 0.3, 'la raquette', 'the paddle', 0.4); tag(X, 1.1, Z, 'le filet', 'the net', 0.8); })();
+/* ---------- 🧭 MINIMAP: a round map in the corner that turns with you (your direction is always up): streets, you, other
+   players, metro stations and nearby places. Click it for the big map; the – button hides it. ---------- */
+var MINI = {on:true, R:80, scale:1.4, cv:null, t:0};
+try { MINI.on = localStorage.getItem('paris.mini') !== '0'; } catch(e){}
+(function(){ var w = document.createElement('div'); w.id = 'minimap'; w.style.cssText = 'position:fixed;right:12px;top:calc(112px + env(safe-area-inset-top,0px));z-index:30;width:170px;height:170px;border-radius:50%;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.45);border:3px solid rgba(255,255,255,.85);background:#cfe0c4;cursor:pointer;display:none';
+  var c = document.createElement('canvas'); c.width = 340; c.height = 340; c.style.cssText = 'width:100%;height:100%'; w.appendChild(c); document.body.appendChild(w); MINI.cv = c; MINI.wrap = w;
+  var b = document.createElement('button'); b.className = 'bar-btn'; b.textContent = '🧭'; b.title = L2('Show / hide the minimap', 'Afficher / cacher la mini-carte'); b.style.cssText = 'position:fixed;right:14px;top:calc(112px + env(safe-area-inset-top,0px));z-index:31;font-size:12px;padding:3px 6px;display:none'; document.body.appendChild(b); MINI.btn = b;
+  b.addEventListener('click', function(e){ e.stopPropagation(); MINI.on = !MINI.on; try { localStorage.setItem('paris.mini', MINI.on ? '1' : '0'); } catch(x){} });
+  w.addEventListener('click', function(e){ e.stopPropagation(); e.preventDefault(); setTimeout(function(){ try { openMap(); } catch(x){} }, 30); }); w.addEventListener('mousedown', function(e){ e.stopPropagation(); });
+  var st = document.createElement('style'); st.textContent = '@media (max-width:700px){#minimap{width:120px !important;height:120px !important}}'; document.head.appendChild(st); })();
+function miniTick(){ var show = flying && MINI.on && !(INT && INT.cur); MINI.wrap.style.display = show ? '' : 'none'; MINI.btn.style.display = flying ? '' : 'none'; MINI.btn.style.top = show ? 'calc(290px + env(safe-area-inset-top,0px))' : 'calc(112px + env(safe-area-inset-top,0px))'; if(!show) return;
+  var now = performance.now(); if(now - MINI.t < 90) return; MINI.t = now;
+  var k = MINI.cv.getContext('2d'), W = 340, C = W/2, S = MINI.scale*(driving || (ride && ride.on) ? 0.75 : 1), px = driving ? carPos.x : ride && ride.on ? ride.px : camera.position.x, pz = driving ? carPos.z : ride && ride.on ? ride.pz : camera.position.z, h = driving ? carYaw : ride && ride.on ? ride.h : yaw, cs = Math.cos(h), sn = Math.sin(h);
+  function P(x, z){ var dx = (x - px)*S, dz = (z - pz)*S; return [C + dx*cs - dz*sn, C + dx*sn + dz*cs]; }
+  k.fillStyle = '#d8e6c8'; k.fillRect(0, 0, W, W);
+  // the streets
+  k.strokeStyle = '#7a7d86'; k.lineCap = 'round'; k.lineWidth = ROAD_HALF*2*S; STREETS.forEach(function(s){ var a = s.v === 1 ? P(s.at, s.a) : P(s.a, s.at), b = s.v === 1 ? P(s.at, s.b) : P(s.b, s.at); if(Math.max(Math.abs(a[0] - C), Math.abs(b[0] - C), Math.abs(a[1] - C), Math.abs(b[1] - C)) > 3000) return; k.beginPath(); k.moveTo(a[0], a[1]); k.lineTo(b[0], b[1]); k.stroke(); });
+  // the Seine / water if near, the Monaco track
+  if(typeof MC !== 'undefined' && MC.P && Math.abs(px - MC.x - 130) < 600 && Math.abs(pz - MC.z) < 600){ k.strokeStyle = '#4a4a50'; k.lineWidth = MC.W*S; k.beginPath(); MC.P.forEach(function(p, i){ var q = P(p.x, p.z); if(i) k.lineTo(q[0], q[1]); else k.moveTo(q[0], q[1]); }); k.closePath(); k.stroke(); }
+  // places + metro
+  k.font = 'bold 22px sans-serif'; k.textAlign = 'center'; k.textBaseline = 'middle'; (EXTRA_PLACES || []).forEach(function(e){ var q = P(e[3], e[4]); if(Math.hypot(q[0] - C, q[1] - C) < C - 14) k.fillText(e[0], q[0], q[1]); });
+  if(typeof MS !== 'undefined') Object.keys(MS).forEach(function(id){ var s = MS[id], q = P(s.x, s.z); if(Math.hypot(q[0] - C, q[1] - C) < C - 12){ k.fillStyle = '#ffcd00'; k.beginPath(); k.arc(q[0], q[1], 9, 0, 7); k.fill(); k.fillStyle = '#16245c'; k.font = 'bold 13px sans-serif'; k.fillText('M', q[0], q[1] + 1); k.font = 'bold 22px sans-serif'; } });
+  // other players
+  (mp && mp.others || []).forEach(function(p){ var s = p.presence; if(!s || !finite(s.x)) return; var q = P(s.x, s.z); if(Math.hypot(q[0] - C, q[1] - C) > C - 8) return; k.fillStyle = '#ff4a6a'; k.strokeStyle = '#fff'; k.lineWidth = 3; k.beginPath(); k.arc(q[0], q[1], 8, 0, 7); k.fill(); k.stroke(); });
+  // you (an arrow pointing up) + north
+  k.fillStyle = '#1f5fd0'; k.strokeStyle = '#fff'; k.lineWidth = 4; k.beginPath(); k.moveTo(C, C - 18); k.lineTo(C + 12, C + 13); k.lineTo(C, C + 6); k.lineTo(C - 12, C + 13); k.closePath(); k.fill(); k.stroke();
+  var nx = C + Math.sin(h)*(C - 22), ny = C - Math.cos(h)*(C - 22);   // north (-z) on the turning map
+  k.fillStyle = 'rgba(255,255,255,.9)'; k.beginPath(); k.arc(nx, ny, 15, 0, 7); k.fill(); k.fillStyle = '#c8382f'; k.font = 'bold 20px sans-serif'; k.fillText('N', nx, ny + 1); }
+
+/* ---------- ⚡ FREEZE WHAT DOESN'T MOVE: 11 000 objects used to have their matrix rebuilt every frame (4-5 ms on a laptop).
+   Objects that stay still are frozen; twice a second we check, and anything that moved is unfrozen right away. ---------- */
+var FRZ = {list:[], snap:[], i:0, t:0};
+function frzKey(o){ var p = o.position, q = o.quaternion, s = o.scale; return p.x + p.y*7 + p.z*13 + q.x*17 + q.y*19 + q.z*23 + q.w*29 + s.x*31 + s.y*37 + s.z*41; }
+function frzScan(){ scene.updateMatrix(); scene.matrixAutoUpdate = false; scene.matrixWorldNeedsUpdate = false; FRZ.list = []; FRZ.snap = []; scene.traverse(function(o){ if(o === scene || o === camera || o.isCamera || o.isLight || (o.parent && o.parent.isCamera)) return; FRZ.list.push(o); FRZ.snap.push(frzKey(o)); }); FRZ.stable = new Uint8Array(FRZ.list.length); }
+function frzTick(dt){ FRZ.t += dt; if(!FRZ.list.length || FRZ.t > 8){ FRZ.t = 0; frzScan(); return; }
+  var L = FRZ.list, n = Math.min(L.length, 2600);
+  for(var j=0;j<n;j++){ var i = (FRZ.i + j) % L.length, o = L[i], kk = frzKey(o);
+    if(kk !== FRZ.snap[i]){ FRZ.snap[i] = kk; FRZ.stable[i] = 0; if(!o.matrixAutoUpdate){ o.matrixAutoUpdate = true; } }
+    else if(FRZ.stable[i] < 3){ FRZ.stable[i]++; if(FRZ.stable[i] === 3 && o.matrixAutoUpdate){ o.updateMatrix(); o.matrixAutoUpdate = false; } } }
+  FRZ.i = (FRZ.i + n) % L.length; }
+/* ---------- 🔺 THE LOUVRE PYRAMID IS A RAMP: drive (or walk, skate, bike) up any face and fly off the top ---------- */
+var PYR = {x:47, z:131, h:14, hx:12*Math.SQRT1_2};
+var PYRS = [PYR, {x:47 - 28, z:131, h:4, hx:3.4*Math.SQRT1_2}, {x:47 + 28, z:131, h:4, hx:3.4*Math.SQRT1_2}];
+(function(){ var L = solidsByOwner['static'] || []; PYRS.forEach(function(P){ for(var i=L.length - 1;i>=0;i--){ var b = L[i], cx = (b.x0 + b.x1)/2, cz = (b.z0 + b.z1)/2; if(Math.abs(cx - P.x) < 0.1 && Math.abs(cz - P.z) < 0.1 && b.x1 - b.x0 < P.hx*2 + 2){ for(var gi = Math.floor(b.x0/SOLID_CELL); gi <= Math.floor(b.x1/SOLID_CELL); gi++) for(var gj = Math.floor(b.z0/SOLID_CELL); gj <= Math.floor(b.z1/SOLID_CELL); gj++){ var cell = solidGrid[solidKey(gi, gj)]; if(cell){ var at = cell.indexOf(b); if(at >= 0) cell.splice(at, 1); } } L.splice(i, 1); } } });
+  for(var k=segColliders.length - 1;k>=0;k--){ var c = segColliders[k]; if(Math.abs(c.ax - PYR.x) < PYR.hx + 1 && Math.abs(c.az - PYR.z) < PYR.hx + 1 && Math.abs(c.bx - PYR.x) < PYR.hx + 1 && Math.abs(c.bz - PYR.z) < PYR.hx + 1) segColliders.splice(k, 1); } })();
+function pyrY(x, z){ var best = -1e9; for(var i=0;i<PYRS.length;i++){ var P = PYRS[i], m = Math.max(Math.abs(x - P.x), Math.abs(z - P.z)); if(m < P.hx){ var y = P.h*(1 - m/P.hx); if(y > best) best = y; } } return best; }
+var _rampAtPY = rampAt; rampAt = function(x, z){ var r = _rampAtPY(x, z), py = pyrY(x, z); if(py > -1e8 && (!r || py > r.y)) return {y:py, slope:0.95, pyr:true}; return r; };
+var _surfaceAtPY = surfaceAt; surfaceAt = function(x, z, curY){ var g = _surfaceAtPY(x, z, curY), py = pyrY(x, z); return py > g ? py : g; };
+tag(PYR.x, 15, PYR.z, 'la pyramide du Louvre (un tremplin !)', 'the Louvre pyramid (a ramp!)', 3);
+/* ---------- 🏁 LE GRAND PRIX DE PARIS: a street circuit through the city (Champs-Élysées, Bd Saint-Germain, Rue Mouffetard,
+   Rue de Vaugirard), 12 gates, lap timer, best-lap leaderboard. Any car. ---------- */
+var PGP = {on:false, gates:[], next:0, t0:0, lap:0, best:0, hud:null, arches:[]};
+(function(){ var pts = [[0, -76], [94, -76], [188, -76], [188, 0], [188, 76], [188, 152], [94, 152], [0, 152], [-94, 152], [-188, 152], [-188, 76], [-188, 0], [-188, -76], [-94, -76]];
+  pts.forEach(function(p, i){ var q = pts[(i + 1) % pts.length], along = Math.abs(q[0] - p[0]) > Math.abs(q[1] - p[1]); PGP.gates.push({x:p[0], z:p[1], alongX:along});
+    var g = new THREE.Group(), col = i === 0 ? 0xffffff : 0xc8382f, M = solidMat(col); [-1, 1].forEach(function(sd){ var post = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 6, 14), M); post.position.set(sd*(ROAD_HALF + 0.8), 3, 0); g.add(post); }); var top = new THREE.Mesh(new THREE.BoxGeometry(ROAD_HALF*2 + 2.4, 1, 0.8), solidMat(i === 0 ? 0x1b1b1d : 0xffd23a)); top.position.y = 6.2; g.add(top);
+    g.position.set(p[0], 0, p[1]); g.rotation.y = along ? Math.PI/2 : 0; root.add(g); PGP.arches.push(top); [-1, 1].forEach(function(sd){ var px = p[0] + (along ? 0 : sd*(ROAD_HALF + 0.8)), pz = p[1] + (along ? sd*(ROAD_HALF + 0.8) : 0); pushSegCollider(px, pz, px, pz, 0.5, -50, 6); }); });
+  airSign('🏁 GRAND PRIX DE PARIS · DÉPART / ARRIVÉE', 0, 7.5, -76.5, 0, 12, '#1b1b1d');
+  addSpot({x:-14, z:-82, r:4, label:function(){ return '🏁 ' + L2('Grand Prix de Paris: street race (best lap)', 'Grand Prix de Paris : course en ville (meilleur tour)'); }, act:function(){ GACT.pgp(); }});
+  EXTRA_PLACES.push(['🏁', 'Le Grand Prix de Paris (circuit en ville)', L2('Street circuit, 14 gates, best-lap board · the Louvre pyramid is a ramp!', 'Circuit en ville, 14 portes, meilleurs tours · la pyramide du Louvre est un tremplin !'), -14, -86, 0]);
+  PGP.hud = document.createElement('div'); PGP.hud.style.cssText = 'position:fixed;left:50%;top:calc(60px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:32;background:rgba(15,20,40,.82);color:#fff;font:700 16px Arial,sans-serif;padding:8px 16px;border-radius:12px;display:none'; document.body.appendChild(PGP.hud); })();
+GACT.pgp = function(){ var all = life.all || {}, rows = Object.keys(all).map(function(k){ var x = all[k] && all[k].pgp; return x && x.b ? {n:(all[k].ch && all[k].ch.fn) || memberName(k), v:x.b} : null; }).filter(Boolean).sort(function(a, b){ return a.v - b.v; }).slice(0, 8);
+  showCard('<h3>🏁 ' + L2('GRAND PRIX DE PARIS', 'LE GRAND PRIX DE PARIS') + '</h3><div class="gc-text" style="text-align:left">' + L2('A street circuit through Paris: drive through the 14 gates in order (the yellow one blinks). Any car works · upgrades at the garage help · traffic lights are only advice here.', 'Un circuit en ville : passe les 14 portes dans l\'ordre (la jaune clignote). N\'importe quelle voiture · les améliorations du garage aident · les feux ne sont que des conseils.') + '</div><div class="gc-text" style="text-align:left"><b>⏱ ' + L2('Fastest laps', 'Meilleurs tours') + '</b><br>' + (rows.length ? rows.map(function(r, i){ return (['🥇', '🥈', '🥉'][i] || (i + 1) + '.') + ' ' + esc(r.n) + ' · ' + fmtT(r.v); }).join('<br>') : '—') + '</div><div class="gc-row">' + gBtn('pgpgo', null, '🏁 ' + L2('START', 'DÉPART'), 'go') + gBtn('close', null, 'OK') + '</div>'); };
+GACT.pgpgo = function(){ closeCard(); if(!(flying && driving)){ goTo({x:-14, z:-76, yaw:-Math.PI/2}); requestFirstPerson('drive'); } setTimeout(function(){ carPos.set(-14, 0, -76); carYaw = -Math.PI/2; camBase = yaw = carYaw; driveSpeed = 0; PGP.on = true; PGP.next = 1; PGP.lap = 0; PGP.t0 = performance.now(); PGP.hud.style.display = ''; say('Trois, deux, un, partez !'); }, 300); };
+function pgpTick(dt){ var t = performance.now()/1000; PGP.arches.forEach(function(a, i){ a.material.color.setHex(PGP.on && i === PGP.next ? (Math.sin(t*8) > 0 ? 0xffd23a : 0xff7f00) : i === 0 ? 0x1b1b1d : 0x8a8f98); }); if(!PGP.on) return; if(!(flying && driving)){ PGP.on = false; PGP.hud.style.display = 'none'; return; }
+  var g = PGP.gates[PGP.next]; if(Math.hypot(carPos.x - g.x, carPos.z - g.z) < ROAD_HALF + 3){ try { playNotes([[84, 0.06]], 'square', 0.06, 60); } catch(e){} if(PGP.next === 0){ var lt = performance.now() - PGP.t0, e = hasChar() ? life.eco : null; PGP.lap++; PGP.t0 = performance.now(); if(e){ e.pgp = e.pgp || {}; var pb = !e.pgp.b || lt < e.pgp.b; if(pb){ e.pgp.b = Math.round(lt); lifeSave(true); } showToast('🏁 ' + L2('Lap ', 'Tour ') + PGP.lap + ' · ' + fmtT(lt) + (pb ? ' · 🏆 ' + L2('best!', 'record !') : '')); say((pb ? 'Nouveau record ! ' : '') + 'Tour ' + PGP.lap + '.'); } } PGP.next = (PGP.next + 1) % PGP.gates.length; }
+  var e2 = hasChar() ? life.eco : null; PGP.hud.innerHTML = '🏁 GP Paris · ' + L2('gate ', 'porte ') + (PGP.next === 0 ? PGP.gates.length : PGP.next) + '/' + PGP.gates.length + ' · ⏱ ' + fmtT(performance.now() - PGP.t0) + (e2 && e2.pgp && e2.pgp.b ? ' · 🏆 ' + fmtT(e2.pgp.b) : '') + ' · ' + Math.round(Math.abs(driveSpeed)*3.6) + ' km/h'; }
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
@@ -21782,7 +21849,7 @@ function animate(){
   updateSpeedo();
   lifeTick(dt);
   jailTick();
-  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt); ambTrainTick(dt); wearOthersTick(); jamTick(); pkTick(dt); bumpTick(dt); cullTick(dt); rigTick(dt); crouchTick(dt); metroTick(dt); copTick(dt); specTick(); msprTick(dt); haloTick(dt); nitroTick(dt); f1Tick(dt); shadowTick(); rdTick(); poolTick(); tlTick(dt); tcarsTick(dt); fpTick(dt); hoverEdgeTick(dt);
+  qcTick(dt); stadiumTick(); zooTick(dt); petsTick(dt); radioTick(); interiorTick(dt); browseTick(); concertTick(); musicAreaTick(); npcTick(); groceryTick(); pleaPanelTick(); pleaSelfTick(); pickTick(); cafeTick(dt); aeTick(dt); playTick(dt || 0.016); picnicTick(dt); ambTrainTick(dt); wearOthersTick(); jamTick(); pkTick(dt); bumpTick(dt); cullTick(dt); rigTick(dt); crouchTick(dt); metroTick(dt); copTick(dt); specTick(); msprTick(dt); haloTick(dt); nitroTick(dt); f1Tick(dt); shadowTick(); rdTick(); poolTick(); tlTick(dt); tcarsTick(dt); fpTick(dt); hoverEdgeTick(dt); miniTick(); frzTick(dt); pgpTick(dt);
   if(!ICE.t || performance.now() - ICE.t > 1000){ ICE.t = performance.now(); if(Math.hypot(camera.position.x - QC.x, camera.position.z - QC.z) < 800) iceSync(); }
   villageTick();
   sendPresence(false);
