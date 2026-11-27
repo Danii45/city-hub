@@ -17920,9 +17920,9 @@ function appInstall(){
   if(APP.standalone){ document.documentElement.classList.add('as-app'); }
   /* phones held upright: ask to turn sideways */
   var rot = document.createElement('div'); rot.id = 'rotate-tip'; rot.innerHTML = '<div style="font-size:64px">📱↻</div><div>' + L2('Turn your phone sideways to play', 'Tourne ton téléphone à l\'horizontale pour jouer') + '</div>'; rot.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#1f3f8f;color:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;font:14px "Press Start 2P",monospace;text-align:center;padding:20px'; document.body.appendChild(rot);
-  function chk(){ var portrait = innerHeight > innerWidth*1.1; rot.style.display = mobile && portrait && flying ? 'flex' : 'none'; }
+  function chk(){ var portrait = innerHeight > innerWidth*1.1; rot.style.display = mobile && portrait && flying && !window.ROT_OK ? 'flex' : 'none'; }
   addEventListener('resize', chk); addEventListener('orientationchange', function(){ setTimeout(chk, 300); }); setInterval(chk, 1500);
-  rot.addEventListener('click', function(){ rot.style.display = 'none'; });
+  rot.addEventListener('click', function(){ window.ROT_OK = true; rot.style.display = 'none'; }); rot.insertAdjacentHTML('beforeend', '<div style="margin-top:22px;padding:12px 18px;border:2px solid #fff;border-radius:14px;font-size:15px">' + L2('…or TAP HERE to play upright', '…ou TOUCHE ICI pour jouer à la verticale') + '</div>');
   if(mobile && screen.orientation && screen.orientation.lock && APP.standalone){ try { screen.orientation.lock('landscape').catch(function(){}); } catch(e){} }
 })();
 /* ---------- 👕 REAL CLOTHES YOU WEAR (3D, on your character, seen by everyone) ---------- */
@@ -20563,7 +20563,7 @@ GACT.spda = function(v){ var ok = (v|0) === SPD.q.ans; SPD.cool = Date.now() + (
   showCard('<h3>🏎</h3><div class="gc-big ' + (ok ? 'good' : 'bad') + '">' + (ok ? '✓ ' + L2('LEVEL UP! ', 'NIVEAU SUPÉRIEUR ! ') + '×' + spdMul() : '✗ ' + esc(SPD.q.opts[SPD.q.ans])) + '</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); };
 (function(){ var G = BAR_GROUPS.filter(function(g){ return g.id === 'snd'; })[0]; if(!G || !G.d) return; var x = document.createElement('button'); x.className = 'bar-btn'; x.innerHTML = '<span>🏎</span><span class="dl">' + esc(L2('Vehicle speed (French question)', 'Vitesse des véhicules (question)')) + '</span>'; x.addEventListener('click', function(){ closeDrops(); GACT.spd(); }); G.d.insertBefore(x, G.d.firstChild); })();
 /* ---------- 🔄 FORCED UPDATES: every open game checks for a newer version every minute and reloads itself (after saving) ---------- */
-var BUILD_ID = '1795792050';
+var BUILD_ID = '1795792060';
 (function(){ var busy = false; function check(){ if(busy || document.hidden) return; busy = true; fetch(location.href.split('#')[0], {cache:'no-store'}).then(function(r){ return r.ok ? r.text() : ''; }).then(function(t){ busy = false; var m = /var BUILD_ID = '([^']+)'/.exec(t || ''); if(m && m[1] !== BUILD_ID && m[1] !== '__' + 'BUILD__') upd(); }).catch(function(){ busy = false; }); }
   function creating(){ try { return !!editing || builder.on || decor.on || blk.on; } catch(e){ return false; } }
   function upd(){ if(upd.on) return;
@@ -22799,6 +22799,33 @@ function dqOpenLc(k){ var pre = {oral:'s-', read:'r-', write:'w-'}[k], cat = {or
 var _dqGoM = dqGo; dqGo = function(t){ var k = t && t.k; if(k === 'lc2' || k === 'read' || k === 'oral' || k === 'write'){ closeCard(); var A = dqFindInt('apprendre'); if(A && !(INT.cur && INT.cur.id === 'apprendre')){ enterInterior(A); setTimeout(function(){ dqOpenLc(k); }, 1700); } else dqOpenLc(k); showToast('🧭 ' + L2('Let\'s go! Your task is opening...', 'C\'est parti ! Ta tâche s\'ouvre...')); return; }
   var r = _dqGoM.apply(this, arguments); if(t && t.p) showToast('🧭 ' + L2('Taking you there...', 'Je t\'y emmène...')); return r; };
 var _rsmRestoreM = rsmRestore; rsmRestore = function(){ var r = _rsmRestoreM.apply(this, arguments); setTimeout(function(){ try { var p = lcGetProg(), T = p && LCT_BY[p.id]; if(T && !lcDone(T.id) && INT.cur && INT.cur.id === 'apprendre' && gcard.el.classList.contains('hidden')) GACT.lcgo(T.id); } catch(e){} }, 2600); return r; };
+
+/* ---------- 📱 PHONES 2.0: everything playable on a phone (portrait or landscape) ---------- */
+(function(){ var st = document.createElement('style'); st.textContent =
+  'button,.btn,[data-g]{touch-action:manipulation;-webkit-tap-highlight-color:transparent}' +
+  'body.touch-play #minimap{top:auto !important;bottom:calc(150px + env(safe-area-inset-bottom,0px)) !important;right:auto !important;left:calc(10px + env(safe-area-inset-left,0px)) !important;width:96px !important;height:96px !important;opacity:.9}' +
+  '@media (max-height:500px){body.touch-play #minimap{bottom:auto !important;top:calc(96px + env(safe-area-inset-top,0px)) !important;width:84px !important;height:84px !important}}' +
+  '@media (max-width:600px){#top-bar{flex-wrap:nowrap !important;overflow-x:auto !important;-webkit-overflow-scrolling:touch;max-width:calc(100vw - 16px) !important;scrollbar-width:none}#top-bar::-webkit-scrollbar{display:none}#top-bar>*{flex:0 0 auto}}' +
+  '@media (max-width:700px),(max-height:500px){#g-card{max-height:calc(100dvh - 24px) !important;overflow-y:auto !important;-webkit-overflow-scrolling:touch}.gc-grid{gap:6px !important}.gc-big{font-size:clamp(16px,4.6vw,24px) !important}}' +
+  'input,textarea,select{font-size:16px}body.mg-on #touch-ui [data-act]{display:none !important}'; document.head.appendChild(st); })();
+/* sports on a phone: the joystick moves your player */
+if(typeof spmInput === 'function'){ var _spmInputM = spmInput; spmInput = function(dt){ if(stickAmount() <= STICK_DEAD) return _spmInputM.apply(this, arguments); var K = {KeyW:keys.KeyW, KeyS:keys.KeyS, KeyA:keys.KeyA, KeyD:keys.KeyD}, tv = SPM.cam === 'tv', x = stick.x, y = stick.y;
+  keys.KeyW = y > 0.35; keys.KeyS = y < -0.35; keys.KeyA = x < -0.35; keys.KeyD = x > 0.35; try { return _spmInputM.apply(this, arguments); } finally { for(var k in K) keys[k] = K[k]; } }; }
+/* JUMP on a phone = the space bar (skateboard ollie, everything that listens for Space) */
+(function(){ var j = document.querySelector('#touch-ui [data-act="jump"]'); if(!j) return; j.addEventListener('pointerdown', function(){ if(typeof skKind === 'function' && skKind()) try { window.dispatchEvent(new KeyboardEvent('keydown', {code:'Space', key:' '})); } catch(e){} }); j.addEventListener('pointerup', function(){ keys.Space = false; }); })();
+setInterval(function(){ var on = typeof SPM !== 'undefined' && SPM.on; document.body.classList.toggle('mg-on', !!on); if(on && IS_TOUCH) [].forEach.call(document.querySelectorAll('div'), function(d){ if(d.childElementCount < 3 && /WASD run/.test(d.textContent) && d.textContent.length < 200) d.style.display = 'none'; }); }, 700);
+/* stop iOS double-tap zoom while playing */
+(function(){ var last = 0; document.addEventListener('touchend', function(e){ var n = Date.now(); if(n - last < 300 && document.body.classList.contains('touch-play') && !(e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName))) e.preventDefault(); last = n; }, {passive:false}); })();
+
+/* ---------- 🏁 SPORT / 🚗 NORMAL drive modes (every car): sport = faster, quicker acceleration, sharper sound; normal = calm and easy ---------- */
+var DMODE = {sport:false}; try { DMODE.sport = localStorage.getItem('paris.dmode') === 'sport'; } catch(e){}
+var _updDriveDM = updateDriveMovement; updateDriveMovement = function(dt){ if(!DMODE.sport || !carSpec) return _updDriveDM.apply(this, arguments); var t = carSpec.topMul, a = carSpec.accel; carSpec.topMul = t*1.3; carSpec.accel = a*1.5; try { return _updDriveDM.apply(this, arguments); } finally { carSpec.topMul = t; carSpec.accel = a; } };
+(function(){ var b = document.createElement('button'); b.id = 'dmode-btn'; b.className = 'btn'; b.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:calc(64px + env(safe-area-inset-bottom,0px));z-index:31;display:none;font-size:15px;padding:8px 14px;border-radius:14px'; document.body.appendChild(b);
+  function paint(){ b.innerHTML = DMODE.sport ? '🏁 <b>SPORT</b> · ' + L2('K or tap: normal', 'K ou touche : normal') : '🚗 <b>NORMAL</b> · ' + L2('K or tap: sport', 'K ou touche : sport'); b.style.background = DMODE.sport ? '#c8382f' : '#fffdf5'; b.style.color = DMODE.sport ? '#fff' : '#23243a'; }
+  window.dmodeToggle = function(){ DMODE.sport = !DMODE.sport; try { localStorage.setItem('paris.dmode', DMODE.sport ? 'sport' : 'normal'); } catch(e){} paint(); try { playNotes(DMODE.sport ? [[55, 0.08], [62, 0.08], [67, 0.2]] : [[67, 0.08], [60, 0.2]], 'sawtooth', 0.06, 160); } catch(e){} showToast(DMODE.sport ? '🏁 ' + L2('SPORT MODE: faster and quicker - careful!', 'MODE SPORT : plus rapide et plus nerveux - attention !') : '🚗 ' + L2('NORMAL MODE: calm and easy driving', 'MODE NORMAL : conduite calme et facile')); say(DMODE.sport ? 'Mode sport !' : 'Mode normal.'); };
+  b.addEventListener('click', function(e){ e.stopPropagation(); dmodeToggle(); b.blur(); }); b.addEventListener('pointerdown', function(e){ e.stopPropagation(); });
+  window.addEventListener('keydown', function(e){ if(e.code === 'KeyK' && driving && !chatOpen && !(e.target && /INPUT|TEXTAREA/.test(e.target.tagName))) dmodeToggle(); });
+  setInterval(function(){ var on = !!(driving && flying && !(typeof SPM !== 'undefined' && SPM.on)); b.style.display = on ? 'block' : 'none'; if(on) paint(); }, 500); })();
 
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
