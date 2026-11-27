@@ -20564,7 +20564,7 @@ GACT.spda = function(v){ var ok = (v|0) === SPD.q.ans; SPD.cool = Date.now() + (
   showCard('<h3>🏎</h3><div class="gc-big ' + (ok ? 'good' : 'bad') + '">' + (ok ? '✓ ' + L2('LEVEL UP! ', 'NIVEAU SUPÉRIEUR ! ') + '×' + spdMul() : '✗ ' + esc(SPD.q.opts[SPD.q.ans])) + '</div><div class="gc-row">' + gBtn('close', null, 'OK', 'go') + '</div>'); };
 (function(){ var G = BAR_GROUPS.filter(function(g){ return g.id === 'snd'; })[0]; if(!G || !G.d) return; var x = document.createElement('button'); x.className = 'bar-btn'; x.innerHTML = '<span>🏎</span><span class="dl">' + esc(L2('Vehicle speed (French question)', 'Vitesse des véhicules (question)')) + '</span>'; x.addEventListener('click', function(){ closeDrops(); GACT.spd(); }); G.d.insertBefore(x, G.d.firstChild); })();
 /* ---------- 🔄 FORCED UPDATES: every open game checks for a newer version every minute and reloads itself (after saving) ---------- */
-var BUILD_ID = '1795787520';
+var BUILD_ID = '1795787877';
 (function(){ var busy = false; function check(){ if(busy || document.hidden) return; busy = true; fetch(location.href.split('#')[0], {cache:'no-store'}).then(function(r){ return r.ok ? r.text() : ''; }).then(function(t){ busy = false; var m = /var BUILD_ID = '([^']+)'/.exec(t || ''); if(m && m[1] !== BUILD_ID && m[1] !== '__' + 'BUILD__') upd(); }).catch(function(){ busy = false; }); }
   function creating(){ try { return !!editing || builder.on || decor.on || blk.on; } catch(e){ return false; } }
   function upd(){ if(upd.on) return;
@@ -21714,6 +21714,93 @@ function bakCard(p){ var L = bakList(p).slice().reverse(); BAK.p = p;
 var BAK = {};
 GACT.bakgo = function(v){ var p = BAK.p, L = p ? bakList(p) : [], x = L[v|0]; if(!x) return; var d = JSON.parse(x.j); d.o = net.uid;
   net.savePlot(p, d).then(function(){ p.data = cleanPlot(d, p); if(p.row) p.row.dirty = true; showToast('🛟 ' + L2('Restored!', 'Version retrouvée !')); closeCard(); }).catch(function(){ showToast(L2('Could not restore right now (is building open?).', 'Impossible pour l\'instant (la construction est-elle ouverte ?).')); }); };
+/* ---------- 🎨 THE NEW DECORATING MENU: drop-down categories, so building the inside is easy ----------
+   🏢 Rooms & floors (+ 1-click room kits) · 🟫 Floors & carpets · 🎨 Walls: paint & wallpaper · 🖼 Posters & wall decor ·
+   🛋 Furniture by room (living room, bedroom, kitchen, bathroom, office & hobbies, shop, my creations) · 🌿 Plants · 🔍 Everything A→Z with search.
+   Works in DECORATE INSIDE (shops & ready-made houses) and in BUILD INSIDE (block houses). Wallpaper patterns are new (d.wp). */
+/* bug fix: an item with a colour number outside the palette (the fireplace) crashed DECORATE INSIDE for houses */
+ITEMS.forEach(function(it){ if(ITEM_COLORS[it.c] === undefined) it.c = 0; });
+var _hexCssSafe = hexCss; hexCss = function(h){ return typeof h === 'number' ? _hexCssSafe(h) : '#888888'; };
+var WP_TYPES = [['Uni', 'Plain'], ['Rayures', 'Stripes'], ['Lambris', 'Wood panels'], ['Carrelage', 'Tiles'], ['Briques', 'Bricks'], ['Pois', 'Polka dots'], ['Frise', 'Border']];
+var DCAT_ROOMS = [
+  ['salon', '🛋', 'Le salon', 'Living room', 'sf ac lt tv fp bg xa cs rc xk lp aq xq2 pn gc xx hl ru'],
+  ['chambre', '🛏', 'La chambre', 'Bedroom', 'bd bb xb wd nt cm dk xc ty tx db at hm xr2 sb xj lp mr'],
+  ['cuisine', '🍳', 'La cuisine', 'Kitchen', 'kt fr ov mw dt tb ch sk wm cf xs'],
+  ['sdb', '🛁', 'La salle de bain', 'Bathroom', 'ba sw wc sk mr pl'],
+  ['loisirs', '🎮', 'Le bureau et les loisirs', 'Office & hobbies', 'pc dk xc bk pn gt dm xg ea xh ts xd gl xi xy pp xl xf xe bc kb xz xu xt gc'],
+  ['magasin', '🏪', 'Le magasin', 'Shop', 'bt ct rg sh dp br ck cf cr mn fz cz xn xo xp xq xr xs tb ch'],
+  ['moi', '✨', 'Mes créations', 'My creations', 'u0 u1 u2 u3 u4 u5 u6 u7']];
+var DCAT_SET = {floor:'ru', wall:'po es mr hl ph xp', plant:'pl fw vs xv xm xw'};
+var DKITS = {h:[['🛏', 'La chambre', 'Bedroom', 'bd nt wd ru lp po'], ['🛋', 'Le salon', 'Living room', 'sf lt tv ac ru pl lp'], ['🍳', 'La cuisine', 'Kitchen', 'kt fr ov dt ch ch'], ['🛁', 'La salle de bain', 'Bathroom', 'ba wc sk mr'], ['💻', 'Le bureau', 'Office', 'dk pc bk ch lp gl']],
+  s:[['☕', 'Le café', 'Café', 'ct rg bt ch ch cf pl'], ['🥖', 'La boulangerie', 'Bakery', 'ct rg br ck dp'], ['👗', 'La boutique', 'Clothes shop', 'ct rg cr mn mr sh'], ['📚', 'La librairie', 'Bookshop', 'ct rg bk bk ch lp'], ['🍦', 'Le glacier', 'Ice cream shop', 'ct rg fz bt ch']]};
+var DM = {open:{rooms:1}, room:null, q:'', bS:{open:{furn:1}, room:null, q:''}};
+function dmIn(list, id){ return (' ' + list + ' ').indexOf(' ' + id + ' ') >= 0; }
+/* turn a grid of item buttons into drop-down categories (the original buttons stay hidden and do the real work) */
+function dmCatalog(src, host, S, kindKey, extra){
+  var btn = {}; [].forEach.call(src.querySelectorAll('.item-btn[data-item]'), function(b){ btn[b.getAttribute('data-item')] = b; });
+  var ids = Object.keys(btn); src.style.display = 'none';
+  function grid(list){ var g = document.createElement('div'); g.className = 'item-grid'; list.forEach(function(id){ var o = btn[id]; if(!o) return; var c = o.cloneNode(true); c.removeAttribute('data-item'); c.addEventListener('click', function(e){ e.preventDefault(); o.click(); }); g.appendChild(c); }); if(!g.children.length){ var m = document.createElement('div'); m.className = 'gc-sub'; m.textContent = '—'; g.appendChild(m); } return g; }
+  function sec(key, title, fill){ var d = document.createElement('details'); d.className = 'dm-sec'; if(S.open[key]) d.open = true; var su = document.createElement('summary'); su.innerHTML = title; d.appendChild(su); d.addEventListener('toggle', function(){ S.open[key] = d.open ? 1 : 0; }); var body = document.createElement('div'); body.className = 'dm-body'; d.appendChild(body); fill(body); host.appendChild(d); return d; }
+  if(extra && extra.before) extra.before(sec);
+  sec('floor', '🟫 ' + L2('Floors & carpets', 'Les sols et les tapis'), function(b){ if(extra && extra.floors) b.appendChild(extra.floors); b.appendChild(grid(ids.filter(function(id){ return dmIn(DCAT_SET.floor, id) || (ITEM_BY_ID[id] && ITEM_BY_ID[id].flat); }))); });
+  if(extra && (extra.walls || extra.wallpaper)) sec('wall', '🎨 ' + L2('Walls: paint & wallpaper', 'Les murs : la peinture et le papier peint'), function(b){ if(extra && extra.walls) b.appendChild(extra.walls); if(extra && extra.wallpaper) b.appendChild(extra.wallpaper); });
+  sec('deco', '🖼 ' + L2('Posters & wall decor', 'Les posters et la déco murale'), function(b){ b.appendChild(grid(ids.filter(function(id){ return dmIn(DCAT_SET.wall, id); }))); });
+  sec('furn', '🛋 ' + L2('Furniture by room', 'Les meubles par pièce'), function(b){ var R = DCAT_ROOMS.filter(function(r){ return ids.some(function(id){ return dmIn(r[4], id); }); }); if(!S.room || !R.some(function(r){ return r[0] === S.room; })) S.room = (R.filter(function(r){ return r[0] === (kindKey === 's' ? 'magasin' : 'salon'); })[0] || R[0] || [null])[0];
+    var chips = document.createElement('div'); chips.className = 'dm-chips'; R.forEach(function(r){ var c = document.createElement('button'); c.className = 'btn' + (S.room === r[0] ? ' go' : ''); c.textContent = r[1] + ' ' + L2(r[3], r[2]); c.addEventListener('click', function(){ S.room = r[0]; [].forEach.call(chips.children, function(x){ x.classList.remove('go'); }); c.classList.add('go'); var old = b.querySelector('.item-grid'); var r2 = DCAT_ROOMS.filter(function(z){ return z[0] === S.room; })[0]; b.replaceChild(grid(ids.filter(function(id){ return dmIn(r2[4], id); })), old); }); chips.appendChild(c); }); b.appendChild(chips);
+    var cur = DCAT_ROOMS.filter(function(z){ return z[0] === S.room; })[0]; b.appendChild(grid(cur ? ids.filter(function(id){ return dmIn(cur[4], id); }) : [])); });
+  sec('plant', '🌿 ' + L2('Plants (indoor & outdoor)', 'Les plantes (intérieur et extérieur)'), function(b){ b.appendChild(grid(ids.filter(function(id){ return dmIn(DCAT_SET.plant, id); }))); });
+  sec('all', '🔍 ' + L2('Everything A → Z (search)', 'Tout de A à Z (chercher)'), function(b){ var inp = document.createElement('input'); inp.className = 'text-input'; inp.placeholder = L2('Search: bed, lit, plante...', 'Chercher : lit, bed, plante...'); inp.value = S.q || ''; inp.autocomplete = 'off'; b.appendChild(inp);
+    function list(){ var q = (S.q || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); return ids.filter(function(id){ var it = ITEM_BY_ID[id]; if(!q) return true; var s = ((it.en || '') + ' ' + (it.fr || '')).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); return s.indexOf(q) >= 0; }).sort(function(a, c){ return tx(ITEM_BY_ID[a]) < tx(ITEM_BY_ID[c]) ? -1 : 1; }); }
+    var g = grid(list()); b.appendChild(g);
+    ['keydown', 'keyup', 'keypress'].forEach(function(ev){ inp.addEventListener(ev, function(e){ e.stopPropagation(); }); });
+    inp.addEventListener('input', function(){ S.q = inp.value; var g2 = grid(list()); b.replaceChild(g2, g); g = g2; }); });
+}
+function dmWallpaperRow(cur, onPick){ var w = document.createElement('div'); w.innerHTML = '<div class="opt-label">' + L2('WALLPAPER', 'LE PAPIER PEINT') + '</div>'; var r = document.createElement('div'); r.className = 'dm-chips';
+  var prev = ['#eee', 'repeating-linear-gradient(90deg,#ddd 0 6px,#fff 6px 12px)', 'linear-gradient(#fff 0 45%,#8a5a3a 45% 52%,#b07a50 52%)', 'repeating-linear-gradient(0deg,#fff 0 1px,transparent 1px 8px),repeating-linear-gradient(90deg,#fff 0 1px,#cfe3ee 1px 8px)', 'repeating-linear-gradient(0deg,#e8e0d0 0 1px,#b5523b 1px 6px)', 'radial-gradient(circle,#c55 2px,transparent 2.5px) 0 0/8px 8px,#fff', 'linear-gradient(#fff 0 15%,#3a6ab0 15% 28%,#fff 28%)'];
+  WP_TYPES.forEach(function(T, i){ var b = document.createElement('button'); b.className = 'btn' + ((cur|0) === i ? ' go' : ''); b.innerHTML = '<span style="display:inline-block;width:16px;height:16px;border:1px solid #23243a;border-radius:3px;vertical-align:middle;background:' + prev[i] + '"></span> ' + L2(T[1], T[0]); b.addEventListener('click', function(){ onPick(i); }); r.appendChild(b); }); w.appendChild(r); return w; }
+/* the wallpaper itself, drawn on the inside walls of ready-made rooms */
+function wpPaint(I, d, L, wpH){ var wp = d.wp|0; if(!wp) return; var hw = L.w/2, inX = hw - WALL_T, inB = L.cz - L.d/2 + WALL_T, inF = L.cz + L.d/2 - WALL_T, base = pick(INWALL_COLORS, d.iw), c2 = shadeHex(base, 0.78), dark = shadeHex(base, 0.6), Ee = 0.032, dx = L.doors[d.dp], dw = L.dw;
+  var faces = [{a:-inX, b:inX, p:function(u0, u1, y0, y1, c){ I.box(u1 - u0, y1 - y0, 0.012, (u0 + u1)/2, (y0 + y1)/2, inB + Ee, c); }},
+    {a:inB, b:inF, p:function(u0, u1, y0, y1, c){ I.box(0.012, y1 - y0, u1 - u0, -inX + Ee, (y0 + y1)/2, (u0 + u1)/2, c); }},
+    {a:inB, b:inF, p:function(u0, u1, y0, y1, c){ I.box(0.012, y1 - y0, u1 - u0, inX - Ee, (y0 + y1)/2, (u0 + u1)/2, c); }},
+    {a:-inX, b:dx - dw/2, p:function(u0, u1, y0, y1, c){ I.box(u1 - u0, y1 - y0, 0.012, (u0 + u1)/2, (y0 + y1)/2, inF - Ee, c); }},
+    {a:dx + dw/2, b:inX, p:function(u0, u1, y0, y1, c){ I.box(u1 - u0, y1 - y0, 0.012, (u0 + u1)/2, (y0 + y1)/2, inF - Ee, c); }}];
+  var Y0 = 0.06, Y1 = 0.05 + wpH;
+  faces.forEach(function(F){ if(F.b - F.a < 0.12) return; var u, y, k;
+    if(wp === 1){ for(u = F.a + 0.1; u + 0.17 <= F.b; u += 0.4) F.p(u, u + 0.17, Y0, Y1, c2); }
+    else if(wp === 2){ var top = Math.min(Y1, 1.0); F.p(F.a, F.b, Y0, top, 0xb07a50); F.p(F.a, F.b, top, top + 0.07, 0x7a4a2a); for(u = F.a + 0.45; u < F.b - 0.1; u += 0.6) F.p(u - 0.015, u + 0.015, Y0, top, 0x8a5a3a); }
+    else if(wp === 3){ for(u = F.a + 0.3; u < F.b - 0.05; u += 0.3) F.p(u - 0.008, u + 0.008, Y0, Y1, 0xffffff); for(y = Y0 + 0.3; y < Y1 - 0.05; y += 0.3) F.p(F.a, F.b, y - 0.008, y + 0.008, 0xffffff); }
+    else if(wp === 4){ F.p(F.a, F.b, Y0, Y1, 0xb5523b); for(y = Y0, k = 0; y < Y1 - 0.02; y += 0.26, k++){ F.p(F.a, F.b, y + 0.24, Math.min(Y1, y + 0.26), 0xe8e0d0); for(u = F.a + (k % 2 ? 0.27 : 0.02); u < F.b - 0.05; u += 0.52) F.p(u, u + 0.02, y, Math.min(Y1, y + 0.24), 0xe8e0d0); } }
+    else if(wp === 5){ for(y = Y0 + 0.2, k = 0; y < Y1 - 0.08; y += 0.36, k++) for(u = F.a + (k % 2 ? 0.36 : 0.18); u < F.b - 0.08; u += 0.36) F.p(u - 0.045, u + 0.045, y - 0.045, y + 0.045, dark); }
+    else if(wp === 6){ var t2 = Y1 - 0.25; F.p(F.a, F.b, t2 - 0.18, t2, 0x3a6ab0); F.p(F.a, F.b, t2 - 0.24, t2 - 0.21, 0x3a6ab0); F.p(F.a, F.b, Y0, Y0 + 0.12, 0x3a6ab0); } }); }
+var _buildRoomWP = buildRoom; buildRoom = function(E, I, d, L, wall, trim, opts){ _buildRoomWP.apply(this, arguments); try { if(d && d.wp){ var wallH = opts && opts.cutaway ? Math.min(2.4, L.gf - 1.2) : L.gf; wpPaint(I, d, L, wallH - 0.05); } } catch(e){} };
+/* keep d.wp through cleaning, saving and the upper floors */
+var _cleanPlotWP = cleanPlot; cleanPlot = function(d, p){ var c = _cleanPlotWP.apply(this, arguments); if(c && d){ var w = Math.floor(Number(d.wp)); c.wp = w >= 0 && w < WP_TYPES.length ? w : 0; if(c.fx && d.fx) Object.keys(c.fx).forEach(function(k){ var x = d.fx[k], ww = Math.floor(Number(x && x.wp)); c.fx[k].wp = ww >= 0 && ww < WP_TYPES.length ? ww : 0; }); } return c; };
+var _plotRecordWP = plotRecord; plotRecord = function(p, d){ var r = _plotRecordWP(p, d); var w = d.wp|0; r.wp = w >= 0 && w < WP_TYPES.length ? w : 0; if(r.fx && d.fx) Object.keys(r.fx).forEach(function(k){ r.fx[k].wp = (d.fx[k] && d.fx[k].wp)|0; }); return r; };
+var _dflNormWP = dflNorm; dflNorm = function(d){ var g = DFL.g, c = _dflNormWP(d); if(DFL.f > 0 && g){ c.fx[DFL.f].wp = d.wp|0; c.wp = g.wp|0; } return c; };
+var _dflSwitchWP = dflSwitch; dflSwitch = function(f){ var before = DFL.f; if(!decor.on || !editing) return _dflSwitchWP(f); var groundWp = before > 0 && DFL.g ? DFL.g.wp|0 : editing.d.wp|0; _dflSwitchWP(f); if(DFL.f === before) return; if(DFL.f > 0){ if(DFL.g) DFL.g.wp = groundWp; editing.d.wp = dflOf(editing.d, DFL.f).wp|0; } else editing.d.wp = groundWp; rebuildPreview(); renderDecor(); };
+var _flrBuildWP = flrBuild; flrBuild = function(p, f){ var F = dflOf(p.data, f), keep = buildRoom; buildRoom = function(E, I, d, L){ d.wp = F.wp|0; return keep.apply(this, arguments); }; try { _flrBuildWP(p, f); } finally { buildRoom = keep; } };
+/* 1-click room kits: put a whole set of furniture in the first free spots (only things you own) */
+function dmKit(k){ if(!decor.on || !editing) return; var kindKey = decor.p.kind === 'store' ? 's' : 'h', K = (DKITS[kindKey] || [])[k|0]; if(!K) return; var L = layoutOf(decor.p.kind), put = 0, miss = [];
+  K[3].split(' ').forEach(function(id){ var it = ITEM_BY_ID[id]; if(!it || it.who.indexOf(kindKey) < 0) return; if(typeof furnOwned === 'function' && !furnOwned(id)){ miss.push(tx(it)); return; } if(editing.items.length >= MAX_ITEMS) return;
+    for(var r=0;r<2;r++) for(var j=0;j<L.gz;j++) for(var i=0;i<L.gx;i++){ var o = {id:id, i:i, j:j, r:r, c:it.c}; if(!itemInside(o, L)) continue; if(!placeProblem(editing.items, o, editing.d)){ editing.items.push(o); put++; return; } } });
+  decorChanged(); renderDecor(); showToast('✨ ' + K[0] + ' ' + L2(K[2], K[1]) + ' · +' + put + (miss.length ? ' · 🔒 ' + L2('buy at Meubles & Cie: ', 'à acheter chez Meubles & Cie : ') + miss.slice(0, 3).join(', ') : '')); }
+(function(){ var st = document.createElement('style'); st.textContent = '.dm-sec{border:2px solid var(--panel-border,#23243a);border-radius:12px;margin:6px 0;background:rgba(255,255,255,.55);overflow:hidden}.dm-sec>summary{cursor:pointer;font:800 13px Arial,sans-serif;padding:9px 10px;list-style:none;display:flex;justify-content:space-between;align-items:center}.dm-sec>summary::-webkit-details-marker{display:none}.dm-sec>summary::after{content:"▾";transition:transform .2s}.dm-sec[open]>summary::after{transform:rotate(180deg)}.dm-sec[open]>summary{border-bottom:2px dashed #c9cbd3}.dm-body{padding:8px}.dm-chips{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0 8px}.dm-chips .btn{font-size:11px;padding:5px 8px;min-height:0}body.dark-ui .dm-sec{background:rgba(255,255,255,.06)}'; document.head.appendChild(st); })();
+/* DECORATE INSIDE: rebuild the panel as drop-downs after every render */
+var _renderDecorDM = renderDecor; renderDecor = function(){ var r = _renderDecorDM.apply(this, arguments); try { dmDecor(); } catch(e){ console.warn(e); } return r; };
+function dmDecor(){ if(!decor.on || !editing) return; var body = document.querySelector('#decor .sp-body'); if(!body) return; var kindKey = decor.p.kind === 'store' ? 's' : 'h';
+  var host = document.getElementById('dm-host'); if(!host){ host = document.createElement('div'); host.id = 'dm-host'; var msg = document.getElementById('dc-msg'); body.insertBefore(host, msg); }
+  var fl = document.getElementById('dc-floors'), wl = document.getElementById('dc-walls'), items = document.getElementById('dc-items'), stor = document.getElementById('dc-storeys');
+  [].forEach.call(body.querySelectorAll(':scope > .opt-label'), function(l){ l.style.display = 'none'; }); // the old FLOOR / WALLS / THINGS titles
+  var park = document.getElementById('dm-park'); if(!park){ park = document.createElement('div'); park.id = 'dm-park'; park.style.display = 'none'; body.appendChild(park); } [fl, wl, stor].forEach(function(x){ if(x) park.appendChild(x); });
+  var keepScroll = body.scrollTop; host.innerHTML = '';
+  dmCatalog(items, host, DM, kindKey, {floors:fl, walls:(function(){ var w = document.createElement('div'); w.innerHTML = '<div class="opt-label">' + L2('PAINT', 'LA PEINTURE') + '</div>'; w.appendChild(wl); return w; })(),
+    wallpaper:dmWallpaperRow(editing.d.wp, function(i){ editing.d.wp = i; decorChanged(); renderDecor(); }),
+    before:function(sec){ sec('rooms', '🏢 ' + L2('Rooms & floors · 1-click room kits', 'Les pièces et les étages · kits en 1 clic'), function(b){ if(stor) b.appendChild(stor); var lab = document.createElement('div'); lab.className = 'opt-label'; lab.textContent = L2('INSTANT ROOM (adds a set of furniture)', 'PIÈCE INSTANTANÉE (ajoute un ensemble de meubles)'); b.appendChild(lab); var r = document.createElement('div'); r.className = 'dm-chips';
+      (DKITS[kindKey] || []).forEach(function(K, i){ var bt = document.createElement('button'); bt.className = 'btn'; bt.textContent = K[0] + ' ' + L2(K[2], K[1]); bt.addEventListener('click', function(){ dmKit(i); }); r.appendChild(bt); }); b.appendChild(r); }); }});
+  body.scrollTop = keepScroll; }
+/* BUILD INSIDE (block houses): the furniture list becomes the same drop-downs */
+var _renderBlocksDM = renderBlocks; renderBlocks = function(){ var r = _renderBlocksDM.apply(this, arguments); try { if(blk.on && blk.where === 'in'){ var body = document.getElementById('bk-body'), g = [].filter.call(body.querySelectorAll('.item-grid'), function(x){ return x.querySelector('[data-item]'); })[0]; if(g){ var lab = g.previousSibling; if(lab && lab.classList && lab.classList.contains('opt-label')) lab.style.display = 'none'; var host = document.createElement('div'); g.parentNode.insertBefore(host, g); dmCatalog(g, host, DM.bS, 'h'); } } } catch(e){ console.warn(e); } return r; };
 /* ---------- 🏖 VACATIONS: the trip to the Carnaval de Québec ----------
    The 🏖 button takes you to Paris-CDG. At the check-in desk you answer the agent in French (passport, destination,
    bags, window or aisle), get your boarding pass, go through security, then board: the plane taxis, takes off and
